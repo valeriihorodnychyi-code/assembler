@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assembler — Loading Battle (frame-based prototype)</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0b0f;--panel:#14161c;--panel2:#1a1d24;--line:#23262e;--text:#f4f4f5;--muted:#9aa0ac;--accent:#ff3a22;--ok:#22c55e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:16px;padding:26px 16px}
+h1{font-size:18px;font-weight:600}.sub{color:var(--muted);font-size:13px;text-align:center;max-width:600px;line-height:1.5}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+.btn{font-family:inherit;font-size:13px;font-weight:600;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 16px;cursor:pointer}
+.btn.go{background:var(--accent);color:#160d08;border-color:transparent}.btn:hover{filter:brightness(1.1)}
+label{font-size:12px;color:var(--muted)}
+
+.arena{position:relative;width:560px;max-width:96vw;height:300px;border-radius:18px;overflow:hidden;
+  background:linear-gradient(180deg,#171a24,#0e1015 70%,#0b0d12);border:1px solid var(--line);box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.ground{position:absolute;left:0;right:0;bottom:0;height:64px;background:linear-gradient(180deg,#1c2030,#11131a);border-top:1px solid #2a2f3d}
+.parallax{position:absolute;inset:0;opacity:.16;background-image:radial-gradient(circle,#5a6377 1.2px,transparent 1.4px);background-size:30px 30px}
+.hpwrap{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:62%;text-align:center}
+.hpname{font-family:'Caveat',cursive;font-size:20px;color:#ffd9d0;margin-bottom:4px;display:flex;justify-content:center;gap:7px;align-items:center}
+.hptag{font-family:'Inter';font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:5px;background:var(--accent);color:#160d08}
+.hptag.boss{background:#a855f7;color:#fff}
+.hpbar{height:13px;border-radius:8px;background:#2a1414;border:1px solid #3a1f1f;overflow:hidden}
+.hpfill{height:100%;width:100%;background:linear-gradient(90deg,#ff3a22,#ff7a4d);transition:width .25s steps(5)}
+
+/* a fighter = OUTER (positional moves) > IMG (the swappable frame + center wiggle) */
+.fighter{position:absolute;bottom:50px;width:132px;height:152px;filter:drop-shadow(3px 5px 0 rgba(0,0,0,.4))}
+.hero{left:6%}.mon{right:6%}
+.fighter img{width:100%;height:100%;object-fit:contain;display:block;transform-origin:50% 62%;animation:wig .5s steps(2,end) infinite alternate}
+.mon img{animation-duration:.44s}
+@keyframes wig{from{transform:rotate(-5deg)}to{transform:rotate(5deg)}}   /* the "paper puppet" wiggle */
+.fighter.atk{animation:lungeR .4s steps(3,end)}
+@keyframes lungeR{0%{transform:translateX(0)}45%{transform:translateX(58px)}100%{transform:translateX(0)}}
+.fighter.super{animation:superR .6s steps(4,end)}
+@keyframes superR{0%{transform:translateX(0) scale(1)}40%{transform:translateX(150px) scale(1.18)}100%{transform:translateX(0)}}
+.fighter.hit{animation:hitS .3s steps(3,end)}
+@keyframes hitS{0%{transform:translateX(0)}30%{transform:translateX(20px) rotate(7deg)}100%{transform:translateX(0)}}
+.fighter.die{animation:dieA .5s steps(5,end) forwards}
+@keyframes dieA{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(42px) rotate(72deg)}}
+.fighter.spawn{animation:spawnA .42s steps(4,end)}
+@keyframes spawnA{0%{opacity:0;transform:translateY(-54px)}100%{opacity:1}}
+
+.callout{position:absolute;bottom:62px;right:7%;font-family:'Caveat',cursive;font-weight:700;font-size:22px;color:var(--accent);text-shadow:0 2px 6px rgba(0,0,0,.6);animation:coB .5s steps(2) infinite;display:none}
+.callout.show{display:block}
+@keyframes coB{from{transform:translateY(0) rotate(-3deg)}to{transform:translateY(-5px) rotate(3deg)}}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.flash.on{animation:fl .25s steps(2)}@keyframes fl{0%{opacity:0}40%{opacity:.5}100%{opacity:0}}
+.dmg{position:absolute;font-family:'Caveat',cursive;font-weight:700;font-size:30px;color:#ffd400;text-shadow:0 2px 0 #7a5b00;pointer-events:none;animation:dmgUp .7s steps(6) forwards}
+@keyframes dmgUp{0%{transform:translateY(0);opacity:0}20%{opacity:1}100%{transform:translateY(-46px);opacity:0}}
+.victory{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:4px;background:rgba(8,12,10,.62)}
+.victory.show{display:flex}.victory .v{font-family:'Caveat',cursive;font-size:46px;color:var(--ok);text-shadow:0 3px 0 #0a3b1f}
+.meta{position:absolute;bottom:10px;left:14px;font-size:12px;color:var(--muted)}
+.vol{position:absolute;top:12px;right:14px;width:34px;height:34px;border-radius:9px;background:rgba(0,0,0,.35);border:1px solid var(--line);color:var(--muted);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
+.vol.on{color:var(--ok);border-color:var(--ok)}
+.note{font-size:12px;color:var(--muted);max-width:620px;line-height:1.6;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.note b{color:var(--text)} code{font-family:monospace;color:#9fd}
+</style></head>
+<body>
+<h1>Assembler — Loading Battle <span style="color:var(--muted);font-weight:400">· frame-based</span></h1>
+<div class="sub">Кожен боєць = набір кадрів-картинок (idle / attack / hit / super). Анімація = підміна кадру + загальний wiggle навколо центру. Зараз кадри — плейсхолдери (SVG); підміниш на свої PNG у ростері.</div>
+
+<div class="arena" id="arena">
+  <div class="parallax"></div><div class="ground"></div>
+  <div class="vol" id="vol" title="sound">🔇</div>
+  <div class="hpwrap"><div class="hpname"><span id="monName">—</span><span class="hptag" id="monTag">MOB</span></div><div class="hpbar"><div class="hpfill" id="hpfill"></div></div></div>
+  <div class="fighter hero" id="hero"><img id="heroImg" alt=""></div>
+  <div class="fighter mon" id="mon"><img id="monImg" alt=""></div>
+  <div class="callout" id="callout">КЛІКНИ ГЕРОЯ! ⚔️</div>
+  <div class="flash" id="flash"></div>
+  <div class="victory" id="victory"><div class="v">VICTORY!</div><div style="color:var(--muted);font-size:13px">завантаження готове</div></div>
+  <div class="meta" id="meta"></div>
+</div>
+
+<div class="controls">
+  <button class="btn go" id="sim">▶ Симулювати завантаження</button>
+  <label>боссів/монстрів: <input type="range" id="units" min="1" max="5" value="3" style="vertical-align:middle"> <b id="unitsV">3</b></label>
+  <button class="btn" id="stop">■ Стоп</button>
+</div>
+
+<div class="note">
+<b>Що дати мені для фінального вигляду (на кожного персонажа):</b> 3–5 <b>прозорих PNG</b> однакового розміру (~256–512px), повернутих в один бік:<br>
+<b>idle/run</b> · <b>attack</b> (удар) · <b>hit</b> (отримав шкоду + емоція) · <b>super</b> (перемога). Монстру досить <b>idle + hit</b>.<br>
+Підключення — це просто URL у ростері: <code>frames:{idle:'capy_idle.png', attack:'capy_atk.png', hit:'capy_hit.png', super:'capy_win.png'}</code>. Рефи з Pinterest — це комерційні паки (купити) або згенерувати свої; движок прийме будь-які PNG.
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const dataURI=svg=>"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+
+/* ---------- PLACEHOLDER frames (swap these URLs for real PNGs) ---------- */
+function capy(state){
+  const eyes={
+    idle:"<circle cx='44' cy='58' r='4.5' fill='#23150b'/><circle cx='78' cy='58' r='4.5' fill='#23150b'/>",
+    attack:"<path d='M38 54 L50 60' stroke='#23150b' stroke-width='4' stroke-linecap='round'/><path d='M84 54 L72 60' stroke='#23150b' stroke-width='4' stroke-linecap='round'/>",
+    hit:"<path d='M40 54 l8 8 M48 54 l-8 8' stroke='#23150b' stroke-width='3.5' stroke-linecap='round'/><path d='M74 54 l8 8 M82 54 l-8 8' stroke='#23150b' stroke-width='3.5' stroke-linecap='round'/><circle cx='96' cy='50' r='4' fill='#7fd4ff'/>",
+    super:"<text x='36' y='66' font-size='18' fill='#ffd400'>★</text><text x='70' y='66' font-size='18' fill='#ffd400'>★</text>"
+  }[state]||"";
+  const glow=state==='super'?"<circle cx='60' cy='64' r='54' fill='#ffd400' opacity='.25'/>":"";
+  const rot=(state==='attack'||state==='super')?-44:18;
+  return dataURI(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 152'>${glow}
+    <ellipse cx='62' cy='118' rx='34' ry='26' fill='#a4733f'/>
+    <rect x='40' y='126' width='10' height='20' rx='4' fill='#6e4a2a'/><rect x='74' y='126' width='10' height='20' rx='4' fill='#6e4a2a'/>
+    <ellipse cx='60' cy='62' rx='42' ry='38' fill='#b07e44'/>
+    <ellipse cx='30' cy='34' rx='9' ry='8' fill='#8a5f33'/><ellipse cx='90' cy='34' rx='9' ry='8' fill='#8a5f33'/>
+    <ellipse cx='60' cy='82' rx='20' ry='13' fill='#caa06a'/>${eyes}
+    <rect x='96' y='40' width='7' height='84' rx='3' transform='rotate(${rot} 99 83)' fill='#8a5a2c'/>
+    <polygon points='110,28 122,40 104,46' fill='#cfd6e0' transform='rotate(${rot} 99 83)'/></svg>`);
+}
+function goblin(state){
+  const eyes=state==='hit'
+    ?"<path d='M44 58 l8 8 M52 58 l-8 8' stroke='#1c2a0f' stroke-width='3.5' stroke-linecap='round'/><path d='M76 58 l8 8 M84 58 l-8 8' stroke='#1c2a0f' stroke-width='3.5' stroke-linecap='round'/>"
+    :"<circle cx='50' cy='62' r='5' fill='#1c2a0f'/><circle cx='78' cy='62' r='5' fill='#1c2a0f'/>";
+  return dataURI(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 152'>
+    <ellipse cx='64' cy='120' rx='30' ry='24' fill='#4f9a33'/>
+    <ellipse cx='62' cy='64' rx='40' ry='34' fill='#5fae3f'/>
+    <polygon points='22,40 40,30 34,58' fill='#4f9a33'/><polygon points='102,40 84,30 90,58' fill='#4f9a33'/>${eyes}
+    <path d='M46 84 Q64 ${state==='hit'?74:92} 82 84' fill='none' stroke='#234d16' stroke-width='4' stroke-linecap='round'/></svg>`);
+}
+function dragon(state){
+  const eyes=state==='hit'
+    ?"<path d='M40 50 l9 9 M49 50 l-9 9' stroke='#2a0a3d' stroke-width='4' stroke-linecap='round'/><path d='M79 50 l9 9 M88 50 l-9 9' stroke='#2a0a3d' stroke-width='4' stroke-linecap='round'/>"
+    :"<circle cx='46' cy='54' r='6.5' fill='#2a0a3d'/><circle cx='82' cy='54' r='6.5' fill='#2a0a3d'/><circle cx='47' cy='52' r='2' fill='#ff3a22'/><circle cx='83' cy='52' r='2' fill='#ff3a22'/>";
+  return dataURI(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 152'>
+    <ellipse cx='64' cy='116' rx='44' ry='32' fill='#7c3aed'/>
+    <ellipse cx='62' cy='56' rx='48' ry='42' fill='#a855f7'/>
+    <polygon points='28,22 40,46 18,44' fill='#6d28d9'/><polygon points='100,22 88,46 110,44' fill='#6d28d9'/>${eyes}
+    <path d='M40 82 L52 76 L60 84 L68 76 L76 84 L88 78' fill='none' stroke='#3b1063' stroke-width='4' stroke-linejoin='round'/></svg>`);
+}
+// ROSTER — pure data. For real art: frames:{idle:'url.png', attack:'…', hit:'…', super:'…'}
+// real sliced heroes (transparent PNGs from Heroes/frames/<dir>/<state>.png)
+const HERO_DIR="../Heroes/frames/";
+const HERO_SHEETS=[
+ {name:"Fox Mage", dir:"fox_mage_character_sprites_202606241859"},
+ {name:"Rhino Fighter", dir:"rhino_fighter_character_sprites_202606241857"},
+ {name:"Champion I", dir:"a_professional_2d_game_sprite_202606241854"},
+ {name:"Champion II", dir:"a_professional_2d_game_sprite_202606241903"},
+ {name:"Champion III", dir:"a_professional_2d_game_sprite_202606241908"},
+ {name:"Champion IV", dir:"a_professional_2d_game_sprite_202606241909"}
+];
+const HEROES=HERO_SHEETS.map(h=>({name:h.name,frames:{
+  idle:HERO_DIR+h.dir+"/idle.png",attack:HERO_DIR+h.dir+"/attack.png",
+  hit:HERO_DIR+h.dir+"/hit.png",super:HERO_DIR+h.dir+"/super.png",win:HERO_DIR+h.dir+"/win.png"}}));
+const MONSTERS=[
+ {name:"Lag Goblin", tier:"mob", frames:{idle:goblin('idle'),hit:goblin('hit')}},
+ {name:"HeyGen Dragon", tier:"boss", frames:{idle:dragon('idle'),hit:dragon('hit')}}
+];
+
+const $u=$("units");$u.oninput=()=>$("unitsV").textContent=$u.value;
+let state=null, atkTimer=null, simTimer=null, soundOn=false, AC=null;
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+function heroFrame(s){$("heroImg").src=state.hero.frames[s]||state.hero.frames.idle;}
+function monFrame(s){$("monImg").src=state.mon.frames[s]||state.mon.frames.idle;}
+function spawnMonster(){
+  const last=state.idx===state.units-1;
+  state.mon = last ? rnd(MONSTERS.filter(m=>m.tier==="boss")) : rnd(MONSTERS.filter(m=>m.tier!=="boss"));
+  state.hpMax=last?120:70; state.hp=state.hpMax; state.finishable=false;
+  $("monName").textContent=state.mon.name; $("monTag").textContent=last?"BOSS":"MOB"; $("monTag").className="hptag"+(last?" boss":"");
+  $("hpfill").style.width="100%"; monFrame('idle');
+  const el=$("mon"); el.classList.remove("die"); el.classList.add("spawn"); $("callout").classList.remove("show");
+  setTimeout(()=>el.classList.remove("spawn"),420);
+}
+function dmgNum(n){const d=document.createElement("div");d.className="dmg";d.textContent="-"+n;d.style.right=(8+Math.random()*16)+"%";d.style.bottom="122px";$("arena").appendChild(d);setTimeout(()=>d.remove(),700);blip(220+Math.random()*120,.06);}
+function flash(){const f=$("flash");f.classList.remove("on");void f.offsetWidth;f.classList.add("on");}
+function attack(strong){
+  const h=$("hero");heroFrame(strong?'super':'attack');
+  h.classList.remove("atk","super");void h.offsetWidth;h.classList.add(strong?"super":"atk");
+  setTimeout(()=>{
+    const m=$("mon");monFrame('hit');m.classList.remove("hit");void m.offsetWidth;m.classList.add("hit");
+    const dmg=strong?state.hp:Math.round(state.hpMax*(0.12+Math.random()*0.10));
+    state.hp=Math.max(0,state.hp-dmg);dmgNum(dmg);$("hpfill").style.width=(state.hp/state.hpMax*100)+"%";
+    if(strong)flash();
+    if(state.hp<=0)killMonster();
+    else{ if(state.hp<=state.hpMax*0.28&&!state.finishable){state.finishable=true;$("callout").classList.add("show");}
+      setTimeout(()=>{heroFrame('idle');monFrame('idle');m.classList.remove("hit");},300); }
+  },strong?240:190);
+}
+function killMonster(){const m=$("mon");$("callout").classList.remove("show");m.classList.add("die");boom();state.idx++;
+  setTimeout(()=>{ if(state.idx>=state.units)victory(); else{heroFrame('idle');spawnMonster();} },520);}
+function victory(){clearInterval(atkTimer);atkTimer=null;clearTimeout(simTimer);if(state&&state.hero.frames.win)heroFrame('win');$("victory").classList.add("show");chord();meta(true);}
+function startBattle(units){
+  stopBattle(true);state={units,idx:0,hero:rnd(HEROES),mon:null,hp:0,hpMax:0,finishable:false,t0:Date.now()};
+  $("victory").classList.remove("show");heroFrame('idle');spawnMonster();meta();
+  atkTimer=setInterval(()=>{if(state&&state.hp>0)attack(false);},1100);
+  simTimer=setTimeout(()=>{if(state&&!$("victory").classList.contains("show")){state.idx=state.units-1;if(state.mon){state.hp=1;attack(true);}}},2500+units*1500);
+}
+function stopBattle(silent){clearInterval(atkTimer);atkTimer=null;clearTimeout(simTimer);if(!silent)$("victory").classList.remove("show");}
+function meta(done){const s=((Date.now()-(state?state.t0:Date.now()))/1000).toFixed(1);$("meta").textContent=done?("готово за "+s+"s"):("монстр "+(state.idx+1)+"/"+state.units+" · "+s+"s");}
+setInterval(()=>{if(state&&!$("victory").classList.contains("show"))meta();},200);
+$("hero").onclick=()=>{if(state&&state.finishable&&state.hp>0)attack(true);};
+$("sim").onclick=()=>startBattle(+$u.value);$("stop").onclick=()=>stopBattle();
+
+/* sound (synth placeholder; swap for AUDIOMACHINE-style track later) */
+function ac(){AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();return AC;}
+function blip(f,dur){if(!soundOn)return;const a=ac(),o=a.createOscillator(),g=a.createGain();o.type="square";o.frequency.value=f;o.connect(g);g.connect(a.destination);const t=a.currentTime;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.12,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+(dur||.1));o.start(t);o.stop(t+(dur||.1)+.02);}
+function boom(){if(!soundOn)return;const a=ac();const b=a.createBuffer(1,4410,44100),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);const s=a.createBufferSource();s.buffer=b;const g=a.createGain();g.gain.value=.25;s.connect(g);g.connect(a.destination);s.start();}
+function chord(){if(!soundOn)return;[523,659,784,1047].forEach((f,i)=>setTimeout(()=>blip(f,.4),i*90));}
+let pad=null;function epic(on){if(on){const a=ac();pad=[110,164.8,220].map(f=>{const o=a.createOscillator(),g=a.createGain();o.type="sawtooth";o.frequency.value=f;g.gain.value=.03;o.connect(g);g.connect(a.destination);o.start();return o;});}else if(pad){pad.forEach(o=>{try{o.stop()}catch(e){}});pad=null;}}
+$("vol").onclick=()=>{soundOn=!soundOn;$("vol").classList.toggle("on",soundOn);$("vol").textContent=soundOn?"🔊":"🔇";epic(soundOn);};
+
+startBattle(3);
+</script>
+</body></html>

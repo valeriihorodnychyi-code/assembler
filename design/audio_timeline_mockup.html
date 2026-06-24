@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Assembler — board + audio timeline (mockup)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0b0f;--panel:#14161c;--panel2:#1a1d24;--line:#23262e;--text:#f4f4f5;--muted:#9aa0ac;--accent:#ff3a22;--accent2:#3b82f6;--ok:#22c55e;
+ --en:#378add;--es:#ef9f27;--de:#e24b4a;--fr:#1d9e75;--hook:#ff3a22;--b1:#3b82f6;--b2:#7f77dd;--pack:#a855f7}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;padding:24px;
+ background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.5px);background-size:24px 24px}
+h1{font-size:17px;font-weight:600;margin-bottom:4px}.sub{color:var(--muted);font-size:13px;max-width:760px;line-height:1.5;margin-bottom:18px}
+.wrap{max-width:1000px;margin:0 auto}
+/* board */
+.board{display:flex;gap:8px;align-items:flex-start;justify-content:center;margin-bottom:26px}
+.col{flex:1;min-width:0}.col .h{font-size:11px;color:var(--muted);text-align:center;margin-bottom:8px}
+.tile{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--ok);font-size:12px;margin-bottom:6px}
+.tile .c{font-weight:700;font-size:9px;padding:2px 6px;border-radius:4px;color:#0d0e12}
+.blk{padding:14px 10px;border-radius:10px;background:var(--panel2);border:2px solid var(--accent2);text-align:center;font-size:12px}
+.blk.soft{border:0.5px solid var(--line)}.blk .s{color:var(--muted);font-size:11px;margin-top:2px}
+.arrow{display:flex;align-items:center;color:var(--muted);font-size:20px;height:42px;margin-top:22px}
+/* timeline */
+.tlbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.tlhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.tlhead .t{font-size:13px;font-weight:600}
+.seglane{position:relative;height:46px;display:flex;gap:3px}
+.seg{height:100%;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#0d0e12;position:relative;overflow:hidden}
+.seg small{position:absolute;bottom:3px;right:6px;font-weight:500;font-size:9px;opacity:.7}
+.lane{position:relative;height:52px;margin-top:8px;border-radius:8px;background:var(--panel2);border:0.5px dashed var(--line);overflow:hidden}
+.lane .lbl{position:absolute;left:8px;top:6px;font-size:10px;color:var(--muted);z-index:1;pointer-events:none}
+.clip{position:absolute;top:7px;bottom:7px;border-radius:7px;background:linear-gradient(180deg,#2a6b46,#1c4a30);border:1px solid #2f8a57;cursor:grab;overflow:hidden;display:flex;align-items:center}
+.clip.t2{background:linear-gradient(180deg,#6b4a2a,#4a3320);border-color:#8a6a3f}
+.clip .wave{position:absolute;inset:0;display:flex;align-items:center;gap:1px;padding:0 10px;opacity:.5}
+.clip .wave i{flex:1;background:#cfeede;border-radius:1px}
+.clip .nm{position:relative;z-index:1;font-size:11px;font-weight:600;padding:0 12px;white-space:nowrap;color:#eaffe9;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.clip .hd{position:absolute;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:2}
+.clip .hd.l{left:0}.clip .hd.r{right:0}
+.clip .hd::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3px;height:46%;background:#eaffe9;border-radius:2px;opacity:.7}
+.gridline{position:absolute;top:0;bottom:0;width:1px;background:rgba(255,255,255,.10);z-index:0}
+.controls{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.btn{font-family:inherit;font-size:12px;font-weight:600;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 13px;cursor:pointer}
+.btn.accent{background:var(--accent);color:#160d08;border-color:transparent}
+.hint{font-size:12px;color:var(--muted);line-height:1.5;margin-top:12px}
+.note{font-size:11px;color:var(--muted);margin-top:14px}
+</style></head>
+<body><div class="wrap">
+<h1>Assembler — борд + аудіо-таймлайн <span style="color:var(--muted);font-weight:400">· mockup</span></h1>
+<div class="sub">Зверху — складання файлів (як на дошці). Знизу — таймлайн креатива: сегменти зліва направо = порядок у відео, а музичні доріжки під ними. <b>Блок музики стартує під тим сегментом, з якого починається</b> (тягни — прилипає до початку сегмента). Трім-ручки = in/out. Дві доріжки.</div>
+
+<!-- BOARD -->
+<div class="board">
+  <div class="col"><div class="h">Hooks (3)</div>
+    <div class="tile" style="border-left-color:var(--en)"><span class="c" style="background:var(--en)">EN</span>original</div>
+    <div class="tile" style="border-left-color:var(--es)"><span class="c" style="background:var(--es)">ES</span>hook_promo_es</div>
+    <div class="tile" style="border-left-color:var(--de)"><span class="c" style="background:var(--de)">DE</span>hook_promo_de</div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="col"><div class="h">Body parts</div>
+    <div class="blk"><b>BODY 1</b><div class="s">summer_promo</div></div>
+    <div class="blk" style="margin-top:6px"><b>BODY 2</b><div class="s">testimonial</div></div>
+  </div>
+  <div class="arrow">→</div>
+  <div class="col"><div class="h">Packshot</div><div class="blk soft">logo_endcard</div></div>
+  <div class="arrow">→</div>
+  <div class="col"><div class="h">✓ Final</div>
+    <div class="tile" style="border-left-color:var(--ok);color:var(--ok)"><span class="c" style="background:var(--ok)">EN</span>⬇ final.mp4</div>
+  </div>
+</div>
+
+<!-- TIMELINE + AUDIO LANES -->
+<div class="tlbox">
+  <div class="tlhead"><div class="t">Timeline · 1 creative</div><div style="font-size:11px;color:var(--muted)" id="clk">14.0s</div></div>
+  <div class="seglane" id="seglane"></div>
+  <div class="lane" id="lane1"><span class="lbl">Track 1</span></div>
+  <div class="lane" id="lane2"><span class="lbl">Track 2</span></div>
+  <div class="controls">
+    <button class="btn accent" id="snapToggle">Snap to segments: ON</button>
+    <span class="hint" style="margin:0;align-self:center">Тягни блок музики · краї = трім in/out · блок прилипає до початку сегмента</span>
+  </div>
+  <div class="hint" id="readout"></div>
+</div>
+<div class="note">mockup · dummy data · показує логіку «музика стартує під своїм сегментом» + 2 доріжки + трім</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+// segments (name, color, seconds)
+const SEGS=[{n:"Hook",c:"--hook",d:3},{n:"Body 1",c:"--b1",d:5},{n:"Body 2",c:"--b2",d:4},{n:"Packshot",c:"--pack",d:2}];
+const TOTAL=SEGS.reduce((a,s)=>a+s.d,0);
+let snap=true;
+// boundaries as fractions 0..1
+const bounds=[0];SEGS.forEach(s=>bounds.push(bounds[bounds.length-1]+s.d/TOTAL));
+function cssv(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+function drawSegs(){
+  const lane=$("seglane");lane.innerHTML="";
+  SEGS.forEach((s,i)=>{const d=document.createElement("div");d.className="seg";d.style.flex=s.d;
+    d.style.background=cssv(s.c);d.innerHTML=s.n+"<small>"+s.d.toFixed(0)+"s</small>";lane.appendChild(d);});
+}
+// clips: {track, start(frac), end(frac), name}
+const clips=[
+ {track:1,start:0,end:8/TOTAL,name:"upbeat_01 · starts @ Hook"},
+ {track:2,start:3/TOTAL,end:14/TOTAL,name:"whoosh_layer · starts @ Body 1"}
+];
+function laneEl(t){return t===1?$("lane1"):$("lane2");}
+function nearestBound(f){let best=bounds[0];for(const b of bounds)if(Math.abs(b-f)<Math.abs(best-f))best=b;return best;}
+function render(){
+  drawSegs();
+  [1,2].forEach(t=>{const l=laneEl(t);l.querySelectorAll(".clip,.gridline").forEach(e=>e.remove());
+    // gridlines at segment boundaries
+    bounds.forEach(b=>{const g=document.createElement("div");g.className="gridline";g.style.left=(b*100)+"%";l.appendChild(g);});
+  });
+  clips.forEach((c,idx)=>{
+    const l=laneEl(c.track);const el=document.createElement("div");el.className="clip"+(c.track===2?" t2":"");
+    el.style.left=(c.start*100)+"%";el.style.width=((c.end-c.start)*100)+"%";
+    let bars="";for(let i=0;i<40;i++)bars+="<i style='height:"+(20+Math.random()*70)+"%'></i>";
+    el.innerHTML="<div class='wave'>"+bars+"</div><div class='nm'>"+c.name+"</div><div class='hd l'></div><div class='hd r'></div>";
+    l.appendChild(el);
+    // drag body
+    el.addEventListener("pointerdown",ev=>{
+      if(ev.target.classList.contains("hd"))return;ev.preventDefault();
+      const lr=l.getBoundingClientRect(),sx=ev.clientX,len=c.end-c.start,s0=c.start;
+      const mv=e2=>{let ns=s0+(e2.clientX-sx)/lr.width;ns=Math.max(0,Math.min(1-len,ns));
+        if(snap)ns=Math.max(0,Math.min(1-len,nearestBound(ns)));c.start=ns;c.end=ns+len;
+        el.style.left=(c.start*100)+"%";readout();};
+      const up=()=>{document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);};
+      document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);});
+    // trim handles
+    el.querySelector(".hd.l").addEventListener("pointerdown",ev=>{ev.preventDefault();ev.stopPropagation();
+      const lr=l.getBoundingClientRect();const mv=e2=>{let f=(e2.clientX-lr.left)/lr.width;f=Math.max(0,Math.min(c.end-0.03,f));c.start=f;el.style.left=(f*100)+"%";el.style.width=((c.end-c.start)*100)+"%";readout();};
+      const up=()=>{document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);};document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);});
+    el.querySelector(".hd.r").addEventListener("pointerdown",ev=>{ev.preventDefault();ev.stopPropagation();
+      const lr=l.getBoundingClientRect();const mv=e2=>{let f=(e2.clientX-lr.left)/lr.width;f=Math.min(1,Math.max(c.start+0.03,f));c.end=f;el.style.width=((c.end-c.start)*100)+"%";readout();};
+      const up=()=>{document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);};document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);});
+  });
+  readout();
+}
+function segAt(f){for(let i=0;i<SEGS.length;i++)if(f>=bounds[i]-1e-4&&f<bounds[i+1]-1e-4)return SEGS[i].n;return SEGS[SEGS.length-1].n;}
+function readout(){
+  $("readout").innerHTML=clips.map(c=>"<b style='color:"+(c.track===1?'#7fe6b8':'#e6c07f')+"'>Track "+c.track+"</b>: старт під <b>"+segAt(c.start)+"</b> · "+((c.end-c.start)*TOTAL).toFixed(1)+"s ("+(c.start*TOTAL).toFixed(1)+"→"+(c.end*TOTAL).toFixed(1)+"s)").join("<br>");
+}
+$("snapToggle").onclick=()=>{snap=!snap;$("snapToggle").textContent="Snap to segments: "+(snap?"ON":"OFF");$("snapToggle").classList.toggle("accent",snap);};
+render();
+</script>
+</body></html>

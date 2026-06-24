@@ -1,0 +1,16 @@
+{
+  "font_name": "Poppins-Bold.ttf",
+  "font_size": 70,
+  "text_color": [255, 255, 255, 255],
+  "text_case": "",
+  "max_chars_per_line": 18,
+  "line_spacing": 10,
+  "margin_bottom": 320,
+  "force_single_line": false,
+  "stroke": {"width": 0, "color": [0, 0, 0, 255]},
+  "stroke_outer": {"width": 0, "color": [0, 0, 0, 255]},
+  "shadow": {"enabled": false, "offset_x": 0, "offset_y": 8, "glow_blur": 0, "color": [0, 0, 0, 255]},
+  "plate": {"enabled": true, "color": [0, 0, 0, 180], "pad_x": 30, "pad_y": 15, "border_radius": 18},
+  "karaoke": {"enabled": false, "active_color": [255, 212, 0, 255]},
+  "karaoke_plate": {"enabled": false, "color": [255, 92, 57, 255], "pad_x": 14, "pad_y": 6, "border_radius": 10}
+}

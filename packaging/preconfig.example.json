@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy this to packaging/preconfig.json and paste the SHARED team keys before building. preconfig.json is git-ignored and gets baked into the .app; on first launch it is written to ~/.assembler/config.json. Keys are extractable from the bundle — rotate if a build leaks.",
+  "elevenlabs_api_key": "sk_paste_shared_key_here",
+  "heygen_api_key": "paste_shared_heygen_key_here"
+}

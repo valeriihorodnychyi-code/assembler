@@ -1,0 +1,34 @@
+# --- secrets (NEVER commit) ---
+config.json
+license.json
+packaging/preconfig.json
+
+# --- python runtime / build artifacts ---
+venv/
+packaging/build/
+packaging/vendor/
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+
+# --- bundled binaries (downloaded at build time) ---
+packaging/vendor/bin/
+
+# --- user data / heavy media (not code) ---
+library/
+work/
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.mp3
+*.wav
+*.m4a
+
+# --- backups & local cruft ---
+web/index_backup_*.html
+Assembler_stable_*.zip
+.DS_Store
+.assembler/

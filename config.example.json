@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy this file to config.json and paste your keys. The app reads config.json on startup. elevenlabs_api_key = voice dub + Scribe. heygen_api_key = lip-sync localization. library_dir = optional shared folder for the body/packshot library.",
+  "elevenlabs_api_key": "sk_paste_your_key_here",
+  "heygen_api_key": "paste_your_heygen_key_here"
+}

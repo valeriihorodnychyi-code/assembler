@@ -1,0 +1,5 @@
+{
+  "version": "1.0.1",
+  "channel": "main",
+  "notes": "Fix uvicorn logging in frozen .app (log_config=None, asyncio/h11)."
+}
