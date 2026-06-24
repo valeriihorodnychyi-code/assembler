@@ -35,7 +35,7 @@ CODE_HOME = os.path.join(ASSEMBLER_HOME, "code")
 #   Release asset:       https://github.com/<owner>/<repo>/releases/latest/download/code.zip
 UPDATE_URL = os.environ.get(
     "CS_UPDATE_URL",
-    "https://github.com/REPLACE_OWNER/REPLACE_REPO/archive/refs/heads/main.zip",
+    "https://github.com/valeriihorodnychyi-code/assembler/archive/refs/heads/main.zip",
 )
 UPDATE_TIMEOUT = int(os.environ.get("CS_UPDATE_TIMEOUT", "25"))
 
