@@ -73,19 +73,28 @@ def _download(url, dest):
         shutil.copyfileobj(r, f)
 
 
-def _healthcheck(code_root, python_exe):
-    hc = os.path.join(code_root, "tools", "healthcheck.py")
-    if not os.path.isfile(hc):
-        # No healthcheck shipped — fall back to a minimal import smoke test.
-        code = ("import sys; sys.path.insert(0, r'%s');"
-                "import server.app" % code_root)
-        r = subprocess.run([python_exe, "-c", code], capture_output=True, text=True,
-                           cwd=code_root, timeout=120)
-        return r.returncode == 0
-    r = subprocess.run([python_exe, hc], capture_output=True, text=True,
-                       cwd=code_root, timeout=180)
-    out = (r.stdout or "") + (r.stderr or "")
-    return "HEALTH: ALL GOOD" in out
+def _healthcheck(code_root, python_exe=None):
+    """Validate a candidate before swapping it in.
+
+    We do NOT spawn a subprocess: inside a frozen .app, sys.executable is the app
+    itself (it would relaunch the app, not run a script). Instead we syntax-check
+    every Python file in-process. Anything that survives this but still fails at
+    runtime is caught by the launcher's start-up rollback.
+    """
+    import ast
+    if not _is_code_root(code_root):
+        return False
+    for base, dirs, files in os.walk(code_root):
+        dirs[:] = [d for d in dirs if d not in ("venv", "__pycache__", ".git")]
+        for fn in files:
+            if fn.endswith(".py"):
+                p = os.path.join(base, fn)
+                try:
+                    ast.parse(open(p, encoding="utf-8").read())
+                except Exception as e:
+                    _log(f"healthcheck: syntax error in {os.path.relpath(p, code_root)}: {e}")
+                    return False
+    return True
 
 
 def _version_of(code_root):

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "channel": "main",
-  "notes": "Fix uvicorn logging in frozen .app (log_config=None, asyncio/h11)."
+  "notes": "In-process healthcheck gate (no subprocess) for auto-update in frozen .app."
 }
