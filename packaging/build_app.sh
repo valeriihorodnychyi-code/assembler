@@ -39,17 +39,18 @@ VENDOR_BIN="$HERE/vendor/bin"
 mkdir -p "$VENDOR_BIN"
 if [[ ! -x "$VENDOR_BIN/ffmpeg" || ! -x "$VENDOR_BIN/ffprobe" ]]; then
   echo "==> ffmpeg/ffprobe not found in vendor/bin."
-  echo "    Trying to download static macOS builds…"
-  : "${FFMPEG_URL:=https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip}"
-  : "${FFPROBE_URL:=https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip}"
+  echo "    Trying to download native arm64 macOS builds…"
+  # Native Apple-Silicon (arm64) static builds — no Rosetta needed on M-series.
+  : "${FFMPEG_URL:=https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip}"
+  : "${FFPROBE_URL:=https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip}"
   TMP="$(mktemp -d)"
   if curl -fsSL "$FFMPEG_URL" -o "$TMP/ffmpeg.zip" && curl -fsSL "$FFPROBE_URL" -o "$TMP/ffprobe.zip"; then
     unzip -o "$TMP/ffmpeg.zip" -d "$VENDOR_BIN" >/dev/null
     unzip -o "$TMP/ffprobe.zip" -d "$VENDOR_BIN" >/dev/null
     chmod +x "$VENDOR_BIN/ffmpeg" "$VENDOR_BIN/ffprobe" || true
     rm -rf "$TMP"
-    echo "    NOTE: evermeet builds may be x86_64 (run via Rosetta on M-series)."
-    echo "    For native arm64, drop arm64 ffmpeg/ffprobe into: $VENDOR_BIN"
+    echo "    Downloaded arm64 ffmpeg/ffprobe."
+    echo "    (If you ever need a specific build, drop ffmpeg/ffprobe into: $VENDOR_BIN)"
   else
     echo "!! Could not download ffmpeg automatically."
     echo "   Place arm64 'ffmpeg' and 'ffprobe' binaries in: $VENDOR_BIN"

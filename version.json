@@ -1,5 +1,5 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "channel": "main",
-  "notes": "In-process healthcheck gate (no subprocess) for auto-update in frozen .app."
+  "notes": "Single-instance lock + multiprocessing.freeze_support() — no relaunch storms."
 }

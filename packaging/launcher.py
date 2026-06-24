@@ -18,6 +18,8 @@ import json
 import threading
 import datetime
 
+_LOCK_FH = None  # held for the process lifetime to keep the single-instance lock
+
 ASSEMBLER_HOME = os.path.join(os.path.expanduser("~"), ".assembler")
 CONFIG_PATH = os.path.join(ASSEMBLER_HOME, "config.json")
 LOG_PATH = os.path.join(ASSEMBLER_HOME, "launch.log")
@@ -177,6 +179,22 @@ def prefetch_whisper():
         log(f"model prefetch deferred ({type(e).__name__}: {e}) — will retry next launch")
 
 
+def acquire_single_instance():
+    """Hard cap: only ONE Assembler may run. If the lock is already held (another
+    instance, or a stray relaunch), we don't start a second server — we just open
+    the browser to the existing one and exit. This makes a relaunch-storm impossible.
+    """
+    global _LOCK_FH
+    import fcntl
+    try:
+        os.makedirs(ASSEMBLER_HOME, exist_ok=True)
+        _LOCK_FH = open(os.path.join(ASSEMBLER_HOME, "app.lock"), "w")
+        fcntl.flock(_LOCK_FH, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
 def run_server(code_home):
     if code_home not in sys.path:
         sys.path.insert(0, code_home)
@@ -188,6 +206,15 @@ def run_server(code_home):
 # ------------------------------------------------------------------- main ---
 def main():
     _setup_logging()
+    if not acquire_single_instance():
+        log("another Assembler instance is already running — opening browser and exiting")
+        try:
+            import webbrowser
+            port = int(os.environ.get("CS_PORT", "8765"))
+            webbrowser.open(f"http://127.0.0.1:{port}")
+        except Exception:
+            pass
+        return
     log(f"resources: {RES}")
     inject_ffmpeg_path()
     preconfig_keys()
@@ -221,4 +248,9 @@ def main():
 
 
 if __name__ == "__main__":
+    # Must be the very first thing: in a frozen app, multiprocessing 'spawn'
+    # re-execs this binary. freeze_support() makes those children behave as
+    # workers instead of re-running main() (which would relaunch the whole app).
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()
