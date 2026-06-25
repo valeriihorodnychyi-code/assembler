@@ -39,11 +39,14 @@ def build_timeline(words, regions):
     tagged = []
     for i, r in enumerate(regions):
         style = st.normalize(r["style"])
+        _wm = style.get("wrap_mode", "chars")
+        _lim = style.get("words_per_line", 3) if _wm == "words" else style.get("max_chars_per_line", 15)
         evs = build_events(
             groups[i],
-            style["max_chars_per_line"],
+            _lim,
             style.get("text_case", "uppercase"),
             r.get("replacements", {}),
+            wrap_mode=_wm,
             pause_gap=style.get("sentence_pause", 0.5),
             max_lines=style.get("max_lines", 1 if style.get("force_single_line") else 2),
         )
@@ -60,7 +63,7 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
     scale_factors = scale_factors or st.DEFAULT_SCALE_FACTORS
     bitrates = bitrates or {"temp_hook": "35M", "final_export": "8M"}
     TARGET_W, TARGET_H = ff.DIMS[fmt]
-    scale = scale_factors.get(fmt, 1.0)
+    scale = 1.0   # NO per-format scaling — font px is absolute, identical caption in every format (9:16 look)
 
     input_w, input_h = ff.get_video_size(video_path)
     is_wide = input_w > input_h

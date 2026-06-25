@@ -291,6 +291,34 @@ async def api_transcribe(
     }
 
 
+class TranscribeClipReq(BaseModel):
+    file_id: str
+    clip: str = "source.mp4"
+    engine: str = "whisper"
+    model_size: str = "small"
+    language: str = ""
+
+
+@app.post("/api/transcribe_clip")
+def api_transcribe_clip(req: TranscribeClipReq):
+    """Transcribe a clip that is ALREADY in the session (uploaded via /api/upload_clip).
+    Lets the EDIT batch flow upload each hook once, then caption them all in one session."""
+    sdir = _session_dir(req.file_id)
+    clip = os.path.basename(req.clip)
+    src = os.path.join(sdir, clip)
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip '{clip}' not found in session")
+    try:
+        result = transcribe.transcribe(
+            src, engine=req.engine, model_size=req.model_size,
+            language=req.language or None,
+            api_key=os.environ.get("ELEVENLABS_API_KEY"),
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Transcription failed: {e}")
+    return {"language": result["language"], "words": result["words"]}
+
+
 class PreviewFrameReq(BaseModel):
     style: dict
     words: Optional[List[dict]] = None
@@ -313,7 +341,7 @@ def api_preview_frame(req: PreviewFrameReq):
     so the on-screen preview matches the final render pixel-for-pixel."""
     TW, TH = ffmpeg_utils.DIMS.get(req.format, (1080, 1920))
     style = st.normalize(req.style)
-    scale = st.DEFAULT_SCALE_FACTORS.get(req.format, 1.0)
+    scale = 1.0   # NO per-format scaling — font px absolute, same caption in every format
     tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}])
     events = [e for e, _ in tagged]
     if events and req.dur:
@@ -409,19 +437,24 @@ class DubReq(BaseModel):
     transcribe_engine: str = "whisper"
     model_size: str = "small"
     provider: str = "elevenlabs"  # elevenlabs (voice dub) | heygen (lip-sync)
+    clip: str = "source.mp4"      # which session clip to localize (a pack hook, e.g. 1_hook.mp4)
 
 
 @app.post("/api/dub")
 def api_dub(req: DubReq):
-    """Stage 1: dub the source into each language and re-transcribe it.
+    """Stage 1: dub the chosen clip into each language and re-transcribe it.
 
     Returns clean (caption-free) dubbed clips + editable transcripts. Captioning is
-    done afterwards via /api/render with clip="dub_<lang>.mp4" and the (edited) words.
+    done afterwards via /api/render with clip="dub_<...>_<lang>.mp4" and the (edited) words.
     """
     sdir = _session_dir(req.file_id)
-    src = os.path.join(sdir, "source.mp4")
+    clip = os.path.basename(req.clip)
+    src = os.path.join(sdir, clip)
     if not os.path.exists(src):
-        raise HTTPException(404, "Source video missing")
+        raise HTTPException(404, f"Clip '{clip}' missing in session")
+    # unique output prefix per source clip so multiple hooks' dubs never collide
+    stem = os.path.splitext(clip)[0]
+    prefix = "" if clip == "source.mp4" else (stem + "_")
     try:
         results, errors = localize.dub_and_transcribe(
             src, req.target_langs, sdir,
@@ -430,6 +463,7 @@ def api_dub(req: DubReq):
             provider=req.provider,
             provider_key=os.environ.get("HEYGEN_API_KEY") if req.provider == "heygen"
             else os.environ.get("ELEVENLABS_API_KEY"),
+            name_prefix=prefix,
         )
     except Exception as e:
         raise HTTPException(500, f"Dub failed: {e}")
@@ -538,6 +572,68 @@ async def upload_clip(file: UploadFile = File(...), file_id: str = Form("")):
     with open(os.path.join(sdir, name), "wb") as out:
         shutil.copyfileobj(file.file, out)
     return {"file_id": file_id, "name": name}
+
+
+@app.get("/api/download_all/{file_id}")
+def download_all(file_id: str):
+    """Zip every finished creative in the session (the batch finals) → one download."""
+    sdir = _session_dir(file_id)
+    out = os.path.join(sdir, "output")
+    import glob as _glob, zipfile as _zip
+    files = sorted(_glob.glob(os.path.join(out, "batch_*.mp4"))) or sorted(_glob.glob(os.path.join(out, "*.mp4")))
+    if not files:
+        raise HTTPException(404, "No finished videos yet")
+    zpath = os.path.join(sdir, "assembler_finals.zip")
+    with _zip.ZipFile(zpath, "w", _zip.ZIP_STORED) as z:
+        for f in files:
+            z.write(f, os.path.basename(f))
+    return FileResponse(zpath, filename="assembler_finals.zip", media_type="application/zip")
+
+
+class PosterReq(BaseModel):
+    file_id: str
+    shots: List[dict]   # [{"file": "batch_x.mp4", "t": 1.2}]  t = seconds (e.g. when the first caption appears)
+
+
+@app.post("/api/posters")
+def posters(req: PosterReq):
+    """Grab a poster frame from each final video (caption already baked in), as a
+    JPEG in the SAME aspect, squeezed to <= 1 MB. Returns a zip of all posters."""
+    sdir = _session_dir(req.file_id)
+    out = os.path.join(sdir, "output")
+    import zipfile as _zip, subprocess
+    made = []
+    for s in req.shots:
+        f = os.path.join(out, os.path.basename(s.get("file", "")))
+        if not os.path.exists(f):
+            continue
+        t = max(0.1, float(s.get("t", 1.0)))
+        png = os.path.join(out, os.path.splitext(os.path.basename(f))[0] + ".png")
+        # ALWAYS the original video resolution — never downscale. Lossless PNG, max compression.
+        cmd = [ffmpeg_utils.FFMPEG, "-y", "-ss", f"{t}", "-i", f,
+               "-frames:v", "1", "-compression_level", "100", png]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # keep ORIGINAL resolution; if a lossless PNG exceeds 1 MB, shrink the COLOR PALETTE
+        # (not the resolution) until it fits.
+        if os.path.exists(png) and os.path.getsize(png) > 1_000_000:
+            try:
+                from PIL import Image
+                im = Image.open(png).convert("RGB")
+                for colors in (256, 128, 64, 32):
+                    im.quantize(colors=colors, method=Image.FASTOCTREE).save(png, optimize=True)
+                    if os.path.getsize(png) <= 1_000_000:
+                        break
+            except Exception:
+                pass
+        if os.path.exists(png):
+            made.append(png)
+    if not made:
+        raise HTTPException(404, "No frames to capture (render first)")
+    zpath = os.path.join(sdir, "assembler_posters.zip")
+    with _zip.ZipFile(zpath, "w", _zip.ZIP_STORED) as z:
+        for p in made:
+            z.write(p, os.path.basename(p))
+    return FileResponse(zpath, filename="assembler_posters.zip", media_type="application/zip")
 
 
 @app.get("/api/session_outputs/{fid}")

@@ -15,7 +15,9 @@ DEFAULT_STYLE = {
     "font_size": 80,
     "text_color": [255, 255, 255, 255],
     "text_case": "uppercase",          # uppercase | lowercase | ""
-    "max_chars_per_line": 15,
+    "wrap_mode": "chars",              # "chars" (guarantees width fit) | "words"
+    "max_chars_per_line": 15,          # used when wrap_mode == "chars"
+    "words_per_line": 3,               # used when wrap_mode == "words"
     "max_lines": 2,                    # 1 or 2 lines on screen
     "line_spacing": 10,
     "margin_bottom": 320,

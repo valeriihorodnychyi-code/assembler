@@ -1,5 +1,5 @@
 {
-  "version": "1.0.3",
+  "version": "1.1.0",
   "channel": "main",
-  "notes": "Single-instance lock + multiprocessing.freeze_support() — no relaunch storms."
+  "notes": "EDIT batch + projects, LOC tab + quiz, words-per-line, 16:9 & 1:1, new icon."
 }

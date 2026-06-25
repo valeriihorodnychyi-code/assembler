@@ -26,8 +26,8 @@
   button.go{background:var(--ok);color:#06210f;font-weight:700}
   button.ghost{background:transparent;border:1px solid var(--line)}
   .stage{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;gap:12px;overflow:auto;background-color:var(--bg);background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px);background-size:24px 24px;background-position:-1px -1px}
-  .viewport{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);background:#000}
-  .viewport video{display:block;max-height:60vh;max-width:100%}
+  .viewport{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);background:#000;max-width:100%}
+  .viewport video{display:block;max-height:72vh;max-width:100%}  /* bounded to its grid column — can never overlap the side panels */
   .viewport canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:340px;height:470px;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;padding:20px}
   .dropzone.drag{border-color:var(--accent);color:var(--txt)}
@@ -113,8 +113,10 @@
   .modeswitch button:not(.active):hover{background:#262a36;color:var(--txt)}
   .tactions{display:flex;align-items:center;gap:10px}
   /* studio edit layout: presets | preview | quick controls */
-  .editstage{display:grid;grid-template-columns:150px minmax(300px,340px) 320px;gap:22px;align-items:center;justify-content:center;width:100%}
+  .editstage{display:grid;grid-template-columns:138px 96px auto 340px;gap:20px;align-items:center;justify-content:center;width:100%}        /* 9:16 / 1:1 — preview hugs the video, panels close */
+  .editstage.wide{grid-template-columns:138px 96px minmax(0,1fr) 340px;justify-content:stretch}                                            /* 16:9 — preview fills the centre (bounded) */
   .editzone{display:flex;flex-direction:column}
+  .groupcol{display:flex;flex-direction:column;gap:8px;max-height:74vh;overflow-y:auto;align-items:stretch}
   .railhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;text-align:center;margin-bottom:8px}
   .presetrail{display:flex;flex-direction:column;gap:6px;max-height:64vh;overflow-y:auto;padding:2px}
   #presetRail .presets{grid-template-columns:1fr;gap:6px;margin-top:0}
@@ -147,6 +149,24 @@
   .tut-nav .go{font-family:'Caveat',cursive;font-size:19px;font-weight:700;color:#06210f;background:#22c55e;border:0;border-radius:9px;padding:2px 16px;cursor:pointer}
   .tut-nav .skip{font-size:11px;color:#7fe6b8;background:transparent;border:0;cursor:pointer}
   .tut-anim{animation:thoughtIn .66s steps(5,end) both}
+  /* hand-drawn quiz + batch hint (same vibe as the tutorial) */
+  .q-card{background:rgba(8,18,12,.92);border:1.5px solid #22c55e;border-radius:16px;padding:18px 20px;max-width:440px;margin:0 auto;transform:rotate(-1deg)}
+  .q-head{font-family:'Caveat',cursive;font-size:16px;letter-spacing:.5px;color:#7fe6b8;text-align:center;margin-bottom:4px}
+  .q-flag{font-size:52px;text-align:center;line-height:1.05}
+  .q-q{font-family:'Caveat',cursive;font-size:27px;font-weight:700;color:#5ff0ad;text-align:center;margin:6px 0 14px;line-height:1.1}
+  .q-opts{display:flex;flex-direction:column;gap:9px;max-width:360px;margin:0 auto}
+  .q-opt{font-family:'Caveat',cursive;font-size:21px;font-weight:700;color:#5ff0ad;background:rgba(34,197,94,.10);border:1.5px solid #22c55e;border-radius:12px;padding:8px 15px;cursor:pointer;transform:rotate(-.5deg);text-align:center}
+  .q-opt:hover{background:rgba(34,197,94,.20)}
+  .q-opt:nth-child(even){transform:rotate(.5deg)}
+  .batch-hint{font-family:'Caveat',cursive;font-size:24px;font-weight:700;color:#5ff0ad;background:rgba(8,18,12,.94);border:1.5px dashed #22c55e;border-radius:15px;padding:14px 22px;text-align:center;max-width:560px;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+  .big-go{font-size:17px!important;padding:13px 26px!important}
+  .loc-row{display:flex;align-items:center;gap:16px;padding:12px;border:1px solid var(--line);border-radius:14px;margin-bottom:12px;background:var(--panel2)}
+  .loc-arrow{font-size:26px;color:#22c55e;flex:0 0 auto}
+  .loc-outs{display:flex;flex-wrap:wrap;gap:8px;flex:1}
+  .loc-mini{position:relative}
+  .loc-excluded{opacity:.32;filter:grayscale(.6)}
+  .loc-x{position:absolute;top:4px;left:4px;border:0;border-radius:7px;background:rgba(0,0,0,.62);color:#fff;cursor:pointer;font-size:12px;padding:2px 7px;z-index:2}
+  .loc-provider{padding:12px 14px;font-size:15px;border-radius:10px;background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
   @keyframes thoughtIn{from{opacity:0;filter:blur(11px);transform:translateY(16px) rotate(-1.5deg) scale(.94)}to{opacity:1;filter:blur(0);transform:translateY(0) rotate(-1.5deg) scale(1)}}
   /* ---- busy bar: capybara progress + live timer ---- */
   #busyBar{position:fixed;bottom:20px;right:20px;z-index:150;display:none;flex-direction:column;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px 18px 15px;box-shadow:0 14px 44px rgba(0,0,0,.55);min-width:320px}
@@ -196,27 +216,36 @@
     <div class="badge" id="encBadge">encoder: …</div>
     <div class="modeswitch">
       <button id="mEdit" class="active" onclick="setMode('edit')">✎ Edit clip</button>
+      <button id="mLoc" onclick="setMode('loc')">🌍 Loc</button>
       <button id="mAsm" onclick="setMode('asm')">▦ Assemble</button>
     </div>
     <div class="tactions" id="actEdit">
       <div class="ratio-tabs" id="ratioTabs">
         <button data-r="9:16" class="active">9:16</button>
-        <button data-r="1:1" disabled title="Coming soon">1:1</button>
-        <button data-r="16:9" disabled title="Coming soon">16:9</button>
+        <button data-r="1:1">1:1</button>
+        <button data-r="16:9">16:9</button>
       </div>
       <button id="transcribeBtn" disabled>① Transcribe</button>
       <button class="primary" id="renderBtn" disabled>Send to Assemble →</button>
+      <button id="sLocBtn" style="display:none">→ LOC</button>
+      <button id="copyAllBtn" style="display:none" title="Скопіювати стиль активного хука на всі">⧉ Style→all</button>
+      <button class="primary" id="sendPackAsmBtn" style="display:none">Pack → Assemble →</button>
+      <button id="sendPackBtn" style="display:none">Pack → LOC →</button>
+      <button class="primary" id="saveHookBtn" style="display:none">💾 Save back → LOC</button>
+      <button class="primary" id="saveLocPackBtn" style="display:none">💾 Save pack → LOC</button>
     </div>
     <div class="tactions" id="actAsm" style="display:none"></div>
     <button class="ghost" id="settingsBtn" title="Settings (keys, machine ID)" style="margin-left:6px">⚙</button>
     <button class="ghost" id="quitBtn" title="Stop the app">Quit</button>
-    <input type="file" id="videoInput" accept="video/*" hidden>
+    <input type="file" id="videoInput" accept="video/*" multiple hidden>
   </header>
 
   <div class="stage">
     <div id="batchStage" style="display:none;width:100%;height:100%;overflow:auto;padding:24px"></div>
+    <div id="locStage" style="display:none;width:100%;height:100%;overflow:auto;padding:24px"></div>
     <div id="editStage" class="editstage">
       <div class="editzone"><div class="railhead">Presets</div><div id="presetRail" class="presetrail"></div></div>
+      <div class="groupcol" id="groupCol"><div class="railhead">Projects</div></div>
       <div class="previewcol" id="previewCol"></div>
       <div class="qpanel" id="quickPanel"></div>
     </div>
@@ -279,7 +308,7 @@
             <button type="button" data-v="large-v3">large-v3</button>
           </div></div>
         <div class="row"><label>Language (optional)</label><input type="text" id="language" placeholder="auto" style="flex:1.3"></div>
-        <textarea id="transcript" rows="3" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
+        <textarea id="transcript" rows="3" style="max-height:260px;overflow-y:auto;resize:vertical" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
         <div class="row" style="margin-top:8px"><label>Manual line breaks</label><label class="switch"><input type="checkbox" id="manualBreaks"><span class="slider"></span></label></div>
         <div class="hint" id="manualHint" style="display:none"><b>Enter</b> = new line · <b>empty line</b> = new caption screen. Your exact splits are used (no auto-wrap).</div>
@@ -314,7 +343,13 @@
             <button type="button" data-v="none">Aa</button>
             <button type="button" data-v="lowercase">aa</button>
           </div></div>
-        <div class="row"><label>Chars per line</label><input type="number" id="maxChars" value="15" min="4" max="40"></div>
+        <div class="row"><label>Line wrap</label>
+          <input type="hidden" id="wrapMode" value="chars">
+          <div class="seg" id="wrapSeg" style="flex:1.3">
+            <button type="button" data-v="chars" class="active">Chars</button>
+            <button type="button" data-v="words">Words</button>
+          </div></div>
+        <div class="row"><label id="wrapLbl">Chars per line</label><input type="number" id="maxChars" value="15" min="1" max="40"></div>
         <div class="row"><label>Lines on screen</label>
           <input type="hidden" id="maxLines" value="2">
           <div class="seg" id="linesSeg" style="flex:1.3">
@@ -503,7 +538,7 @@
   <div class="bb-track">
     <div class="bb-fill"></div>
   </div>
-  <div class="bb-meta"><span id="bbLabel">Working…</span> · <span id="bbTimer">0.0s</span></div>
+  <div class="bb-meta" style="font-size:14px"><span id="bbLabel">Working…</span> · <span id="bbTimer" style="font-weight:700">0s</span></div>
 </div>
 <div class="modal-bg" id="settingsModal">
   <div class="modal">
@@ -542,9 +577,12 @@ const API="";   // same origin
 let ratio="9:16", customFontName=null, videoFile=null, fileId=null, realWords=null;
 let splitOn=false, editingSlot="A", styleB=null;
 let variants={}, activeVar="en", enVideoUrl=null;   // language variants (en + dubbed)
+let editPack=[], activeHook=-1, sharedCtrl=null;     // EDIT batch: pack of original hooks (each: {clip,videoUrl,words,ctrl,lang})
+let editingHook=null, packMode="orig";               // packMode: "orig" = originals pack, "loc" = a localized pack opened from LOC
+let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius"];
 
 const PRESETS={
   "Clean White":{fontFamily:"Arial Black",fontSize:80,textColor:"#ffffff",textCase:"uppercase",strokeOuterW:0,strokeW:0,shadowOn:true,shY:6,shBlur:8,shColor:"#000000",plateOn:false,karaokeOn:false},
@@ -594,16 +632,16 @@ function chime(kind){
 
 // ---------- busy bar (capybara progress + live timer) ----------
 let _busyT0=0,_busyTick=null;
+function fmtDur(ms){const s=Math.round(ms/1000);const m=Math.floor(s/60),r=s%60;return m>0?(m+":"+String(r).padStart(2,"0")):(r+"s");}  // round to whole seconds; hh-free mm:ss — not F1 telemetry 🏎️
 function busyStart(label){
   _busyT0=performance.now();
-  $("bbLabel").textContent=label||"Working…";$("bbTimer").textContent="0.0s";
+  $("bbLabel").textContent=label||"Working…";$("bbTimer").textContent="0s";
   $("busyBar").classList.add("show");
-  clearInterval(_busyTick);_busyTick=setInterval(()=>{$("bbTimer").textContent=((performance.now()-_busyT0)/1000).toFixed(1)+"s";},100);
+  clearInterval(_busyTick);_busyTick=setInterval(()=>{$("bbTimer").textContent=fmtDur(performance.now()-_busyT0);},500);
 }
 function busyDone(label){
   clearInterval(_busyTick);
-  const secs=((performance.now()-_busyT0)/1000).toFixed(1);
-  $("bbLabel").innerHTML=(label||"Done")+" <b>· "+secs+"s</b>";$("bbTimer").textContent="";
+  $("bbLabel").innerHTML=(label||"Done")+" <b>· "+fmtDur(performance.now()-_busyT0)+"</b>";$("bbTimer").textContent="";
   setTimeout(()=>$("busyBar").classList.remove("show"),3000);
 }
 function busyStop(){clearInterval(_busyTick);$("busyBar").classList.remove("show");}
@@ -635,7 +673,7 @@ $("settingsSave").onclick=async()=>{
 };
 
 function readControls(){
-  return {fontFamily:$("fontFamily").value,fontSize:+$("fontSize").value,textColor:$("textColor").value,textCase:$("textCase").value,maxChars:+$("maxChars").value,maxLines:+$("maxLines").value,marginBottom:+$("marginBottom").value,lineSpacing:+$("lineSpacing").value,
+  return {fontFamily:$("fontFamily").value,fontSize:+$("fontSize").value,textColor:$("textColor").value,textCase:$("textCase").value,wrapMode:$("wrapMode").value,maxChars:+$("maxChars").value,maxLines:+$("maxLines").value,marginBottom:+$("marginBottom").value,lineSpacing:+$("lineSpacing").value,
     strokeW:+$("strokeW").value,strokeColor:$("strokeColor").value,strokeOuterW:+$("strokeOuterW").value,strokeOuterColor:$("strokeOuterColor").value,
     shadowOn:$("shadowOn").checked,shX:+$("shX").value,shY:+$("shY").value,shBlur:+$("shBlur").value,shColor:$("shColor").value,
     plateOn:$("plateOn").checked,plateLine:$("plateLine").checked,plateFull:$("plateFull").checked,plateColor:$("plateColor").value,plateAlpha:+$("plateAlpha").value,platePadX:+$("platePadX").value,platePadY:+$("platePadY").value,plateRadius:+$("plateRadius").value,boxOffsetY:+$("boxOffsetY").value,
@@ -646,13 +684,14 @@ function writeControls(s){
   for(const k of STYLE_IDS) if(k in s) set(k,s[k]);
   if($("caseSeg"))updateCaseSeg();
   if($("linesSeg"))updateLinesSeg();
+  if($("wrapSeg"))updateWrapSeg();
 }
 
 // convert UI control object -> engine JSON schema
 function toEngineStyle(s){
   const arr=(h,a=255)=>{const[r,g,b]=hexToRgb(h);return[r,g,b,a];};
   return {font_name:customFontName||(s.fontFamily+".ttf"),font_size:s.fontSize,text_color:arr(s.textColor),
-    text_case:s.textCase==="none"?"":s.textCase,max_chars_per_line:s.maxChars,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,
+    text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,
     stroke:{width:s.strokeW,color:arr(s.strokeColor)},stroke_outer:{width:s.strokeOuterW,color:arr(s.strokeOuterColor)},
     shadow:{enabled:s.shadowOn,offset_x:s.shX,offset_y:s.shY,glow_blur:s.shBlur,color:arr(s.shColor)},
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
@@ -661,7 +700,7 @@ function toEngineStyle(s){
 }
 
 // ---------- EVENTS (preview) ----------
-function buildEvents(dur,maxChars,maxLines,wordsOverride){
+function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode){
   const PAUSE=0.5, ENDERS=/[.!?…]$/; maxLines=maxLines||2;
   let raw;
   const src=wordsOverride||((realWords&&realWords.length)?realWords:null);
@@ -689,10 +728,17 @@ function buildEvents(dur,maxChars,maxLines,wordsOverride){
     const phrases=[];let cur=[];
     for(const w of words){if(cur.length){const p=cur[cur.length-1];if(p.ends||(w.start-p.end)>PAUSE){phrases.push(cur);cur=[];}}cur.push(w);}
     if(cur.length)phrases.push(cur);
-    for(const ph of phrases){let lines=[],line=[],chars=0;
-      for(const w of ph){const wl=w.text.length,sp=line.length?1:0;
-        if(chars+sp+wl<=maxChars){line.push(w);chars+=sp+wl;}else{if(line.length)lines.push(line);line=[w];chars=wl;}}
-      if(line.length)lines.push(line);
+    const lim=Math.max(1,limit||((wrapMode==="words")?3:15));   // parity with engine: chars OR words
+    for(const ph of phrases){let lines=[],line=[];
+      if(wrapMode==="words"){
+        for(const w of ph){if(line.length>=lim){lines.push(line);line=[];}line.push(w);}
+        if(line.length)lines.push(line);
+      }else{
+        let chars=0;
+        for(const w of ph){const wl=w.text.length,sp=line.length?1:0;
+          if(chars+sp+wl<=lim){line.push(w);chars+=sp+wl;}else{if(line.length)lines.push(line);line=[w];chars=wl;}}
+        if(line.length)lines.push(line);
+      }
       for(let i=0;i<lines.length;i+=maxLines)chunks.push(lines.slice(i,i+maxLines));}
   }
   const events=[];
@@ -730,8 +776,8 @@ function render(t,dur){
   const[W,H]=DIMS[ratio];canvas.width=W;canvas.height=H;ctx.clearRect(0,0,W,H);
   if(!videoLoaded){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,"#3a2b4d");g.addColorStop(1,"#1a2740");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
   const s=styleAt(t);
-  const scale=W/1080;
-  const events=buildEvents(dur||4,s.maxChars,s.maxLines);
+  const scale=1;   // no per-format scaling — caption px absolute, identical in every format (matches engine)
+  const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode);
   if(!events.length)return;
   let ev=events.find(e=>t>=e.start&&t<e.end);
   if(!ev)return; // silence before first word / after last -> nothing on screen (no random text)
@@ -773,12 +819,121 @@ function loop(ts){let t,dur;
 requestAnimationFrame(loop);
 
 // ---------- video ----------
-function loadVideo(file){videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
+function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();
+  videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
   variants={en:{clip:null,videoUrl:url,words:null,style:null,trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";
   setStatus("Video loaded. Transcribe for captions, or just trim & Send to Compose as-is.","");}
 $("loadBtn").onclick=()=>$("videoInput").click();
-$("videoInput").onchange=e=>{if(e.target.files[0])loadVideo(e.target.files[0]);};
+$("sLocBtn").onclick=()=>sendToCompose("loc");
+$("sendPackBtn").onclick=()=>sendPack("loc");
+$("sendPackAsmBtn").onclick=()=>sendPack("asm");
+$("copyAllBtn").onclick=copyStyleToAll;
+$("saveHookBtn").onclick=saveEditingHook;
+$("saveLocPackBtn").onclick=saveLocPack;
+$("videoInput").onchange=e=>{const fs=e.target.files;if(!fs||!fs.length)return;
+  if(fs.length>1){const arr=Array.from(fs);e.target.value="";batchOriginals(arr);}
+  else{loadVideo(fs[0]);e.target.value="";}};
+
+// EDIT batch: drop N original hooks → upload each into ONE session → transcribe each →
+// put them on the Assemble board captioned with the CURRENT (shared) style. Single clip
+// stays the old single path; this kicks in only when 2+ files are chosen.
+function batchHint(html){let h=$("batchHint");if(!h){h=document.createElement("div");h.id="batchHint";h.className="batch-hint";h.style.cssText+=";position:fixed;left:50%;bottom:96px;transform:translateX(-50%) rotate(-1deg);z-index:135";document.body.appendChild(h);}h.style.display="block";h.innerHTML=html;}
+function batchHintHide(){const h=$("batchHint");if(h)h.style.display="none";}
+async function batchOriginals(files){
+  editingHook=null;packMode="orig";_packFormats=new Set();
+  sharedCtrl=readControls();                                   // the style designed in EDIT = default for the whole pack
+  const eng=$("engine").value,ms=$("modelSize").value,lang=$("language").value;
+  busyStart("Батч: "+files.length+" хуків…");editPack=[];let ok=0;
+  batchHint(TL("Транскрибую твій пак 🎬<br>все добре — трошки зачекай ✨","Transcribing your pack 🎬<br>all good — hang tight ✨"));
+  for(let i=0;i<files.length;i++){
+    const f=files[i];
+    const safe=(i+1)+"_"+(f.name||"hook.mp4").replace(/[^\w.\-]+/g,"_");
+    const uniq=new File([f],safe,{type:f.type||"video/mp4"});
+    try{
+      setStatus("Хук "+(i+1)+"/"+files.length+": завантаження…","",true);
+      batchHint("Хук "+(i+1)+" / "+files.length+" 🎬<br>"+TL("завантажую…","uploading…"));
+      let fd=new FormData();fd.append("file",uniq);fd.append("file_id",fileId||"");
+      let r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});let d=await r.json();
+      if(!r.ok)throw new Error(d.detail||"upload failed");
+      fileId=d.file_id;const clip=d.name;
+      setStatus("Хук "+(i+1)+"/"+files.length+": транскрайб…","",true);
+      batchHint("Хук "+(i+1)+" / "+files.length+" 🎬<br>"+TL("розпізнаю текст…","recognizing text…"));
+      r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:clip,engine:eng,model_size:ms,language:lang})});
+      d=await r.json();if(!r.ok)throw new Error(d.detail||"transcribe failed");
+      const hk={name:clip,clip:clip,lang:(typeof langFromName==="function"&&langFromName(clip))||"en",
+                videoUrl:URL.createObjectURL(f),words:d.words,ctrl:JSON.parse(JSON.stringify(sharedCtrl)),
+                style:toEngineStyle(sharedCtrl),src:"edit"};
+      if(!hooks.some(h=>h.clip===clip))hooks.push(hk);   // on the board immediately → never lost
+      editPack.push(hk);                                  // editPack items ARE the board hooks (edits persist live)
+      ok++;
+    }catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
+  }
+  batchHintHide();
+  if(ok){busyDone(ok+" хуків готово");
+    $("dropzone").style.display="none";video.hidden=false;canvas.hidden=false;videoLoaded=true;
+    activeHook=-1;renderHookTiles();selectHook(0);
+    updateEditButtons();
+    setStatus(ok+" хуків транскрибовано. Клікай по стрічці, щоб поправити окремий; далі «Send to Assemble» або вкладка LOC.","ok");
+  } else busyStop();
+}
+// --- EDIT pack: per-hook fine-tuning (mirrors the old per-language filmstrip) ---
+function saveActiveHook(){
+  if(activeHook<0||activeHook>=editPack.length)return;
+  const h=editPack[activeHook];
+  try{const rw=remapWords($("transcript").value,h.words);if(rw)h.words=rw;}catch(e){}
+  h.ctrl=readControls();h.style=toEngineStyle(h.ctrl);   // h is a board hook → board stays current
+}
+function selectHook(i){
+  if(i<0||i>=editPack.length)return;
+  editingHook=null;
+  saveActiveHook();
+  const h=editPack[i];activeHook=i;
+  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,style:h.ctrl,language:h.lang}};activeVar="en";
+  enVideoUrl=h.videoUrl;realWords=h.words;
+  video.src=h.videoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};
+  $("transcript").value=(h.words||[]).map(w=>w.word||w.text).join(" ");autoGrow();
+  writeControls(h.ctrl);
+  $("transcribeBtn").disabled=false;$("renderBtn").disabled=false;
+  renderHookStrip();renderGroupBar();updateEditButtons();
+  if(typeof exactOn!=="undefined"&&exactOn)scheduleExact();
+}
+function renderHookStrip(){
+  const fs=$("filmstrip");if(!fs)return;
+  if(!editPack.length){fs.style.display="none";fs.innerHTML="";return;}
+  fs.style.display="flex";fs.innerHTML="";
+  editPack.forEach((h,i)=>{
+    const card=document.createElement("div");card.className="fcard"+(i===activeHook?" active":"");card.title="Поправити хук "+(i+1);
+    const cv=document.createElement("canvas");cv.width=180;cv.height=320;card.appendChild(cv);
+    const badge=document.createElement("div");badge.className="fb";badge.textContent=(i+1);card.appendChild(badge);
+    card.onclick=()=>selectHook(i);
+    fs.appendChild(card);
+    drawThumb(cv,{videoUrl:h.videoUrl,words:h.words,style:h.ctrl},"hook"+i);
+  });
+}
+function sendPack(target){
+  if(!editPack.length)return;
+  saveActiveHook();let added=0;
+  editPack.forEach(h=>{if(hooks.some(x=>x.clip===h.clip))return;
+    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.words,style:toEngineStyle(h.ctrl),src:"edit"});added++;});
+  renderHookTiles();setMode(target==="asm"?"asm":"loc");
+  setStatus("Пак ("+editPack.length+") → "+(target==="asm"?"Assemble":"LOC")+".","ok");
+}
+function copyStyleToAll(){
+  if(!editPack.length)return;
+  saveActiveHook();const ctrl=readControls();
+  editPack.forEach(h=>h.ctrl=JSON.parse(JSON.stringify(ctrl)));
+  renderHookStrip();setStatus("Стиль активного хука скопійовано на всі "+editPack.length+" 🎯","ok");
+}
+function updateEditButtons(){
+  const pack=editPack.length>0, editing=!!editingHook, locpack=pack&&packMode==="loc";
+  const show=(id,on)=>{const e=$(id);if(e)e.style.display=on?"inline-block":"none";};
+  show("renderBtn",!pack&&!editing);show("sLocBtn",!pack&&!editing);
+  show("sendPackAsmBtn",pack&&!editing&&!locpack);show("sendPackBtn",false);show("copyAllBtn",pack&&!editing);
+  show("saveLocPackBtn",locpack&&!editing);
+  show("saveHookBtn",editing);
+}
 const dz=$("dropzone");
 dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");});
 ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
@@ -835,7 +990,7 @@ function scheduleExact(){if(!exactOn)return;clearTimeout(exactTimer);exactTimer=
 async function fetchExact(){
   if(!exactOn)return;
   if($("batchStage").style.display==="block")return;
-  if(ratio!=="9:16"||!videoLoaded||!video.paused)return;   // only a settled 9:16 frame
+  if(!videoLoaded||!video.paused)return;   // a settled frame in any format (9:16 / 1:1 / 16:9)
   const v=variants[activeVar];
   if(!v||!v.words||!v.words.length)return;
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -887,7 +1042,10 @@ $("fontInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;const f
 document.querySelectorAll("input[type=range]").forEach(r=>{const v=$(r.id+"V");if(v)r.addEventListener("input",()=>v.textContent=r.value);});
 
 // ---------- auto-grow transcript (full text, no scroll) ----------
-function autoGrow(){const ta=$("transcript");if(!ta.offsetParent)return;ta.style.height="auto";ta.style.height=Math.max(ta.scrollHeight,150)+"px";}
+function autoGrow(){const ta=$("transcript");if(!ta||!ta.offsetParent)return;ta.style.height="auto";
+  const cap=260;                                                  // fixed cap: controls below stay visible even with long transcripts
+  ta.style.height=Math.min(Math.max(ta.scrollHeight,120),cap)+"px";
+  ta.style.overflowY=(ta.scrollHeight>cap)?"auto":"hidden";}
 $("transcript").addEventListener("input",()=>{
   autoGrow();
   // live: re-map edited text onto the existing word timecodes so the caption preview updates
@@ -938,7 +1096,7 @@ function fromEngineStyle(e){
   const g=(o,k,d)=>(o&&o[k]!=null)?o[k]:d;
   const st=e.stroke||{},so=e.stroke_outer||{},sh=e.shadow||{},pl=e.plate||{},ka=e.karaoke||{},kp=e.karaoke_plate||{};
   return {fontFamily:(e.font_name||"Poppins-Bold.ttf").replace(/\.(ttf|otf)$/i,""),fontSize:+e.font_size||80,textColor:hx(e.text_color),
-    textCase:(e.text_case===""||e.text_case==null)?"none":e.text_case,maxChars:+e.max_chars_per_line||15,
+    textCase:(e.text_case===""||e.text_case==null)?"none":e.text_case,wrapMode:e.wrap_mode||"chars",maxChars:(e.wrap_mode==="words")?(+e.words_per_line||3):(+e.max_chars_per_line||15),
     maxLines:+e.max_lines||(e.force_single_line?1:2),marginBottom:+e.margin_bottom||320,lineSpacing:+g(e,"line_spacing",10),boxOffsetY:+g(e,"box_offset_y",0),
     strokeW:+g(st,"width",0),strokeColor:hx(st.color),strokeOuterW:+g(so,"width",0),strokeOuterColor:hx(so.color),
     shadowOn:!!sh.enabled,shX:+g(sh,"offset_x",0),shY:+g(sh,"offset_y",8),shBlur:+g(sh,"glow_blur",0),shColor:hx(sh.color),
@@ -956,7 +1114,7 @@ function styleSampleCSS(e){
 }
 function presetCard(label,sampleCSS,custom,onClick){
   const b=document.createElement("div");b.className="preset";b.title=label+(custom?" (custom)":"");
-  b.innerHTML="<div class='pv'><span style='"+sampleCSS+"'>Aa</span></div><div class='pn'"+(custom?" style='color:var(--accent)'":"")+">"+label+"</div>";
+  b.innerHTML="<div class='pv'><span style='"+sampleCSS+"'>Aa</span></div><div class='pn'>"+(custom?"★ ":"")+label+"</div>";
   b.onclick=()=>{onClick();markPreset(b);};return b;
 }
 function renderPresetRail(){
@@ -993,7 +1151,23 @@ function updateCaseSeg(){const v=$("textCase").value;$("caseSeg").querySelectorA
 $("caseSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("textCase").value=b.dataset.v;updateCaseSeg();scheduleExact();});
 
 // ---------- ratio ----------
-$("ratioTabs").querySelectorAll("button").forEach(b=>{b.onclick=()=>{ratio=b.dataset.r;$("ratioTabs").querySelectorAll("button").forEach(x=>x.classList.remove("active"));b.classList.add("active");const[W,H]=DIMS[ratio];canvas.style.aspectRatio=W+"/"+H;};});
+function setRatio(r){if(!DIMS[r])return;ratio=r;
+  if($("editStage"))$("editStage").classList.toggle("wide",r==="16:9");   // wide layout only for 16:9
+  $("ratioTabs").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x.dataset.r===r));
+  const[W,H]=DIMS[r];if(canvas)canvas.style.aspectRatio=W+"/"+H;
+  if(typeof drawFrame==="function")try{drawFrame();}catch(e){}
+  if(typeof scheduleExact==="function")scheduleExact();
+  if(typeof refreshAssembleHints==="function")refreshAssembleHints();
+  if(typeof renderBatchStage==="function"&&currentMode==="asm")renderBatchStage();}
+$("ratioTabs").querySelectorAll("button").forEach(b=>{b.onclick=()=>{setRatio(b.dataset.r);setStatus("Формат: "+ratio,"");};});
+// Auto-detect format from the loaded video so captions scale to the right aspect.
+function autoDetectRatio(){if(!video||!video.videoWidth||!video.videoHeight)return;
+  const w=video.videoWidth,h=video.videoHeight;
+  const r=(Math.abs(w-h)/Math.max(w,h)<0.06)?"1:1":(w>h?"16:9":"9:16");
+  if(r!==ratio){setRatio(r);setStatus("Авто-формат: "+r+" (за відео)","");}
+  if(editPack.length>0){_packFormats.add(r);
+    if(_packFormats.size>1)setStatus("⚠️ У паку змішані формати ("+[..._packFormats].join(", ")+") — краще тримати ОДИН формат на проєкт.","err");}}
+if(typeof video!=="undefined"&&video)video.addEventListener("loadedmetadata",autoDetectRatio);
 
 // ---------- format chips ----------
 $("fmtChips").querySelectorAll(".chip").forEach(c=>c.onclick=()=>{if(c.classList.contains("soon"))return;c.classList.toggle("on");});
@@ -1007,6 +1181,8 @@ $("slotA").onclick=()=>{ if(editingSlot==="B"){styleB=readControls();} writeCont
 $("slotB").onclick=()=>{ if(editingSlot==="A"){window._styleA=readControls();} writeControls(styleB||readControls()); setSlot("B"); };
 function updateLinesSeg(){const v=String($("maxLines").value);$("linesSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
 $("linesSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("maxLines").value=b.dataset.v;updateLinesSeg();scheduleExact();});
+function updateWrapSeg(){const v=$("wrapMode").value;$("wrapSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));if($("wrapLbl"))$("wrapLbl").textContent=(v==="words")?"Words per line":"Chars per line";const inp=$("maxChars");if(inp)inp.max=(v==="words")?8:40;}
+segPick("wrapSeg","wrapMode",v=>{updateWrapSeg();const inp=$("maxChars");if(v==="words"){if(+inp.value>8)inp.value=3;}else{if(+inp.value<=8)inp.value=15;}scheduleExact();});
 function segPick(segId,hiddenId,after){$(segId).querySelectorAll("button").forEach(b=>b.onclick=()=>{if(b.disabled)return;$(hiddenId).value=b.dataset.v;$(segId).querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));if(after)after(b.dataset.v);});}
 segPick("engineSeg","engine",v=>{$("modelRow").style.display=v==="whisper"?"flex":"none";});
 segPick("modelSeg","modelSize");
@@ -1015,14 +1191,28 @@ $("locProvider").onchange=e=>{$("locProviderHint").textContent=e.target.value===
 
 // ---------- transcribe ----------
 $("transcribeBtn").onclick=async()=>{
-  if(!videoFile)return;setStatus("Transcribing… (first Whisper run loads the model, please wait)","",true);busyStart("Транскрибую…");$("transcribeBtn").disabled=true;
-  const fd=new FormData();fd.append("file",videoFile);fd.append("engine",$("engine").value);fd.append("model_size",$("modelSize").value);fd.append("language",$("language").value);
-  try{const r=await fetch(API+"/api/transcribe",{method:"POST",body:fd});const d=await r.json();
-    if(!r.ok)throw new Error(d.detail||"failed");
-    fileId=d.file_id;realWords=d.words;$("transcript").value=realWords.map(w=>w.word||w.text).join(" ");autoGrow();
-    if(enVideoUrl){video.src=enVideoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};}  // re-sync preview to the original (fixes EN/DE mix on re-transcribe)
-    variants={en:{clip:"source.mp4",videoUrl:enVideoUrl,words:realWords,style:readControls(),language:d.language||"en",trim:(variants.en&&variants.en.trim)||null}};activeVar="en";buildVarTabs();
-    setStatus(`Transcribed ${realWords.length} words (${d.language}). Preview now uses real timing. Ready to render.`,"ok");busyDone("Транскрибовано");$("renderBtn").disabled=false;$("renderBtn2").disabled=false;$("localizeBtn").disabled=false;
+  const curClip=(variants.en&&variants.en.clip)||null;
+  if(!videoFile && !(fileId&&curClip)){setStatus("Завантаж відео.","err");return;}
+  setStatus("Transcribing… (first Whisper run loads the model)","",true);busyStart("Транскрибую…");$("transcribeBtn").disabled=true;
+  try{
+    let d;
+    if(videoFile){   // fresh single clip → upload + transcribe
+      const fd=new FormData();fd.append("file",videoFile);fd.append("engine",$("engine").value);fd.append("model_size",$("modelSize").value);fd.append("language",$("language").value);
+      const r=await fetch(API+"/api/transcribe",{method:"POST",body:fd});d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+      fileId=d.file_id;
+      if(enVideoUrl){video.src=enVideoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};}
+      variants={en:{clip:"source.mp4",videoUrl:enVideoUrl,words:d.words,style:readControls(),language:d.language||"en",trim:(variants.en&&variants.en.trim)||null}};activeVar="en";buildVarTabs();
+    }else{           // re-transcribe a clip already in the session (a pack hook / localized hook)
+      const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:curClip,engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value})});
+      d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+      if(variants.en)variants.en.words=d.words;
+      if(activeHook>=0&&editPack[activeHook])editPack[activeHook].words=d.words;
+      if(editingHook)editingHook.words=d.words;
+    }
+    realWords=d.words;$("transcript").value=realWords.map(w=>w.word||w.text).join(" ");autoGrow();
+    setStatus("Транскрибовано "+realWords.length+" слів ("+(d.language||"")+").","ok");busyDone("Транскрибовано");
+    $("renderBtn").disabled=false;if($("renderBtn2"))$("renderBtn2").disabled=false;if($("localizeBtn"))$("localizeBtn").disabled=false;
   }catch(e){setStatus("Transcription error: "+e.message,"err");busyStop();}
   $("transcribeBtn").disabled=false;
 };
@@ -1031,7 +1221,7 @@ $("transcribeBtn").onclick=async()=>{
 // "Send to Compose" — the single forward action for EN and every localized variant.
 // Pushes live hooks (clip + words + style + trim) onto the board. Baking happens once,
 // at the final Render in Compose.
-async function sendToCompose(){
+async function sendToCompose(target){
   if(!videoFile && !fileId){setStatus("Load a video first.","err");return;}
   // raw clip (not transcribed) → upload it so it can be a Compose segment, no captions needed
   if(variants.en && !variants.en.clip && videoFile){
@@ -1049,8 +1239,8 @@ async function sendToCompose(){
     if(v.overlays&&v.overlays.length)hook.overlays=v.overlays.map(o=>({name:o.name,x:o.x,y:o.y,w:o.w,angle:o.angle||0}));
     if(v.words&&v.words.length&&v.style){hook.words=v.words;hook.style=toEngineStyle(v.style);}  // captions only if present
     hooks.push(hook);added++;});
-  renderHookTiles();showSection("compose");
-  setStatus(added?("Sent "+added+" clip(s) to Compose. Pick a body, then Render."):"Already on the board — pick a body and Render.","ok");
+  renderHookTiles();setMode(target==="loc"?"loc":"asm");
+  setStatus(added?("Надіслано "+added+" кліп(ів) → "+(target==="loc"?"LOC":"Assemble")+"."):"Вже на дошці.","ok");
 }
 
 // optional power path: bake + export just this one clip (kept in the Render tab)
@@ -1128,6 +1318,7 @@ $("renderAllLocBtn").onclick=sendToCompose;
 
 // ---------- language variants (active tab) ----------
 function buildVarTabs(){
+  if(editPack.length){$("varTabs").style.display="none";renderHookStrip();return;}   // EDIT batch: show hook strip instead of language tabs
   const keys=Object.keys(variants);
   const tabs=$("varTabs");
   if(keys.length<=1){tabs.style.display="none";tabs.innerHTML="";}
@@ -1141,7 +1332,7 @@ function buildVarTabs(){
 const filmVideos={};
 function drawThumbCaption(ctx,W,H,s,words,t){
   if(!s)return;
-  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words);
+  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode);
   if(!events.length)return;
   const ev=events.find(e=>t>=e.start&&t<e.end)||events[0];if(!ev)return;
   const scale=W/1080,fs=(s.fontSize||80)*scale;ctx.font=fs+"px '"+(s.fontFamily||"Arial")+"'";ctx.textBaseline="top";
@@ -1172,6 +1363,7 @@ function drawThumb(cv,v,lang){
 }
 function buildFilmstrip(){
   const fs=$("filmstrip");if(!fs)return;
+  if(editPack.length){renderHookStrip();return;}   // EDIT batch: the strip is the pack of hooks
   const keys=Object.keys(variants);
   if(keys.length<=1){fs.style.display="none";fs.innerHTML="";return;}
   fs.style.display="flex";fs.innerHTML="";
@@ -1249,11 +1441,14 @@ let musicState={name:null};   // optional music bed for the whole batch (session
 let lastMusicFile=null;        // last uploaded File, for "save to library"
 function langFromName(n){const m=n.match(/_([a-z]{2})\.[^.]+$/i);if(m)return m[1].toLowerCase();if(/caption|_en\b/i.test(n))return "en";return "";}
 function langColor(l){return LANG_COLORS[l]||"#5F5E5A";}
-function srcColor(s){return s==="edit"?"var(--ok)":"var(--accent2)";}   // green = from Edit tab, blue = added manually
+function srcColor(s){return s==="loc"?"var(--accent)":(s==="edit"?"var(--ok)":"var(--accent2)");}   // logo colors: green=Orig(edit), red=Loc, blue=Add
 
 function renderHookTiles(){
   const box=$("hookTiles");box.innerHTML="";
   if(!hooks.length){box.innerHTML="<div style='color:var(--muted);font-size:12px'>No hooks yet — import files or pull from this session.</div>";renderBatchStage();return;}
+  const lg=document.createElement("div");lg.style.cssText="display:flex;gap:12px;font-size:10px;color:var(--muted);margin:0 0 6px 2px";
+  lg.innerHTML="<span><b style='color:var(--ok)'>▌</b> Orig</span><span><b style='color:var(--accent)'>▌</b> Loc</span><span><b style='color:var(--accent2)'>▌</b> Add</span>";
+  box.appendChild(lg);
   hooks.forEach((h,i)=>{const t=document.createElement("div");
     t.style.cssText="display:flex;align-items:center;gap:8px;padding:7px 9px;margin:4px 0;border-radius:7px;background:var(--panel2);border-left:4px solid "+srcColor(h.src)+";font-size:12px";
     t.innerHTML="<span style='background:"+langColor(h.lang)+";color:#0d0e12;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(h.lang||"?").toUpperCase()+"</span><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+h.name+"</span>";
@@ -1423,7 +1618,7 @@ $("packAsset").onchange=renderBatchStage;
 $("batchAssembleBtn").onclick=async()=>{
   if(!hooks.length){setStatus("Add hooks first.","err");return;}
   if(!fileId){setStatus("No session.","err");return;}
-  const packBase=$("packAsset").value,fmt="9:16";
+  const packBase=$("packAsset").value,fmt=ratio;   // project format (9:16 / 1:1 / 16:9)
   const recipes=hooks.map(h=>{const hookSeg={type:"session",ref:h.clip||h.name};
     if(h.words&&h.style){hookSeg.words=h.words;hookSeg.style=h.style;}  // live hook → bake captions now
     if(h.trim)hookSeg.trim=h.trim;                                     // cut clip at assemble
@@ -1448,32 +1643,276 @@ $("batchAssembleBtn").onclick=async()=>{
 };
 
 // ---------- rail navigation (icon sidebar) ----------
-// Two modes: edit (single-clip editor: text/style/localize/export stacked) and asm (the board).
+// Three modes: edit (single-clip studio), loc (localizations only), asm (the board).
+let currentMode="edit";
 function setMode(m){
-  const asm=(m==="asm");
+  if(m!=="edit"&&m!=="loc"&&m!=="asm")m="edit";
+  currentMode=m;
+  const asm=(m==="asm"), loc=(m==="loc"), edit=(m==="edit");
+  // Left sidebar sections: compose only in asm; the rest only in edit; loc UI is self-contained.
   document.querySelectorAll(".sec").forEach(s=>{
     const isCompose=s.dataset.sec==="compose";
-    s.style.display=((asm?isCompose:!isCompose))?"block":"none";
+    s.style.display=((asm?isCompose:(edit&&!isCompose)))?"block":"none";
   });
-  $("mEdit").classList.toggle("active",!asm);
+  $("mEdit").classList.toggle("active",edit);
+  $("mLoc").classList.toggle("active",loc);
   $("mAsm").classList.toggle("active",asm);
-  $("actEdit").style.display=asm?"none":"flex";
+  $("actEdit").style.display=edit?"flex":"none";
   $("actAsm").style.display=asm?"flex":"none";
   $("panelContent").scrollTop=0;
   $("batchStage").style.display=asm?"block":"none";
-  $("editStage").style.display=asm?"none":"grid";
-  $("trimRow").style.display=(asm||!videoLoaded)?"none":"flex";
+  $("locStage").style.display=loc?"block":"none";
+  $("editStage").style.display=edit?"grid":"none";
+  $("trimRow").style.display=(!edit||!videoLoaded)?"none":"flex";
   if(asm){$("varTabs").style.display="none";pullSessionHooks(true);renderBatchStage();}
-  else{autoGrow();buildVarTabs();buildFilmstrip();if(typeof renderOverlays==="function"){renderOverlays();renderOverlayList();}}
+  else if(loc){$("varTabs").style.display="none";if(typeof renderLocStage==="function")renderLocStage();}
+  else{autoGrow();buildVarTabs();buildFilmstrip();if(typeof renderGroupBar==="function")renderGroupBar();if(typeof renderOverlays==="function"){renderOverlays();renderOverlayList();}}
   if(typeof tutOn!=="undefined"&&tutOn){tutIdx=0;showTut();}
 }
+// LOC workspace shell — localizations only (built out in the next increments).
+// Country/language data — powers both the language chips and the waiting-quiz.
+const LOC_LANGS={
+  es:{name:"Spanish",flag:"🇪🇸",q:[
+    {q:{ua:"Столиця Іспанії?",en:"Capital of Spain?"},o:["Barcelona","Madrid","Valencia"],a:1},
+    {q:{ua:"Валюта Іспанії?",en:"Spain's currency?"},o:["Peseta","Euro","Dollar"],a:1},
+    {q:{ua:"«Привіт» іспанською?",en:"«Hello» in Spanish?"},o:["Bonjour","Hola","Ciao"],a:1},
+    {q:{ua:"Іспанська страва?",en:"Spanish dish?"},o:["Paella","Pizza","Sushi"],a:0}]},
+  fr:{name:"French",flag:"🇫🇷",q:[
+    {q:{ua:"Столиця Франції?",en:"Capital of France?"},o:["Lyon","Paris","Marseille"],a:1},
+    {q:{ua:"«Дякую» французькою?",en:"«Thank you» in French?"},o:["Gracias","Merci","Danke"],a:1},
+    {q:{ua:"Символ Парижа?",en:"Paris landmark?"},o:["Colosseum","Eiffel Tower","Big Ben"],a:1},
+    {q:{ua:"Валюта Франції?",en:"France's currency?"},o:["Franc","Euro","Lira"],a:1}]},
+  de:{name:"German",flag:"🇩🇪",q:[
+    {q:{ua:"Столиця Німеччини?",en:"Capital of Germany?"},o:["Munich","Berlin","Hamburg"],a:1},
+    {q:{ua:"«Так» німецькою?",en:"«Yes» in German?"},o:["Ja","Oui","Sì"],a:0},
+    {q:{ua:"Німецький автобренд?",en:"German car brand?"},o:["BMW","Fiat","Renault"],a:0},
+    {q:{ua:"Німецьке свято?",en:"German festival?"},o:["Oktoberfest","La Tomatina","Holi"],a:0}]},
+  it:{name:"Italian",flag:"🇮🇹",q:[
+    {q:{ua:"Столиця Італії?",en:"Capital of Italy?"},o:["Milan","Rome","Naples"],a:1},
+    {q:{ua:"«Дякую» італійською?",en:"«Thank you» in Italian?"},o:["Merci","Grazie","Gracias"],a:1},
+    {q:{ua:"Італійська страва?",en:"Italian dish?"},o:["Paella","Pasta","Schnitzel"],a:1},
+    {q:{ua:"Місто на воді в Італії?",en:"Italian city on water?"},o:["Venice","Porto","Nice"],a:0}]},
+  pt:{name:"Portuguese",flag:"🇵🇹",q:[
+    {q:{ua:"Столиця Португалії?",en:"Capital of Portugal?"},o:["Lisbon","Porto","Faro"],a:0},
+    {q:{ua:"Валюта Португалії?",en:"Portugal's currency?"},o:["Escudo","Euro","Real"],a:1},
+    {q:{ua:"«Дякую» (ч.р.) португальською?",en:"«Thank you» (m) in Portuguese?"},o:["Obrigado","Gracias","Merci"],a:0},
+    {q:{ua:"Португалія відома…",en:"Portugal is famous for…"},o:["Fado","Flamenco","Polka"],a:0}]},
+};
+function TL(ua,en){return (typeof tutLang!=="undefined"&&tutLang==="en")?en:ua;}
+const TARGET_LANGS=["es","fr","de","it","pt"];   // current localization pool
+let locExcluded=new Set();                        // source clips the user toggled off (✕) before localizing
+function localizedFor(srcClip){
+  const stem=(srcClip||"").replace(/\.[^.]+$/,"");
+  return hooks.filter(h=>h.src==="loc"&&(h.clip.indexOf("dub_"+stem+"_")===0||(srcClip==="source.mp4"&&/^dub_[a-z]{2}\.mp4$/i.test(h.clip))));
+}
+function renderLocStage(){
+  const st=$("locStage");const srcs=locSources();const haveLoc=hooks.some(h=>h.src==="loc");
+  st.innerHTML='<div style="max-width:1060px;margin:0 auto">'
+    +'<h2 style="margin:0 0 4px;letter-spacing:.5px">LOC</h2>'
+    +'<div style="color:var(--muted);margin-bottom:16px">Локалізація хуків: '+(srcs.length?('<b>'+srcs.length+'</b> вихідних — ✕ виключає хук перед локалізацією'):'<b style="color:var(--accent)">немає хуків</b> — зроби пак в EDIT і натисни «Send pack → LOC»')+'.</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Мови локалізації:</div>'
+    +'<div id="locLangs" style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:16px"></div>'
+    +'<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">'
+      +'<select id="locProvider2" class="loc-provider"><option value="elevenlabs">Voice dub (ElevenLabs)</option><option value="heygen">Lip-sync (HeyGen)</option></select>'
+      +'<button class="primary big-go" id="locGoBtn">🌍 Localize</button></div>'
+    +'<div style="display:flex;gap:20px;align-items:flex-start">'
+      +'<div id="locRows" style="flex:1;min-width:0"></div>'
+      +(haveLoc?'<button class="primary big-go" style="flex:0 0 auto;align-self:center;font-size:19px;padding:18px 26px" onclick="setMode(\'asm\')">▦ Send to Assemble →</button>':'')
+    +'</div>'
+    +'<div id="locQuiz" style="display:none;position:fixed;left:24px;bottom:96px;z-index:135;max-width:360px"></div>'
+    +'</div>';
+  const LC=$("locLangs");
+  TARGET_LANGS.forEach(l=>{const c=LOC_LANGS[l];if(!c)return;
+    const chip=document.createElement("div");chip.className="chip";chip.dataset.l=l;chip.style.cssText="flex:0 0 auto;font-size:14px;padding:9px 15px";chip.textContent=c.flag+" "+l.toUpperCase();
+    chip.onclick=()=>chip.classList.toggle("on");LC.appendChild(chip);});
+  $("locGoBtn").onclick=localizePack;
+  const rows=$("locRows");
+  if(!srcs.length){rows.innerHTML='<div style="color:var(--muted);font-size:12px">—</div>';}
+  srcs.forEach((s,i)=>{
+    const excluded=locExcluded.has(s.clip);
+    const row=document.createElement("div");row.className="loc-row"+(excluded?" loc-excluded":"");
+    // original
+    const src=document.createElement("div");src.className="loc-mini";src.style.flex="0 0 auto";
+    const x=document.createElement("button");x.className="loc-x";x.textContent=excluded?"+":"✕";x.title=excluded?"Повернути в локалізацію":"Виключити з локалізації";
+    x.onclick=()=>{excluded?locExcluded.delete(s.clip):locExcluded.add(s.clip);renderLocStage();};
+    src.appendChild(x);
+    if(s.videoUrl){const cv=document.createElement("canvas");cv.width=74;cv.height=132;cv.style.borderRadius="8px";src.appendChild(cv);row.appendChild(src);
+      try{drawThumb(cv,{videoUrl:s.videoUrl,words:s.words,style:s.ctrl},"locsrc"+i);}catch(e){}}
+    else{src.insertAdjacentHTML("beforeend",'<div style="padding:16px 8px;font-size:10px;color:var(--muted);text-align:center;width:74px;word-break:break-all">'+(s.name||s.clip)+'</div>');row.appendChild(src);}
+    // arrow + localized outputs (the 1 → many fan-out)
+    const outs=localizedFor(s.clip);
+    const arrow=document.createElement("div");arrow.className="loc-arrow";arrow.textContent=outs.length?"→":"⋯";row.appendChild(arrow);
+    const og=document.createElement("div");og.className="loc-outs";
+    if(!outs.length)og.innerHTML='<div style="color:var(--muted);font-size:12px;align-self:center">'+(excluded?'виключено':'ще не локалізовано')+'</div>';
+    outs.forEach((h,j)=>{const mini=document.createElement("div");mini.className="loc-mini";
+      const cv=document.createElement("canvas");cv.width=50;cv.height=89;cv.style.borderRadius="6px";mini.appendChild(cv);
+      const badge=document.createElement("div");badge.className="fb";badge.style.fontSize="9px";badge.textContent=(h.lang||"").toUpperCase();if(typeof langColor==="function")badge.style.background=langColor(h.lang);mini.appendChild(badge);
+      const ed=document.createElement("button");ed.textContent="✎";ed.title="Поправити титри";ed.style.cssText="position:absolute;top:3px;right:3px;border:0;border-radius:6px;background:rgba(0,0,0,.62);color:#fff;cursor:pointer;font-size:11px;padding:2px 5px";
+      ed.onclick=(e)=>{e.stopPropagation();editLocHook(h);};mini.appendChild(ed);
+      og.appendChild(mini);try{drawThumb(cv,{videoUrl:API+"/clip/"+fileId+"/"+h.clip,words:h.words,style:h.ctrl},"locm"+h.clip+j);}catch(e){}});
+    row.appendChild(og);
+    if(outs.length){const eall=document.createElement("button");eall.textContent="✎ усі";eall.title="Редагувати всі локалізації цього хука разом";
+      eall.style.cssText="flex:0 0 auto;align-self:center;font-size:12px;padding:8px 12px";eall.onclick=()=>editLocPack(s.clip);row.appendChild(eall);}
+    rows.appendChild(row);
+  });
+}
+function locSources(){
+  // originals always live on the board (src "edit") → single source of truth, no editPack confusion
+  return hooks.filter(h=>h.src==="edit").map(h=>({clip:h.clip,lang:h.lang||"en",
+    style:h.style||(h.ctrl?toEngineStyle(h.ctrl):null),name:h.name,videoUrl:h.videoUrl||null,words:h.words||null,ctrl:h.ctrl||null}));
+}
+async function localizePack(){
+  const langs=Array.from(document.querySelectorAll('#locLangs .chip.on')).map(c=>c.dataset.l);
+  if(!langs.length){setStatus("Обери хоч одну мову.","err");return;}
+  const srcs=locSources().filter(s=>!locExcluded.has(s.clip));
+  if(!srcs.length){setStatus("Немає хуків для локалізації (усі виключені або порожньо).","err");return;}
+  if(!fileId){setStatus("Немає сесії — спершу зроби хуки в EDIT.","err");return;}
+  const provider=$("locProvider2")?$("locProvider2").value:"elevenlabs";
+  // make sure the ORIGINALS are on the board too (so EN versions assemble alongside the localized ones)
+  srcs.forEach(s=>{if(!hooks.some(h=>h.clip===s.clip))hooks.push({name:s.clip,clip:s.clip,lang:s.lang||"en",words:s.words,style:s.style,ctrl:s.ctrl,src:"edit"});});
+  busyStart("Локалізація: "+srcs.length+"×"+langs.length+"…");startQuiz(langs);let added=0;
+  for(const s of srcs){
+    try{
+      const r=await fetch(API+"/api/dub",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:s.clip,target_langs:langs,provider:provider,model_size:$("modelSize").value})});
+      const d=await r.json();if(!r.ok)throw new Error(d.detail||"dub failed");
+      (d.results||[]).forEach(res=>{if(hooks.some(h=>h.clip===res.clip))return;
+        const hook={name:res.clip,clip:res.clip,lang:res.lang,words:res.words,src:"loc",
+                    videoUrl:API+"/clip/"+fileId+"/"+res.clip};
+        if(s.style)hook.style=s.style;            // localized inherits the original's caption style
+        if(s.ctrl)hook.ctrl=JSON.parse(JSON.stringify(s.ctrl));  // own controls copy for thumbnail + ✎ edit
+        hooks.push(hook);added++;});
+    }catch(e){setStatus("Лок "+(s.name||s.clip)+": "+e.message,"err");}
+  }
+  stopQuiz();renderHookTiles();renderLocStage();
+  if(added){if(typeof chime==="function")chime("localize");busyDone(added+" локалізованих хуків");setStatus(added+" локалізованих хуків → на дошці Assemble.","ok");}
+  else busyStop();
+}
+function renderLocResults(){
+  const box=$("locResults");if(!box)return;
+  const locs=hooks.filter(h=>h.src==="loc");
+  if(!locs.length){box.innerHTML="";return;}
+  box.innerHTML='<div style="font-weight:700;margin:14px 0 4px">Готові локалізації</div>'
+    +'<div style="color:var(--muted);font-size:12px;margin-bottom:10px">Клікни ✎ на версії, щоб поправити її титри в EDIT.</div>'
+    +'<div id="locResGrid" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px"></div>'
+    +'<button class="primary" onclick="setMode(\'asm\')">▦ До Assemble →</button>';
+  const grid=$("locResGrid");
+  locs.forEach((h,i)=>{
+    const card=document.createElement("div");card.className="fcard";card.style.position="relative";card.title=h.name||h.clip;
+    const cv=document.createElement("canvas");cv.width=74;cv.height=132;card.appendChild(cv);
+    const badge=document.createElement("div");badge.className="fb";badge.textContent=(h.lang||"").toUpperCase();
+    if(typeof langColor==="function")badge.style.background=langColor(h.lang);card.appendChild(badge);
+    const ed=document.createElement("button");ed.textContent="✎";ed.title="Поправити титри";
+    ed.style.cssText="position:absolute;top:4px;right:4px;border:0;border-radius:7px;background:rgba(0,0,0,.62);color:#fff;cursor:pointer;font-size:13px;padding:3px 7px";
+    ed.onclick=(e)=>{e.stopPropagation();editLocHook(h);};
+    card.appendChild(ed);grid.appendChild(card);
+    try{drawThumb(cv,{videoUrl:API+"/clip/"+fileId+"/"+h.clip,words:h.words,style:h.ctrl},"locres"+i);}catch(e){}
+  });
+}
+// open ANY board hook (e.g. a localized version) in the full EDIT editor to fix its captions
+function editLocHook(h){
+  activeHook=-1;editingHook=h;   // keep editPack intact so the EDIT originals are NEVER lost
+  const url=API+"/clip/"+fileId+"/"+h.clip;
+  const ctrl=h.ctrl||sharedCtrl||readControls();
+  enVideoUrl=url;realWords=h.words||[];
+  variants={en:{clip:h.clip,videoUrl:url,words:h.words,style:ctrl,language:h.lang}};activeVar="en";
+  video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
+  video.onloadedmetadata=()=>{videoLoaded=true;};videoLoaded=true;
+  $("transcript").value=(h.words||[]).map(w=>w.word||w.text).join(" ");
+  writeControls(ctrl);
+  updateEditButtons();
+  setMode("edit");autoGrow();
+  setStatus("Правиш локалізований хук «"+(h.name||h.clip)+"» ("+(h.lang||"").toUpperCase()+"). Натисни 💾 Save back → повернешся в LOC.","");
+}
+function saveEditingHook(){
+  if(!editingHook)return;
+  try{const rw=remapWords($("transcript").value,editingHook.words);if(rw)editingHook.words=rw;}catch(e){}
+  const ctrl=readControls();editingHook.ctrl=ctrl;editingHook.style=toEngineStyle(ctrl);
+  editingHook=null;updateEditButtons();
+  renderHookTiles();setMode("loc");
+  setStatus("Збережено — локалізований хук оновлено.","ok");
+}
+// open ALL localized versions of one source as a pack in EDIT (edit them like one project)
+// EDIT groups: Originals + one per source's localizations — switchable, nothing ever lost.
+function editGroups(){
+  const origs=hooks.filter(h=>h.src==="edit");const groups=[];
+  const unloc=origs.filter(o=>localizedFor(o.clip).length===0);
+  if(unloc.length)groups.push({label:"📦 Originals",items:unloc,mode:"orig"});       // only not-yet-localized originals
+  origs.forEach(o=>{const locs=localizedFor(o.clip);                                  // each localized hook → its own project (orig + langs)
+    if(locs.length)groups.push({label:"🎬 "+(o.name||o.clip).replace(/\.[^.]+$/,""),items:[o].concat(locs),mode:"proj"});});
+  return groups;
+}
+function renderGroupBar(){
+  const gc=$("groupCol");if(!gc)return;
+  let bar=$("groupBar");
+  if(!bar){bar=document.createElement("div");bar.id="groupBar";bar.style.cssText="display:flex;flex-direction:column;gap:4px;margin-bottom:6px";gc.insertBefore(bar,gc.children[1]||null);}
+  const groups=editGroups();
+  if(!(groups.length>1||groups.some(g=>g.mode==="proj"))){bar.style.display="none";return;}   // show once projects exist or there's a choice
+  bar.style.display="flex";bar.innerHTML="<div style='font-size:10px;color:var(--muted);margin-bottom:2px'>Проєкти</div>";
+  groups.forEach(g=>{const b=document.createElement("button");b.textContent=g.label;
+    const active=editPack.length&&editPack[0]&&g.items[0]&&editPack[0].clip===g.items[0].clip;
+    b.style.cssText="font-size:11px;padding:6px 8px;text-align:left;border-radius:7px;border:1px solid var(--line);background:"+(active?"var(--accent)":"var(--panel2)")+";color:"+(active?"#fff":"var(--txt)");
+    b.onclick=()=>loadGroup(g.items,g.mode);bar.appendChild(b);});
+}
+function loadGroup(items,mode){
+  if(!items||!items.length)return;
+  editingHook=null;packMode=(mode==="loc")?"loc":"orig";
+  editPack=items;activeHook=-1;
+  $("dropzone").style.display="none";video.hidden=false;canvas.hidden=false;videoLoaded=true;
+  selectHook(0);setMode("edit");renderGroupBar();updateEditButtons();
+}
+function editLocPack(srcClip){   // open the whole project: original + its localizations
+  const orig=hooks.find(h=>h.src==="edit"&&h.clip===srcClip);
+  loadGroup((orig?[orig]:[]).concat(localizedFor(srcClip)),"proj");
+}
+function saveLocPack(){
+  saveActiveHook();
+  editPack.forEach(it=>{const ref=it._ref||hooks.find(h=>h.clip===it.clip);
+    if(ref){ref.words=it.words;ref.ctrl=it.ctrl;ref.style=toEngineStyle(it.ctrl);}});
+  editPack=[];activeHook=-1;packMode="orig";updateEditButtons();
+  renderHookTiles();setMode("loc");
+  setStatus("Лок-пак збережено 🎯","ok");
+}
+// ---------- waiting quiz: countries of the localization languages ----------
+let quizTimer=null,quizScore=0,quizPool=[],quizIdx=0,quizLangs=[];
+function buildQuizPool(langs){
+  const use=(langs&&langs.length)?langs:Object.keys(LOC_LANGS);const pool=[];
+  use.forEach(l=>{const c=LOC_LANGS[l];if(c)(c.q||[]).forEach(q=>pool.push({...q,flag:c.flag,name:c.name}));});
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  return pool;
+}
+function startQuiz(langs){quizLangs=langs||[];quizPool=buildQuizPool(quizLangs);quizIdx=0;quizScore=0;
+  const box=$("locQuiz");if(!box||!quizPool.length)return;box.style.display="block";renderQuiz();}
+function renderQuiz(){
+  const box=$("locQuiz");if(!box||!quizPool.length)return;
+  if(quizIdx>=quizPool.length){const last=quizPool.length?quizPool[quizPool.length-1].q.ua:null;quizPool=buildQuizPool(quizLangs);if(quizPool.length>1&&quizPool[0].q.ua===last)quizPool.push(quizPool.shift());quizIdx=0;}
+  const q=quizPool[quizIdx];const lng=(typeof tutLang!=="undefined"&&tutLang==="en")?"en":"ua";
+  box.innerHTML='<div class="q-card tut-anim">'
+    +'<div class="q-head">'+TL("поки кручу локалізацію — вікторина 🎲 · рахунок ","localizing… here's a quiz 🎲 · score ")+quizScore+'</div>'
+    +'<div class="q-flag">'+q.flag+'</div>'
+    +'<div class="q-q">'+(q.q[lng]||q.q.ua)+'</div>'
+    +'<div class="q-opts" id="quizOpts"></div></div>';
+  const opts=box.querySelector("#quizOpts");
+  q.o.forEach((opt,i)=>{const b=document.createElement("button");b.textContent=opt;b.className="q-opt";
+    b.onclick=()=>answerQuiz(i,b);opts.appendChild(b);});
+}
+function answerQuiz(i,btn){
+  const q=quizPool[quizIdx];const opts=btn.parentElement.querySelectorAll("button");
+  opts.forEach((b,j)=>{b.disabled=true;if(j===q.a)b.style.background="rgba(34,197,94,.28)";});
+  if(i===q.a)quizScore++;else btn.style.background="rgba(255,58,34,.28)";
+  clearTimeout(quizTimer);quizTimer=setTimeout(()=>{quizIdx++;renderQuiz();},1150);
+}
+function stopQuiz(){clearTimeout(quizTimer);const box=$("locQuiz");if(box){box.style.display="none";box.innerHTML="";}}
 // Relocate the most-used controls around the preview (studio layout). IDs/handlers stay intact.
 function buildStudioLayout(){
   const presets=$("presets"), ph=presets?presets.parentElement:null;
   if(presets)$("presetRail").appendChild(presets);
   if(ph)ph.style.display="none";                       // hide the now-empty "Presets" header in the sidebar
+  const gcol=$("groupCol");if(gcol&&$("filmstrip"))gcol.appendChild($("filmstrip"));   // hook/project strip lives in its own vertical column
   const pc=$("previewCol");
-  [$("filmstrip"),$("viewport"),$("transport"),$("trimRow")].forEach(el=>{if(el)pc.appendChild(el);});
+  [$("viewport"),$("transport"),$("trimRow")].forEach(el=>{if(el)pc.appendChild(el);});
+  const ez=document.querySelector(".editzone");
+  if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="width:100%;margin:0 0 8px;font-size:12px;padding:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all lives by the style presets
   const qp=$("quickPanel");
   [$("grpTranscribe"),$("grpBaseText")].forEach(el=>{if(el)qp.appendChild(el);});
   const tb=$("transcribeBtn"),body=$("grpTranscribe")&&$("grpTranscribe").querySelector(".body");
@@ -1530,7 +1969,8 @@ function positionTutorial(force){
 function tutTick(){if(!tutOn){tutRAF=null;return;}positionTutorial(false);tutRAF=requestAnimationFrame(tutTick);}
 function closeTut(){tutOn=false;if(tutRAF){cancelAnimationFrame(tutRAF);tutRAF=null;}$("tutBtn").classList.remove("on");["tutSpot","tutHint","tutBlur"].forEach(id=>{const e=$(id);if(e)e.remove();});}
 function tutToggle(){if(tutOn){closeTut();return;}tutOn=true;tutIdx=0;$("tutBtn").classList.add("on");showTut();}
-function tutLangToggle(){tutLang=(tutLang==="ua")?"en":"ua";$("tutLangBtn").textContent=(tutLang==="ua")?"EN":"UA";$("tutBtn").textContent=TUTL[tutLang].btn;if(tutOn)showTut();}
+function tutLangToggle(){tutLang=(tutLang==="ua")?"en":"ua";$("tutLangBtn").textContent=(tutLang==="ua")?"EN":"UA";$("tutBtn").textContent=TUTL[tutLang].btn;if(tutOn)showTut();
+  if($("locQuiz")&&$("locQuiz").style.display!=="none"&&typeof renderQuiz==="function")renderQuiz();}
 function tutNext(){   // fade everything out, then reappear at the next spot (no choppy flight)
   const h=$("tutHint"),s=$("tutSpot"),b=$("tutBlur");
   if(h)h.style.opacity="0";if(s)s.style.opacity="0";if(b)[...b.children].forEach(d=>d.style.opacity="0");
@@ -1623,8 +2063,22 @@ function renderBatchStage(){
   let html="<div style='display:flex;gap:8px;align-items:flex-start;justify-content:center;max-width:1000px;margin:0 auto'>"+cols.join("")+"</div>";
   if(musicTracks.length)html+="<div style='margin:16px auto 0;max-width:620px;padding:9px 12px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--accent);font-size:12px;text-align:center;color:var(--muted)'>🎵 "+musicTracks.length+" музичн"+(musicTracks.length>1?"і доріжки":"а доріжка")+" · налаштування в панелі <b>Audio</b> ліворуч</div>";
   const n=shown.length;
-  html+="<div style='display:flex;justify-content:center;margin-top:22px'><button id='boardBuild' class='primary' style='padding:15px 44px;font-size:17px;font-weight:700;letter-spacing:.3px'>🎬 Render "+n+" video"+(n>1?"s":"")+"</button></div>";
+  html+="<div style='display:flex;gap:12px;justify-content:center;align-items:center;margin-top:22px'><button id='boardBuild' class='primary' style='padding:15px 44px;font-size:17px;font-weight:700;letter-spacing:.3px'>🎬 Render "+n+" video"+(n>1?"s":"")+"</button>"
+    +(hasFinals?"<button id='dlAllBtn' style='padding:14px 26px;font-size:15px'>⬇ Завантажити все (zip)</button><button id='posterBtn' style='padding:14px 26px;font-size:15px'>🖼 Прев'ю-картинки</button>":"")+"</div>";
   el.innerHTML=html;
+  if($("dlAllBtn"))$("dlAllBtn").onclick=()=>{if(fileId)window.location=API+"/api/download_all/"+fileId;else setStatus("Спершу зроби рендер.","err");};
+  if($("posterBtn"))$("posterBtn").onclick=async()=>{
+    const shots=shown.map(h=>{const f=batchFinals[clipKey(h)];if(!f)return null;
+      const t=(h.words&&h.words.length&&h.words[0].start!=null)?(+h.words[0].start+0.2):1.0;   // frame at the first caption
+      return {file:f.file,t:Math.max(0.1,t)};}).filter(Boolean);
+    if(!shots.length||!fileId){setStatus("Спершу зроби рендер.","err");return;}
+    setStatus("Готую прев'ю-картинки…","",true);busyStart("Прев'ю-картинки…");
+    try{const r=await fetch(API+"/api/posters",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,shots})});
+      if(!r.ok)throw new Error((await r.json()).detail||"failed");
+      const u=URL.createObjectURL(await r.blob());const aa=document.createElement("a");aa.href=u;aa.download="assembler_posters.zip";aa.click();setTimeout(()=>URL.revokeObjectURL(u),4000);
+      busyDone("Прев'ю готові");setStatus("PNG-прев'ю (оригінальна роздільність) завантажено.","ok");
+    }catch(e){setStatus("Прев'ю помилка: "+e.message,"err");busyStop();}
+  };
   el.querySelectorAll("[data-rm]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();hooks.splice(+x.dataset.rm,1);renderHookTiles();});
   el.querySelectorAll("[data-rmbody]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();bodyParts.splice(+x.dataset.rmbody,1);if(!bodyParts.length)bodyParts=[""];renderBatchStage();});
   el.querySelectorAll("[data-pick]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();openPicker(t.dataset.pick,t,t.dataset.slot===''?null:+t.dataset.slot);});

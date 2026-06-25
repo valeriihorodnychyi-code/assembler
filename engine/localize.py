@@ -15,7 +15,8 @@ from . import dub, heygen, transcribe, compose, styles as st
 
 def dub_and_transcribe(video_path, target_langs, dest_dir, source_lang="en",
                        api_key=None, transcribe_engine="whisper", model_size="small",
-                       work_dir=None, progress=None, provider="elevenlabs", provider_key=None):
+                       work_dir=None, progress=None, provider="elevenlabs", provider_key=None,
+                       name_prefix=""):
     """Stage 1 of localization: produce a clean (no-caption) dubbed clip + its
     transcription per language. Returns (results, errors) where each result is
     {"lang", "clip"(filename in dest_dir), "words", "language"}.
@@ -33,13 +34,14 @@ def dub_and_transcribe(video_path, target_langs, dest_dir, source_lang="en",
                 progress(lang, "dubbing")
             dubbed = provider_mod.dub_clip(video_path, lang, source_lang=source_lang,
                                            api_key=(provider_key or api_key), work_dir=work_dir)
-            dest = os.path.join(dest_dir, f"dub_{lang}.mp4")
+            out_name = f"dub_{name_prefix}{lang}.mp4"
+            dest = os.path.join(dest_dir, out_name)
             shutil.move(dubbed, dest)
             if progress:
                 progress(lang, "transcribing")
             tr = transcribe.transcribe(dest, engine=transcribe_engine,
                                        model_size=model_size, language=lang, api_key=api_key)
-            results.append({"lang": lang, "clip": f"dub_{lang}.mp4",
+            results.append({"lang": lang, "clip": out_name,
                             "words": tr["words"], "language": tr["language"]})
         except Exception as e:
             errors[lang] = str(e)

@@ -16,8 +16,8 @@ def _word_text(w):
 SENTENCE_ENDERS = ".!?…"
 
 
-def build_events(words, max_chars_per_line, text_case="uppercase", replacements=None,
-                 pause_gap=0.5, max_lines=2):
+def build_events(words, limit, text_case="uppercase", replacements=None,
+                 pause_gap=0.5, max_lines=2, wrap_mode="chars"):
     """Group a flat list of {text,start,end} words into karaoke events.
 
     Each event = a visible 1-2 line chunk + the index of the currently active word.
@@ -85,20 +85,32 @@ def build_events(words, max_chars_per_line, text_case="uppercase", replacements=
             cur.append(w)
         if cur:
             phrases.append(cur)
+        lim = max(1, int(limit))
         for phrase in phrases:
-            lines, line, line_chars = [], [], 0
-            for w in phrase:
-                word_len = len(w["text"])
-                space_len = 1 if line else 0
-                if line_chars + space_len + word_len <= max_chars_per_line:
-                    line.append(w)
-                    line_chars += space_len + word_len
-                else:
-                    if line:
+            lines = []
+            if wrap_mode == "words":          # wrap by WORD count per line
+                line = []
+                for w in phrase:
+                    if len(line) >= lim:
                         lines.append(line)
-                    line, line_chars = [w], word_len
-            if line:
-                lines.append(line)
+                        line = []
+                    line.append(w)
+                if line:
+                    lines.append(line)
+            else:                             # wrap by CHARS (default — guarantees width fit)
+                line, line_chars = [], 0
+                for w in phrase:
+                    word_len = len(w["text"])
+                    space_len = 1 if line else 0
+                    if line_chars + space_len + word_len <= lim:
+                        line.append(w)
+                        line_chars += space_len + word_len
+                    else:
+                        if line:
+                            lines.append(line)
+                        line, line_chars = [w], word_len
+                if line:
+                    lines.append(line)
             step = max(1, int(max_lines))
             for j in range(0, len(lines), step):
                 chunks.append(lines[j:j + step])
