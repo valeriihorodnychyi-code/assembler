@@ -1,0 +1,25 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#202531"/>
+      <stop offset="1" stop-color="#0f1116"/>
+    </linearGradient>
+    <pattern id="dots" width="46" height="46" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="3" fill="#ffffff" fill-opacity="0.06"/>
+    </pattern>
+    <clipPath id="card"><rect x="32" y="32" width="960" height="960" rx="224"/></clipPath>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  <g clip-path="url(#card)">
+    <rect x="32" y="32" width="960" height="960" fill="url(#bg)"/>
+    <rect x="32" y="32" width="960" height="960" fill="url(#dots)"/>
+  </g>
+  <rect x="32" y="32" width="960" height="960" rx="224" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="3"/>
+  <g filter="url(#sh)">
+    <rect x="186" y="372" width="520" height="74" rx="37" fill="#ff3a22"/>
+    <rect x="338" y="475" width="520" height="74" rx="37" fill="#3b82f6"/>
+    <rect x="246" y="578" width="560" height="74" rx="37" fill="#22c55e"/>
+  </g>
+</svg>
