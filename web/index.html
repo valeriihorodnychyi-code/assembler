@@ -2034,9 +2034,8 @@ const I18N={
 };
 let uiLang="ua";
 function setUILang(lang){uiLang=lang;
-  document.querySelectorAll("[data-i18n]").forEach(el=>{const t=I18N[el.getAttribute("data-i18n")];if(t&&t[lang]!=null)el.textContent=t[lang];});
-  document.querySelectorAll("[data-i18n-ph]").forEach(el=>{const t=I18N[el.getAttribute("data-i18n-ph")];if(t&&t[lang]!=null)el.placeholder=t[lang];});
-  document.querySelectorAll("[data-i18n-title]").forEach(el=>{const t=I18N[el.getAttribute("data-i18n-title")];if(t&&t[lang]!=null)el.title=t[lang];});
+  // Chrome (buttons + settings) stay English by design. Only the tutorial,
+  // its tips and the loc quiz follow the language switch.
   tutLang=lang;if($("tutLangBtn"))$("tutLangBtn").textContent=(lang==="ua")?"EN":"UA";
   if($("tutBtn")&&typeof TUTL!=="undefined")$("tutBtn").textContent=TUTL[lang].btn;
   if(typeof tutOn!=="undefined"&&tutOn&&typeof showTut==="function")showTut();
