@@ -253,6 +253,25 @@ def post_style(body: SaveStyle):
     return {"saved": os.path.basename(path), "styles": st.list_styles()}
 
 
+@app.get("/api/caption_rules")
+def get_caption_rules():
+    """Shared auto-caption rules (keep_together / glue / no_line_end / widow control)."""
+    return subtitles.load_rules()
+
+
+@app.post("/api/caption_rules")
+def post_caption_rules(body: dict):
+    """Save the shared caption rules. Body is the full rules object."""
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Rules must be an object")
+    path = subtitles._rules_path()
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(body, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+    return {"saved": True, "rules": subtitles.load_rules()}
+
+
 @app.post("/api/transcribe")
 async def api_transcribe(
     file: UploadFile = File(...),
@@ -327,6 +346,7 @@ class PreviewFrameReq(BaseModel):
     dur: float = 0.0   # clip duration, so the last caption "holds" like in the real render
     cap_in: Optional[float] = None    # captions only shown within [cap_in, cap_out]
     cap_out: Optional[float] = None
+    lang: str = "en"                  # language for auto-caption stopword rules
 
 
 @app.get("/api/font_metrics")
@@ -347,7 +367,8 @@ def api_preview_frame(req: PreviewFrameReq):
     # caption window: nothing shown outside [cap_in, cap_out]
     if (req.cap_in is not None and req.time < req.cap_in) or (req.cap_out is not None and req.time >= req.cap_out):
         return Response(status_code=204)
-    tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}])
+    tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}],
+                                    lang=(req.lang or "en"))
     events = [e for e, _ in tagged]
     if events and req.dur:
         events[-1]["end"] = max(events[-1]["end"], req.dur)  # hold last caption to clip end

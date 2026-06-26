@@ -355,6 +355,11 @@
             <button type="button" data-v="words">Words</button>
           </div></div>
         <div class="row"><label id="wrapLbl">Chars per line</label><input type="number" id="maxChars" value="15" min="1" max="40"></div>
+        <div class="row" style="align-items:flex-start"><label title="Фрази, які НІКОЛИ не розриваються між рядками/титрами — по одній на рядок (напр. Tai Chi). Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label>
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1.3">
+            <textarea id="keepTogether" rows="3" placeholder="Tai Chi&#10;New York&#10;Muscle Booster" style="font-size:11px;resize:vertical;width:100%"></textarea>
+            <button type="button" id="saveRulesBtn" class="ghost" style="align-self:flex-end;font-size:11px" onclick="saveKeepTogether()">💾 Save phrases</button>
+          </div></div>
         <div class="row"><label data-i18n="lblLines">Lines on screen</label>
           <input type="hidden" id="maxLines" value="2">
           <div class="seg" id="linesSeg" style="flex:1.3">
@@ -710,8 +715,57 @@ function toEngineStyle(s){
 }
 
 // ---------- EVENTS (preview) ----------
-function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode){
-  const PAUSE=0.5, ENDERS=/[.!?…]$/; maxLines=maxLines||2;
+// ---------- auto-caption rules (mirror of engine/subtitles.py grouping) ----------
+let CAPTION_RULES=null;
+const _MONTHS=new Set(["january","february","march","april","may","june","july","august","september","october","november","december","jan","feb","mar","apr","jun","jul","aug","sep","sept","oct","nov","dec"]);
+const _WEEKDAYS=new Set(["monday","tuesday","wednesday","thursday","friday","saturday","sunday","mon","tue","tues","wed","thu","thur","thurs","fri","sat","sun"]);
+const _SYM=new Set(["%","$","€","£","+","&","/","x"]);
+function _isNum(t){return /^[+\-]?[\d.,]*\d/.test(t||"");}
+function capLang(){const v=variants&&variants[activeVar]&&variants[activeVar].lang;return String(v||($("language")&&$("language").value)||"en").toLowerCase();}
+async function loadCaptionRules(){try{CAPTION_RULES=await(await fetch(API+"/api/caption_rules")).json();}catch(e){CAPTION_RULES={};}fillKeepTogether();}
+function fillKeepTogether(){const ta=$("keepTogether");if(ta&&CAPTION_RULES)ta.value=(CAPTION_RULES.keep_together||[]).join("\n");}
+async function saveKeepTogether(){
+  const ta=$("keepTogether");if(!ta)return;
+  const list=ta.value.split("\n").map(s=>s.trim()).filter(Boolean);
+  CAPTION_RULES=CAPTION_RULES||{};CAPTION_RULES.keep_together=list;
+  const b=$("saveRulesBtn"),old=b?b.textContent:"";if(b){b.textContent="…";b.disabled=true;}
+  try{await fetch(API+"/api/caption_rules",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(CAPTION_RULES)});
+      if(b)b.textContent="✓ Saved";}
+  catch(e){if(b)b.textContent="✕ Error";}
+  setTimeout(()=>{if(b){b.textContent=old||"💾 Save phrases";b.disabled=false;}},1200);
+  if(typeof scheduleExact==="function")scheduleExact();
+  try{render(video.currentTime||0,video.duration||0);}catch(e){}
+}
+function buildGroups(words,lang,pauseGap){
+  const n=words.length; if(n<=1)return words.length?[words.slice()]:[];
+  const R=CAPTION_RULES||{}, glue=R.glue||{};
+  const units=new Set((R.units||[]).map(u=>String(u).toLowerCase()));
+  const stop=new Set(((R.no_line_end||{})[lang]||[]).map(s=>String(s).toLowerCase()));
+  const lc=words.map(w=>(w.text||"").toLowerCase());
+  const bond=new Array(n-1).fill(false);
+  const gapOk=i=>{const g=(+words[i+1].start)-(+words[i].end);return isNaN(g)?true:g<=pauseGap;};
+  for(let i=0;i<n-1;i++){
+    if(words[i].ends)continue;
+    if(!gapOk(i))continue;
+    const a=lc[i],b=lc[i+1];
+    if(stop.size&&stop.has(a))bond[i]=true;
+    if(glue.number_unit!==false&&_isNum(a)&&(units.has(b)||_SYM.has(b)))bond[i]=true;
+    if(glue.currency!==false&&(_SYM.has(a)||_SYM.has(b)))bond[i]=true;
+    if(glue.dates!==false){
+      if((_MONTHS.has(a)&&_isNum(b))||(_isNum(a)&&_MONTHS.has(b)))bond[i]=true;
+      if(_WEEKDAYS.has(a)||_WEEKDAYS.has(b))bond[i]=true;
+    }
+  }
+  const phrases=(R.keep_together||[]).map(p=>String(p).trim().toLowerCase().split(/\s+/).filter(Boolean)).filter(t=>t.length>=2);
+  for(let s=0;s<n;s++)for(const toks of phrases){const k=toks.length;
+    if(s+k<=n){let ok=true;for(let j=0;j<k;j++)if(lc[s+j]!==toks[j]){ok=false;break;}
+      if(ok)for(let j=s;j<s+k-1;j++)if(!words[j].ends)bond[j]=true;}}
+  const groups=[];let cur=[words[0]];
+  for(let i=0;i<n-1;i++){if(bond[i])cur.push(words[i+1]);else{groups.push(cur);cur=[words[i+1]];}}
+  groups.push(cur);return groups;
+}
+function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang){
+  const PAUSE=0.5, ENDERS=/[.!?…]$/; maxLines=maxLines||2; lang=lang||"en";
   let raw;
   const src=wordsOverride||((realWords&&realWords.length)?realWords:null);
   if(src){ raw=src.map(w=>({r:(w.word||w.text||""),start:+w.start,end:+w.end,brk:w.brk||null})); }
@@ -739,16 +793,24 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode){
     for(const w of words){if(cur.length){const p=cur[cur.length-1];if(p.ends||(w.start-p.end)>PAUSE){phrases.push(cur);cur=[];}}cur.push(w);}
     if(cur.length)phrases.push(cur);
     const lim=Math.max(1,limit||((wrapMode==="words")?3:15));   // parity with engine: chars OR words
-    for(const ph of phrases){let lines=[],line=[];
+    const minw=+((CAPTION_RULES||{}).min_last_line_words||0)||0;
+    for(const ph of phrases){
+      // group atomic units first (keep_together / numbers / dates / stopwords), then wrap by GROUPS
+      const groups=buildGroups(ph,lang,PAUSE);
+      let glines=[];
       if(wrapMode==="words"){
-        for(const w of ph){if(line.length>=lim){lines.push(line);line=[];}line.push(w);}
-        if(line.length)lines.push(line);
+        let line=[],count=0;
+        for(const g of groups){const gw=g.length;if(line.length&&count+gw>lim){glines.push(line);line=[];count=0;}line.push(g);count+=gw;}
+        if(line.length)glines.push(line);
       }else{
-        let chars=0;
-        for(const w of ph){const wl=w.text.length,sp=line.length?1:0;
-          if(chars+sp+wl<=lim){line.push(w);chars+=sp+wl;}else{if(line.length)lines.push(line);line=[w];chars=wl;}}
-        if(line.length)lines.push(line);
+        let line=[],chars=0;
+        for(const g of groups){const glen=g.reduce((a,w)=>a+w.text.length,0)+(g.length-1);let sp=line.length?1:0;
+          if(line.length&&chars+sp+glen>lim){glines.push(line);line=[];chars=0;sp=0;}line.push(g);chars+=sp+glen;}
+        if(line.length)glines.push(line);
       }
+      while(minw>1&&glines.length>1&&glines[glines.length-1].reduce((a,g)=>a+g.length,0)<minw&&glines[glines.length-2].length>1)
+        glines[glines.length-1].unshift(glines[glines.length-2].pop());
+      const lines=glines.map(ln=>ln.reduce((a,g)=>a.concat(g),[]));   // flatten groups -> words
       for(let i=0;i<lines.length;i+=maxLines)chunks.push(lines.slice(i,i+maxLines));}
   }
   const events=[];
@@ -789,11 +851,17 @@ function render(t,dur){
   const cw=(typeof capWin==="function")?capWin():{in:null,out:null};   // hide captions outside the in/out window
   if((cw.in!=null&&t<cw.in)||(cw.out!=null&&t>=cw.out))return;
   const scale=1;   // no per-format scaling — caption px absolute, identical in every format (matches engine)
-  const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode);
+  const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang());
   if(!events.length)return;
   let ev=events.find(e=>t>=e.start&&t<e.end);
   if(!ev)return; // silence before first word / after last -> nothing on screen (no random text)
-  const fs=s.fontSize*scale;ctx.font=`${fs}px "${s.fontFamily}"`;ctx.textBaseline="alphabetic";
+  const lines=ev.lines.map(l=>l.map(w=>({...w,disp:applyCase(w.text,s.textCase)})));
+  let fs=s.fontSize*scale;ctx.font=`${fs}px "${s.fontFamily}"`;
+  // shrink-to-fit: never let a caption line exceed the safe frame width (matches engine)
+  {const SAFE=W*0.92,sw=ctx.measureText(" ").width;
+   const mw=Math.max(0,...lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*sw));
+   if(mw>SAFE&&mw>0){fs=Math.max(8,Math.floor(fs*SAFE/mw));ctx.font=`${fs}px "${s.fontFamily}"`;}}
+  ctx.textBaseline="alphabetic";
   const mkey=(customFontName||(s.fontFamily+".ttf"))+"|"+Math.round(fs);
   const em=fontMetricsCache[mkey];
   let lineH;
@@ -802,7 +870,6 @@ function render(t,dur){
        if(!em)fetchMetrics(mkey,(customFontName||(s.fontFamily+".ttf")),Math.round(fs));}
   const asc=(em&&em.ascent!=null)?em.ascent:fs*0.8;   // baseline offset to match engine glyph placement
   const lineSp=s.lineSpacing*scale;
-  const lines=ev.lines.map(l=>l.map(w=>({...w,disp:applyCase(w.text,s.textCase)})));
   const totalH=lines.length*lineH+(lines.length-1)*lineSp;
   const startY=(H-s.marginBottom*scale)-totalH/2;
   const spaceW=ctx.measureText(" ").width;
@@ -1008,7 +1075,7 @@ async function fetchExact(){
   const v=variants[activeVar];
   if(!v||!v.words||!v.words.length)return;
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out})});
+      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang()})});
     if(r.status===204){hideExact();return;}
     if(!r.ok)return;
     const url=URL.createObjectURL(await r.blob());const img=$("exactImg");
@@ -1360,7 +1427,7 @@ function buildVarTabs(){
 const filmVideos={};
 function drawThumbCaption(ctx,W,H,s,words,t){
   if(!s)return;
-  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode);
+  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode,capLang());
   if(!events.length)return;
   const ev=events.find(e=>t>=e.start&&t<e.end)||events[0];if(!ev)return;
   const scale=W/1080,fs=(s.fontSize||80)*scale;ctx.font=fs+"px '"+(s.fontFamily||"Arial")+"'";ctx.textBaseline="top";
@@ -2256,7 +2323,7 @@ async function init(){
     if(!d.heygen_key_present){const o=$("locProvider").querySelector('option[value=heygen]');if(o)o.textContent+=" — no API key";}
     await populateFonts(d.fonts);
   }catch(e){$("encBadge").textContent="offline preview (no backend)";}
-  loadLibrary();loadSavedStyles();refreshAssembleHints();renderHookTiles();if(typeof renderTrackList==="function")renderTrackList();
+  loadLibrary();loadSavedStyles();loadCaptionRules();refreshAssembleHints();renderHookTiles();if(typeof renderTrackList==="function")renderTrackList();
   try{setUILang(localStorage.getItem("asm_lang")||"ua");}catch(e){try{setUILang("ua");}catch(_){}}
 }
 init();

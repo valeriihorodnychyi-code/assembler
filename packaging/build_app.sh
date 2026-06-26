@@ -31,7 +31,7 @@ rsync -a \
   --exclude '__pycache__' --exclude '*.pyc' \
   --exclude 'config.json' --exclude 'license.json' \
   --exclude 'web/index_backup_*.html' \
-  engine server web tools styles fonts version.json requirements.txt README.md \
+  engine server web tools styles fonts version.json caption_rules.json requirements.txt README.md \
   "$STAGED/"
 
 # --- 3. ensure arm64 ffmpeg + ffprobe in packaging/vendor/bin ----------------

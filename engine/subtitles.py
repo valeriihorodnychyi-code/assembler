@@ -6,6 +6,7 @@ timestamp normalization).
 """
 import os
 import re
+import json
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 
@@ -15,9 +16,131 @@ def _word_text(w):
 
 SENTENCE_ENDERS = ".!?…"
 
+# English month / weekday names used by the automatic date glue. (Localized
+# month names for es/fr/... can be added later; numbers + units glue already
+# works language-agnostically.)
+_MONTHS = {"january", "february", "march", "april", "may", "june", "july",
+           "august", "september", "october", "november", "december",
+           "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"}
+_WEEKDAYS = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+             "mon", "tue", "tues", "wed", "thu", "thur", "thurs", "fri", "sat", "sun"}
+_SYMBOLS = {"%", "$", "€", "£", "+", "&", "/", "x"}
+
+_RULES_CACHE = {}
+
+
+def _rules_path():
+    return os.environ.get("CS_CAPTION_RULES",
+                          os.path.join(os.path.dirname(os.path.dirname(__file__)), "caption_rules.json"))
+
+
+def load_rules(path=None):
+    """Load (and cache by mtime) the shared caption rules JSON.
+
+    Returns a safe default dict if the file is missing or malformed so captioning
+    never breaks just because rules are absent.
+    """
+    p = path or _rules_path()
+    default = {"keep_together": [], "glue": {}, "units": [], "no_line_end": {}, "min_last_line_words": 0}
+    try:
+        mtime = os.path.getmtime(p)
+    except OSError:
+        return default
+    cached = _RULES_CACHE.get(p)
+    if cached and cached[0] == mtime:
+        return cached[1]
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return default
+    _RULES_CACHE[p] = (mtime, data)
+    return data
+
+
+def _is_number(t):
+    return bool(re.match(r"^[+\-]?[\d.,]*\d", t or ""))
+
+
+def _phrase_token_lists(rules):
+    out = []
+    for phrase in rules.get("keep_together", []) or []:
+        toks = [t for t in re.split(r"\s+", str(phrase).strip().lower()) if t]
+        if len(toks) >= 2:
+            out.append(toks)
+    return out
+
+
+def build_groups(words, rules, lang="en", pause_gap=0.5):
+    """Split a phrase's word list into atomic groups that must stay together.
+
+    A "group" is a run of consecutive words that the wrapper is never allowed to
+    break across (line or caption). Rules applied: keep_together dictionary,
+    number+unit, currency/symbols, dates & weekdays, and no_line_end stopwords
+    (a stopword is glued to the FOLLOWING word so it can never end a line).
+    """
+    n = len(words)
+    if n <= 1:
+        return [list(words)] if words else []
+    glue = rules.get("glue", {}) or {}
+    units = set(u.lower() for u in (rules.get("units", []) or []))
+    stop = set(s.lower() for s in (rules.get("no_line_end", {}) or {}).get(lang, []))
+    lc = [(_word_text(w) if not isinstance(w, dict) else w.get("text", "")).lower() for w in words]
+
+    bond = [False] * (n - 1)   # bond[i] => words[i] and words[i+1] cannot be split
+
+    def gap_ok(i):
+        try:
+            return (float(words[i + 1]["start"]) - float(words[i]["end"])) <= pause_gap
+        except (KeyError, TypeError, ValueError):
+            return True
+
+    for i in range(n - 1):
+        if words[i].get("ends_sentence"):   # never glue across a sentence end
+            continue
+        if not gap_ok(i):                    # never glue across a long speech pause
+            continue
+        a, b = lc[i], lc[i + 1]
+        # no_line_end stopword -> glue to the next word
+        if stop and a in stop:
+            bond[i] = True
+        # number + unit ("5 kg", "30 days", "20 %") — only glue to a known unit/symbol,
+        # not to any following word (otherwise "26 today" would glue).
+        if glue.get("number_unit", True) and _is_number(a) and (b in units or b in _SYMBOLS):
+            bond[i] = True
+        if glue.get("currency", True) and (a in _SYMBOLS or b in _SYMBOLS):
+            bond[i] = True
+        # dates: "June 26", "26 June", weekday next to a neighbour
+        if glue.get("dates", True):
+            if (a in _MONTHS and _is_number(b)) or (_is_number(a) and b in _MONTHS):
+                bond[i] = True
+            if a in _WEEKDAYS or b in _WEEKDAYS:
+                bond[i] = True
+
+    # keep_together dictionary phrases (override: bond every internal pair)
+    phrases = _phrase_token_lists(rules)
+    if phrases:
+        for start in range(n):
+            for toks in phrases:
+                k = len(toks)
+                if start + k <= n and lc[start:start + k] == toks:
+                    for j in range(start, start + k - 1):
+                        if not words[j].get("ends_sentence"):
+                            bond[j] = True
+
+    groups, cur = [], [words[0]]
+    for i in range(n - 1):
+        if bond[i]:
+            cur.append(words[i + 1])
+        else:
+            groups.append(cur)
+            cur = [words[i + 1]]
+    groups.append(cur)
+    return groups
+
 
 def build_events(words, limit, text_case="uppercase", replacements=None,
-                 pause_gap=0.5, max_lines=2, wrap_mode="chars"):
+                 pause_gap=0.5, max_lines=2, wrap_mode="chars", lang="en", rules=None):
     """Group a flat list of {text,start,end} words into karaoke events.
 
     Each event = a visible 1-2 line chunk + the index of the currently active word.
@@ -28,6 +151,8 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     Within a phrase, words wrap to <= max_chars lines, grouped into <= 2-line chunks.
     """
     replacements = replacements or {}
+    if rules is None:
+        rules = load_rules()
     clean = []
     for w in words:
         raw = _word_text(w).strip()
@@ -87,30 +212,40 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
             phrases.append(cur)
         lim = max(1, int(limit))
         for phrase in phrases:
-            lines = []
+            # Build atomic groups first (keep_together / numbers / dates / stopwords),
+            # then wrap by GROUPS so a glued unit never breaks across a line or caption.
+            groups = build_groups(phrase, rules, lang=lang, pause_gap=pause_gap)
+            glines = []   # lines as lists OF groups
             if wrap_mode == "words":          # wrap by WORD count per line
-                line = []
-                for w in phrase:
-                    if len(line) >= lim:
-                        lines.append(line)
-                        line = []
-                    line.append(w)
+                line, count = [], 0
+                for g in groups:
+                    gw = len(g)
+                    if line and count + gw > lim:
+                        glines.append(line)
+                        line, count = [], 0
+                    line.append(g)
+                    count += gw
                 if line:
-                    lines.append(line)
+                    glines.append(line)
             else:                             # wrap by CHARS (default — guarantees width fit)
                 line, line_chars = [], 0
-                for w in phrase:
-                    word_len = len(w["text"])
+                for g in groups:
+                    glen = sum(len(w["text"]) for w in g) + (len(g) - 1)
                     space_len = 1 if line else 0
-                    if line_chars + space_len + word_len <= lim:
-                        line.append(w)
-                        line_chars += space_len + word_len
-                    else:
-                        if line:
-                            lines.append(line)
-                        line, line_chars = [w], word_len
+                    if line and line_chars + space_len + glen > lim:
+                        glines.append(line)
+                        line, line_chars = [], 0
+                        space_len = 0
+                    line.append(g)
+                    line_chars += space_len + glen
                 if line:
-                    lines.append(line)
+                    glines.append(line)
+            # widow control: avoid a final line with fewer than N words
+            minw = int((rules or {}).get("min_last_line_words", 0) or 0)
+            while (minw > 1 and len(glines) > 1
+                   and sum(len(g) for g in glines[-1]) < minw and len(glines[-2]) > 1):
+                glines[-1].insert(0, glines[-2].pop())
+            lines = [[w for g in line for w in g] for line in glines]   # flatten groups -> words
             step = max(1, int(max_lines))
             for j in range(0, len(lines), step):
                 chunks.append(lines[j:j + step])
@@ -188,6 +323,15 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         lines = event["lines"]
 
     active_idx = event["active_word_index"]
+    # shrink-to-fit: never let a caption line exceed the safe frame width (keeps long
+    # keep-together phrases or a single long word from spilling past the frame edge).
+    safe_w = width * 0.92
+    _sp = font.getlength(" ")
+    _maxw = max((sum(font.getlength(w["text"]) for w in line) + (len(line) - 1) * _sp
+                 for line in lines), default=0)
+    if _maxw > safe_w > 0:
+        font_size = max(8, int(font_size * safe_w / _maxw))
+        font = load_font(font_path, font_size)
     ascent, descent = font.getmetrics()
     line_height = ascent + descent
     line_spacing = int(int(style_cfg.get("line_spacing", 10)) * scale_factor)

@@ -22,11 +22,12 @@ def _region_for(t, regions):
     return regions[-1]
 
 
-def build_timeline(words, regions):
+def build_timeline(words, regions, lang="en"):
     """Return events sorted by time, each tagged with the style that applies to it.
 
     `regions` is a list of {"start", "end"(nullable), "style"}. A single-style render
-    is just one region covering the whole clip.
+    is just one region covering the whole clip. `lang` selects the language-specific
+    auto-caption rules (no_line_end stopwords).
     """
     # group words by region (by word start time) so chunks never cross a style boundary
     groups = {i: [] for i in range(len(regions))}
@@ -49,6 +50,7 @@ def build_timeline(words, regions):
             wrap_mode=_wm,
             pause_gap=style.get("sentence_pause", 0.5),
             max_lines=style.get("max_lines", 1 if style.get("force_single_line") else 2),
+            lang=lang,
         )
         for e in evs:
             tagged.append((e, style))

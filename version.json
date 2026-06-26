@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.1",
   "channel": "main",
-  "notes": "Caption & overlay in/out timeline, chars/words wrap, last-frame caption fix, auto-format, flexi layout, export (single PNG + videos&posters zip), uninstaller."
+  "notes": "Auto-caption rules (keep-together, numbers/units/dates glue, no-line-end stopwords, widow control) + shrink-to-fit safety net so captions never spill past the frame. Editable keep-together phrases in Base text. Caption chrome reverted to EN."
 }
