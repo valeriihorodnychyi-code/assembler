@@ -325,6 +325,8 @@ class PreviewFrameReq(BaseModel):
     time: float = 0.0
     format: str = "9:16"
     dur: float = 0.0   # clip duration, so the last caption "holds" like in the real render
+    cap_in: Optional[float] = None    # captions only shown within [cap_in, cap_out]
+    cap_out: Optional[float] = None
 
 
 @app.get("/api/font_metrics")
@@ -342,6 +344,9 @@ def api_preview_frame(req: PreviewFrameReq):
     TW, TH = ffmpeg_utils.DIMS.get(req.format, (1080, 1920))
     style = st.normalize(req.style)
     scale = 1.0   # NO per-format scaling — font px absolute, same caption in every format
+    # caption window: nothing shown outside [cap_in, cap_out]
+    if (req.cap_in is not None and req.time < req.cap_in) or (req.cap_out is not None and req.time >= req.cap_out):
+        return Response(status_code=204)
     tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}])
     events = [e for e, _ in tagged]
     if events and req.dur:
@@ -595,38 +600,36 @@ class PosterReq(BaseModel):
     shots: List[dict]   # [{"file": "batch_x.mp4", "t": 1.2}]  t = seconds (e.g. when the first caption appears)
 
 
+def _render_poster(out_dir, fname, t):
+    """One poster frame: PNG in ORIGINAL resolution; if >1 MB shrink the palette, never the size."""
+    import subprocess
+    f = os.path.join(out_dir, os.path.basename(fname))
+    if not os.path.exists(f):
+        return None
+    png = os.path.join(out_dir, os.path.splitext(os.path.basename(f))[0] + ".png")
+    subprocess.run([ffmpeg_utils.FFMPEG, "-y", "-ss", f"{max(0.1, float(t))}", "-i", f,
+                    "-frames:v", "1", "-compression_level", "100", png],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if os.path.exists(png) and os.path.getsize(png) > 1_000_000:
+        try:
+            from PIL import Image
+            im = Image.open(png).convert("RGB")
+            for colors in (256, 128, 64, 32):
+                im.quantize(colors=colors, method=Image.FASTOCTREE).save(png, optimize=True)
+                if os.path.getsize(png) <= 1_000_000:
+                    break
+        except Exception:
+            pass
+    return png if os.path.exists(png) else None
+
+
 @app.post("/api/posters")
 def posters(req: PosterReq):
-    """Grab a poster frame from each final video (caption already baked in), as a
-    JPEG in the SAME aspect, squeezed to <= 1 MB. Returns a zip of all posters."""
+    """Zip of poster frames for every final video."""
     sdir = _session_dir(req.file_id)
     out = os.path.join(sdir, "output")
-    import zipfile as _zip, subprocess
-    made = []
-    for s in req.shots:
-        f = os.path.join(out, os.path.basename(s.get("file", "")))
-        if not os.path.exists(f):
-            continue
-        t = max(0.1, float(s.get("t", 1.0)))
-        png = os.path.join(out, os.path.splitext(os.path.basename(f))[0] + ".png")
-        # ALWAYS the original video resolution — never downscale. Lossless PNG, max compression.
-        cmd = [ffmpeg_utils.FFMPEG, "-y", "-ss", f"{t}", "-i", f,
-               "-frames:v", "1", "-compression_level", "100", png]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        # keep ORIGINAL resolution; if a lossless PNG exceeds 1 MB, shrink the COLOR PALETTE
-        # (not the resolution) until it fits.
-        if os.path.exists(png) and os.path.getsize(png) > 1_000_000:
-            try:
-                from PIL import Image
-                im = Image.open(png).convert("RGB")
-                for colors in (256, 128, 64, 32):
-                    im.quantize(colors=colors, method=Image.FASTOCTREE).save(png, optimize=True)
-                    if os.path.getsize(png) <= 1_000_000:
-                        break
-            except Exception:
-                pass
-        if os.path.exists(png):
-            made.append(png)
+    import zipfile as _zip
+    made = [p for s in req.shots if (p := _render_poster(out, s.get("file", ""), s.get("t", 1.0)))]
     if not made:
         raise HTTPException(404, "No frames to capture (render first)")
     zpath = os.path.join(sdir, "assembler_posters.zip")
@@ -634,6 +637,64 @@ def posters(req: PosterReq):
         for p in made:
             z.write(p, os.path.basename(p))
     return FileResponse(zpath, filename="assembler_posters.zip", media_type="application/zip")
+
+
+def _safe_name(name, fallback="creative"):
+    n = "".join(ch for ch in (name or "") if ch.isalnum() or ch in " _-.").strip()
+    return n or fallback
+
+
+class PosterOneReq(BaseModel):
+    file_id: str
+    file: str
+    t: float = 1.0
+    name: Optional[str] = None   # custom export filename (without extension)
+
+
+@app.post("/api/poster_one")
+def poster_one(req: PosterOneReq):
+    """A single poster PNG (original resolution) — no zip, for one preview."""
+    sdir = _session_dir(req.file_id)
+    png = _render_poster(os.path.join(sdir, "output"), req.file, req.t)
+    if not png:
+        raise HTTPException(404, "Clip not found (render first)")
+    dl = _safe_name(req.name, os.path.splitext(os.path.basename(png))[0]) + ".png"
+    return FileResponse(png, filename=dl, media_type="image/png")
+
+
+@app.post("/api/export_all")
+def export_all(req: PosterReq):
+    """One archive: final videos + auto-generated PNG posters (in /videos and /posters),
+    named with the user's creative names (video and poster share the same name)."""
+    sdir = _session_dir(req.file_id)
+    out = os.path.join(sdir, "output")
+    import glob as _glob, zipfile as _zip
+    zpath = os.path.join(sdir, "assembler_export.zip")
+    n = 0
+    used = set()
+    with _zip.ZipFile(zpath, "w", _zip.ZIP_STORED) as z:
+        shots = req.shots or []
+        if shots:
+            for s in shots:
+                vf = os.path.join(out, os.path.basename(s.get("file", "")))
+                if not os.path.exists(vf):
+                    continue
+                nm = _safe_name(s.get("name"), os.path.splitext(os.path.basename(vf))[0])
+                base = nm
+                k = 2
+                while nm in used:           # avoid duplicate names colliding in the zip
+                    nm = f"{base}_{k}"; k += 1
+                used.add(nm)
+                z.write(vf, f"videos/{nm}.mp4"); n += 1
+                p = _render_poster(out, s.get("file", ""), s.get("t", 1.0))
+                if p:
+                    z.write(p, f"posters/{nm}.png")
+        else:  # no naming info — just zip whatever finals exist
+            for v in (sorted(_glob.glob(os.path.join(out, "batch_*.mp4"))) or sorted(_glob.glob(os.path.join(out, "*.mp4")))):
+                z.write(v, "videos/" + os.path.basename(v)); n += 1
+    if not n:
+        raise HTTPException(404, "No finished videos yet")
+    return FileResponse(zpath, filename="assembler_export.zip", media_type="application/zip")
 
 
 @app.get("/api/session_outputs/{fid}")
@@ -678,7 +739,8 @@ def api_batch_assemble(req: BatchReq):
                 cand = os.path.join(base, nm)
                 if nm and os.path.exists(cand):
                     out.append({"path": cand, "x": o.get("x", 0), "y": o.get("y", 0),
-                                "w": o.get("w", 240), "angle": o.get("angle", 0)})
+                                "w": o.get("w", 240), "angle": o.get("angle", 0),
+                                "in": o.get("in"), "out": o.get("out")})
                     break
         return out
 

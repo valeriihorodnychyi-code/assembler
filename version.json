@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "channel": "main",
-  "notes": "EDIT batch + projects, LOC tab + quiz, words-per-line, 16:9 & 1:1, new icon."
+  "notes": "Caption & overlay in/out timeline, chars/words wrap, last-frame caption fix, auto-format, flexi layout, export (single PNG + videos&posters zip), uninstaller."
 }

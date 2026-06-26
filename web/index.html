@@ -113,7 +113,8 @@
   .modeswitch button:not(.active):hover{background:#262a36;color:var(--txt)}
   .tactions{display:flex;align-items:center;gap:10px}
   /* studio edit layout: presets | preview | quick controls */
-  .editstage{display:grid;grid-template-columns:138px 96px auto 340px;gap:20px;align-items:center;justify-content:center;width:100%}        /* 9:16 / 1:1 — preview hugs the video, panels close */
+  .editstage{display:grid;grid-template-columns:138px 96px auto 340px;gap:20px;align-items:start;justify-content:center;width:100%}        /* 9:16 / 1:1 — preview hugs the video, panels close */
+  .previewcol{align-self:center}        /* keep the video vertically centred while panels start from the top */
   .editstage.wide{grid-template-columns:138px 96px minmax(0,1fr) 340px;justify-content:stretch}                                            /* 16:9 — preview fills the centre (bounded) */
   .editzone{display:flex;flex-direction:column}
   .groupcol{display:flex;flex-direction:column;gap:8px;max-height:74vh;overflow-y:auto;align-items:stretch}
@@ -166,6 +167,7 @@
   .loc-mini{position:relative}
   .loc-excluded{opacity:.32;filter:grayscale(.6)}
   .loc-x{position:absolute;top:4px;left:4px;border:0;border-radius:7px;background:rgba(0,0,0,.62);color:#fff;cursor:pointer;font-size:12px;padding:2px 7px;z-index:2}
+  .lang-sticker{position:absolute;top:-9px;right:-4px;z-index:3;font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#06210f;background:#22c55e;border-radius:8px;padding:1px 11px;transform:rotate(3deg);box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;letter-spacing:.5px}
   .loc-provider{padding:12px 14px;font-size:15px;border-radius:10px;background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
   @keyframes thoughtIn{from{opacity:0;filter:blur(11px);transform:translateY(16px) rotate(-1.5deg) scale(.94)}to{opacity:1;filter:blur(0);transform:translateY(0) rotate(-1.5deg) scale(1)}}
   /* ---- busy bar: capybara progress + live timer ---- */
@@ -212,31 +214,31 @@
         </svg>
       </div>
     </div>
-    <button class="primary" id="loadBtn" style="margin-left:4px">LOAD VIDEO</button>
+    <button class="primary" id="loadBtn" data-i18n="loadVideo" style="margin-left:4px">LOAD VIDEO</button>
     <div class="badge" id="encBadge">encoder: …</div>
     <div class="modeswitch">
-      <button id="mEdit" class="active" onclick="setMode('edit')">✎ Edit clip</button>
-      <button id="mLoc" onclick="setMode('loc')">🌍 Loc</button>
-      <button id="mAsm" onclick="setMode('asm')">▦ Assemble</button>
+      <button id="mEdit" class="active" data-i18n="mEdit" onclick="setMode('edit')">✎ Edit clip</button>
+      <button id="mLoc" data-i18n="mLoc" onclick="setMode('loc')">🌍 Loc</button>
+      <button id="mAsm" data-i18n="mAsm" onclick="setMode('asm')">▦ Assemble</button>
     </div>
     <div class="tactions" id="actEdit">
-      <div class="ratio-tabs" id="ratioTabs">
+      <div class="ratio-tabs" id="ratioTabs" style="display:none">
         <button data-r="9:16" class="active">9:16</button>
         <button data-r="1:1">1:1</button>
         <button data-r="16:9">16:9</button>
       </div>
-      <button id="transcribeBtn" disabled>① Transcribe</button>
-      <button class="primary" id="renderBtn" disabled>Send to Assemble →</button>
-      <button id="sLocBtn" style="display:none">→ LOC</button>
-      <button id="copyAllBtn" style="display:none" title="Скопіювати стиль активного хука на всі">⧉ Style→all</button>
-      <button class="primary" id="sendPackAsmBtn" style="display:none">Pack → Assemble →</button>
-      <button id="sendPackBtn" style="display:none">Pack → LOC →</button>
-      <button class="primary" id="saveHookBtn" style="display:none">💾 Save back → LOC</button>
-      <button class="primary" id="saveLocPackBtn" style="display:none">💾 Save pack → LOC</button>
+      <button id="transcribeBtn" data-i18n="transcribe" disabled>① Transcribe</button>
+      <button class="primary" id="renderBtn" data-i18n="sendAsm" disabled>Send to Assemble →</button>
+      <button id="sLocBtn" data-i18n="toLoc" style="display:none">→ LOC</button>
+      <button id="copyAllBtn" data-i18n="styleAll" style="display:none" title="Скопіювати стиль активного хука на всі">⧉ Style→all</button>
+      <button class="primary" id="sendPackAsmBtn" data-i18n="packAsm" style="display:none">Pack → Assemble →</button>
+      <button id="sendPackBtn" data-i18n="packLoc" style="display:none">Pack → LOC →</button>
+      <button class="primary" id="saveHookBtn" data-i18n="saveBack" style="display:none">💾 Save back → LOC</button>
+      <button class="primary" id="saveLocPackBtn" data-i18n="savePack" style="display:none">💾 Save pack → LOC</button>
     </div>
     <div class="tactions" id="actAsm" style="display:none"></div>
     <button class="ghost" id="settingsBtn" title="Settings (keys, machine ID)" style="margin-left:6px">⚙</button>
-    <button class="ghost" id="quitBtn" title="Stop the app">Quit</button>
+    <button class="ghost" id="quitBtn" data-i18n="quit" title="Stop the app">Quit</button>
     <input type="file" id="videoInput" accept="video/*" multiple hidden>
   </header>
 
@@ -292,23 +294,26 @@
 
     <section class="sec active" data-sec="text">
     <details class="grp" open id="grpTranscribe">
-      <summary>Transcription <span class="chev">›</span></summary>
+      <summary><span data-i18n="grpTranscription">Transcription</span> <span class="chev">›</span></summary>
       <div class="body">
-        <div class="row"><label>Engine</label>
+        <div class="row"><label data-i18n="lblEngine">Engine</label>
           <input type="hidden" id="engine" value="whisper">
           <div class="seg" id="engineSeg" style="flex:1.3">
             <button type="button" data-v="whisper" class="active">Whisper · local</button>
             <button type="button" data-v="scribe">Scribe</button>
           </div></div>
-        <div class="row" id="modelRow"><label>Whisper model</label>
+        <div class="row" id="modelRow"><label data-i18n="lblModel">Whisper model</label>
           <input type="hidden" id="modelSize" value="small">
           <div class="seg" id="modelSeg" style="flex:1.3">
             <button type="button" data-v="small" class="active">small</button>
             <button type="button" data-v="medium">medium</button>
             <button type="button" data-v="large-v3">large-v3</button>
           </div></div>
-        <div class="row"><label>Language (optional)</label><input type="text" id="language" placeholder="auto" style="flex:1.3"></div>
-        <textarea id="transcript" rows="3" style="max-height:260px;overflow-y:auto;resize:vertical" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
+        <input type="hidden" id="language" value="">
+        <div style="position:relative">
+          <span id="langSticker" class="lang-sticker" style="display:none"></span>
+          <textarea id="transcript" rows="3" style="max-height:260px;overflow-y:auto;resize:vertical" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
+        </div>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
         <div class="row" style="margin-top:8px"><label>Manual line breaks</label><label class="switch"><input type="checkbox" id="manualBreaks"><span class="slider"></span></label></div>
         <div class="hint" id="manualHint" style="display:none"><b>Enter</b> = new line · <b>empty line</b> = new caption screen. Your exact splits are used (no auto-wrap).</div>
@@ -322,7 +327,7 @@
       <div class="presets" id="presets"></div>
     </div>
     <details class="grp">
-      <summary>Style regions (hook / body) <span class="chev">›</span></summary>
+      <summary><span data-i18n="secStyleRegions">Style regions (hook / body)</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Different style for body</label><label class="switch"><input type="checkbox" id="splitOn"><span class="slider"></span></label></div>
         <div id="splitControls" style="display:none">
@@ -334,40 +339,45 @@
     </details>
 
     <details class="grp" open id="grpBaseText">
-      <summary>Base text <span class="chev">›</span></summary>
+      <summary><span data-i18n="grpBaseText">Base text</span> <span class="chev">›</span></summary>
       <div class="body">
-        <div class="row"><label>Case</label>
+        <div class="row"><label data-i18n="lblCase">Case</label>
           <input type="hidden" id="textCase" value="uppercase">
           <div class="seg" id="caseSeg" style="flex:1.3">
             <button type="button" data-v="uppercase" class="active">AA</button>
             <button type="button" data-v="none">Aa</button>
             <button type="button" data-v="lowercase">aa</button>
           </div></div>
-        <div class="row"><label>Line wrap</label>
+        <div class="row"><label data-i18n="lblWrap">Line wrap</label>
           <input type="hidden" id="wrapMode" value="chars">
           <div class="seg" id="wrapSeg" style="flex:1.3">
             <button type="button" data-v="chars" class="active">Chars</button>
             <button type="button" data-v="words">Words</button>
           </div></div>
         <div class="row"><label id="wrapLbl">Chars per line</label><input type="number" id="maxChars" value="15" min="1" max="40"></div>
-        <div class="row"><label>Lines on screen</label>
+        <div class="row"><label data-i18n="lblLines">Lines on screen</label>
           <input type="hidden" id="maxLines" value="2">
           <div class="seg" id="linesSeg" style="flex:1.3">
             <button type="button" data-v="1">1 line</button>
             <button type="button" data-v="2" class="active">2 lines</button>
           </div></div>
-        <div class="row"><label>Font</label><select id="fontSelect"><option>loading…</option></select></div>
-        <div class="row"><label>Upload new font</label><input type="file" id="fontInput" accept=".ttf,.otf" style="flex:1.3;font-size:11px"></div>
+        <div class="row"><label data-i18n="lblCaptions" title="Показувати титри лише в цьому проміжку часу (порожнє = весь кліп)">Captions in / out</label>
+          <div style="display:flex;gap:6px;flex:1.3">
+            <input type="number" id="capIn" placeholder="0.0" min="0" step="0.1" style="flex:1" title="від (с)">
+            <input type="number" id="capOut" placeholder="end" min="0" step="0.1" style="flex:1" title="до (с)">
+          </div></div>
+        <div class="row"><label data-i18n="lblFont">Font</label><select id="fontSelect"><option>loading…</option></select></div>
+        <div class="row"><label data-i18n="lblNewFont">Upload new font</label><input type="file" id="fontInput" accept=".ttf,.otf" style="flex:1.3;font-size:11px"></div>
         <input type="hidden" id="fontFamily" value="Poppins-Bold">
-        <div class="row"><label>Size</label><input type="range" id="fontSize" min="20" max="160" value="80"><span class="val" id="fontSizeV">80</span></div>
-        <div class="row"><label>Text color</label><input type="color" id="textColor" value="#ffffff"></div>
-        <div class="row"><label>Bottom margin</label><input type="range" id="marginBottom" min="0" max="900" value="320"><span class="val" id="marginBottomV">320</span></div>
-        <div class="row"><label>Line spacing</label><input type="range" id="lineSpacing" min="-20" max="60" value="10"><span class="val" id="lineSpacingV">10</span></div>
+        <div class="row"><label data-i18n="lblSize">Size</label><input type="range" id="fontSize" min="20" max="160" value="80"><span class="val" id="fontSizeV">80</span></div>
+        <div class="row"><label data-i18n="lblColor">Text color</label><input type="color" id="textColor" value="#ffffff"></div>
+        <div class="row"><label data-i18n="lblMargin">Bottom margin</label><input type="range" id="marginBottom" min="0" max="900" value="320"><span class="val" id="marginBottomV">320</span></div>
+        <div class="row"><label data-i18n="lblSpacing">Line spacing</label><input type="range" id="lineSpacing" min="-20" max="60" value="10"><span class="val" id="lineSpacingV">10</span></div>
       </div>
     </details>
 
     <details class="grp">
-      <summary>Stroke <span class="chev">›</span></summary>
+      <summary><span data-i18n="secStroke">Stroke</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Inner</label><input type="range" id="strokeW" min="0" max="20" value="0"><span class="val" id="strokeWV">0</span></div>
         <div class="row"><label>Color</label><input type="color" id="strokeColor" value="#000000"></div>
@@ -377,7 +387,7 @@
     </details>
 
     <details class="grp">
-      <summary>Shadow / glow <span class="chev">›</span></summary>
+      <summary><span data-i18n="secShadow">Shadow / glow</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Enable</label><label class="switch"><input type="checkbox" id="shadowOn"><span class="slider"></span></label></div>
         <div class="row"><label>Offset X</label><input type="range" id="shX" min="-40" max="40" value="0"><span class="val" id="shXV">0</span></div>
@@ -388,7 +398,7 @@
     </details>
 
     <details class="grp">
-      <summary>Plate (text background) <span class="chev">›</span></summary>
+      <summary><span data-i18n="secPlate">Plate (text background)</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Enable</label><label class="switch"><input type="checkbox" id="plateOn"><span class="slider"></span></label></div>
         <div class="row"><label>Per-line (plate behind each line)</label><label class="switch"><input type="checkbox" id="plateLine"><span class="slider"></span></label></div>
@@ -404,7 +414,7 @@
     </details>
 
     <details class="grp" open>
-      <summary>Karaoke (word highlight) <span class="chev">›</span></summary>
+      <summary><span data-i18n="secKaraoke">Karaoke (word highlight)</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Active word color</label><label class="switch"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label></div>
         <div class="row"><label>Color</label><input type="color" id="karaokeColor" value="#ffd400"></div>
@@ -417,7 +427,7 @@
     </details>
 
     <details class="grp">
-      <summary>Overlays · PNG / .mov <span class="chev">›</span></summary>
+      <summary><span data-i18n="secOverlays">Overlays · PNG / .mov</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Add</label><input type="file" id="overlayFile" accept="image/*,video/*" style="flex:1.3;font-size:11px"></div>
         <div id="overlayList" style="margin-top:6px;font-size:12px;color:var(--muted)"></div>
@@ -426,7 +436,7 @@
     </details>
 
     <details class="grp">
-      <summary>Custom styles <span class="chev">›</span></summary>
+      <summary><span data-i18n="secCustom">Custom styles</span> <span class="chev">›</span></summary>
       <div class="body">
         <button class="go" id="saveStyleBtn2" style="width:100%">＋ Save current look to library</button>
         <button id="importStyleBtn2" style="width:100%;margin-top:6px">⤴ Import a style file (.json)</button>
@@ -439,7 +449,7 @@
 
     <section class="sec" data-sec="export">
     <details class="grp" open>
-      <summary>Export one clip (optional) <span class="chev">›</span></summary>
+      <summary><span data-i18n="secExport">Export one clip (optional)</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="hint">Quick path: bake captions on just the active clip and download it. For the real deliverables use <b>Send to Compose → Render</b>.</div>
         <div class="row"><label>Render formats</label>
@@ -456,7 +466,7 @@
 
     <section class="sec" data-sec="localize">
     <details class="grp" open>
-      <summary>Localize <span class="chev">›</span></summary>
+      <summary><span data-i18n="secLocalize">Localize</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Method</label>
           <select id="locProvider"><option value="elevenlabs">Voice dub (ElevenLabs)</option><option value="heygen">Lip-sync (HeyGen)</option></select></div>
@@ -776,6 +786,8 @@ function render(t,dur){
   const[W,H]=DIMS[ratio];canvas.width=W;canvas.height=H;ctx.clearRect(0,0,W,H);
   if(!videoLoaded){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,"#3a2b4d");g.addColorStop(1,"#1a2740");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
   const s=styleAt(t);
+  const cw=(typeof capWin==="function")?capWin():{in:null,out:null};   // hide captions outside the in/out window
+  if((cw.in!=null&&t<cw.in)||(cw.out!=null&&t>=cw.out))return;
   const scale=1;   // no per-format scaling — caption px absolute, identical in every format (matches engine)
   const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode);
   if(!events.length)return;
@@ -819,7 +831,7 @@ function loop(ts){let t,dur;
 requestAnimationFrame(loop);
 
 // ---------- video ----------
-function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();
+function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if(typeof setLangSticker==="function")setLangSticker(null);
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
   variants={en:{clip:null,videoUrl:url,words:null,style:null,trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";
@@ -895,6 +907,8 @@ function selectHook(i){
   video.src=h.videoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};
   $("transcript").value=(h.words||[]).map(w=>w.word||w.text).join(" ");autoGrow();
   writeControls(h.ctrl);
+  if(typeof loadCapWin==="function"){loadCapWin(h);variants.en.capIn=(h.cap_in!=null?h.cap_in:null);variants.en.capOut=(h.cap_out!=null?h.cap_out:null);}
+  if(typeof setLangSticker==="function")setLangSticker(h.lang);
   $("transcribeBtn").disabled=false;$("renderBtn").disabled=false;
   renderHookStrip();renderGroupBar();updateEditButtons();
   if(typeof exactOn!=="undefined"&&exactOn)scheduleExact();
@@ -994,7 +1008,7 @@ async function fetchExact(){
   const v=variants[activeVar];
   if(!v||!v.words||!v.words.length)return;
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0})});
+      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out})});
     if(r.status===204){hideExact();return;}
     if(!r.ok)return;
     const url=URL.createObjectURL(await r.blob());const img=$("exactImg");
@@ -1181,6 +1195,18 @@ $("slotA").onclick=()=>{ if(editingSlot==="B"){styleB=readControls();} writeCont
 $("slotB").onclick=()=>{ if(editingSlot==="A"){window._styleA=readControls();} writeControls(styleB||readControls()); setSlot("B"); };
 function updateLinesSeg(){const v=String($("maxLines").value);$("linesSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
 $("linesSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("maxLines").value=b.dataset.v;updateLinesSeg();scheduleExact();});
+$("capIn").oninput=applyCapWin;$("capOut").oninput=applyCapWin;
+function capWin(){const i=parseFloat($("capIn").value),o=parseFloat($("capOut").value);return {in:isNaN(i)?null:i,out:isNaN(o)?null:o};}
+function applyCapWin(){const w=capWin();
+  if(variants.en){variants.en.capIn=w.in;variants.en.capOut=w.out;}
+  const h=(editPack.length&&activeHook>=0)?editPack[activeHook]:editingHook;
+  if(h){h.cap_in=w.in;h.cap_out=w.out;}
+  scheduleExact();}
+function setLangSticker(lang){const el=$("langSticker");if(!el)return;
+  if(!lang){el.style.display="none";return;}
+  const c=(typeof LOC_LANGS!=="undefined")?LOC_LANGS[lang]:null;
+  el.textContent=(c?c.flag+" ":"🌐 ")+String(lang).toUpperCase();el.style.display="inline-block";}
+function loadCapWin(h){const v=h||{};$("capIn").value=(v.cap_in!=null?v.cap_in:(v.capIn!=null?v.capIn:""));$("capOut").value=(v.cap_out!=null?v.cap_out:(v.capOut!=null?v.capOut:""));}
 function updateWrapSeg(){const v=$("wrapMode").value;$("wrapSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));if($("wrapLbl"))$("wrapLbl").textContent=(v==="words")?"Words per line":"Chars per line";const inp=$("maxChars");if(inp)inp.max=(v==="words")?8:40;}
 segPick("wrapSeg","wrapMode",v=>{updateWrapSeg();const inp=$("maxChars");if(v==="words"){if(+inp.value>8)inp.value=3;}else{if(+inp.value<=8)inp.value=15;}scheduleExact();});
 function segPick(segId,hiddenId,after){$(segId).querySelectorAll("button").forEach(b=>b.onclick=()=>{if(b.disabled)return;$(hiddenId).value=b.dataset.v;$(segId).querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));if(after)after(b.dataset.v);});}
@@ -1211,6 +1237,7 @@ $("transcribeBtn").onclick=async()=>{
       if(editingHook)editingHook.words=d.words;
     }
     realWords=d.words;$("transcript").value=realWords.map(w=>w.word||w.text).join(" ");autoGrow();
+    if(typeof setLangSticker==="function")setLangSticker(d.language);
     setStatus("Транскрибовано "+realWords.length+" слів ("+(d.language||"")+").","ok");busyDone("Транскрибовано");
     $("renderBtn").disabled=false;if($("renderBtn2"))$("renderBtn2").disabled=false;if($("localizeBtn"))$("localizeBtn").disabled=false;
   }catch(e){setStatus("Transcription error: "+e.message,"err");busyStop();}
@@ -1236,8 +1263,9 @@ async function sendToCompose(target){
   const langs=Object.keys(variants);let added=0;
   langs.forEach(l=>{const v=variants[l];if(!v||!v.clip||hooks.some(h=>h.clip===v.clip))return;
     const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,trim:v.trim||null,src:"edit"};
-    if(v.overlays&&v.overlays.length)hook.overlays=v.overlays.map(o=>({name:o.name,x:o.x,y:o.y,w:o.w,angle:o.angle||0}));
+    if(v.overlays&&v.overlays.length)hook.overlays=v.overlays.map(o=>({name:o.name,x:o.x,y:o.y,w:o.w,angle:o.angle||0,in:(o.in!=null?o.in:null),out:(o.out!=null?o.out:null)}));
     if(v.words&&v.words.length&&v.style){hook.words=v.words;hook.style=toEngineStyle(v.style);}  // captions only if present
+    if(v.capIn!=null)hook.cap_in=v.capIn;if(v.capOut!=null)hook.cap_out=v.capOut;   // caption in/out window
     hooks.push(hook);added++;});
   renderHookTiles();setMode(target==="loc"?"loc":"asm");
   setStatus(added?("Надіслано "+added+" кліп(ів) → "+(target==="loc"?"LOC":"Assemble")+"."):"Вже на дошці.","ok");
@@ -1280,7 +1308,7 @@ const dlLink=(url,label,name)=>{const a=document.createElement("a");a.href=API+u
 function remapWords(text, stored){
   const toks=text.trim().split(/\s+/).filter(Boolean);
   if(!stored||!stored.length){const slot=3/Math.max(toks.length,1);return toks.map((t,i)=>({word:t,start:i*slot,end:(i+1)*slot}));}
-  if(toks.length===stored.length) return stored.map((w,i)=>({word:toks[i],start:+w.start,end:+w.end}));
+  if(toks.length===stored.length) return stored.map((w,i)=>({word:toks[i],start:+w.start,end:+w.end,brk:w.brk||null}));  // keep manual line/chunk breaks
   const t0=+stored[0].start,t1=+stored[stored.length-1].end,span=Math.max(t1-t0,0.1),slot=span/Math.max(toks.length,1);
   return toks.map((t,i)=>({word:t,start:t0+i*slot,end:t0+(i+1)*slot}));
 }
@@ -1437,6 +1465,8 @@ const LANG_COLORS={en:"#888780",es:"#EF9F27",de:"#378ADD",fr:"#D4537E",it:"#97C4
 let hooks=[];   // [{name, lang, clip, words?, style?}]
 let bodyParts=[""];   // body segments on the board (base names; "" = empty slot). Concatenated in order.
 let batchFinals={};   // {recipeName: {url, file}} — built creatives, shown on the board
+let creativeNames={};   // {finalFile: custom export name} — applied to video + PNG in the export zip
+function creativeName(file){return creativeNames[file] || String(file||"creative").replace(/^batch_/,"").replace(/\.[^.]+$/,"");}
 let musicState={name:null};   // optional music bed for the whole batch (session file OR library id)
 let lastMusicFile=null;        // last uploaded File, for "save to library"
 function langFromName(n){const m=n.match(/_([a-z]{2})\.[^.]+$/i);if(m)return m[1].toLowerCase();if(/caption|_en\b/i.test(n))return "en";return "";}
@@ -1621,6 +1651,7 @@ $("batchAssembleBtn").onclick=async()=>{
   const packBase=$("packAsset").value,fmt=ratio;   // project format (9:16 / 1:1 / 16:9)
   const recipes=hooks.map(h=>{const hookSeg={type:"session",ref:h.clip||h.name};
     if(h.words&&h.style){hookSeg.words=h.words;hookSeg.style=h.style;}  // live hook → bake captions now
+    if(h.cap_in!=null)hookSeg.cap_in=h.cap_in;if(h.cap_out!=null)hookSeg.cap_out=h.cap_out;  // caption in/out window
     if(h.trim)hookSeg.trim=h.trim;                                     // cut clip at assemble
     if(h.overlays&&h.overlays.length)hookSeg.overlays=h.overlays;       // PNG/.mov stickers baked on the hook
     const segs=[hookSeg];
@@ -1820,6 +1851,8 @@ function editLocHook(h){
   video.onloadedmetadata=()=>{videoLoaded=true;};videoLoaded=true;
   $("transcript").value=(h.words||[]).map(w=>w.word||w.text).join(" ");
   writeControls(ctrl);
+  if(typeof loadCapWin==="function"){loadCapWin(h);variants.en.capIn=(h.cap_in!=null?h.cap_in:null);variants.en.capOut=(h.cap_out!=null?h.cap_out:null);}
+  if(typeof setLangSticker==="function")setLangSticker(h.lang);
   updateEditButtons();
   setMode("edit");autoGrow();
   setStatus("Правиш локалізований хук «"+(h.name||h.clip)+"» ("+(h.lang||"").toUpperCase()+"). Натисни 💾 Save back → повернешся в LOC.","");
@@ -1925,23 +1958,32 @@ function showSection(sec){setMode(sec==="compose"?"asm":"edit");}
 // ---------- tutorial mode (step-by-step hand-drawn coach) ----------
 const TUT={
   edit:[
-    {sel:"#loadBtn",     ua:"1. Тицьни сюди — завантаж відео", en:"1. Click here — load a video"},
-    {sel:"#transcribeBtn", ua:"2. Транскрибуй — слова й тайминги", en:"2. Transcribe — get words & timings"},
-    {sel:"#presetRail",  ua:"3. Обери пресет або підлаштуй стиль", en:"3. Pick a preset or tweak the style"},
-    {sel:"#localizeBtn", ua:"4. Інші мови? Відкрий Localize — обери мови й зроби дубляж. Кожна стане окремим хуком", en:"4. Other languages? Open Localize — pick languages & dub. Each becomes its own hook"},
-    {sel:"#renderBtn",   ua:"5. Готово? Send to Assemble →", en:"5. Done? Send to Assemble →"}
+    {sel:"#loadBtn",     ua:"1. Завантаж відео. Кілька файлів = пак хуків одразу", en:"1. Load a video. Pick several = a whole hook pack"},
+    {sel:"#transcribeBtn", ua:"2. Транскрибуй — слова й тайминги (мову визначить авто)", en:"2. Transcribe — words & timings (language auto-detected)"},
+    {sel:"#presetRail",  ua:"3. Обери пресет або підлаштуй стиль титрів", en:"3. Pick a preset or tweak the caption style"},
+    {sel:"#capIn", side:"left", ua:"4. За потреби обріж показ титрів: in / out (сек)", en:"4. Optionally cut captions: in / out (sec)"},
+    {sel:"#groupCol", fallback:"#presetRail", ua:"5. Пак? Перемикай хуки/проєкти тут", en:"5. A pack? Switch hooks/projects here"},
+    {sel:"#mLoc",        ua:"6. Потрібні інші мови? Перемкнись на LOC", en:"6. Need other languages? Switch to LOC"},
+    {sel:"#mAsm",        ua:"7. Готово — у Assemble на збірку", en:"7. Ready — go to Assemble"}
+  ],
+  loc:[
+    {sel:"#locLangs",   ua:"1. Обери мови локалізації (ES · FR · DE · IT · PT)", en:"1. Pick target languages (ES · FR · DE · IT · PT)"},
+    {sel:"#locGoBtn",   ua:"2. Тисни Localize — піде дубляж (поки крутиться — квіз 🎲)", en:"2. Hit Localize — dubbing runs (enjoy the quiz 🎲)"},
+    {sel:"#locRows", fallback:"#locGoBtn", ua:"3. Готові локи можна поправити: ✎ на версії або «✎ усі» на ряду", en:"3. Tweak results: ✎ on a version or “✎ all” on a row"},
+    {sel:"#mAsm",       ua:"4. Далі — Assemble", en:"4. Then — Assemble"}
   ],
   asm:[
     {sel:"[data-pick='body']", ua:"1. Клікни тайл — обери Body…", en:"1. Click the tile — choose a Body…"},
     {sel:"[data-pick='packshot']", ua:"2. …і Packshot", en:"2. …and a Packshot"},
     {sel:"#boardBuild", ua:"3. Тисни Render", en:"3. Hit Render"},
-    {sel:"#finCol", fallback:"#boardBuild", side:"right", ua:"4. Забери готові файли звідси ⬇ (зʼявляться після Render)", en:"4. Grab the finished files here ⬇ (they appear after Render)"}
+    {sel:"#nameBox", fallback:"#boardBuild", ua:"4. Назви креативів (по рядку) — підуть у назви відео і PNG", en:"4. Name your creatives (one per line) — used for video & PNG"},
+    {sel:"#dlAllBtn", fallback:"#boardBuild", side:"left", ua:"5. Забери відео + PNG одним архівом ⬇", en:"5. Grab videos + PNG in one archive ⬇"}
   ]
 };
 const TUTL={ua:{step:"Крок",next:"далі →",done:"готово ✓",skip:"пропустити",btn:"✎ як це працює?"},
             en:{step:"Step",next:"next →",done:"done ✓",skip:"skip",btn:"✎ how it works?"}};
 let tutOn=false, tutIdx=0, tutLang="ua", tutRAF=null, tutLastKey="";
-function curMode(){return $("mEdit").classList.contains("active")?"edit":"asm";}
+function curMode(){return (typeof currentMode!=="undefined"&&TUT[currentMode])?currentMode:"edit";}
 function curStep(){const s=TUT[curMode()];return s&&s[tutIdx];}
 function tutBlurEls(){let c=$("tutBlur");if(!c){c=document.createElement("div");c.id="tutBlur";for(let i=0;i<4;i++){const d=document.createElement("div");d.className="tut-blur";c.appendChild(d);}document.body.appendChild(c);}return c.children;}
 function setRect(d,x,y,w,h){d.style.left=x+"px";d.style.top=y+"px";d.style.width=Math.max(0,w)+"px";d.style.height=Math.max(0,h)+"px";}
@@ -1969,8 +2011,38 @@ function positionTutorial(force){
 function tutTick(){if(!tutOn){tutRAF=null;return;}positionTutorial(false);tutRAF=requestAnimationFrame(tutTick);}
 function closeTut(){tutOn=false;if(tutRAF){cancelAnimationFrame(tutRAF);tutRAF=null;}$("tutBtn").classList.remove("on");["tutSpot","tutHint","tutBlur"].forEach(id=>{const e=$(id);if(e)e.remove();});}
 function tutToggle(){if(tutOn){closeTut();return;}tutOn=true;tutIdx=0;$("tutBtn").classList.add("on");showTut();}
-function tutLangToggle(){tutLang=(tutLang==="ua")?"en":"ua";$("tutLangBtn").textContent=(tutLang==="ua")?"EN":"UA";$("tutBtn").textContent=TUTL[tutLang].btn;if(tutOn)showTut();
-  if($("locQuiz")&&$("locQuiz").style.display!=="none"&&typeof renderQuiz==="function")renderQuiz();}
+// ---------- UI i18n (single EN/UA switch drives everything) ----------
+const I18N={
+  loadVideo:{ua:"ЗАВАНТАЖИТИ",en:"LOAD VIDEO"},
+  mEdit:{ua:"✎ Кліп",en:"✎ Edit clip"}, mLoc:{ua:"🌍 Локалізація",en:"🌍 Loc"}, mAsm:{ua:"▦ Збірка",en:"▦ Assemble"},
+  transcribe:{ua:"① Транскрайб",en:"① Transcribe"}, sendAsm:{ua:"У Збірку →",en:"Send to Assemble →"},
+  toLoc:{ua:"→ Лок",en:"→ LOC"}, styleAll:{ua:"⧉ Стиль усім",en:"⧉ Style→all"},
+  packAsm:{ua:"Пак → Збірка →",en:"Pack → Assemble →"}, packLoc:{ua:"Пак → Лок →",en:"Pack → LOC →"},
+  saveBack:{ua:"💾 Зберегти → Лок",en:"💾 Save back → LOC"}, savePack:{ua:"💾 Зберегти пак → Лок",en:"💾 Save pack → LOC"},
+  quit:{ua:"Вихід",en:"Quit"},
+  secStyleRegions:{ua:"Зони стилю (хук / боді)",en:"Style regions (hook / body)"},
+  secStroke:{ua:"Обведення",en:"Stroke"}, secShadow:{ua:"Тінь / світіння",en:"Shadow / glow"},
+  secPlate:{ua:"Плашка (фон тексту)",en:"Plate (text background)"}, secKaraoke:{ua:"Караоке (підсвітка слова)",en:"Karaoke (word highlight)"},
+  secOverlays:{ua:"Оверлеї · PNG / .mov",en:"Overlays · PNG / .mov"}, secCustom:{ua:"Кастомні стилі",en:"Custom styles"},
+  secExport:{ua:"Експорт одного кліпа (опц.)",en:"Export one clip (optional)"}, secLocalize:{ua:"Локалізація",en:"Localize"},
+  grpTranscription:{ua:"Транскрипція",en:"Transcription"}, grpBaseText:{ua:"Базовий текст",en:"Base text"},
+  lblEngine:{ua:"Рушій",en:"Engine"}, lblModel:{ua:"Модель Whisper",en:"Whisper model"},
+  lblCase:{ua:"Регістр",en:"Case"}, lblWrap:{ua:"Перенос рядків",en:"Line wrap"}, lblLines:{ua:"Рядків на екрані",en:"Lines on screen"},
+  lblFont:{ua:"Шрифт",en:"Font"}, lblSize:{ua:"Розмір",en:"Size"}, lblColor:{ua:"Колір тексту",en:"Text color"},
+  lblMargin:{ua:"Відступ знизу",en:"Bottom margin"}, lblSpacing:{ua:"Міжрядок",en:"Line spacing"},
+  lblCaptions:{ua:"Титри in / out",en:"Captions in / out"}, lblNewFont:{ua:"Завантажити шрифт",en:"Upload new font"}
+};
+let uiLang="ua";
+function setUILang(lang){uiLang=lang;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{const t=I18N[el.getAttribute("data-i18n")];if(t&&t[lang]!=null)el.textContent=t[lang];});
+  document.querySelectorAll("[data-i18n-ph]").forEach(el=>{const t=I18N[el.getAttribute("data-i18n-ph")];if(t&&t[lang]!=null)el.placeholder=t[lang];});
+  document.querySelectorAll("[data-i18n-title]").forEach(el=>{const t=I18N[el.getAttribute("data-i18n-title")];if(t&&t[lang]!=null)el.title=t[lang];});
+  tutLang=lang;if($("tutLangBtn"))$("tutLangBtn").textContent=(lang==="ua")?"EN":"UA";
+  if($("tutBtn")&&typeof TUTL!=="undefined")$("tutBtn").textContent=TUTL[lang].btn;
+  if(typeof tutOn!=="undefined"&&tutOn&&typeof showTut==="function")showTut();
+  if($("locQuiz")&&$("locQuiz").style.display!=="none"&&typeof renderQuiz==="function")renderQuiz();
+  try{localStorage.setItem("asm_lang",lang);}catch(e){}}
+function tutLangToggle(){setUILang(uiLang==="ua"?"en":"ua");}
 function tutNext(){   // fade everything out, then reappear at the next spot (no choppy flight)
   const h=$("tutHint"),s=$("tutSpot"),b=$("tutBlur");
   if(h)h.style.opacity="0";if(s)s.style.opacity="0";if(b)[...b.children].forEach(d=>d.style.opacity="0");
@@ -2057,27 +2129,46 @@ function renderBatchStage(){
   if(hasFinals){
     const fin=shown.map(h=>{const f=batchFinals[clipKey(h)];
       if(!f)return tile(h.name,h.lang,"<span style='color:var(--muted)'>…</span>");
-      return "<a href='"+API+f.url+"' download='"+f.file+"' style='text-decoration:none;display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--ok);font-size:12px;color:var(--ok)'><span style='background:var(--ok);color:#06210f;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(h.lang||"?").toUpperCase()+"</span><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>⬇ "+f.file+"</span></a>";}).join("");
+      const t=(h.words&&h.words.length&&h.words[0].start!=null)?Math.max(0.1,+h.words[0].start+0.2):1.0;
+      return "<div style='display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--ok);font-size:12px'>"
+        +"<span style='background:var(--ok);color:#06210f;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(h.lang||"?").toUpperCase()+"</span>"
+        +"<a href='"+API+f.url+"' download='"+f.file+"' title='Завантажити відео' style='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ok);text-decoration:none'>⬇ "+f.file+"</a>"
+        +"<button class='posterOne' data-file='"+f.file+"' data-t='"+t+"' title='Прев’ю-картинка (PNG)' style='border:0;border-radius:6px;background:rgba(255,255,255,.08);color:var(--txt);cursor:pointer;font-size:13px;padding:3px 7px'>🖼</button></div>";}).join("");
     cols.push(arrow,col("✓ Final videos",fin,"finCol"));
   }
   let html="<div style='display:flex;gap:8px;align-items:flex-start;justify-content:center;max-width:1000px;margin:0 auto'>"+cols.join("")+"</div>";
   if(musicTracks.length)html+="<div style='margin:16px auto 0;max-width:620px;padding:9px 12px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--accent);font-size:12px;text-align:center;color:var(--muted)'>🎵 "+musicTracks.length+" музичн"+(musicTracks.length>1?"і доріжки":"а доріжка")+" · налаштування в панелі <b>Audio</b> ліворуч</div>";
   const n=shown.length;
   html+="<div style='display:flex;gap:12px;justify-content:center;align-items:center;margin-top:22px'><button id='boardBuild' class='primary' style='padding:15px 44px;font-size:17px;font-weight:700;letter-spacing:.3px'>🎬 Render "+n+" video"+(n>1?"s":"")+"</button>"
-    +(hasFinals?"<button id='dlAllBtn' style='padding:14px 26px;font-size:15px'>⬇ Завантажити все (zip)</button><button id='posterBtn' style='padding:14px 26px;font-size:15px'>🖼 Прев'ю-картинки</button>":"")+"</div>";
+    +(hasFinals?"<button id='dlAllBtn' class='primary' style='padding:14px 24px;font-size:15px'>⬇ Завантажити все</button>":"")+"</div>"
+    +(hasFinals?"<div style='text-align:center;font-size:11px;color:var(--muted);margin-top:6px'>відео + PNG-прев'ю одним архівом · або 🖼 поряд із кожним відео для одиночної картинки</div>":"");
+  if(hasFinals){const finals=shown.map(h=>batchFinals[clipKey(h)]).filter(Boolean);
+    html+="<div style='max-width:620px;margin:16px auto 0'>"
+      +"<div style='font-size:12px;color:var(--muted);margin-bottom:5px'>📝 Назви креативів — по рядку на відео (застосуються до відео і PNG в архіві):</div>"
+      +"<textarea id='nameBox' rows='"+Math.min(Math.max(finals.length,2),8)+"' style='width:100%;font-size:12px;font-family:monospace'>"+finals.map(f=>creativeName(f.file)).join("\n").replace(/</g,"&lt;")+"</textarea></div>";}
   el.innerHTML=html;
-  if($("dlAllBtn"))$("dlAllBtn").onclick=()=>{if(fileId)window.location=API+"/api/download_all/"+fileId;else setStatus("Спершу зроби рендер.","err");};
-  if($("posterBtn"))$("posterBtn").onclick=async()=>{
-    const shots=shown.map(h=>{const f=batchFinals[clipKey(h)];if(!f)return null;
-      const t=(h.words&&h.words.length&&h.words[0].start!=null)?(+h.words[0].start+0.2):1.0;   // frame at the first caption
-      return {file:f.file,t:Math.max(0.1,t)};}).filter(Boolean);
-    if(!shots.length||!fileId){setStatus("Спершу зроби рендер.","err");return;}
-    setStatus("Готую прев'ю-картинки…","",true);busyStart("Прев'ю-картинки…");
-    try{const r=await fetch(API+"/api/posters",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,shots})});
+  if($("nameBox")){const finals=shown.map(h=>batchFinals[clipKey(h)]).filter(Boolean);
+    $("nameBox").oninput=()=>{const ls=$("nameBox").value.split("\n");finals.forEach((f,i)=>{const v=(ls[i]||"").trim();if(v)creativeNames[f.file]=v;else delete creativeNames[f.file];});};}
+  function dlBlob(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),4000);}
+  // single poster PNG next to each final
+  el.querySelectorAll(".posterOne").forEach(b=>b.onclick=async()=>{
+    if(!fileId)return;b.disabled=true;const old=b.textContent;b.textContent="…";
+    try{const nm=creativeName(b.dataset.file);
+      const r=await fetch(API+"/api/poster_one",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,file:b.dataset.file,t:+b.dataset.t,name:nm})});
       if(!r.ok)throw new Error((await r.json()).detail||"failed");
-      const u=URL.createObjectURL(await r.blob());const aa=document.createElement("a");aa.href=u;aa.download="assembler_posters.zip";aa.click();setTimeout(()=>URL.revokeObjectURL(u),4000);
-      busyDone("Прев'ю готові");setStatus("PNG-прев'ю (оригінальна роздільність) завантажено.","ok");
-    }catch(e){setStatus("Прев'ю помилка: "+e.message,"err");busyStop();}
+      dlBlob(await r.blob(),nm+".png");setStatus("PNG-прев'ю завантажено.","ok");
+    }catch(e){setStatus("Прев'ю помилка: "+e.message,"err");}b.disabled=false;b.textContent=old;});
+  // download everything: videos + auto-generated posters, one archive
+  if($("dlAllBtn"))$("dlAllBtn").onclick=async()=>{
+    if(!fileId){setStatus("Спершу зроби рендер.","err");return;}
+    const shots=shown.map(h=>{const f=batchFinals[clipKey(h)];if(!f)return null;
+      const t=(h.words&&h.words.length&&h.words[0].start!=null)?Math.max(0.1,+h.words[0].start+0.2):1.0;
+      return {file:f.file,t,name:creativeName(f.file)};}).filter(Boolean);
+    setStatus("Пакую відео + прев'ю…","",true);busyStart("Експорт…");
+    try{const r=await fetch(API+"/api/export_all",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,shots})});
+      if(!r.ok)throw new Error((await r.json()).detail||"failed");
+      dlBlob(await r.blob(),"Assembler_export.zip");busyDone("Готово");setStatus("Завантажено: відео + PNG-прев'ю.","ok");
+    }catch(e){setStatus("Експорт помилка: "+e.message,"err");busyStop();}
   };
   el.querySelectorAll("[data-rm]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();hooks.splice(+x.dataset.rm,1);renderHookTiles();});
   el.querySelectorAll("[data-rmbody]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();bodyParts.splice(+x.dataset.rmbody,1);if(!bodyParts.length)bodyParts=[""];renderBatchStage();});
@@ -2102,8 +2193,14 @@ async function addOverlay(file){
 }
 function renderOverlayList(){
   const box=$("overlayList");if(!box)return;const ovs=curOverlays();
-  box.innerHTML=ovs.length?ovs.map((o,i)=>"<div style='display:flex;gap:6px;align-items:center;margin:3px 0'><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+o.name+"</span><span data-ovrm='"+i+"' style='cursor:pointer;color:var(--accent)'>✕</span></div>").join(""):"<span>No overlays.</span>";
+  box.innerHTML=ovs.length?ovs.map((o,i)=>"<div style='margin:5px 0'>"
+    +"<div style='display:flex;gap:6px;align-items:center'><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px'>"+o.name+"</span><span data-ovrm='"+i+"' style='cursor:pointer;color:var(--accent)'>✕</span></div>"
+    +"<div style='display:flex;gap:6px;align-items:center;margin-top:3px'><span style='font-size:10px;color:var(--muted)'>in/out</span>"
+    +"<input type='number' class='ov-in' data-i='"+i+"' value='"+(o.in!=null?o.in:"")+"' placeholder='0' min='0' step='0.1' style='width:60px'>"
+    +"<input type='number' class='ov-out' data-i='"+i+"' value='"+(o.out!=null?o.out:"")+"' placeholder='end' min='0' step='0.1' style='width:60px'></div></div>").join(""):"<span>No overlays.</span>";
   box.querySelectorAll("[data-ovrm]").forEach(x=>x.onclick=()=>{curOverlays().splice(+x.dataset.ovrm,1);renderOverlays();renderOverlayList();});
+  box.querySelectorAll(".ov-in").forEach(inp=>inp.oninput=()=>{const v=parseFloat(inp.value);curOverlays()[+inp.dataset.i].in=isNaN(v)?null:v;});
+  box.querySelectorAll(".ov-out").forEach(inp=>inp.oninput=()=>{const v=parseFloat(inp.value);curOverlays()[+inp.dataset.i].out=isNaN(v)?null:v;});
 }
 function renderOverlays(){
   const layer=$("overlayLayer");if(!layer)return;layer.innerHTML="";
@@ -2161,6 +2258,7 @@ async function init(){
     await populateFonts(d.fonts);
   }catch(e){$("encBadge").textContent="offline preview (no backend)";}
   loadLibrary();loadSavedStyles();refreshAssembleHints();renderHookTiles();if(typeof renderTrackList==="function")renderTrackList();
+  try{setUILang(localStorage.getItem("asm_lang")||"ua");}catch(e){try{setUILang("ua");}catch(_){}}
 }
 init();
 </script>

@@ -251,11 +251,37 @@ def shift_words(words, start, end):
     return out
 
 
-def caption_clip(clip_path, words, style, fmt, output_path, work_dir):
+def clip_caption_window(tagged, cap_in=None, cap_out=None):
+    """Keep captions only inside [cap_in, cap_out] (seconds). Events fully outside are
+    dropped; partial ones are clamped. Used to cut titles between scenes / long pauses."""
+    if cap_in is None and cap_out is None:
+        return tagged
+    lo = float(cap_in) if cap_in is not None else -1e9
+    hi = float(cap_out) if cap_out is not None else 1e9
+    out = []
+    for e, s in tagged:
+        if e["end"] <= lo or e["start"] >= hi:
+            continue
+        e = dict(e)
+        e["start"] = max(e["start"], lo)
+        e["end"] = min(e["end"], hi)
+        if e["end"] > e["start"]:
+            out.append((e, s))
+    return out
+
+
+def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None):
     """Bake captions onto a single clip (no body). Used by the non-destructive
     assemble so a hook's captions are burned only at final assembly time."""
     regions = [{"start": 0, "end": None, "style": st.normalize(style)}]
     tagged = build_timeline(words or [], regions)
+    try:  # hold the last caption to the very end of the clip (otherwise it vanishes on the final frames)
+        dur = ff.get_video_duration(clip_path)
+        if tagged and dur:
+            tagged[-1][0]["end"] = max(tagged[-1][0]["end"], dur)
+    except Exception:
+        pass
+    tagged = clip_caption_window(tagged, cap_in, cap_out)
     render_format(clip_path, [(dict(e), s) for e, s in tagged], fmt, output_path,
                   work_dir, body_path=None)
     return output_path
@@ -344,7 +370,8 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
                     words = shift_words(words, float(trim[0]), float(trim[1]))
             if words and seg.get("style"):
                 cap = os.path.join(work_dir, f"cap_{i}.mp4")
-                caption_clip(path, words, seg["style"], fmt, cap, work_dir)
+                caption_clip(path, words, seg["style"], fmt, cap, work_dir,
+                             seg.get("cap_in"), seg.get("cap_out"))
                 path = cap
             if seg.get("overlays"):  # PNG / alpha-.mov stickers on top (reaction style)
                 ovp = os.path.join(work_dir, f"ov_{i}.mp4")
@@ -494,7 +521,13 @@ def apply_overlays(video_path, overlays, fmt, output_path):
             X = int(round(x + w / 2 - ow / 2))
             Y = int(round(y + h / 2 - oh / 2))
         out = f"[c{i}]"
-        parts.append(f"{prev}[ov{i}]overlay={X}:{Y}:format=auto:eof_action=repeat{out}")
+        oi, oo = ov.get("in"), ov.get("out")          # show the sticker only within [in, out] seconds
+        enable = ""
+        if oi is not None or oo is not None:
+            lo = float(oi) if oi is not None else 0.0
+            hi = float(oo) if oo is not None else 1e9
+            enable = f":enable='between(t,{lo},{hi})'"
+        parts.append(f"{prev}[ov{i}]overlay={X}:{Y}:format=auto:eof_action=repeat{enable}{out}")
         prev = out
     cmd = ["ffmpeg", *inputs, "-filter_complex", "; ".join(parts),
            "-map", prev, "-map", "0:a?", "-t", f"{dur:.3f}"]

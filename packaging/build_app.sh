@@ -67,9 +67,15 @@ pyinstaller "$HERE/Assembler.spec" --clean --noconfirm \
 
 APP="$REPO/dist/Assembler.app"
 ZIP="$REPO/dist/Assembler.zip"
-echo "==> Zipping for distribution"
+echo "==> Zipping for distribution (app + uninstaller)"
+# Stage a folder so the team gets the app AND a one-click uninstaller together.
+DISTDIR="$REPO/dist/Assembler"
+rm -rf "$DISTDIR"; mkdir -p "$DISTDIR"
+cp -R "$APP" "$DISTDIR/"
+cp "$HERE/uninstall.command" "$DISTDIR/Uninstall Assembler.command"
+chmod +x "$DISTDIR/Uninstall Assembler.command"
 rm -f "$ZIP"
-ditto -c -k --keepParent "$APP" "$ZIP"
+ditto -c -k --keepParent "$DISTDIR" "$ZIP"
 echo ""
 echo "============================================================"
 echo " Built: $APP"
