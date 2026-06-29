@@ -898,7 +898,7 @@ function loop(ts){let t,dur;
 requestAnimationFrame(loop);
 
 // ---------- video ----------
-function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if(typeof setLangSticker==="function")setLangSticker(null);
+function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if($("language"))$("language").value="";if(typeof setLangSticker==="function")setLangSticker(null);
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
   variants={en:{clip:null,videoUrl:url,words:null,style:null,trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";
@@ -970,6 +970,8 @@ function selectHook(i){
   saveActiveHook();
   const h=editPack[i];activeHook=i;
   variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,style:h.ctrl,language:h.lang}};activeVar="en";
+  videoFile=null;                                  // in-session clip — re-transcribe targets it, no session fork
+  if($("language"))$("language").value=h.lang||""; // force the hook's language on re-transcribe
   enVideoUrl=h.videoUrl;realWords=h.words;
   video.src=h.videoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};
   $("transcript").value=(h.words||[]).map(w=>w.word||w.text).join(" ");autoGrow();
@@ -1295,6 +1297,8 @@ $("transcribeBtn").onclick=async()=>{
       fileId=d.file_id;
       if(enVideoUrl){video.src=enVideoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};}
       variants={en:{clip:"source.mp4",videoUrl:enVideoUrl,words:d.words,style:readControls(),language:d.language||"en",trim:(variants.en&&variants.en.trim)||null}};activeVar="en";buildVarTabs();
+      videoFile=null;   // the clip now lives in the session — re-transcribe must target it, not re-upload (which would fork a new session and orphan localized clips)
+      if($("language"))$("language").value=d.language||"";
     }else{           // re-transcribe a clip already in the session (a pack hook / localized hook)
       const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({file_id:fileId,clip:curClip,engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value})});
@@ -1812,7 +1816,8 @@ function renderLocStage(){
     +'<div id="locLangs" style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:16px"></div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">'
       +'<select id="locProvider2" class="loc-provider"><option value="elevenlabs">Voice dub (ElevenLabs)</option><option value="heygen">Lip-sync (HeyGen)</option></select>'
-      +'<button class="primary big-go" id="locGoBtn">🌍 Localize</button></div>'
+      +'<button class="primary big-go" id="locGoBtn">🌍 Localize</button>'
+      +(haveLoc?'<button class="ghost" id="locBackupBtn" title="Завантажити всі локалізовані кліпи + транскрипти одним архівом — резерв на випадок краху сесії">⬇ Backup .zip</button>':'')+'</div>'
     +'<div style="display:flex;gap:20px;align-items:flex-start">'
       +'<div id="locRows" style="flex:1;min-width:0"></div>'
       +(haveLoc?'<button class="primary big-go" style="flex:0 0 auto;align-self:center;font-size:19px;padding:18px 26px" onclick="setMode(\'asm\')">▦ Send to Assemble →</button>':'')
@@ -1824,6 +1829,7 @@ function renderLocStage(){
     const chip=document.createElement("div");chip.className="chip";chip.dataset.l=l;chip.style.cssText="flex:0 0 auto;font-size:14px;padding:9px 15px";chip.textContent=c.flag+" "+l.toUpperCase();
     chip.onclick=()=>chip.classList.toggle("on");LC.appendChild(chip);});
   $("locGoBtn").onclick=localizePack;
+  if($("locBackupBtn"))$("locBackupBtn").onclick=downloadLocs;
   const rows=$("locRows");
   if(!srcs.length){rows.innerHTML='<div style="color:var(--muted);font-size:12px">—</div>';}
   srcs.forEach((s,i)=>{
@@ -1858,6 +1864,12 @@ function locSources(){
   // originals always live on the board (src "edit") → single source of truth, no editPack confusion
   return hooks.filter(h=>h.src==="edit").map(h=>({clip:h.clip,lang:h.lang||"en",
     style:h.style||(h.ctrl?toEngineStyle(h.ctrl):null),name:h.name,videoUrl:h.videoUrl||null,words:h.words||null,ctrl:h.ctrl||null}));
+}
+function downloadLocs(){
+  if(!fileId){setStatus("Немає сесії — спершу зроби локалізації.","err");return;}
+  setStatus("Готую архів локалізацій…","",true);
+  window.location.href=API+"/api/download_locs/"+fileId;   // FileResponse → browser saves the zip
+  setTimeout(()=>setStatus("Архів локалізацій завантажується ⬇","ok"),800);
 }
 async function localizePack(){
   const langs=Array.from(document.querySelectorAll('#locLangs .chip.on')).map(c=>c.dataset.l);
@@ -1914,6 +1926,8 @@ function editLocHook(h){
   const ctrl=h.ctrl||sharedCtrl||readControls();
   enVideoUrl=url;realWords=h.words||[];
   variants={en:{clip:h.clip,videoUrl:url,words:h.words,style:ctrl,language:h.lang}};activeVar="en";
+  videoFile=null;                                  // edit the in-session clip — never re-upload (no session fork)
+  if($("language"))$("language").value=h.lang||""; // force re-transcribe to the localized language (not auto-detect → EN)
   video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;};videoLoaded=true;
   $("transcript").value=(h.words||[]).map(w=>w.word||w.text).join(" ");

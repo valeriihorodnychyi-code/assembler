@@ -616,6 +616,24 @@ def download_all(file_id: str):
     return FileResponse(zpath, filename="assembler_finals.zip", media_type="application/zip")
 
 
+@app.get("/api/download_locs/{file_id}")
+def download_locs(file_id: str):
+    """Backup zip of every localized (caption-free) clip + its transcript in the session,
+    so a session crash never means re-paying HeyGen/ElevenLabs to regenerate them."""
+    sdir = _session_dir(file_id)
+    import glob as _glob, zipfile as _zip
+    clips = sorted(_glob.glob(os.path.join(sdir, "dub_*.mp4")))
+    if not clips:
+        raise HTTPException(404, "No localized clips in this session yet")
+    zpath = os.path.join(sdir, "assembler_localized.zip")
+    with _zip.ZipFile(zpath, "w", _zip.ZIP_STORED) as z:
+        for f in clips:
+            z.write(f, os.path.basename(f))
+        for j in sorted(_glob.glob(os.path.join(sdir, "words_*.json"))):   # transcripts too (cheap, enables full restore)
+            z.write(j, os.path.basename(j))
+    return FileResponse(zpath, filename="assembler_localized.zip", media_type="application/zip")
+
+
 class PosterReq(BaseModel):
     file_id: str
     shots: List[dict]   # [{"file": "batch_x.mp4", "t": 1.2}]  t = seconds (e.g. when the first caption appears)
@@ -800,7 +818,8 @@ def api_batch_assemble(req: BatchReq):
             for s in r.get("segments", []):
                 p = resolve(s)
                 if p is None:
-                    raise RuntimeError("a segment file is missing")
+                    raise RuntimeError(f"segment file not found in this session: '{os.path.basename(s.get('ref',''))}' "
+                                       f"(type={s.get('type')}). The clip may belong to a different/older session.")
                 # non-destructive: a segment may carry caption-data baked at assemble time
                 segs.append({"clip": p, "words": s.get("words"), "style": s.get("style"),
                              "trim": s.get("trim"), "fade_in": s.get("fade_in"),
