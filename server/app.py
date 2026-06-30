@@ -256,7 +256,7 @@ def post_style(body: SaveStyle):
 class DetectCutsReq(BaseModel):
     file_id: str
     clip: str = "source.mp4"
-    threshold: float = 0.4
+    threshold: float = 0.3   # lower = more sensitive (catches cuts between similar shots)
 
 
 @app.post("/api/detect_cuts")

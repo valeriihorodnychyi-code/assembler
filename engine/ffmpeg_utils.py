@@ -75,7 +75,7 @@ def run(cmd: list, quiet: bool = True):
     return proc
 
 
-def detect_scene_cuts(path: str, threshold: float = 0.4) -> list:
+def detect_scene_cuts(path: str, threshold: float = 0.3) -> list:
     """Return scene-cut timestamps (seconds) via ffmpeg's scene-score filter.
 
     One decode-only pass (no encode) — cheap. `threshold` 0..1: lower = more

@@ -371,11 +371,18 @@
             <input type="number" id="capIn" placeholder="0.0" min="0" step="0.1" style="flex:1" title="від (с)">
             <input type="number" id="capOut" placeholder="end" min="0" step="0.1" style="flex:1" title="до (с)">
           </div></div>
-        <div class="row"><label title="Знайти монтажні склейки в кліпі — титри не переходитимуть через кат на нову сцену">Scene cuts</label>
-          <div style="display:flex;gap:6px;flex:1.3;align-items:center">
-            <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px" onclick="detectCuts()">🎬 Detect cuts</button>
-            <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
-            <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати кати" onclick="clearCuts()">✕</button>
+        <div class="row" style="align-items:flex-start"><label title="Знайти монтажні склейки в кліпі — титри не переходитимуть через кат на нову сцену">Scene cuts</label>
+          <div style="display:flex;flex-direction:column;gap:5px;flex:1.3">
+            <div style="display:flex;gap:6px;align-items:center">
+              <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px" onclick="detectCuts()">🎬 Detect cuts</button>
+              <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
+              <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати кати" onclick="clearCuts()">✕</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;font-size:10px;color:var(--muted)" title="Чутливість: нижче = ловить більше катів (для схожих планів), вище = лише явні склейки">
+              <span>sens</span>
+              <input type="range" id="cutSens" min="0.1" max="0.6" step="0.05" value="0.3" style="flex:1" oninput="if($('cutSensV'))$('cutSensV').textContent=(+this.value).toFixed(2)">
+              <span id="cutSensV" class="val" style="min-width:30px;text-align:right">0.30</span>
+            </div>
           </div></div>
         <div class="row"><label data-i18n="lblFont">Font</label><select id="fontSelect"><option>loading…</option></select></div>
         <div class="row"><label data-i18n="lblNewFont">Upload new font</label><input type="file" id="fontInput" accept=".ttf,.otf" style="flex:1.3;font-size:11px"></div>
@@ -1903,9 +1910,10 @@ async function detectCuts(){
   const v=variants[activeVar];
   if(!fileId||!v||!v.clip){setStatus("Спершу транскрайбни — кліп має бути в сесії.","err");return;}
   const btn=$("detectCutsBtn"),old=btn?btn.textContent:"";if(btn){btn.textContent="…";btn.disabled=true;}
+  const thr=$("cutSens")?+$("cutSens").value:0.3;
   try{
     const r=await fetch(API+"/api/detect_cuts",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,clip:v.clip,threshold:0.4})});
+      body:JSON.stringify({file_id:fileId,clip:v.clip,threshold:thr})});
     const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
     v.cuts=d.cuts||[];
     if(editingHook)editingHook.cuts=v.cuts;

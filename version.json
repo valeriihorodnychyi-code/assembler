@@ -1,5 +1,5 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "channel": "main",
-  "notes": "Scene-cut detection (🎬 Detect cuts): captions never cross a montage cut — they end at the cut and a fresh caption starts on the new shot. Works in preview + final render, per-clip. Plus LOC auto-original, Whisper VAD, LOC backup zip, session-fork fix, auto-caption rules, shrink-to-fit."
+  "notes": "Scene-cut detection tuned: default sensitivity 0.3 + a sensitivity slider, so cuts between similar-looking shots (low scene score) are caught too. Plus 1.4.0 cut detection, LOC auto-original, Whisper VAD, LOC backup zip."
 }
