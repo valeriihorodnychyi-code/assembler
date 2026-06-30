@@ -69,6 +69,9 @@ if os.path.exists(_PCFG):
             os.environ.setdefault("ELEVENLABS_API_KEY", _pc["elevenlabs_api_key"])
         if _pc.get("heygen_api_key"):
             os.environ.setdefault("HEYGEN_API_KEY", _pc["heygen_api_key"])
+        if _pc.get("library_dir"):   # persist the chosen library folder across restarts (dev mode)
+            os.environ["CS_LIBRARY_DIR"] = os.path.expanduser(_pc["library_dir"])
+            library.LIBRARY_DIR = os.environ["CS_LIBRARY_DIR"]
     except Exception:
         pass
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.4.4",
+  "version": "1.4.5",
   "channel": "main",
-  "notes": "Smart captions subsection now highlighted green so it stands out. Plus undo last manual cut, UI declutter, frame-stepping, manual cut markers, sensitivity slider."
+  "notes": "Shared library: smarter Google Drive auto-detection (nested folders) + library path now persists across restarts. New 'Update Assembler.command' force-updater for the team. Green Smart-captions section."
 }

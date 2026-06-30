@@ -123,22 +123,26 @@ def detect_drive_library():
     """
     import glob
     home = os.path.expanduser("~")
-    patterns = [
-        # Google Drive for Desktop (current): ~/Library/CloudStorage/GoogleDrive-<email>/...
-        os.path.join(home, "Library", "CloudStorage", "GoogleDrive-*",
-                     "Shared drives", "*", LIBRARY_FOLDER_NAME),
-        os.path.join(home, "Library", "CloudStorage", "GoogleDrive-*",
-                     "My Drive", LIBRARY_FOLDER_NAME),
-        os.path.join(home, "Library", "CloudStorage", "GoogleDrive-*",
-                     "My Drive", "*", LIBRARY_FOLDER_NAME),
-        # Older Drive client mount points
-        os.path.join("/Volumes", "GoogleDrive", "Shared drives", "*", LIBRARY_FOLDER_NAME),
-        os.path.join("/Volumes", "GoogleDrive", "My Drive", LIBRARY_FOLDER_NAME),
-    ]
-    for pat in patterns:
-        hits = sorted(glob.glob(pat))
-        if hits:
-            return hits[0]
+    # Drive/Dropbox sync roots (current + legacy mount points).
+    roots = (glob.glob(os.path.join(home, "Library", "CloudStorage", "GoogleDrive-*"))
+             + glob.glob(os.path.join(home, "Library", "CloudStorage", "Dropbox*"))
+             + glob.glob(os.path.join(home, "Google Drive*"))
+             + glob.glob(os.path.join(home, "Dropbox*"))
+             + ["/Volumes/GoogleDrive"])
+    # Look a few levels under Shared drives / My Drive (handles nested folders), then
+    # also directly under the sync root, for a folder literally named LIBRARY_FOLDER_NAME.
+    mids = ["Shared drives/*", "Shared drives/*/*", "Shared drives/*/*/*",
+            "My Drive", "My Drive/*", "My Drive/*/*", "My Drive/*/*/*",
+            "", "*", "*/*"]
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for mid in mids:
+            parts = [p for p in mid.split("/") if p]
+            pat = os.path.join(root, *parts, LIBRARY_FOLDER_NAME) if parts else os.path.join(root, LIBRARY_FOLDER_NAME)
+            hits = sorted(glob.glob(pat))
+            if hits:
+                return hits[0]
     return None
 
 
