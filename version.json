@@ -1,5 +1,5 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "channel": "main",
-  "notes": "Undo last manual cut (↶). UI declutter: keep-together + scene cuts folded into a collapsible 'Smart captions' subsection so Base text is short again. Plus frame-stepping, manual cut markers, sensitivity slider."
+  "notes": "Smart captions subsection now highlighted green so it stands out. Plus undo last manual cut, UI declutter, frame-stepping, manual cut markers, sensitivity slider."
 }
