@@ -268,7 +268,9 @@
       <div id="filmstrip"></div>
     </div>
     <div class="transport" id="transport">
+      <button id="frameBack" title="−1 кадр (←)">⟨</button>
       <button id="playBtn">▶</button>
+      <button id="frameFwd" title="+1 кадр (→)">⟩</button>
       <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
       <span class="val" id="timeLbl" style="width:auto">0.0s</span>
       <button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
@@ -376,8 +378,9 @@
             <div style="display:flex;gap:6px;align-items:center">
               <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px" onclick="detectCuts()">🎬 Detect cuts</button>
               <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
-              <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати кати" onclick="clearCuts()">✕</button>
+              <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати всі кати" onclick="clearCuts()">✕</button>
             </div>
+            <button type="button" id="addCutBtn" class="ghost" style="font-size:11px" title="Додати кат вручну на поточному кадрі плеєра (жовті мітки на трім-барі, клік по мітці прибирає)" onclick="addCutHere()">＋ кат на поточному кадрі</button>
             <div style="display:flex;gap:6px;align-items:center;font-size:10px;color:var(--muted)" title="Чутливість: нижче = ловить більше катів (для схожих планів), вище = лише явні склейки">
               <span>sens</span>
               <input type="range" id="cutSens" min="0.1" max="0.6" step="0.05" value="0.3" style="flex:1" oninput="if($('cutSensV'))$('cutSensV').textContent=(+this.value).toFixed(2)">
@@ -1039,6 +1042,26 @@ dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");}
 ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
 dz.addEventListener("drop",e=>{if(e.dataTransfer.files[0])loadVideo(e.dataTransfer.files[0]);});
 $("playBtn").onclick=()=>{if(!videoLoaded)return;if(video.paused){video.play();$("playBtn").textContent="❚❚";}else{video.pause();$("playBtn").textContent="▶";}};
+const FPS=30;   // matches render fps — one frame = 1/30s
+function stepFrame(d){
+  if(!videoLoaded)return;
+  if(!video.paused){video.pause();$("playBtn").textContent="▶";}
+  const dur=video.duration||0;
+  let t=(video.currentTime||0)+d/FPS;
+  t=Math.max(0,dur?Math.min(dur-0.001,t):t);
+  video.currentTime=t;
+  if(typeof scheduleExact==="function")scheduleExact();
+}
+if($("frameBack"))$("frameBack").onclick=()=>stepFrame(-1);
+if($("frameFwd"))$("frameFwd").onclick=()=>stepFrame(1);
+// ← / → step one frame (when not typing in a field), so you can land exactly on a cut/trim
+document.addEventListener("keydown",(e)=>{
+  if(currentMode!=="edit"||!videoLoaded)return;
+  const tag=(e.target&&e.target.tagName)||"";
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||e.target.isContentEditable)return;
+  if(e.key==="ArrowLeft"){e.preventDefault();stepFrame(e.shiftKey?-5:-1);}
+  else if(e.key==="ArrowRight"){e.preventDefault();stepFrame(e.shiftKey?5:1);}
+});
 $("seek").oninput=e=>{if(videoLoaded)video.currentTime=(e.target.value/100)*(video.duration||0);};
 
 // ---------- trim (per-clip in/out, baked at assemble) — visual handle bar ----------
@@ -1924,7 +1947,28 @@ async function detectCuts(){
   if(btn){btn.textContent=old||"🎬 Detect cuts";btn.disabled=false;}
 }
 function clearCuts(){const v=variants[activeVar];if(v)v.cuts=[];if(editingHook)editingHook.cuts=[];if(activeHook>=0&&editPack[activeHook])editPack[activeHook].cuts=[];updateCutsLabel();if(typeof scheduleExact==="function")scheduleExact();}
-function updateCutsLabel(){const v=variants[activeVar];const n=(v&&v.cuts)?v.cuts.length:0;const el=$("cutsLabel");if(el)el.textContent=n?(n+" cuts"):"none";}
+function _syncCuts(arr){const v=variants[activeVar];if(v)v.cuts=arr;if(editingHook)editingHook.cuts=arr;if(activeHook>=0&&editPack[activeHook])editPack[activeHook].cuts=arr;}
+function addCutHere(){
+  const v=variants[activeVar];if(!v){setStatus("Нема активного кліпа.","err");return;}
+  const t=+(video.currentTime||0);
+  const arr=(v.cuts||[]).slice();
+  if(!arr.some(c=>Math.abs(c-t)<0.02)){arr.push(+t.toFixed(3));arr.sort((a,b)=>a-b);}
+  _syncCuts(arr);updateCutsLabel();
+  if(typeof scheduleExact==="function")scheduleExact();
+  setStatus("Кат додано на "+t.toFixed(2)+"с","ok");
+}
+function renderCutTicks(){
+  const bar=$("trimBar");if(!bar)return;
+  bar.querySelectorAll(".cutTick").forEach(e=>e.remove());
+  const v=variants[activeVar],dur=video.duration||0;
+  if(!v||!v.cuts||!v.cuts.length||!dur)return;
+  v.cuts.forEach(c=>{const d=document.createElement("div");d.className="cutTick";
+    d.title="Кат "+(+c).toFixed(2)+"с — клік прибрати";
+    d.style.cssText="position:absolute;top:-4px;bottom:-4px;width:2px;background:#ffd400;z-index:3;cursor:pointer;left:"+Math.max(0,Math.min(100,(c/dur)*100))+"%";
+    d.onclick=(e)=>{e.stopPropagation();_syncCuts((v.cuts||[]).filter(x=>x!==c));updateCutsLabel();if(typeof scheduleExact==="function")scheduleExact();};
+    bar.appendChild(d);});
+}
+function updateCutsLabel(){const v=variants[activeVar];const n=(v&&v.cuts)?v.cuts.length:0;const el=$("cutsLabel");if(el)el.textContent=n?(n+" cuts"):"none";renderCutTicks();}
 function downloadLocs(){
   if(!fileId){setStatus("Немає сесії — спершу зроби локалізації.","err");return;}
   setStatus("Готую архів локалізацій…","",true);

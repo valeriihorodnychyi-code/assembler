@@ -1,5 +1,5 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "channel": "main",
-  "notes": "Scene-cut detection tuned: default sensitivity 0.3 + a sensitivity slider, so cuts between similar-looking shots (low scene score) are caught too. Plus 1.4.0 cut detection, LOC auto-original, Whisper VAD, LOC backup zip."
+  "notes": "Frame-by-frame stepping (⟨ ⟩ buttons + ←/→ keys, Shift = 5 frames) for precise trims/cuts. Manual cut markers: ＋ add a cut at the playhead, yellow ticks on the trim bar, click a tick to remove. Plus cut-detection sensitivity slider."
 }
