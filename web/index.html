@@ -357,11 +357,6 @@
             <button type="button" data-v="words">Words</button>
           </div></div>
         <div class="row"><label id="wrapLbl">Chars per line</label><input type="number" id="maxChars" value="15" min="1" max="40"></div>
-        <div class="row" style="align-items:flex-start"><label title="Фрази, які НІКОЛИ не розриваються між рядками/титрами — по одній на рядок (напр. Tai Chi). Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label>
-          <div style="display:flex;flex-direction:column;gap:4px;flex:1.3">
-            <textarea id="keepTogether" rows="3" placeholder="Tai Chi&#10;New York&#10;Muscle Booster" style="font-size:11px;resize:vertical;width:100%"></textarea>
-            <button type="button" id="saveRulesBtn" class="ghost" style="align-self:flex-end;font-size:11px" onclick="saveKeepTogether()">💾 Save phrases</button>
-          </div></div>
         <div class="row"><label data-i18n="lblLines">Lines on screen</label>
           <input type="hidden" id="maxLines" value="2">
           <div class="seg" id="linesSeg" style="flex:1.3">
@@ -373,20 +368,34 @@
             <input type="number" id="capIn" placeholder="0.0" min="0" step="0.1" style="flex:1" title="від (с)">
             <input type="number" id="capOut" placeholder="end" min="0" step="0.1" style="flex:1" title="до (с)">
           </div></div>
-        <div class="row" style="align-items:flex-start"><label title="Знайти монтажні склейки в кліпі — титри не переходитимуть через кат на нову сцену">Scene cuts</label>
-          <div style="display:flex;flex-direction:column;gap:5px;flex:1.3">
-            <div style="display:flex;gap:6px;align-items:center">
-              <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px" onclick="detectCuts()">🎬 Detect cuts</button>
-              <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
-              <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати всі кати" onclick="clearCuts()">✕</button>
+        <details class="subgrp" style="margin:6px 0;border:0.5px solid var(--line);border-radius:8px;padding:4px 8px">
+          <summary style="cursor:pointer;font-size:12px;color:var(--muted);list-style:none">⚙ Smart captions · keep-together &amp; scene cuts</summary>
+          <div style="padding-top:8px;display:flex;flex-direction:column;gap:8px">
+            <div>
+              <label style="font-size:11px;color:var(--muted)" title="Фрази, які НІКОЛИ не розриваються між рядками/титрами (по одній на рядок). Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label>
+              <textarea id="keepTogether" rows="3" placeholder="Tai Chi&#10;New York&#10;Muscle Booster" style="font-size:11px;resize:vertical;width:100%;margin-top:4px"></textarea>
+              <button type="button" id="saveRulesBtn" class="ghost" style="float:right;font-size:11px;margin-top:4px" onclick="saveKeepTogether()">💾 Save phrases</button>
+              <div style="clear:both"></div>
             </div>
-            <button type="button" id="addCutBtn" class="ghost" style="font-size:11px" title="Додати кат вручну на поточному кадрі плеєра (жовті мітки на трім-барі, клік по мітці прибирає)" onclick="addCutHere()">＋ кат на поточному кадрі</button>
-            <div style="display:flex;gap:6px;align-items:center;font-size:10px;color:var(--muted)" title="Чутливість: нижче = ловить більше катів (для схожих планів), вище = лише явні склейки">
-              <span>sens</span>
-              <input type="range" id="cutSens" min="0.1" max="0.6" step="0.05" value="0.3" style="flex:1" oninput="if($('cutSensV'))$('cutSensV').textContent=(+this.value).toFixed(2)">
-              <span id="cutSensV" class="val" style="min-width:30px;text-align:right">0.30</span>
+            <div>
+              <label style="font-size:11px;color:var(--muted)" title="Знайти монтажні склейки — титри не переходитимуть через кат на нову сцену">Scene cuts</label>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+                <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px" onclick="detectCuts()">🎬 Detect cuts</button>
+                <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
+                <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати всі кати" onclick="clearCuts()">✕</button>
+              </div>
+              <div style="display:flex;gap:6px;margin-top:5px">
+                <button type="button" id="addCutBtn" class="ghost" style="flex:1;font-size:11px" title="Додати кат вручну на поточному кадрі плеєра" onclick="addCutHere()">＋ кат на кадрі</button>
+                <button type="button" id="undoCutBtn" class="ghost" style="font-size:11px" title="Скасувати останній доданий вручну кат" onclick="undoLastCut()">↶ undo</button>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;font-size:10px;color:var(--muted);margin-top:5px" title="Чутливість: нижче = ловить більше катів (для схожих планів), вище = лише явні склейки">
+                <span>sens</span>
+                <input type="range" id="cutSens" min="0.1" max="0.6" step="0.05" value="0.3" style="flex:1" oninput="if($('cutSensV'))$('cutSensV').textContent=(+this.value).toFixed(2)">
+                <span id="cutSensV" class="val" style="min-width:30px;text-align:right">0.30</span>
+              </div>
             </div>
-          </div></div>
+          </div>
+        </details>
         <div class="row"><label data-i18n="lblFont">Font</label><select id="fontSelect"><option>loading…</option></select></div>
         <div class="row"><label data-i18n="lblNewFont">Upload new font</label><input type="file" id="fontInput" accept=".ttf,.otf" style="flex:1.3;font-size:11px"></div>
         <input type="hidden" id="fontFamily" value="Poppins-Bold">
@@ -1950,12 +1959,21 @@ function clearCuts(){const v=variants[activeVar];if(v)v.cuts=[];if(editingHook)e
 function _syncCuts(arr){const v=variants[activeVar];if(v)v.cuts=arr;if(editingHook)editingHook.cuts=arr;if(activeHook>=0&&editPack[activeHook])editPack[activeHook].cuts=arr;}
 function addCutHere(){
   const v=variants[activeVar];if(!v){setStatus("Нема активного кліпа.","err");return;}
-  const t=+(video.currentTime||0);
+  const t=+((video.currentTime||0).toFixed(3));
   const arr=(v.cuts||[]).slice();
-  if(!arr.some(c=>Math.abs(c-t)<0.02)){arr.push(+t.toFixed(3));arr.sort((a,b)=>a-b);}
+  if(arr.some(c=>Math.abs(c-t)<0.02)){setStatus("Тут уже є кат.","");return;}
+  arr.push(t);arr.sort((a,b)=>a-b);
+  v.manualCuts=(v.manualCuts||[]).concat(t);   // remember manual adds for undo
   _syncCuts(arr);updateCutsLabel();
   if(typeof scheduleExact==="function")scheduleExact();
   setStatus("Кат додано на "+t.toFixed(2)+"с","ok");
+}
+function undoLastCut(){
+  const v=variants[activeVar];if(!v||!(v.manualCuts&&v.manualCuts.length)){setStatus("Нема ручних катів для скасування.","");return;}
+  const t=v.manualCuts.pop();
+  _syncCuts((v.cuts||[]).filter(c=>Math.abs(c-t)>=0.001));updateCutsLabel();
+  if(typeof scheduleExact==="function")scheduleExact();
+  setStatus("Прибрано останній ручний кат ("+(+t).toFixed(2)+"с)","ok");
 }
 function renderCutTicks(){
   const bar=$("trimBar");if(!bar)return;

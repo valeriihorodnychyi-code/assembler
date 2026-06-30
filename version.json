@@ -1,5 +1,5 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.3",
   "channel": "main",
-  "notes": "Frame-by-frame stepping (⟨ ⟩ buttons + ←/→ keys, Shift = 5 frames) for precise trims/cuts. Manual cut markers: ＋ add a cut at the playhead, yellow ticks on the trim bar, click a tick to remove. Plus cut-detection sensitivity slider."
+  "notes": "Undo last manual cut (↶). UI declutter: keep-together + scene cuts folded into a collapsible 'Smart captions' subsection so Base text is short again. Plus frame-stepping, manual cut markers, sensitivity slider."
 }
