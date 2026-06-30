@@ -75,6 +75,22 @@ def run(cmd: list, quiet: bool = True):
     return proc
 
 
+def detect_scene_cuts(path: str, threshold: float = 0.4) -> list:
+    """Return scene-cut timestamps (seconds) via ffmpeg's scene-score filter.
+
+    One decode-only pass (no encode) — cheap. `threshold` 0..1: lower = more
+    sensitive (catches softer transitions), higher = only hard cuts.
+    """
+    import re
+    cmd = [FFMPEG, "-i", path, "-filter:v",
+           f"select='gt(scene,{float(threshold)})',metadata=print:file=-",
+           "-an", "-f", "null", "-"]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    blob = (proc.stdout or b"").decode("utf-8", "ignore") + (proc.stderr or b"").decode("utf-8", "ignore")
+    cuts = sorted({round(float(m), 3) for m in re.findall(r"pts_time:([0-9.]+)", blob)})
+    return [c for c in cuts if c > 0.05]   # ignore a "cut" at the very first frame
+
+
 # Target dimensions per aspect ratio
 DIMS = {
     "9:16": (1080, 1920),

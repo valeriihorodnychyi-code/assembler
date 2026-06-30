@@ -37,11 +37,24 @@ def transcribe_whisper(video_path: str, model_size: str = "small",
         _WHISPER_CACHE[key] = WhisperModel(model_size, device=device, compute_type="int8")
     model = _WHISPER_CACHE[key]
 
-    segments, info = model.transcribe(video_path, word_timestamps=True, language=language)
-    words = []
-    for seg in segments:
-        for w in (seg.words or []):
-            words.append({"word": w.word.strip(), "start": float(w.start), "end": float(w.end)})
+    def _collect(segs):
+        out = []
+        for seg in segs:
+            for w in (seg.words or []):
+                out.append({"word": w.word.strip(), "start": float(w.start), "end": float(w.end)})
+        return out
+
+    # vad_filter trims non-speech so the FIRST word's timestamp lands on the real
+    # speech onset (otherwise faster-whisper anchors it to ~0 and the first caption
+    # shows from frame 0 over a silent/music intro). Timestamps stay in video time.
+    # Fall back gracefully if VAD deps (onnxruntime) aren't available.
+    try:
+        segments, info = model.transcribe(video_path, word_timestamps=True,
+                                          language=language, vad_filter=True)
+        words = _collect(segments)
+    except Exception:
+        segments, info = model.transcribe(video_path, word_timestamps=True, language=language)
+        words = _collect(segments)
     return {"language": getattr(info, "language", language) or "en", "words": words}
 
 

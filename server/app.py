@@ -253,6 +253,26 @@ def post_style(body: SaveStyle):
     return {"saved": os.path.basename(path), "styles": st.list_styles()}
 
 
+class DetectCutsReq(BaseModel):
+    file_id: str
+    clip: str = "source.mp4"
+    threshold: float = 0.4
+
+
+@app.post("/api/detect_cuts")
+def api_detect_cuts(req: DetectCutsReq):
+    """Scene-cut timestamps for a session clip, so captions can be clipped at cuts."""
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip '{os.path.basename(req.clip)}' not found in session")
+    try:
+        cuts = ffmpeg_utils.detect_scene_cuts(src, threshold=req.threshold)
+    except Exception as e:
+        raise HTTPException(500, f"Cut detection failed: {e}")
+    return {"cuts": cuts}
+
+
 @app.get("/api/caption_rules")
 def get_caption_rules():
     """Shared auto-caption rules (keep_together / glue / no_line_end / widow control)."""
@@ -347,6 +367,7 @@ class PreviewFrameReq(BaseModel):
     cap_in: Optional[float] = None    # captions only shown within [cap_in, cap_out]
     cap_out: Optional[float] = None
     lang: str = "en"                  # language for auto-caption stopword rules
+    cuts: Optional[List[float]] = None  # scene-cut times → captions don't cross a cut
 
 
 @app.get("/api/font_metrics")
@@ -368,7 +389,7 @@ def api_preview_frame(req: PreviewFrameReq):
     if (req.cap_in is not None and req.time < req.cap_in) or (req.cap_out is not None and req.time >= req.cap_out):
         return Response(status_code=204)
     tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}],
-                                    lang=(req.lang or "en"))
+                                    lang=(req.lang or "en"), cuts=req.cuts)
     events = [e for e, _ in tagged]
     if events and req.dur:
         events[-1]["end"] = max(events[-1]["end"], req.dur)  # hold last caption to clip end
@@ -394,6 +415,7 @@ class RenderReq(BaseModel):
     use_body: bool = False          # use body files placed in the session dir / project root
     clip: str = "source.mp4"        # which clip in the session to caption (e.g. dub_es.mp4)
     trim: Optional[list] = None     # [start, end] seconds — same trim the Compose board applies
+    cuts: Optional[List[float]] = None  # scene cuts → captions clipped at cuts
 
 
 @app.post("/api/render")
@@ -439,12 +461,15 @@ def api_render(req: RenderReq):
         compose.trim_clip(src, req.trim[0], req.trim[1], trimmed)
         src = trimmed
         words = compose.shift_words(words or [], float(req.trim[0]), float(req.trim[1]))
+        if req.cuts:   # re-base scene cuts to the trimmed clip too
+            lo, hi = float(req.trim[0]), float(req.trim[1])
+            req.cuts = [c - lo for c in req.cuts if lo < c < hi]
 
     try:
         outputs = compose.render(
             src, words or [], req.regions, req.formats, out_dir,
             bodies=bodies, default_body=default_body, smart_trim=req.smart_trim,
-            out_prefix=out_prefix,
+            out_prefix=out_prefix, cuts=req.cuts,
         )
     except Exception as e:
         raise HTTPException(500, f"Render failed: {e}")
@@ -823,6 +848,8 @@ def api_batch_assemble(req: BatchReq):
                 # non-destructive: a segment may carry caption-data baked at assemble time
                 segs.append({"clip": p, "words": s.get("words"), "style": s.get("style"),
                              "trim": s.get("trim"), "fade_in": s.get("fade_in"),
+                             "cap_in": s.get("cap_in"), "cap_out": s.get("cap_out"),
+                             "cuts": s.get("cuts"),
                              "overlays": resolve_overlays(s.get("overlays"))})
             if not segs:
                 raise RuntimeError("recipe has no segments")

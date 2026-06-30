@@ -140,7 +140,7 @@ def build_groups(words, rules, lang="en", pause_gap=0.5):
 
 
 def build_events(words, limit, text_case="uppercase", replacements=None,
-                 pause_gap=0.5, max_lines=2, wrap_mode="chars", lang="en", rules=None):
+                 pause_gap=0.5, max_lines=2, wrap_mode="chars", lang="en", rules=None, cuts=None):
     """Group a flat list of {text,start,end} words into karaoke events.
 
     Each event = a visible 1-2 line chunk + the index of the currently active word.
@@ -200,11 +200,17 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
         if lines:
             chunks.append(lines)
     else:
+        cut_list = sorted(float(c) for c in (cuts or []))
+
+        def _cut_between(a_start, b_start):   # a scene cut falls between two words -> new caption
+            return any(a_start < c <= b_start for c in cut_list)
+
         phrases, cur = [], []
         for w in clean:
             if cur:
                 prev = cur[-1]
-                if prev["ends_sentence"] or (w["start"] - prev["end"]) > pause_gap:
+                if (prev["ends_sentence"] or (w["start"] - prev["end"]) > pause_gap
+                        or _cut_between(prev["start"], w["start"])):
                     phrases.append(cur)
                     cur = []
             cur.append(w)
@@ -269,6 +275,16 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
         events[i]["end"] = events[i + 1]["start"]
         if events[i]["end"] <= events[i]["start"]:
             events[i]["end"] = events[i]["start"] + 0.1
+
+    # Clamp a caption's end to the next scene cut so a frozen caption never lingers
+    # over the next shot (the post-cut words already start a fresh caption above).
+    if cuts:
+        cl = sorted(float(c) for c in cuts)
+        for e in events:
+            for c in cl:
+                if e["start"] < c < e["end"]:
+                    e["end"] = c
+                    break
     return events
 
 

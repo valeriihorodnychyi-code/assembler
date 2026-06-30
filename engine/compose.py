@@ -22,7 +22,7 @@ def _region_for(t, regions):
     return regions[-1]
 
 
-def build_timeline(words, regions, lang="en"):
+def build_timeline(words, regions, lang="en", cuts=None):
     """Return events sorted by time, each tagged with the style that applies to it.
 
     `regions` is a list of {"start", "end"(nullable), "style"}. A single-style render
@@ -51,6 +51,7 @@ def build_timeline(words, regions, lang="en"):
             pause_gap=style.get("sentence_pause", 0.5),
             max_lines=style.get("max_lines", 1 if style.get("force_single_line") else 2),
             lang=lang,
+            cuts=cuts,
         )
         for e in evs:
             tagged.append((e, style))
@@ -272,11 +273,11 @@ def clip_caption_window(tagged, cap_in=None, cap_out=None):
     return out
 
 
-def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None):
+def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None, cuts=None):
     """Bake captions onto a single clip (no body). Used by the non-destructive
     assemble so a hook's captions are burned only at final assembly time."""
     regions = [{"start": 0, "end": None, "style": st.normalize(style)}]
-    tagged = build_timeline(words or [], regions)
+    tagged = build_timeline(words or [], regions, cuts=cuts)
     try:  # hold the last caption to the very end of the clip (otherwise it vanishes on the final frames)
         dur = ff.get_video_duration(clip_path)
         if tagged and dur:
@@ -371,9 +372,13 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
                 if words:
                     words = shift_words(words, float(trim[0]), float(trim[1]))
             if words and seg.get("style"):
+                seg_cuts = seg.get("cuts")
+                if seg_cuts and trim:   # re-base scene cuts to the trimmed clip, like words
+                    lo, hi = float(trim[0]), float(trim[1])
+                    seg_cuts = [c - lo for c in seg_cuts if lo < c < hi]
                 cap = os.path.join(work_dir, f"cap_{i}.mp4")
                 caption_clip(path, words, seg["style"], fmt, cap, work_dir,
-                             seg.get("cap_in"), seg.get("cap_out"))
+                             seg.get("cap_in"), seg.get("cap_out"), cuts=seg_cuts)
                 path = cap
             if seg.get("overlays"):  # PNG / alpha-.mov stickers on top (reaction style)
                 ovp = os.path.join(work_dir, f"ov_{i}.mp4")
@@ -558,7 +563,7 @@ def assemble(hook_path, body_path, fmt, output_path, work_dir=None, bitrates=Non
 
 def render(video_path, words, regions, formats, output_dir, work_dir=None,
            bodies=None, default_body=None, scale_factors=None, bitrates=None,
-           smart_trim=False, out_prefix="caption"):
+           smart_trim=False, out_prefix="caption", cuts=None):
     """Top-level render. Returns list of output file paths (one per format).
 
     `regions`: list of {"start","end","style"} OR pass a single style via
@@ -571,7 +576,7 @@ def render(video_path, words, regions, formats, output_dir, work_dir=None,
     bodies = bodies or {}
     outputs = []
     try:
-        tagged = build_timeline(words, regions)
+        tagged = build_timeline(words, regions, cuts=cuts)
         for fmt in formats:
             body = bodies.get(fmt, default_body)
             out = os.path.join(output_dir, f"{fmt.replace(':', 'x')}_{out_prefix}.mp4")

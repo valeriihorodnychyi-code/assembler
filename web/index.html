@@ -371,6 +371,12 @@
             <input type="number" id="capIn" placeholder="0.0" min="0" step="0.1" style="flex:1" title="від (с)">
             <input type="number" id="capOut" placeholder="end" min="0" step="0.1" style="flex:1" title="до (с)">
           </div></div>
+        <div class="row"><label title="Знайти монтажні склейки в кліпі — титри не переходитимуть через кат на нову сцену">Scene cuts</label>
+          <div style="display:flex;gap:6px;flex:1.3;align-items:center">
+            <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px" onclick="detectCuts()">🎬 Detect cuts</button>
+            <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
+            <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати кати" onclick="clearCuts()">✕</button>
+          </div></div>
         <div class="row"><label data-i18n="lblFont">Font</label><select id="fontSelect"><option>loading…</option></select></div>
         <div class="row"><label data-i18n="lblNewFont">Upload new font</label><input type="file" id="fontInput" accept=".ttf,.otf" style="flex:1.3;font-size:11px"></div>
         <input type="hidden" id="fontFamily" value="Poppins-Bold">
@@ -764,8 +770,10 @@ function buildGroups(words,lang,pauseGap){
   for(let i=0;i<n-1;i++){if(bond[i])cur.push(words[i+1]);else{groups.push(cur);cur=[words[i+1]];}}
   groups.push(cur);return groups;
 }
-function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang){
+function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts){
   const PAUSE=0.5, ENDERS=/[.!?…]$/; maxLines=maxLines||2; lang=lang||"en";
+  const cutList=(cuts||[]).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+  const cutBetween=(a,b)=>cutList.some(c=>a<c&&c<=b);   // scene cut between two words → new caption
   let raw;
   const src=wordsOverride||((realWords&&realWords.length)?realWords:null);
   if(src){ raw=src.map(w=>({r:(w.word||w.text||""),start:+w.start,end:+w.end,brk:w.brk||null})); }
@@ -790,7 +798,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang){
     if(lines.length)chunks.push(lines);
   }else{
     const phrases=[];let cur=[];
-    for(const w of words){if(cur.length){const p=cur[cur.length-1];if(p.ends||(w.start-p.end)>PAUSE){phrases.push(cur);cur=[];}}cur.push(w);}
+    for(const w of words){if(cur.length){const p=cur[cur.length-1];if(p.ends||(w.start-p.end)>PAUSE||cutBetween(p.start,w.start)){phrases.push(cur);cur=[];}}cur.push(w);}
     if(cur.length)phrases.push(cur);
     const lim=Math.max(1,limit||((wrapMode==="words")?3:15));   // parity with engine: chars OR words
     const minw=+((CAPTION_RULES||{}).min_last_line_words||0)||0;
@@ -820,6 +828,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang){
   // but leave a gap before the first word and after the last (-> blank, not random text).
   for(let i=0;i<events.length-1;i++){events[i].end=events[i+1].start;if(events[i].end<=events[i].start)events[i].end=events[i].start+0.1;}
   if(events.length&&dur)events[events.length-1].end=Math.max(events[events.length-1].end,dur); // hold last caption to end
+  if(cutList.length){for(const e of events){for(const c of cutList){if(e.start<c&&c<e.end){e.end=c;break;}}}}  // clamp end at next cut → no linger over the next shot
   return events;
 }
 
@@ -851,7 +860,7 @@ function render(t,dur){
   const cw=(typeof capWin==="function")?capWin():{in:null,out:null};   // hide captions outside the in/out window
   if((cw.in!=null&&t<cw.in)||(cw.out!=null&&t>=cw.out))return;
   const scale=1;   // no per-format scaling — caption px absolute, identical in every format (matches engine)
-  const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang());
+  const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null);
   if(!events.length)return;
   let ev=events.find(e=>t>=e.start&&t<e.end);
   if(!ev)return; // silence before first word / after last -> nothing on screen (no random text)
@@ -901,7 +910,7 @@ requestAnimationFrame(loop);
 function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if($("language"))$("language").value="";if(typeof setLangSticker==="function")setLangSticker(null);
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
-  variants={en:{clip:null,videoUrl:url,words:null,style:null,trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";
+  variants={en:{clip:null,videoUrl:url,words:null,style:null,trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
   setStatus("Video loaded. Transcribe for captions, or just trim & Send to Compose as-is.","");}
 $("loadBtn").onclick=()=>$("videoInput").click();
 $("sLocBtn").onclick=()=>sendToCompose("loc");
@@ -969,7 +978,8 @@ function selectHook(i){
   editingHook=null;
   saveActiveHook();
   const h=editPack[i];activeHook=i;
-  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,style:h.ctrl,language:h.lang}};activeVar="en";
+  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,style:h.ctrl,language:h.lang,cuts:h.cuts||null}};activeVar="en";
+  if(typeof updateCutsLabel==="function")updateCutsLabel();
   videoFile=null;                                  // in-session clip — re-transcribe targets it, no session fork
   if($("language"))$("language").value=h.lang||""; // force the hook's language on re-transcribe
   enVideoUrl=h.videoUrl;realWords=h.words;
@@ -1077,7 +1087,7 @@ async function fetchExact(){
   const v=variants[activeVar];
   if(!v||!v.words||!v.words.length)return;
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang()})});
+      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null})});
     if(r.status===204){hideExact();return;}
     if(!r.ok)return;
     const url=URL.createObjectURL(await r.blob());const img=$("exactImg");
@@ -1333,10 +1343,11 @@ async function sendToCompose(target){
     variants[activeVar].style=readControls();variants[activeVar].words=remapWords($("transcript").value,variants[activeVar].words);}
   const langs=Object.keys(variants);let added=0;
   langs.forEach(l=>{const v=variants[l];if(!v||!v.clip||hooks.some(h=>h.clip===v.clip))return;
-    const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,trim:v.trim||null,src:"edit"};
+    const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,trim:v.trim||null,src:"edit",videoUrl:v.videoUrl||null};
     if(v.overlays&&v.overlays.length)hook.overlays=v.overlays.map(o=>({name:o.name,x:o.x,y:o.y,w:o.w,angle:o.angle||0,in:(o.in!=null?o.in:null),out:(o.out!=null?o.out:null)}));
-    if(v.words&&v.words.length&&v.style){hook.words=v.words;hook.style=toEngineStyle(v.style);}  // captions only if present
+    if(v.words&&v.words.length){hook.words=v.words;hook.ctrl=v.style||null;if(v.style)hook.style=toEngineStyle(v.style);}  // carry words + ctrl so LOC shows a real thumbnail
     if(v.capIn!=null)hook.cap_in=v.capIn;if(v.capOut!=null)hook.cap_out=v.capOut;   // caption in/out window
+    if(v.cuts&&v.cuts.length)hook.cuts=v.cuts;   // scene cuts travel with the hook
     hooks.push(hook);added++;});
   renderHookTiles();setMode(target==="loc"?"loc":"asm");
   setStatus(added?("Надіслано "+added+" кліп(ів) → "+(target==="loc"?"LOC":"Assemble")+"."):"Вже на дошці.","ok");
@@ -1723,6 +1734,7 @@ $("batchAssembleBtn").onclick=async()=>{
   const recipes=hooks.map(h=>{const hookSeg={type:"session",ref:h.clip||h.name};
     if(h.words&&h.style){hookSeg.words=h.words;hookSeg.style=h.style;}  // live hook → bake captions now
     if(h.cap_in!=null)hookSeg.cap_in=h.cap_in;if(h.cap_out!=null)hookSeg.cap_out=h.cap_out;  // caption in/out window
+    if(h.cuts&&h.cuts.length)hookSeg.cuts=h.cuts;   // scene cuts → captions clipped at cuts
     if(h.trim)hookSeg.trim=h.trim;                                     // cut clip at assemble
     if(h.overlays&&h.overlays.length)hookSeg.overlays=h.overlays;       // PNG/.mov stickers baked on the hook
     const segs=[hookSeg];
@@ -1767,7 +1779,7 @@ function setMode(m){
   $("editStage").style.display=edit?"grid":"none";
   $("trimRow").style.display=(!edit||!videoLoaded)?"none":"flex";
   if(asm){$("varTabs").style.display="none";pullSessionHooks(true);renderBatchStage();}
-  else if(loc){$("varTabs").style.display="none";if(typeof renderLocStage==="function")renderLocStage();}
+  else if(loc){$("varTabs").style.display="none";if(typeof ensureOriginalsOnBoard==="function")ensureOriginalsOnBoard();if(typeof renderLocStage==="function")renderLocStage();}
   else{autoGrow();buildVarTabs();buildFilmstrip();if(typeof renderGroupBar==="function")renderGroupBar();if(typeof renderOverlays==="function"){renderOverlays();renderOverlayList();}}
   if(typeof tutOn!=="undefined"&&tutOn){tutIdx=0;showTut();}
 }
@@ -1860,11 +1872,51 @@ function renderLocStage(){
     rows.appendChild(row);
   });
 }
+function ensureOriginalsOnBoard(){
+  // Auto-place the current EN original on the board when entering LOC, so the user
+  // doesn't have to go back and press "Send to LOC". Carries videoUrl/words/ctrl so
+  // the LOC source shows a real thumbnail (not an empty "original" placeholder).
+  if(editingHook)return 0;                       // don't treat a localized clip being edited as an "original"
+  if(typeof variants!=="object"||!variants)return 0;
+  // fold live edits into the active variant first
+  if(variants[activeVar]&&variants[activeVar].words&&variants[activeVar].words.length){
+    try{variants[activeVar].style=readControls();
+        const rw=remapWords($("transcript").value,variants[activeVar].words);if(rw)variants[activeVar].words=rw;}catch(e){}
+  }
+  let added=0;
+  Object.keys(variants).forEach(l=>{const v=variants[l];
+    if(!v||!v.clip||/^dub_/i.test(v.clip)||hooks.some(h=>h.clip===v.clip))return;   // skip loc clips + dupes
+    const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,
+                trim:v.trim||null,src:"edit",videoUrl:v.videoUrl||null};
+    if(v.words&&v.words.length){hook.words=v.words;hook.ctrl=v.style||null;if(v.style)hook.style=toEngineStyle(v.style);}
+    if(v.capIn!=null)hook.cap_in=v.capIn;if(v.capOut!=null)hook.cap_out=v.capOut;
+    if(v.cuts&&v.cuts.length)hook.cuts=v.cuts;
+    hooks.push(hook);added++;});
+  return added;
+}
 function locSources(){
   // originals always live on the board (src "edit") → single source of truth, no editPack confusion
   return hooks.filter(h=>h.src==="edit").map(h=>({clip:h.clip,lang:h.lang||"en",
     style:h.style||(h.ctrl?toEngineStyle(h.ctrl):null),name:h.name,videoUrl:h.videoUrl||null,words:h.words||null,ctrl:h.ctrl||null}));
 }
+async function detectCuts(){
+  const v=variants[activeVar];
+  if(!fileId||!v||!v.clip){setStatus("Спершу транскрайбни — кліп має бути в сесії.","err");return;}
+  const btn=$("detectCutsBtn"),old=btn?btn.textContent:"";if(btn){btn.textContent="…";btn.disabled=true;}
+  try{
+    const r=await fetch(API+"/api/detect_cuts",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:v.clip,threshold:0.4})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+    v.cuts=d.cuts||[];
+    if(editingHook)editingHook.cuts=v.cuts;
+    if(activeHook>=0&&editPack[activeHook])editPack[activeHook].cuts=v.cuts;
+    updateCutsLabel();if(typeof scheduleExact==="function")scheduleExact();
+    setStatus("Знайдено катів: "+v.cuts.length+(v.cuts.length?" → титри не перетинатимуть склейки":""),"ok");
+  }catch(e){setStatus("Детект катів: "+e.message,"err");}
+  if(btn){btn.textContent=old||"🎬 Detect cuts";btn.disabled=false;}
+}
+function clearCuts(){const v=variants[activeVar];if(v)v.cuts=[];if(editingHook)editingHook.cuts=[];if(activeHook>=0&&editPack[activeHook])editPack[activeHook].cuts=[];updateCutsLabel();if(typeof scheduleExact==="function")scheduleExact();}
+function updateCutsLabel(){const v=variants[activeVar];const n=(v&&v.cuts)?v.cuts.length:0;const el=$("cutsLabel");if(el)el.textContent=n?(n+" cuts"):"none";}
 function downloadLocs(){
   if(!fileId){setStatus("Немає сесії — спершу зроби локалізації.","err");return;}
   setStatus("Готую архів локалізацій…","",true);
@@ -1925,7 +1977,8 @@ function editLocHook(h){
   const url=API+"/clip/"+fileId+"/"+h.clip;
   const ctrl=h.ctrl||sharedCtrl||readControls();
   enVideoUrl=url;realWords=h.words||[];
-  variants={en:{clip:h.clip,videoUrl:url,words:h.words,style:ctrl,language:h.lang}};activeVar="en";
+  variants={en:{clip:h.clip,videoUrl:url,words:h.words,style:ctrl,language:h.lang,cuts:h.cuts||null}};activeVar="en";
+  if(typeof updateCutsLabel==="function")updateCutsLabel();
   videoFile=null;                                  // edit the in-session clip — never re-upload (no session fork)
   if($("language"))$("language").value=h.lang||""; // force re-transcribe to the localized language (not auto-detect → EN)
   video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";

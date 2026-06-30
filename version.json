@@ -1,5 +1,5 @@
 {
-  "version": "1.3.3",
+  "version": "1.4.0",
   "channel": "main",
-  "notes": "Backup: download all localized (caption-free) clips + transcripts as one zip from LOC, so a session crash never means re-paying HeyGen/ElevenLabs. Plus 1.3.2 session-fork + language bugfix, auto-caption rules, shrink-to-fit."
+  "notes": "Scene-cut detection (🎬 Detect cuts): captions never cross a montage cut — they end at the cut and a fresh caption starts on the new shot. Works in preview + final render, per-clip. Plus LOC auto-original, Whisper VAD, LOC backup zip, session-fork fix, auto-caption rules, shrink-to-fit."
 }
