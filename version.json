@@ -1,5 +1,5 @@
 {
-  "version": "1.6.0",
+  "version": "1.6.1",
   "channel": "main",
-  "notes": "Batch flow: upload pack first, pick model, then '① Transcribe pack' on demand (language auto-detected, no filename guessing). '① Transcribe' now does only the active hook — transcribe one specific clip without touching others. Smart captions own section, accordion panel, scrim, smart remap."
+  "notes": "UI: batch hint moved to the right (off the preview); accordion removed; '+ Cut here' English + accent to match Detect cuts; Plate Padding Y allows negative; Bottom margin range raised so captions can go above the middle."
 }
