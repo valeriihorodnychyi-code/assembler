@@ -113,9 +113,9 @@
   .modeswitch button:not(.active):hover{background:#262a36;color:var(--txt)}
   .tactions{display:flex;align-items:center;gap:10px}
   /* studio edit layout: presets | preview | quick controls */
-  .editstage{display:grid;grid-template-columns:138px 96px auto 340px;gap:20px;align-items:start;justify-content:center;width:100%}        /* 9:16 / 1:1 — preview hugs the video, panels close */
+  .editstage{display:grid;grid-template-columns:138px 96px auto 440px;gap:20px;align-items:start;justify-content:center;width:100%}        /* 9:16 / 1:1 — preview hugs the video, wider tools column on the right */
   .previewcol{align-self:center}        /* keep the video vertically centred while panels start from the top */
-  .editstage.wide{grid-template-columns:138px 96px minmax(0,1fr) 340px;justify-content:stretch}                                            /* 16:9 — preview fills the centre (bounded) */
+  .editstage.wide{grid-template-columns:138px 96px minmax(0,1fr) 440px;justify-content:stretch}                                            /* 16:9 — preview fills the centre (bounded) */
   .editzone{display:flex;flex-direction:column}
   .groupcol{display:flex;flex-direction:column;gap:8px;max-height:74vh;overflow-y:auto;align-items:stretch}
   .railhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;text-align:center;margin-bottom:8px}
@@ -269,9 +269,9 @@
       <div id="filmstrip"></div>
     </div>
     <div class="transport" id="transport">
-      <button id="frameBack" title="−1 кадр (←)">⟨</button>
-      <button id="playBtn">▶</button>
-      <button id="frameFwd" title="+1 кадр (→)">⟩</button>
+      <button id="frameBack" title="−1 кадр (←)" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 12px">⟨</button>
+      <button id="playBtn" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 16px">▶</button>
+      <button id="frameFwd" title="+1 кадр (→)" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 12px">⟩</button>
       <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
       <span class="val" id="timeLbl" style="width:auto">0.0s</span>
       <button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
@@ -389,14 +389,15 @@
         <div style="clear:both"></div>
         <div class="row" style="margin-top:10px"><label title="Знайти монтажні склейки — титри не переходитимуть через кат на нову сцену">Scene cuts</label>
           <div style="display:flex;gap:6px;align-items:center;flex:1.3">
-            <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px;color:var(--accent);border-color:var(--accent)" onclick="detectCuts()">🎬 Detect cuts</button>
+            <button type="button" id="detectCutsBtn" style="flex:1;font-size:11px;background:var(--accent);color:#fff;border:none" onclick="detectCuts()">🎬 Detect cuts</button>
             <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
             <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати всі кати" onclick="clearCuts()">✕</button>
           </div></div>
         <div class="row"><label></label>
           <div style="display:flex;gap:6px;flex:1.3">
-            <button type="button" id="addCutBtn" class="ghost" style="flex:1;font-size:11px;color:var(--accent);border-color:var(--accent)" title="Add a cut at the current playhead frame" onclick="addCutHere()">＋ Cut here</button>
+            <button type="button" id="addCutBtn" style="flex:1;font-size:11px;background:var(--accent);color:#fff;border:none" title="Add a cut at the current playhead frame" onclick="addCutHere()">＋ Cut here</button>
             <button type="button" id="undoCutBtn" class="ghost" style="font-size:11px" title="Скасувати останній доданий вручну кат" onclick="undoLastCut()">↶ undo</button>
+            <button type="button" id="cutsToAllBtn" class="ghost" style="font-size:11px" title="Скопіювати ці кати на всі хуки на дошці (для локалізацій того самого хука)" onclick="applyCutsToAll()">⧉ to all</button>
           </div></div>
         <div class="row"><label style="font-size:10px" title="Чутливість: нижче = ловить більше катів (для схожих планів), вище = лише явні склейки">sens</label>
           <div style="display:flex;gap:6px;align-items:center;flex:1.3">
@@ -2044,6 +2045,15 @@ async function detectCuts(){
   if(btn){btn.textContent=old||"🎬 Detect cuts";btn.disabled=false;}
 }
 function clearCuts(){const v=variants[activeVar];if(v)v.cuts=[];if(editingHook)editingHook.cuts=[];if(activeHook>=0&&editPack[activeHook])editPack[activeHook].cuts=[];updateCutsLabel();if(typeof scheduleExact==="function")scheduleExact();}
+function applyCutsToAll(){
+  const v=variants[activeVar];const cuts=(v&&v.cuts)||[];
+  if(!cuts.length){setStatus("Спершу знайди або постав кати.","");return;}
+  let n=0;
+  editPack.forEach(h=>{h.cuts=cuts.slice();n++;});
+  hooks.forEach(h=>{h.cuts=cuts.slice();});   // board hooks incl. localizations of the same clip
+  setStatus("Кати ("+cuts.length+") скопійовано на всі хуки.","ok");
+  if(typeof scheduleExact==="function")scheduleExact();
+}
 function _syncCuts(arr){const v=variants[activeVar];if(v)v.cuts=arr;if(editingHook)editingHook.cuts=arr;if(activeHook>=0&&editPack[activeHook])editPack[activeHook].cuts=arr;}
 function addCutHere(){
   const v=variants[activeVar];if(!v){setStatus("Нема активного кліпа.","err");return;}
