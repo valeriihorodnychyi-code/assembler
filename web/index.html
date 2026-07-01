@@ -557,6 +557,12 @@
         <div class="row"><label>Import files</label><input type="file" id="batchFiles" accept="video/*" multiple style="flex:1.3;font-size:11px"></div>
         <button id="pullLocBtn" style="width:100%;margin-top:4px">↻ Refresh from this session</button>
         <div id="hookTiles" style="margin-top:10px"></div>
+        <div id="mergeBar" style="display:none;margin-top:10px;border-top:0.5px solid var(--line);padding-top:10px">
+          <div class="row" style="margin:0 0 6px"><label title="Якщо у хуків є титри — запекти їх у злитий кліп. Вимкни, щоб склеїти сире відео.">Bake captions</label>
+            <label class="switch"><input type="checkbox" id="mergeCaps" checked><span class="slider"></span></label></div>
+          <button id="mergeHooksBtn" style="width:100%" title="Склеїти ВСІ хуки на дошці по порядку в один довгий хук-парт">🔗 Merge hooks → one clip</button>
+          <div id="mergeResult" style="margin-top:8px"></div>
+        </div>
       </div>
     </details>
 
@@ -1756,7 +1762,43 @@ function renderHookTiles(){
     t.appendChild(mk("▼",()=>{if(i<hooks.length-1){[hooks[i+1],hooks[i]]=[hooks[i],hooks[i+1]];renderHookTiles();}}));
     t.appendChild(mk("✕",()=>{hooks.splice(i,1);renderHookTiles();}));
     box.appendChild(t);});
+  const mb=$("mergeBar");if(mb)mb.style.display=hooks.length>=2?"":"none";   // merge needs ≥2 hooks
   renderBatchStage();
+}
+let mergeSeq=0;
+// Merge ALL hooks on the board (in order) into ONE long hook clip. Reuses the
+// non-destructive assemble engine: one recipe, every hook a segment. Captions are
+// baked per-hook when "Bake captions" is on AND that hook actually has captions.
+async function mergeHooks(){
+  if(hooks.length<2){setStatus("Need at least 2 hooks to merge.","err");return;}
+  if(!fileId){setStatus("No session.","err");return;}
+  const bake=$("mergeCaps")?$("mergeCaps").checked:true;
+  const segs=hooks.map(h=>{const seg={type:"session",ref:h.clip||h.name};
+    if(bake&&h.words&&h.style){seg.words=h.words;seg.style=h.style;
+      if(h.cap_in!=null)seg.cap_in=h.cap_in;if(h.cap_out!=null)seg.cap_out=h.cap_out;
+      if(h.cuts&&h.cuts.length)seg.cuts=h.cuts;}
+    if(h.trim)seg.trim=h.trim;                                   // trim always respected
+    if(h.overlays&&h.overlays.length)seg.overlays=h.overlays;    // stickers always baked
+    return seg;});
+  const name="Merged_hook"+(++mergeSeq>1?("_"+mergeSeq):"");
+  const recipe={name,format:ratio,segments:segs};
+  const btn=$("mergeHooksBtn");if(btn)btn.disabled=true;
+  setStatus("Merging "+hooks.length+" hooks…","",true);busyStart("Склеюю "+hooks.length+" хуків…");
+  try{const r=await fetch(API+"/api/batch_assemble",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,recipes:[recipe]})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+    const err=d.errors&&d.errors[name];
+    if(err)throw new Error(err);
+    const out=d.results&&d.results[0];if(!out)throw new Error("no output");
+    // add the merged clip to the board as a reusable component…
+    hooks.push({name:"🔗 "+name,clip:out.file,lang:hooks[0].lang||"",src:"added"});
+    renderHookTiles();
+    // …and give a download button for it right away
+    const box=$("mergeResult");
+    if(box)box.innerHTML="<a href='"+API+out.url+"' download style='display:inline-block;background:var(--ok);color:#0d0e12;font-weight:600;font-size:12px;padding:6px 12px;border-radius:7px;text-decoration:none'>⬇ Download merged hook</a> <span style='font-size:11px;color:var(--muted)'>also added to the board ↑</span>";
+    setStatus("Merged "+segs.length+" hooks into one clip.","ok");chime("render");busyDone("Склеєно в один хук");
+  }catch(e){setStatus("Merge failed: "+e.message,"err");busyStop();}
+  if(btn)btn.disabled=false;
 }
 $("batchFiles").onchange=async e=>{
   const files=[...e.target.files];if(!files.length)return;
@@ -1776,6 +1818,7 @@ async function pullSessionHooks(silent){
   }catch(e){if(!silent)setStatus("Pull failed: "+e.message,"err");}
 }
 $("pullLocBtn").onclick=()=>pullSessionHooks(false);
+if($("mergeHooksBtn"))$("mergeHooksBtn").onclick=mergeHooks;
 // ---------- music tracks (timeline-based, up to 2) ----------
 let musicTracks=[];            // {name,lib,startSeg,inSec,outSec,vol,duck,dur,peaks}
 let timelineOpen=false;
