@@ -458,14 +458,24 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         kp_px = int(int(kp.get("pad_x", 15)) * scale_factor)
         kp_py = int(int(kp.get("pad_y", 5)) * scale_factor)
         kp_rad = int(int(kp.get("border_radius", 10)) * scale_factor)
-        kp_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        kd = ImageDraw.Draw(kp_img)
+        kp_rects = []
         for x, y, text, is_active in word_positions:
             if is_active:
                 bbox = draw.textbbox((x, y), text, font=font)
-                c = [bbox[0] - kp_px, bbox[1] - kp_py - box_off, bbox[2] + kp_px, bbox[3] + kp_py - box_off]
-                (kd.rounded_rectangle(c, radius=kp_rad, fill=kp_c) if kp_rad > 0
-                 else kd.rectangle(c, fill=kp_c))
+                kp_rects.append([bbox[0] - kp_px, bbox[1] - kp_py - box_off, bbox[2] + kp_px, bbox[3] + kp_py - box_off])
+        if shadow_on and kp_rects:   # drop shadow cast by the word plate
+            ksh = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            ksd = ImageDraw.Draw(ksh)
+            for r in kp_rects:
+                sc = [r[0] + sh_x, r[1] + sh_y, r[2] + sh_x, r[3] + sh_y]
+                (ksd.rounded_rectangle(sc, radius=kp_rad, fill=sh_c) if kp_rad > 0 else ksd.rectangle(sc, fill=sh_c))
+            if sh_blur > 0:
+                ksh = ksh.filter(ImageFilter.GaussianBlur(sh_blur))
+            final_img.alpha_composite(ksh)
+        kp_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        kd = ImageDraw.Draw(kp_img)
+        for r in kp_rects:
+            (kd.rounded_rectangle(r, radius=kp_rad, fill=kp_c) if kp_rad > 0 else kd.rectangle(r, fill=kp_c))
         final_img.alpha_composite(kp_img)
 
     text_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))

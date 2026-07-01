@@ -1,5 +1,5 @@
 {
-  "version": "1.6.3",
+  "version": "1.6.4",
   "channel": "main",
-  "notes": "Right tools column widened 340→440px (Transcription / Base text / Smart captions get more room); the stage shifts slightly left. Advanced look settings stay in the left bar as before."
+  "notes": "Captions in/out moved into Smart captions (with the cuts/timing tools). Word plate (karaoke highlight) now casts the shadow too when Shadow is on. Right tools column wider."
 }
