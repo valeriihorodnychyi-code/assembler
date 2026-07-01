@@ -1,5 +1,5 @@
 {
-  "version": "1.5.3",
+  "version": "1.6.0",
   "channel": "main",
-  "notes": "Left panel accordion: opening a section auto-collapses the others, so Transcription and Base text no longer fight for vertical space. Smart-captions moved under Transcription. Plus per-file batch language, collapsed noisy sections, smart remap, scrim."
+  "notes": "Batch flow: upload pack first, pick model, then '① Transcribe pack' on demand (language auto-detected, no filename guessing). '① Transcribe' now does only the active hook — transcribe one specific clip without touching others. Smart captions own section, accordion panel, scrim, smart remap."
 }

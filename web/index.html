@@ -228,6 +228,7 @@
         <button data-r="16:9">16:9</button>
       </div>
       <button id="transcribeBtn" data-i18n="transcribe" disabled>① Transcribe</button>
+      <button id="packTranscribeBtn" style="display:none" title="Транскрибувати всі не-транскрибовані хуки паку обраною моделлю (мова — авто)">① Transcribe pack</button>
       <button class="primary" id="renderBtn" data-i18n="sendAsm" disabled>Send to Assemble →</button>
       <button id="sLocBtn" data-i18n="toLoc" style="display:none">→ LOC</button>
       <button id="copyAllBtn" data-i18n="styleAll" style="display:none" title="Скопіювати стиль активного хука на всі">⧉ Style→all</button>
@@ -319,34 +320,6 @@
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
         <div class="row" style="margin-top:8px"><label>Manual line breaks</label><label class="switch"><input type="checkbox" id="manualBreaks"><span class="slider"></span></label></div>
         <div class="hint" id="manualHint" style="display:none"><b>Enter</b> = new line · <b>empty line</b> = new caption screen. Your exact splits are used (no auto-wrap).</div>
-        <details class="subgrp" style="margin:8px 0;border:1px solid #34c759;border-radius:8px;padding:6px 9px;background:rgba(52,199,89,.10)">
-          <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#34c759">✨ Smart captions · keep-together &amp; scene cuts</summary>
-          <div style="padding-top:8px;display:flex;flex-direction:column;gap:8px">
-            <div>
-              <label style="font-size:11px;color:var(--muted)" title="Фрази, які НІКОЛИ не розриваються між рядками/титрами (по одній на рядок). Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label>
-              <textarea id="keepTogether" rows="3" placeholder="Tai Chi&#10;New York&#10;Muscle Booster" style="font-size:11px;resize:vertical;width:100%;margin-top:4px"></textarea>
-              <button type="button" id="saveRulesBtn" class="ghost" style="float:right;font-size:11px;margin-top:4px" onclick="saveKeepTogether()">💾 Save phrases</button>
-              <div style="clear:both"></div>
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--muted)" title="Знайти монтажні склейки — титри не переходитимуть через кат на нову сцену">Scene cuts</label>
-              <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
-                <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px" onclick="detectCuts()">🎬 Detect cuts</button>
-                <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
-                <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати всі кати" onclick="clearCuts()">✕</button>
-              </div>
-              <div style="display:flex;gap:6px;margin-top:5px">
-                <button type="button" id="addCutBtn" class="ghost" style="flex:1;font-size:11px" title="Додати кат вручну на поточному кадрі плеєра" onclick="addCutHere()">＋ кат на кадрі</button>
-                <button type="button" id="undoCutBtn" class="ghost" style="font-size:11px" title="Скасувати останній доданий вручну кат" onclick="undoLastCut()">↶ undo</button>
-              </div>
-              <div style="display:flex;gap:6px;align-items:center;font-size:10px;color:var(--muted);margin-top:5px" title="Чутливість: нижче = ловить більше катів (для схожих планів), вище = лише явні склейки">
-                <span>sens</span>
-                <input type="range" id="cutSens" min="0.1" max="0.6" step="0.05" value="0.3" style="flex:1" oninput="if($('cutSensV'))$('cutSensV').textContent=(+this.value).toFixed(2)">
-                <span id="cutSensV" class="val" style="min-width:30px;text-align:right">0.30</span>
-              </div>
-            </div>
-          </div>
-        </details>
       </div>
     </details>
     </section>
@@ -403,6 +376,33 @@
         <div class="row"><label data-i18n="lblColor">Text color</label><input type="color" id="textColor" value="#ffffff"></div>
         <div class="row"><label data-i18n="lblMargin">Bottom margin</label><input type="range" id="marginBottom" min="0" max="900" value="320"><span class="val" id="marginBottomV">320</span></div>
         <div class="row"><label data-i18n="lblSpacing">Line spacing</label><input type="range" id="lineSpacing" min="-20" max="60" value="10"><span class="val" id="lineSpacingV">10</span></div>
+      </div>
+    </details>
+
+    <details class="grp" id="grpSmart" style="border-color:#34c759">
+      <summary style="color:#34c759"><span>✨ Smart captions</span> <span class="chev">›</span></summary>
+      <div class="body">
+        <div class="row" style="align-items:center"><label title="Фрази, які НІКОЛИ не розриваються між рядками/титрами (по одній на рядок). Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label>
+          <button type="button" id="keepExpandBtn" class="ghost" style="font-size:11px" title="Розгорнути / згорнути поле" onclick="toggleKeepExpand()">⤢</button></div>
+        <textarea id="keepTogether" rows="2" placeholder="Tai Chi&#10;New York&#10;Muscle Booster" style="font-size:11px;resize:vertical;width:100%"></textarea>
+        <button type="button" id="saveRulesBtn" class="ghost" style="float:right;font-size:11px;margin-top:4px" onclick="saveKeepTogether()">💾 Save phrases</button>
+        <div style="clear:both"></div>
+        <div class="row" style="margin-top:10px"><label title="Знайти монтажні склейки — титри не переходитимуть через кат на нову сцену">Scene cuts</label>
+          <div style="display:flex;gap:6px;align-items:center;flex:1.3">
+            <button type="button" id="detectCutsBtn" class="ghost" style="flex:1;font-size:11px" onclick="detectCuts()">🎬 Detect cuts</button>
+            <span id="cutsLabel" class="val" style="min-width:48px;text-align:center">none</span>
+            <button type="button" id="clearCutsBtn" class="ghost" style="font-size:11px" title="Прибрати всі кати" onclick="clearCuts()">✕</button>
+          </div></div>
+        <div class="row"><label></label>
+          <div style="display:flex;gap:6px;flex:1.3">
+            <button type="button" id="addCutBtn" class="ghost" style="flex:1;font-size:11px" title="Додати кат вручну на поточному кадрі плеєра" onclick="addCutHere()">＋ кат на кадрі</button>
+            <button type="button" id="undoCutBtn" class="ghost" style="font-size:11px" title="Скасувати останній доданий вручну кат" onclick="undoLastCut()">↶ undo</button>
+          </div></div>
+        <div class="row"><label style="font-size:10px" title="Чутливість: нижче = ловить більше катів (для схожих планів), вище = лише явні склейки">sens</label>
+          <div style="display:flex;gap:6px;align-items:center;flex:1.3">
+            <input type="range" id="cutSens" min="0.1" max="0.6" step="0.05" value="0.3" style="flex:1" oninput="if($('cutSensV'))$('cutSensV').textContent=(+this.value).toFixed(2)">
+            <span id="cutSensV" class="val" style="min-width:30px;text-align:right">0.30</span>
+          </div></div>
       </div>
     </details>
 
@@ -761,6 +761,7 @@ function _isNum(t){return /^[+\-]?[\d.,]*\d/.test(t||"");}
 function capLang(){const v=variants&&variants[activeVar]&&variants[activeVar].lang;return String(v||($("language")&&$("language").value)||"en").toLowerCase();}
 async function loadCaptionRules(){try{CAPTION_RULES=await(await fetch(API+"/api/caption_rules")).json();}catch(e){CAPTION_RULES={};}fillKeepTogether();}
 function fillKeepTogether(){const ta=$("keepTogether");if(ta&&CAPTION_RULES)ta.value=(CAPTION_RULES.keep_together||[]).join("\n");}
+function toggleKeepExpand(){const ta=$("keepTogether"),b=$("keepExpandBtn");if(!ta)return;const big=(+ta.rows||2)<=2;ta.rows=big?9:2;if(b)b.textContent=big?"⤡":"⤢";}
 async function saveKeepTogether(){
   const ta=$("keepTogether");if(!ta)return;
   const list=ta.value.split("\n").map(s=>s.trim()).filter(Boolean);
@@ -965,12 +966,13 @@ $("videoInput").onchange=e=>{const fs=e.target.files;if(!fs||!fs.length)return;
 // stays the old single path; this kicks in only when 2+ files are chosen.
 function batchHint(html){let h=$("batchHint");if(!h){h=document.createElement("div");h.id="batchHint";h.className="batch-hint";h.style.cssText+=";position:fixed;left:50%;bottom:96px;transform:translateX(-50%) rotate(-1deg);z-index:135";document.body.appendChild(h);}h.style.display="block";h.innerHTML=html;}
 function batchHintHide(){const h=$("batchHint");if(h)h.style.display="none";}
+// Phase 1: just UPLOAD the pack (no transcribe). Names never affect anything — the
+// user then picks a model and hits "Transcribe pack" (Whisper auto-detects language).
 async function batchOriginals(files){
   editingHook=null;packMode="orig";_packFormats=new Set();
-  sharedCtrl=readControls();                                   // the style designed in EDIT = default for the whole pack
-  const eng=$("engine").value,ms=$("modelSize").value,lang=$("language").value;
-  busyStart("Батч: "+files.length+" хуків…");editPack=[];let ok=0;
-  batchHint(TL("Транскрибую твій пак 🎬<br>все добре — трошки зачекай ✨","Transcribing your pack 🎬<br>all good — hang tight ✨"));
+  sharedCtrl=readControls();
+  busyStart("Завантаження паку: "+files.length+"…");editPack=[];let ok=0;
+  batchHint(TL("Завантажую пак 🎬<br>далі — «① Transcribe pack»","Uploading pack 🎬<br>then hit “① Transcribe pack”"));
   for(let i=0;i<files.length;i++){
     const f=files[i];
     const safe=(i+1)+"_"+(f.name||"hook.mp4").replace(/[^\w.\-]+/g,"_");
@@ -982,30 +984,50 @@ async function batchOriginals(files){
       let r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});let d=await r.json();
       if(!r.ok)throw new Error(d.detail||"upload failed");
       fileId=d.file_id;const clip=d.name;
-      // per-file language from the filename (localized packs mix languages) so Whisper
-      // doesn't auto-detect Spanish audio as English; non-EN clips get at least Medium.
-      const flang=((typeof langFromName==="function"&&langFromName(f.name||clip))||lang||"");
-      const useMs=(flang&&flang!=="en"&&ms==="small")?"medium":ms;
-      setStatus("Хук "+(i+1)+"/"+files.length+": транскрайб "+(flang?flang.toUpperCase():"auto")+"…","",true);
-      batchHint("Хук "+(i+1)+" / "+files.length+" 🎬<br>"+TL("розпізнаю текст…","recognizing text…"));
-      r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:clip,engine:eng,model_size:useMs,language:flang})});
-      d=await r.json();if(!r.ok)throw new Error(d.detail||"transcribe failed");
-      const hk={name:clip,clip:clip,lang:(flang||d.language||"en"),
-                videoUrl:URL.createObjectURL(f),words:d.words,ctrl:JSON.parse(JSON.stringify(sharedCtrl)),
+      const hk={name:clip,clip:clip,lang:((typeof langFromName==="function"&&langFromName(f.name))||""),  // tile colour only, best-effort
+                videoUrl:URL.createObjectURL(f),words:null,ctrl:JSON.parse(JSON.stringify(sharedCtrl)),
                 style:toEngineStyle(sharedCtrl),src:"edit"};
-      if(!hooks.some(h=>h.clip===clip))hooks.push(hk);   // on the board immediately → never lost
-      editPack.push(hk);                                  // editPack items ARE the board hooks (edits persist live)
-      ok++;
+      if(!hooks.some(h=>h.clip===clip))hooks.push(hk);
+      editPack.push(hk);ok++;
     }catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
   }
   batchHintHide();
-  if(ok){busyDone(ok+" хуків готово");
+  if(ok){busyDone(ok+" хуків завантажено");
     $("dropzone").style.display="none";video.hidden=false;canvas.hidden=false;videoLoaded=true;
-    activeHook=-1;renderHookTiles();selectHook(0);
-    updateEditButtons();
-    setStatus(ok+" хуків транскрибовано. Клікай по стрічці, щоб поправити окремий; далі «Send to Assemble» або вкладка LOC.","ok");
+    activeHook=-1;renderHookTiles();selectHook(0);updateEditButtons();
+    setStatus(ok+" хуків завантажено. Обери модель (small / medium) і тисни «① Transcribe pack».","ok");
   } else busyStop();
+}
+// Phase 2: transcribe every not-yet-transcribed hook, on demand, with the chosen
+// model. Language is AUTO-DETECTED per clip (reliable on Medium) — no filename guessing.
+async function transcribePack(){
+  const eng=$("engine").value, ms=$("modelSize").value;
+  const todo=editPack.filter(h=>!h.words||!h.words.length);
+  if(!todo.length){setStatus("Усі хуки вже транскрибовані.","");return;}
+  busyStart("Транскрайб паку: "+todo.length+" ("+ms+")…");let ok=0;
+  for(let i=0;i<todo.length;i++){const h=todo[i];
+    try{
+      setStatus("Транскрайб "+(i+1)+"/"+todo.length+"…","",true);
+      batchHint("Хук "+(i+1)+" / "+todo.length+" 🎬<br>"+TL("розпізнаю текст…","recognizing text…"));
+      const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:h.clip,engine:eng,model_size:ms,language:""})});  // "" = auto-detect
+      const d=await r.json();if(!r.ok)throw new Error(d.detail||"transcribe failed");
+      h.words=d.words; if(d.language)h.lang=d.language;
+    ok++;}catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
+  }
+  batchHintHide();
+  if(typeof renderHookStrip==="function")renderHookStrip();renderHookTiles();
+  // refresh the active hook's transcript view WITHOUT saveActiveHook (its textarea was
+  // empty pre-transcribe; saving would wipe the freshly-recognized words).
+  const ah=(activeHook>=0)?editPack[activeHook]:null;
+  if(ah){realWords=ah.words;if(variants.en){variants.en.words=ah.words;variants.en.lang=ah.lang;}
+    $("transcript").value=(ah.words||[]).map(w=>w.word||w.text).join(" ");autoGrow();
+    if(typeof setLangSticker==="function")setLangSticker(ah.lang);
+    if(typeof scheduleExact==="function")scheduleExact();}
+  updateEditButtons();
+  if(ok){busyDone(ok+" транскрибовано");if(typeof chime==="function")chime("localize");
+    setStatus(ok+" хуків транскрибовано ("+ms+"). Клікай по стрічці, щоб поправити.","ok");}
+  else busyStop();
 }
 // --- EDIT pack: per-hook fine-tuning (mirrors the old per-language filmstrip) ---
 function saveActiveHook(){
@@ -1067,11 +1089,16 @@ function updateEditButtons(){
   show("sendPackAsmBtn",pack&&!editing&&!locpack);show("sendPackBtn",false);show("copyAllBtn",pack&&!editing);
   show("saveLocPackBtn",locpack&&!editing);
   show("saveHookBtn",editing);
+  const tb=$("transcribeBtn");if(tb)tb.textContent="① Transcribe";   // single = active hook only
+  const ptb=$("packTranscribeBtn");                                   // pack = all pending, shown only when there's a pack to do
+  if(ptb){const pend=editPack.filter(h=>!h.words||!h.words.length).length;
+    ptb.style.display=(pack&&!editing&&pend>0)?"inline-block":"none";
+    ptb.textContent="① Transcribe pack ("+pend+")";}
 }
 const dz=$("dropzone");
 dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");});
 ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
-dz.addEventListener("drop",e=>{if(e.dataTransfer.files[0])loadVideo(e.dataTransfer.files[0]);});
+dz.addEventListener("drop",e=>{const fs=e.dataTransfer.files;if(!fs||!fs.length)return;if(fs.length>1)batchOriginals(Array.from(fs));else loadVideo(fs[0]);});
 $("playBtn").onclick=()=>{if(!videoLoaded)return;if(video.paused){video.play();$("playBtn").textContent="❚❚";}else{video.pause();$("playBtn").textContent="▶";}};
 const FPS=30;   // matches render fps — one frame = 1/30s
 function stepFrame(d){
@@ -1363,6 +1390,7 @@ $("locProvider").onchange=e=>{$("locProviderHint").textContent=e.target.value===
 
 // ---------- transcribe ----------
 $("transcribeBtn").onclick=async()=>{
+  // transcribes ONLY the active clip/hook — one specific video, others untouched
   const curClip=(variants.en&&variants.en.clip)||null;
   if(!videoFile && !(fileId&&curClip)){setStatus("Завантаж відео.","err");return;}
   setStatus("Transcribing… (first Whisper run loads the model)","",true);busyStart("Транскрибую…");$("transcribeBtn").disabled=true;
@@ -1643,13 +1671,17 @@ function creativeName(file){return creativeNames[file] || String(file||"creative
 let musicState={name:null};   // optional music bed for the whole batch (session file OR library id)
 let lastMusicFile=null;        // last uploaded File, for "save to library"
 function langFromName(n){
-  // Find a known language code token ANYWHERE in the name (last one wins), so
-  // body_es_9x16.mp4, 1_hook_es.mp4, promo-de.mov all resolve correctly.
+  // Detect language from a filename: full language words (…-Spanish_…) first, then
+  // 2-letter codes as tokens (body_es_9x16.mp4, promo-de.mov). No "caption" heuristic —
+  // our own outputs contain "caption" in every language, which used to force EN.
   const KN=new Set(["en","es","fr","de","it","pt","pl","nl","ja","ko","zh","uk","ru","tr"]);
+  const NAMES={english:"en",spanish:"es","español":"es",espanol:"es",french:"fr","français":"fr",francais:"fr",
+    german:"de",deutsch:"de",italian:"it",italiano:"it",portuguese:"pt","português":"pt",portugues:"pt",brazilian:"pt",
+    polish:"pl",dutch:"nl",japanese:"ja",korean:"ko",chinese:"zh",mandarin:"zh",ukrainian:"uk",russian:"ru",turkish:"tr"};
   const low=String(n||"").toLowerCase();
+  for(const w in NAMES){if(low.includes(w))return NAMES[w];}
   const toks=[...low.matchAll(/(?:^|[_\-\s.])([a-z]{2})(?=[_\-\s.]|$)/g)].map(m=>m[1]).filter(x=>KN.has(x));
   if(toks.length)return toks[toks.length-1];
-  if(/caption|_en\b/i.test(low))return "en";
   return "";
 }
 function langColor(l){return LANG_COLORS[l]||"#5F5E5A";}
@@ -2212,9 +2244,11 @@ function buildStudioLayout(){
   const ez=document.querySelector(".editzone");
   if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="width:100%;margin:0 0 8px;font-size:12px;padding:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all lives by the style presets
   const qp=$("quickPanel");
-  [$("grpTranscribe"),$("grpBaseText")].forEach(el=>{if(el)qp.appendChild(el);});
+  [$("grpTranscribe"),$("grpBaseText"),$("grpSmart")].forEach(el=>{if(el)qp.appendChild(el);});
   const tb=$("transcribeBtn"),body=$("grpTranscribe")&&$("grpTranscribe").querySelector(".body");
   if(tb&&body){tb.style.width="100%";tb.style.marginTop="6px";tb.className="primary";body.appendChild(tb);}
+  const ptb=$("packTranscribeBtn");
+  if(ptb&&body){ptb.style.width="100%";ptb.style.marginTop="6px";ptb.className="go";body.appendChild(ptb);ptb.onclick=transcribePack;}
   qp.addEventListener("input",scheduleExact);qp.addEventListener("change",scheduleExact);
 }
 // Back-compat shim: old calls like showSection("compose") still work.
