@@ -1,5 +1,5 @@
 {
-  "version": "1.6.4",
+  "version": "1.7.0",
   "channel": "main",
-  "notes": "Captions in/out moved into Smart captions (with the cuts/timing tools). Word plate (karaoke highlight) now casts the shadow too when Shadow is on. Right tools column wider."
+  "notes": "Gradients: new section — 2-color gradient (vertical/horizontal/diagonal) you can apply to the plate & word-plate, the active karaoke word, or all text. Localize removed from the left bar (LOC has its own screen). In LOC, Quit + settings sit by the version badge. Plus separate word/plate shadows, stroke master toggle."
 }

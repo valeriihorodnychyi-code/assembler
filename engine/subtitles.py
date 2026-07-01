@@ -324,6 +324,25 @@ def load_font(font_path, size):
         return ImageFont.load_default()
 
 
+def _linear_gradient(w, h, c0, c1, direction="vertical"):
+    """A w×h RGBA linear gradient from c0 to c1. direction: vertical | horizontal | diag."""
+    w = max(1, int(w)); h = max(1, int(h))
+    n = 256
+    ramp = Image.new("RGBA", (1, n))
+    c0 = tuple(c0); c1 = tuple(c1)
+    for i in range(n):
+        t = i / (n - 1)
+        ramp.putpixel((0, i), tuple(int(round(c0[k] * (1 - t) + c1[k] * t)) for k in range(4)))
+    if direction == "horizontal":
+        return ramp.rotate(90, expand=True).resize((w, h))
+    if direction == "diag":
+        d = int(max(w, h) * 1.5)
+        g = ramp.resize((d, d)).rotate(45, expand=True)
+        gx = (g.width - w) // 2; gy = (g.height - h) // 2
+        return g.crop((gx, gy, gx + w, gy + h))
+    return ramp.resize((w, h))   # vertical (top -> bottom)
+
+
 def render_subtitle_png(event, filename, width, height, font_path, style_cfg, scale_factor=1.0):
     """Render a single karaoke event to a transparent PNG (pixel-faithful to preview)."""
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
@@ -385,12 +404,30 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         current_y += line_height + line_spacing
 
     plate_on = style_cfg.get("plate", {}).get("enabled", False)
-    shadow_on = style_cfg.get("shadow", {}).get("enabled", False)
-    sh = style_cfg.get("shadow", {})
+    sh = style_cfg.get("shadow", {})                       # TEXT shadow (words) — independent of the plate
+    shadow_on = sh.get("enabled", False)
     sh_x = int(int(sh.get("offset_x", 0)) * scale_factor)
     sh_y = int(int(sh.get("offset_y", 10)) * scale_factor)
     sh_c = tuple(sh.get("color", [0, 0, 0, 255]))
     sh_blur = int(int(sh.get("glow_blur", 0)) * scale_factor)
+    psh = style_cfg.get("plate_shadow", {})                # PLATE / word-plate drop shadow — its own controls
+    plate_shadow_on = psh.get("enabled", False)
+    psh_x = int(int(psh.get("offset_x", 0)) * scale_factor)
+    psh_y = int(int(psh.get("offset_y", 10)) * scale_factor)
+    psh_c = tuple(psh.get("color", [0, 0, 0, 255]))
+    psh_blur = int(int(psh.get("glow_blur", 0)) * scale_factor)
+    stroke_master = bool(style_cfg.get("stroke_on", True))  # master on/off for the whole outline (inner + outer)
+    grad_cfg = style_cfg.get("gradient", {})
+    g_colors = grad_cfg.get("colors", [[255, 90, 44, 255], [255, 212, 0, 255]])
+    g_dir = grad_cfg.get("direction", "vertical")
+    g_on_text = bool(grad_cfg.get("on_text", False))
+    g_on_active = bool(grad_cfg.get("on_active", False))
+    g_on_plate = bool(grad_cfg.get("on_plate", False))
+
+    def _grad_layer(mask):   # paste the caption gradient through a white mask -> RGBA layer
+        lay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        lay.paste(_linear_gradient(width, height, g_colors[0], g_colors[1], g_dir), (0, 0), mask)
+        return lay
 
     if plate_on:
         plate = style_cfg["plate"]
@@ -418,39 +455,30 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
             rects.append([rx0, start_y - pad_y - box_off,
                           rx0 + max_lw + pad_x * 2, start_y + total_height + pad_y - box_off])
 
-        if shadow_on:
+        if plate_shadow_on:
             shadow_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             sd = ImageDraw.Draw(shadow_img)
             for r in rects:
-                sc = [r[0] + sh_x, r[1] + sh_y, r[2] + sh_x, r[3] + sh_y]
-                (sd.rounded_rectangle(sc, radius=radius, fill=sh_c) if radius > 0
-                 else sd.rectangle(sc, fill=sh_c))
-            if sh_blur > 0:
-                shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(sh_blur))
+                sc = [r[0] + psh_x, r[1] + psh_y, r[2] + psh_x, r[3] + psh_y]
+                (sd.rounded_rectangle(sc, radius=radius, fill=psh_c) if radius > 0
+                 else sd.rectangle(sc, fill=psh_c))
+            if psh_blur > 0:
+                shadow_img = shadow_img.filter(ImageFilter.GaussianBlur(psh_blur))
             final_img.alpha_composite(shadow_img)
 
-        plate_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        pd = ImageDraw.Draw(plate_img)
-        for r in rects:
-            (pd.rounded_rectangle(r, radius=radius, fill=plate_color) if radius > 0
-             else pd.rectangle(r, fill=plate_color))
-        final_img.alpha_composite(plate_img)
-
-    elif shadow_on:
-        st = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        sd = ImageDraw.Draw(st)
-        so_w = int(int(style_cfg.get("stroke_outer", {}).get("width", 0)) * scale_factor)
-        s_w = int(int(style_cfg.get("stroke", {}).get("width", 0)) * scale_factor)
-        for x, y, text, _ in word_positions:
-            if so_w > 0:
-                sd.text((x + sh_x, y + sh_y), text, font=font, fill=sh_c, stroke_width=so_w, stroke_fill=sh_c)
-            elif s_w > 0:
-                sd.text((x + sh_x, y + sh_y), text, font=font, fill=sh_c, stroke_width=s_w, stroke_fill=sh_c)
-            else:
-                sd.text((x + sh_x, y + sh_y), text, font=font, fill=sh_c)
-        if sh_blur > 0:
-            st = st.filter(ImageFilter.GaussianBlur(sh_blur))
-        final_img.alpha_composite(st)
+        if g_on_plate:
+            pmask = Image.new("L", (width, height), 0)
+            pmd = ImageDraw.Draw(pmask)
+            for r in rects:
+                (pmd.rounded_rectangle(r, radius=radius, fill=255) if radius > 0 else pmd.rectangle(r, fill=255))
+            final_img.alpha_composite(_grad_layer(pmask))
+        else:
+            plate_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            pd = ImageDraw.Draw(plate_img)
+            for r in rects:
+                (pd.rounded_rectangle(r, radius=radius, fill=plate_color) if radius > 0
+                 else pd.rectangle(r, fill=plate_color))
+            final_img.alpha_composite(plate_img)
 
     kp = style_cfg.get("karaoke_plate", {})
     if kp.get("enabled", False):
@@ -463,40 +491,74 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
             if is_active:
                 bbox = draw.textbbox((x, y), text, font=font)
                 kp_rects.append([bbox[0] - kp_px, bbox[1] - kp_py - box_off, bbox[2] + kp_px, bbox[3] + kp_py - box_off])
-        if shadow_on and kp_rects:   # drop shadow cast by the word plate
+        if plate_shadow_on and kp_rects:   # drop shadow cast by the word plate
             ksh = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             ksd = ImageDraw.Draw(ksh)
             for r in kp_rects:
-                sc = [r[0] + sh_x, r[1] + sh_y, r[2] + sh_x, r[3] + sh_y]
-                (ksd.rounded_rectangle(sc, radius=kp_rad, fill=sh_c) if kp_rad > 0 else ksd.rectangle(sc, fill=sh_c))
-            if sh_blur > 0:
-                ksh = ksh.filter(ImageFilter.GaussianBlur(sh_blur))
+                sc = [r[0] + psh_x, r[1] + psh_y, r[2] + psh_x, r[3] + psh_y]
+                (ksd.rounded_rectangle(sc, radius=kp_rad, fill=psh_c) if kp_rad > 0 else ksd.rectangle(sc, fill=psh_c))
+            if psh_blur > 0:
+                ksh = ksh.filter(ImageFilter.GaussianBlur(psh_blur))
             final_img.alpha_composite(ksh)
-        kp_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        kd = ImageDraw.Draw(kp_img)
-        for r in kp_rects:
-            (kd.rounded_rectangle(r, radius=kp_rad, fill=kp_c) if kp_rad > 0 else kd.rectangle(r, fill=kp_c))
-        final_img.alpha_composite(kp_img)
+        if g_on_plate and kp_rects:
+            kmask = Image.new("L", (width, height), 0)
+            kmd = ImageDraw.Draw(kmask)
+            for r in kp_rects:
+                (kmd.rounded_rectangle(r, radius=kp_rad, fill=255) if kp_rad > 0 else kmd.rectangle(r, fill=255))
+            final_img.alpha_composite(_grad_layer(kmask))
+        else:
+            kp_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            kd = ImageDraw.Draw(kp_img)
+            for r in kp_rects:
+                (kd.rounded_rectangle(r, radius=kp_rad, fill=kp_c) if kp_rad > 0 else kd.rectangle(r, fill=kp_c))
+            final_img.alpha_composite(kp_img)
 
     text_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     td = ImageDraw.Draw(text_img)
     text_c = tuple(style_cfg["text_color"])
     karaoke_on = style_cfg.get("karaoke", {}).get("enabled", False)
     karaoke_c = tuple(style_cfg.get("karaoke", {}).get("active_color", [255, 0, 0, 255]))
-    s_w = int(int(style_cfg.get("stroke", {}).get("width", 0)) * scale_factor)
+    s_w = int(int(style_cfg.get("stroke", {}).get("width", 0)) * scale_factor) if stroke_master else 0
     s_c = tuple(style_cfg.get("stroke", {}).get("color", [0, 0, 0, 255]))
-    so_w = int(int(style_cfg.get("stroke_outer", {}).get("width", 0)) * scale_factor)
+    so_w = int(int(style_cfg.get("stroke_outer", {}).get("width", 0)) * scale_factor) if stroke_master else 0
     so_c = tuple(style_cfg.get("stroke_outer", {}).get("color", [0, 0, 0, 255]))
+
+    # TEXT shadow (words) — drawn ABOVE the plate so words under a plate can still cast a shadow
+    if shadow_on:
+        st = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(st)
+        for x, y, text, _ in word_positions:
+            sw = so_w if so_w > 0 else s_w
+            if sw > 0:
+                sd.text((x + sh_x, y + sh_y), text, font=font, fill=sh_c, stroke_width=sw, stroke_fill=sh_c)
+            else:
+                sd.text((x + sh_x, y + sh_y), text, font=font, fill=sh_c)
+        if sh_blur > 0:
+            st = st.filter(ImageFilter.GaussianBlur(sh_blur))
+        final_img.alpha_composite(st)
 
     if so_w > 0:
         for x, y, text, _ in word_positions:
             td.text((x, y), text, font=font, fill=so_c, stroke_width=so_w, stroke_fill=so_c)
+    grad_glyphs = []
     for x, y, text, is_active in word_positions:
-        fill = karaoke_c if (karaoke_on and is_active) else text_c
-        if s_w > 0:
-            td.text((x, y), text, font=font, fill=fill, stroke_width=s_w, stroke_fill=s_c)
+        use_grad = g_on_text or (g_on_active and is_active)
+        if use_grad:
+            if s_w > 0:   # keep the inner stroke ring; the glyph body is filled by the gradient below
+                td.text((x, y), text, font=font, fill=s_c, stroke_width=s_w, stroke_fill=s_c)
+            grad_glyphs.append((x, y, text))
         else:
-            td.text((x, y), text, font=font, fill=fill)
+            fill = karaoke_c if (karaoke_on and is_active) else text_c
+            if s_w > 0:
+                td.text((x, y), text, font=font, fill=fill, stroke_width=s_w, stroke_fill=s_c)
+            else:
+                td.text((x, y), text, font=font, fill=fill)
+    if grad_glyphs:
+        gmask = Image.new("L", (width, height), 0)
+        gmd = ImageDraw.Draw(gmask)
+        for x, y, text in grad_glyphs:
+            gmd.text((x, y), text, font=font, fill=255)
+        text_img.alpha_composite(_grad_layer(gmask))
     final_img.alpha_composite(text_img)
     final_img.save(filename)
 

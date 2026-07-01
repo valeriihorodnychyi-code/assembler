@@ -410,10 +410,12 @@
     <details class="grp">
       <summary><span data-i18n="secStroke">Stroke</span> <span class="chev">›</span></summary>
       <div class="body">
+        <div class="row"><label>Enable</label><label class="switch"><input type="checkbox" id="strokeOn" checked><span class="slider"></span></label></div>
         <div class="row"><label>Inner</label><input type="range" id="strokeW" min="0" max="20" value="0"><span class="val" id="strokeWV">0</span></div>
         <div class="row"><label>Color</label><input type="color" id="strokeColor" value="#000000"></div>
         <div class="row"><label>Outer</label><input type="range" id="strokeOuterW" min="0" max="30" value="0"><span class="val" id="strokeOuterWV">0</span></div>
         <div class="row"><label>Color</label><input type="color" id="strokeOuterColor" value="#000000"></div>
+        <div class="hint">Inner + Outer together = a double outline. The Enable switch turns the whole outline off/on.</div>
       </div>
     </details>
 
@@ -451,6 +453,27 @@
         <div class="row"><label>Corner radius</label><input type="range" id="plateRadius" min="0" max="60" value="15"><span class="val" id="plateRadiusV">15</span></div>
         <div class="row"><label>Box vertical nudge ↑/↓</label><input type="range" id="boxOffsetY" min="-120" max="120" value="0"><span class="val" id="boxOffsetYV">0</span></div>
         <div class="hint">Moves the plate &amp; highlight box up (+) / down (−) without moving the text. Bottom margin still moves the whole caption.</div>
+        <div style="border-top:1px solid var(--line);margin:10px 0 4px"></div>
+        <div class="row"><label>Plate shadow</label><label class="switch"><input type="checkbox" id="plateShadowOn"><span class="slider"></span></label></div>
+        <div class="row"><label>Shadow X</label><input type="range" id="pshX" min="-40" max="40" value="0"><span class="val" id="pshXV">0</span></div>
+        <div class="row"><label>Shadow Y</label><input type="range" id="pshY" min="-40" max="40" value="8"><span class="val" id="pshYV">8</span></div>
+        <div class="row"><label>Shadow blur</label><input type="range" id="pshBlur" min="0" max="60" value="0"><span class="val" id="pshBlurV">0</span></div>
+        <div class="row"><label>Shadow color</label><input type="color" id="pshColor" value="#000000"></div>
+        <div class="hint">Drop shadow of the plate &amp; word-plate — separate from the text shadow (Shadow / glow).</div>
+      </div>
+    </details>
+
+    <details class="grp">
+      <summary><span>Gradients</span> <span class="chev">›</span></summary>
+      <div class="body">
+        <div class="row"><label>Color A</label><input type="color" id="gradC0" value="#ff5a2c"></div>
+        <div class="row"><label>Color B</label><input type="color" id="gradC1" value="#ffd400"></div>
+        <div class="row"><label>Direction</label>
+          <select id="gradDir" style="flex:1.3"><option value="vertical">↓ Vertical</option><option value="horizontal">→ Horizontal</option><option value="diag">↘ Diagonal</option></select></div>
+        <div class="row"><label>On plate / word-plate</label><label class="switch"><input type="checkbox" id="gradPlate"><span class="slider"></span></label></div>
+        <div class="row"><label>On active (karaoke) word</label><label class="switch"><input type="checkbox" id="gradActive"><span class="slider"></span></label></div>
+        <div class="row"><label>On all text</label><label class="switch"><input type="checkbox" id="gradText"><span class="slider"></span></label></div>
+        <div class="hint">Two-color gradient. Apply it to the plate, just the highlighted word, or the whole caption — mix with strokes &amp; shadows for new looks.</div>
       </div>
     </details>
 
@@ -633,7 +656,7 @@ let editingHook=null, packMode="orig";               // packMode: "orig" = origi
 let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","scrimOn","scrimColor","scrimAlpha","scrimFeather"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather"];
 
 const PRESETS={
   "Clean White":{fontFamily:"Arial Black",fontSize:80,textColor:"#ffffff",textCase:"uppercase",strokeOuterW:0,strokeW:0,shadowOn:true,shY:6,shBlur:8,shColor:"#000000",plateOn:false,karaokeOn:false},
@@ -727,8 +750,11 @@ function readControls(){
   return {fontFamily:$("fontFamily").value,fontSize:+$("fontSize").value,textColor:$("textColor").value,textCase:$("textCase").value,wrapMode:$("wrapMode").value,maxChars:+$("maxChars").value,maxLines:+$("maxLines").value,marginBottom:+$("marginBottom").value,lineSpacing:+$("lineSpacing").value,
     strokeW:+$("strokeW").value,strokeColor:$("strokeColor").value,strokeOuterW:+$("strokeOuterW").value,strokeOuterColor:$("strokeOuterColor").value,
     shadowOn:$("shadowOn").checked,shX:+$("shX").value,shY:+$("shY").value,shBlur:+$("shBlur").value,shColor:$("shColor").value,
+    strokeOn:$("strokeOn")?$("strokeOn").checked:true,
+    plateShadowOn:$("plateShadowOn")?$("plateShadowOn").checked:false,pshX:+($("pshX")?$("pshX").value:0),pshY:+($("pshY")?$("pshY").value:8),pshBlur:+($("pshBlur")?$("pshBlur").value:0),pshColor:$("pshColor")?$("pshColor").value:"#000000",
     plateOn:$("plateOn").checked,plateLine:$("plateLine").checked,plateFull:$("plateFull").checked,plateColor:$("plateColor").value,plateAlpha:+$("plateAlpha").value,platePadX:+$("platePadX").value,platePadY:+$("platePadY").value,plateRadius:+$("plateRadius").value,boxOffsetY:+$("boxOffsetY").value,
     karaokeOn:$("karaokeOn").checked,karaokeColor:$("karaokeColor").value,kpOn:$("kpOn").checked,kpColor:$("kpColor").value,kpPadX:+$("kpPadX").value,kpPadY:+$("kpPadY").value,kpRadius:+$("kpRadius").value,
+    gradC0:$("gradC0")?$("gradC0").value:"#ff5a2c",gradC1:$("gradC1")?$("gradC1").value:"#ffd400",gradDir:$("gradDir")?$("gradDir").value:"vertical",gradText:$("gradText")?$("gradText").checked:false,gradActive:$("gradActive")?$("gradActive").checked:false,gradPlate:$("gradPlate")?$("gradPlate").checked:false,
     scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value};
 }
 function writeControls(s){
@@ -744,11 +770,13 @@ function toEngineStyle(s){
   const arr=(h,a=255)=>{const[r,g,b]=hexToRgb(h);return[r,g,b,a];};
   return {font_name:customFontName||(s.fontFamily+".ttf"),font_size:s.fontSize,text_color:arr(s.textColor),
     text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,
-    stroke:{width:s.strokeW,color:arr(s.strokeColor)},stroke_outer:{width:s.strokeOuterW,color:arr(s.strokeOuterColor)},
+    stroke_on:s.strokeOn!==false,stroke:{width:s.strokeW,color:arr(s.strokeColor)},stroke_outer:{width:s.strokeOuterW,color:arr(s.strokeOuterColor)},
     shadow:{enabled:s.shadowOn,offset_x:s.shX,offset_y:s.shY,glow_blur:s.shBlur,color:arr(s.shColor)},
+    plate_shadow:{enabled:s.plateShadowOn,offset_x:s.pshX,offset_y:s.pshY,glow_blur:s.pshBlur,color:arr(s.pshColor)},
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
     scrim:{enabled:s.scrimOn,color:arr(s.scrimColor,s.scrimAlpha),pad:40,feather:s.scrimFeather},
     karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},
+    gradient:{colors:[arr(s.gradC0),arr(s.gradC1)],direction:s.gradDir||"vertical",on_text:!!s.gradText,on_active:!!s.gradActive,on_plate:!!s.gradPlate},
     karaoke_plate:{enabled:s.kpOn,color:arr(s.kpColor),pad_x:s.kpPadX,pad_y:s.kpPadY,border_radius:s.kpRadius}};
 }
 
@@ -925,17 +953,24 @@ function render(t,dur){
     gr.addColorStop(0,c(0));gr.addColorStop(Math.min(.49,f/Hh),c(s.scrimAlpha));
     gr.addColorStop(Math.max(.51,1-f/Hh),c(s.scrimAlpha));gr.addColorStop(1,c(0));
     ctx.fillStyle=gr;ctx.fillRect(0,y0,W,Hh);}
-  if(s.plateOn){ctx.fillStyle=rgba(s.plateColor,s.plateAlpha);const px=s.platePadX*scale,py=s.platePadY*scale,rad=s.plateRadius*scale;
+  const capGrad=()=>{const top=startY-boff,bot=startY+totalH-boff;
+    const g=(s.gradDir==="horizontal")?ctx.createLinearGradient(0,0,W,0):(s.gradDir==="diag")?ctx.createLinearGradient(0,top,W,bot):ctx.createLinearGradient(0,top,0,bot);
+    g.addColorStop(0,s.gradC0||"#ff5a2c");g.addColorStop(1,s.gradC1||"#ffd400");return g;};
+  const pshadow=()=>{if(s.plateShadowOn){ctx.shadowColor=rgba(s.pshColor,255);ctx.shadowBlur=s.pshBlur*scale;ctx.shadowOffsetX=s.pshX*scale;ctx.shadowOffsetY=s.pshY*scale;}};
+  if(s.plateOn){ctx.save();pshadow();ctx.fillStyle=s.gradPlate?capGrad():rgba(s.plateColor,s.plateAlpha);const px=s.platePadX*scale,py=s.platePadY*scale,rad=s.plateRadius*scale;
     if(s.plateFull){rr(0,startY-py-boff,W,totalH+py*2,0);ctx.fill();}
     else if(s.plateLine){for(let li=0;li<lines.length;li++){const ly=startY+li*(lineH+lineSp)-boff;rr(W/2-lw[li]/2-px,ly-py,lw[li]+px*2,lineH+py*2,rad);ctx.fill();}}
-    else{const m=Math.max(...lw,0);rr(W/2-m/2-px,startY-py-boff,m+px*2,totalH+py*2,rad);ctx.fill();}}
-  if(s.shadowOn&&!s.plateOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of pos)ctx.fillText(p.disp,p.x,p.y+asc);ctx.restore();}
-  if(s.kpOn){ctx.save();if(s.shadowOn){ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;}
-    for(const p of pos)if(p.active){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:asc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;const top=(p.y+asc)-ga;const h=ga+gd;ctx.fillStyle=rgba(s.kpColor,255);rr(p.x-s.kpPadX*scale,top-s.kpPadY*scale-boff,p.wide+s.kpPadX*2*scale,h+s.kpPadY*2*scale,s.kpRadius*scale);ctx.fill();}
+    else{const m=Math.max(...lw,0);rr(W/2-m/2-px,startY-py-boff,m+px*2,totalH+py*2,rad);ctx.fill();}
     ctx.restore();}
-  if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)ctx.strokeText(p.disp,p.x,p.y+asc);}
-  if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of pos)ctx.strokeText(p.disp,p.x,p.y+asc);}
-  for(const p of pos){ctx.fillStyle=(s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):rgba(s.textColor,255);ctx.fillText(p.disp,p.x,p.y+asc);}
+  if(s.kpOn){ctx.save();pshadow();
+    for(const p of pos)if(p.active){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:asc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;const top=(p.y+asc)-ga;const h=ga+gd;ctx.fillStyle=s.gradPlate?capGrad():rgba(s.kpColor,255);rr(p.x-s.kpPadX*scale,top-s.kpPadY*scale-boff,p.wide+s.kpPadX*2*scale,h+s.kpPadY*2*scale,s.kpRadius*scale);ctx.fill();}
+    ctx.restore();}
+  if(s.shadowOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of pos)ctx.fillText(p.disp,p.x,p.y+asc);ctx.restore();}   // word shadow — over the plate too
+  if(s.strokeOn!==false){
+    if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)ctx.strokeText(p.disp,p.x,p.y+asc);}
+    if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of pos)ctx.strokeText(p.disp,p.x,p.y+asc);}
+  }
+  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):rgba(s.textColor,255));ctx.fillText(p.disp,p.x,p.y+asc);}
 }
 function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
 
@@ -1278,14 +1313,17 @@ function applyPreset(name){const p={...PRESETS[name]};delete p.fontFamily;/* kee
 function fromEngineStyle(e){
   const hx=a=>a?("#"+[a[0],a[1],a[2]].map(n=>(+n).toString(16).padStart(2,"0")).join("")):"#000000";
   const g=(o,k,d)=>(o&&o[k]!=null)?o[k]:d;
-  const st=e.stroke||{},so=e.stroke_outer||{},sh=e.shadow||{},pl=e.plate||{},ka=e.karaoke||{},kp=e.karaoke_plate||{};
+  const st=e.stroke||{},so=e.stroke_outer||{},sh=e.shadow||{},pl=e.plate||{},ka=e.karaoke||{},kp=e.karaoke_plate||{},gr=e.gradient||{};
   return {fontFamily:(e.font_name||"Poppins-Bold.ttf").replace(/\.(ttf|otf)$/i,""),fontSize:+e.font_size||80,textColor:hx(e.text_color),
     textCase:(e.text_case===""||e.text_case==null)?"none":e.text_case,wrapMode:e.wrap_mode||"chars",maxChars:(e.wrap_mode==="words")?(+e.words_per_line||3):(+e.max_chars_per_line||15),
     maxLines:+e.max_lines||(e.force_single_line?1:2),marginBottom:+e.margin_bottom||320,lineSpacing:+g(e,"line_spacing",10),boxOffsetY:+g(e,"box_offset_y",0),
     strokeW:+g(st,"width",0),strokeColor:hx(st.color),strokeOuterW:+g(so,"width",0),strokeOuterColor:hx(so.color),
     shadowOn:!!sh.enabled,shX:+g(sh,"offset_x",0),shY:+g(sh,"offset_y",8),shBlur:+g(sh,"glow_blur",0),shColor:hx(sh.color),
+    strokeOn:(e.stroke_on!==false),
+    plateShadowOn:!!(e.plate_shadow&&e.plate_shadow.enabled),pshX:+g(e.plate_shadow||{},"offset_x",0),pshY:+g(e.plate_shadow||{},"offset_y",8),pshBlur:+g(e.plate_shadow||{},"glow_blur",0),pshColor:hx((e.plate_shadow&&e.plate_shadow.color)||[0,0,0,255]),
     plateOn:!!pl.enabled,plateLine:!!pl.per_line,plateFull:!!pl.full_width,plateColor:hx(pl.color),plateAlpha:(pl.color&&pl.color[3]!=null)?pl.color[3]:160,platePadX:+g(pl,"pad_x",30),platePadY:+g(pl,"pad_y",15),plateRadius:+g(pl,"border_radius",15),
     karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
+    gradC0:hx((gr.colors&&gr.colors[0])||[255,90,44,255]),gradC1:hx((gr.colors&&gr.colors[1])||[255,212,0,255]),gradDir:gr.direction||"vertical",gradText:!!gr.on_text,gradActive:!!gr.on_active,gradPlate:!!gr.on_plate,
     scrimOn:!!(e.scrim&&e.scrim.enabled),scrimColor:hx((e.scrim&&e.scrim.color)||[0,0,0,150]),scrimAlpha:(e.scrim&&e.scrim.color&&e.scrim.color[3]!=null)?e.scrim.color[3]:150,scrimFeather:+g(e.scrim||{},"feather",70)};
 }
 // mini "Aa" sample CSS derived from an engine style
@@ -1895,9 +1933,13 @@ function setMode(m){
   const asm=(m==="asm"), loc=(m==="loc"), edit=(m==="edit");
   // Left sidebar sections: compose only in asm; the rest only in edit; loc UI is self-contained.
   document.querySelectorAll(".sec").forEach(s=>{
+    if(s.dataset.sec==="localize"){s.style.display="none";return;}   // Localize removed from the left bar — LOC has its own screen
     const isCompose=s.dataset.sec==="compose";
     s.style.display=((asm?isCompose:(edit&&!isCompose)))?"block":"none";
   });
+  // In LOC, move Quit + settings next to the version badge (the top-right is empty there).
+  const _sb=$("settingsBtn"),_qb=$("quitBtn"),_eb=$("encBadge"),_vi=$("videoInput");
+  if(_sb&&_qb&&_eb&&_vi){ if(loc){_eb.after(_sb,_qb);} else {_vi.before(_sb,_qb);} }
   $("mEdit").classList.toggle("active",edit);
   $("mLoc").classList.toggle("active",loc);
   $("mAsm").classList.toggle("active",asm);

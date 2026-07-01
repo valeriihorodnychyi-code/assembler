@@ -23,11 +23,15 @@ DEFAULT_STYLE = {
     "margin_bottom": 320,
     "box_offset_y": 0,                 # nudge plate/highlight box up(+)/down(-), text stays
     "force_single_line": False,
+    "stroke_on": True,                 # master on/off for the whole outline (inner + outer = double stroke)
     "stroke": {"width": 0, "color": [0, 0, 0, 255]},
     "stroke_outer": {"width": 0, "color": [0, 0, 0, 255]},
-    "shadow": {"enabled": False, "offset_x": 0, "offset_y": 8, "glow_blur": 0, "color": [0, 0, 0, 255]},
+    "shadow": {"enabled": False, "offset_x": 0, "offset_y": 8, "glow_blur": 0, "color": [0, 0, 0, 255]},   # shadow on the WORDS (works even under a plate)
+    "plate_shadow": {"enabled": False, "offset_x": 0, "offset_y": 8, "glow_blur": 0, "color": [0, 0, 0, 255]},  # drop shadow of the plate / word-plate
     "plate": {"enabled": False, "per_line": False, "color": [0, 0, 0, 160], "pad_x": 30, "pad_y": 15, "border_radius": 15},
     "scrim": {"enabled": False, "color": [0, 0, 0, 150], "pad": 40, "feather": 70},  # soft dark band behind text for light footage
+    "gradient": {"colors": [[255, 90, 44, 255], [255, 212, 0, 255]], "direction": "vertical",
+                 "on_text": False, "on_active": False, "on_plate": False},
     "karaoke": {"enabled": True, "active_color": [255, 212, 0, 255]},
     "karaoke_plate": {"enabled": False, "color": [255, 92, 57, 255], "pad_x": 14, "pad_y": 6, "border_radius": 10},
 }
