@@ -1694,7 +1694,12 @@ $("uploadLibBtn").onclick=async()=>{
 $("quitBtn").onclick=async()=>{
   if(!confirm("Stop Assembler? The server will close — re-open by running run.command again."))return;
   try{await fetch(API+"/api/shutdown",{method:"POST"});}catch(e){}
-  document.body.innerHTML="<div style='display:flex;height:100vh;align-items:center;justify-content:center;color:#8a90a0;font-family:-apple-system,sans-serif;font-size:15px'>Assembler stopped. You can close this tab. ↻ Run <b style='color:#e8eaf0;margin:0 6px'>run.command</b> to start again.</div>";
+  document.body.innerHTML="<div style='display:flex;flex-direction:column;height:100vh;align-items:center;justify-content:center;gap:14px;color:#8a90a0;font-family:-apple-system,sans-serif;text-align:center;padding:20px'>"
+    +"<div style='font-size:22px;color:#e8eaf0;font-weight:600'>✓ Assembler зупинено</div>"
+    +"<div style='font-size:15px'>Цю вкладку можна закрити.</div>"
+    +"<div style='font-size:15px'>Щоб продовжити — <b style='color:#e8eaf0'>відкрий Assembler знову</b> (з Дока або папки Applications). Вона стартує на свіжій версії.</div>"
+    +"<div style='font-size:13px;color:#5f6470;margin-top:6px'>Не оновлюється? Запусти <b style='color:#aeb4c0'>Update Assembler.command</b> зі спільного диска.</div>"
+    +"</div>";
 };
 
 // ---------- batch board ----------
