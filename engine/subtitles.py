@@ -16,6 +16,25 @@ def _word_text(w):
 
 SENTENCE_ENDERS = ".!?…"
 
+
+def _is_sentence_end(raw):
+    """True only for a genuine sentence-ending word.
+
+    A trailing '?' '!' or '…' always ends a sentence. A trailing '.' does too —
+    UNLESS the word is a dotted abbreviation/acronym ("U.S.", "e.g.", "U.S.A.")
+    or a single initial, where the period is part of the token, not the sentence.
+    This keeps phrases like "U.S. National" from being split before grouping.
+    """
+    if not raw:
+        return False
+    last = raw[-1]
+    if last in "!?…":
+        return True
+    if last != ".":
+        return False
+    core = raw.rstrip(".")
+    return "." not in core
+
 # English month / weekday names used by the automatic date glue. (Localized
 # month names for es/fr/... can be added later; numbers + units glue already
 # works language-agnostically.)
@@ -62,10 +81,19 @@ def _is_number(t):
     return bool(re.match(r"^[+\-]?[\d.,]*\d", t or ""))
 
 
+_KW_EDGE = ".,!?…:;\"'`()[]{}«»„“”"
+
+
+def _kw_norm(t):
+    """Normalize a token for keep_together matching: lowercase + strip edge punctuation
+    so 'U.S.' (phrase) matches 'U.S' (word already stripped of a trailing dot)."""
+    return str(t or "").lower().strip(_KW_EDGE)
+
+
 def _phrase_token_lists(rules):
     out = []
     for phrase in rules.get("keep_together", []) or []:
-        toks = [t for t in re.split(r"\s+", str(phrase).strip().lower()) if t]
+        toks = [_kw_norm(t) for t in re.split(r"\s+", str(phrase).strip()) if _kw_norm(t)]
         if len(toks) >= 2:
             out.append(toks)
     return out
@@ -86,6 +114,7 @@ def build_groups(words, rules, lang="en", pause_gap=0.5):
     units = set(u.lower() for u in (rules.get("units", []) or []))
     stop = set(s.lower() for s in (rules.get("no_line_end", {}) or {}).get(lang, []))
     lc = [(_word_text(w) if not isinstance(w, dict) else w.get("text", "")).lower() for w in words]
+    kw = [_kw_norm(x) for x in lc]   # edge-punctuation-stripped form for keep_together matching
 
     bond = [False] * (n - 1)   # bond[i] => words[i] and words[i+1] cannot be split
 
@@ -123,7 +152,7 @@ def build_groups(words, rules, lang="en", pause_gap=0.5):
         for start in range(n):
             for toks in phrases:
                 k = len(toks)
-                if start + k <= n and lc[start:start + k] == toks:
+                if start + k <= n and kw[start:start + k] == toks:
                     for j in range(start, start + k - 1):
                         if not words[j].get("ends_sentence"):
                             bond[j] = True
@@ -156,7 +185,7 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     clean = []
     for w in words:
         raw = _word_text(w).strip()
-        ends_sentence = raw[-1:] in SENTENCE_ENDERS if raw else False
+        ends_sentence = _is_sentence_end(raw)
         text = raw.rstrip(".,!?…")
         for old, new in replacements.items():
             text = re.sub(r"\b" + re.escape(old) + r"\b", new, text, flags=re.IGNORECASE)
@@ -187,7 +216,8 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     # 1) MANUAL layout (the user's own line/chunk breaks) takes priority when present;
     #    otherwise fall back to automatic phrase + max-chars wrapping.
     chunks = []
-    if any(w.get("brk") for w in clean):
+    manual_layout = any(w.get("brk") for w in clean)
+    if manual_layout:
         lines, line = [], []
         for w in clean:
             line.append(w)
@@ -268,7 +298,7 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
             if end_time <= start_time:  # guard: Whisper hallucinated negative duration
                 end_time = start_time + 0.1
             events.append({"start": start_time, "end": end_time,
-                           "lines": chunk, "active_word_index": i})
+                           "lines": chunk, "active_word_index": i, "manual": manual_layout})
 
     # Hard timestamp normalization so overlays never overlap or invert.
     for i in range(len(events) - 1):
@@ -364,8 +394,10 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     _sp = font.getlength(" ")
     _maxw = max((sum(font.getlength(w["text"]) for w in line) + (len(line) - 1) * _sp
                  for line in lines), default=0)
-    if _maxw > safe_w > 0:
-        font_size = max(8, int(font_size * safe_w / _maxw))
+    # Skip auto-shrink for MANUAL layouts (the user controls line breaks — respect their
+    # size; if a line overflows they add a break). Otherwise shrink but never below 55%.
+    if _maxw > safe_w > 0 and not event.get("manual"):
+        font_size = max(8, int(font_size * max(safe_w / _maxw, 0.55)))
         font = load_font(font_path, font_size)
     ascent, descent = font.getmetrics()
     line_height = ascent + descent

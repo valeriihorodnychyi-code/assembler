@@ -1,5 +1,5 @@
 {
-  "version": "1.7.1",
+  "version": "1.7.2",
   "channel": "main",
-  "notes": "Clearer 'Assembler stopped' screen (reopen from Dock/Applications; Update.command hint). Gradients: new section — 2-color gradient (vertical/horizontal/diagonal) you can apply to the plate & word-plate, the active karaoke word, or all text. Localize removed from the left bar (LOC has its own screen). In LOC, Quit + settings sit by the version badge. Plus separate word/plate shadows, stroke master toggle."
+  "notes": "Keep-together now matches phrases with punctuation (e.g. 'U.S. National' stays whole). Manual line breaks no longer shrink captions to tiny — auto-shrink is skipped in manual mode and never goes below 55%. Clearer 'Assembler stopped' screen (reopen from Dock/Applications; Update.command hint). Gradients: new section — 2-color gradient (vertical/horizontal/diagonal) you can apply to the plate & word-plate, the active karaoke word, or all text. Localize removed from the left bar (LOC has its own screen). In LOC, Quit + settings sit by the version badge. Plus separate word/plate shadows, stroke master toggle."
 }

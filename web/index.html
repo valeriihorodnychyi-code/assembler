@@ -823,16 +823,23 @@ function buildGroups(words,lang,pauseGap){
       if(_WEEKDAYS.has(a)||_WEEKDAYS.has(b))bond[i]=true;
     }
   }
-  const phrases=(R.keep_together||[]).map(p=>String(p).trim().toLowerCase().split(/\s+/).filter(Boolean)).filter(t=>t.length>=2);
+  const kwn=t=>String(t||"").toLowerCase().replace(/^[.,!?…:;"'`()\[\]{}«»„“”]+|[.,!?…:;"'`()\[\]{}«»„“”]+$/g,"");  // strip edge punctuation (U.S. → u.s)
+  const kw=lc.map(kwn);
+  const phrases=(R.keep_together||[]).map(p=>String(p).trim().split(/\s+/).map(kwn).filter(Boolean)).filter(t=>t.length>=2);
   for(let s=0;s<n;s++)for(const toks of phrases){const k=toks.length;
-    if(s+k<=n){let ok=true;for(let j=0;j<k;j++)if(lc[s+j]!==toks[j]){ok=false;break;}
+    if(s+k<=n){let ok=true;for(let j=0;j<k;j++)if(kw[s+j]!==toks[j]){ok=false;break;}
       if(ok)for(let j=s;j<s+k-1;j++)if(!words[j].ends)bond[j]=true;}}
   const groups=[];let cur=[words[0]];
   for(let i=0;i<n-1;i++){if(bond[i])cur.push(words[i+1]);else{groups.push(cur);cur=[words[i+1]];}}
   groups.push(cur);return groups;
 }
 function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts){
-  const PAUSE=0.5, ENDERS=/[.!?…]$/; maxLines=maxLines||2; lang=lang||"en";
+  const PAUSE=0.5; maxLines=maxLines||2; lang=lang||"en";
+  // genuine sentence end: ? ! … always; a trailing '.' only when it is NOT a dotted
+  // abbreviation/acronym ("U.S.", "e.g.") — matches engine _is_sentence_end.
+  const isEnd=s=>{const t=(s||"").trim();if(!t)return false;const l=t[t.length-1];
+    if(l==="!"||l==="?"||l==="…")return true;if(l!==".")return false;
+    return !t.replace(/\.+$/,"").includes(".");};
   const cutList=(cuts||[]).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
   const cutBetween=(a,b)=>cutList.some(c=>a<c&&c<=b);   // scene cut between two words → new caption
   let raw;
@@ -842,7 +849,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts){
         raw=txt.map((t,i)=>({r:t,start:i*slot,end:(i+1)*slot,brk:null})); }
   // keep sentence-end flag before stripping punctuation
   const words=[];
-  for(const x of raw){const s=(x.r||"").trim();if(!s)continue;const text=s.replace(/[.,!?…]+$/,"");if(text)words.push({text,start:x.start,end:x.end,ends:ENDERS.test(s),brk:x.brk||null});}
+  for(const x of raw){const s=(x.r||"").trim();if(!s)continue;const text=s.replace(/[.,!?…]+$/,"");if(text)words.push({text,start:x.start,end:x.end,ends:isEnd(s),brk:x.brk||null});}
   if(!words.length)return[];
   // merge hyphenated fragments into one word (e.g. "segunda-feira")
   const mg=[];for(const w of words){if(mg.length&&(mg[mg.length-1].text.endsWith("-")||w.text.startsWith("-")||w.text==="-")){mg[mg.length-1].text+=w.text;mg[mg.length-1].end=w.end;mg[mg.length-1].ends=w.ends;mg[mg.length-1].brk=w.brk;}else mg.push(w);}
@@ -884,7 +891,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts){
   }
   const events=[];
   for(const chunk of chunks){const flat=chunk.flat();
-    for(let i=0;i<flat.length;i++)events.push({start:flat[i].start,end:(i+1<flat.length?flat[i+1].start:flat[i].end),lines:chunk,active:i});}
+    for(let i=0;i<flat.length;i++)events.push({start:flat[i].start,end:(i+1<flat.length?flat[i+1].start:flat[i].end),lines:chunk,active:i,manual:manual});}
   // Match the engine: make events contiguous so a chunk FREEZES through a pause,
   // but leave a gap before the first word and after the last (-> blank, not random text).
   for(let i=0;i<events.length-1;i++){events[i].end=events[i+1].start;if(events[i].end<=events[i].start)events[i].end=events[i].start+0.1;}
@@ -927,10 +934,11 @@ function render(t,dur){
   if(!ev)return; // silence before first word / after last -> nothing on screen (no random text)
   const lines=ev.lines.map(l=>l.map(w=>({...w,disp:applyCase(w.text,s.textCase)})));
   let fs=s.fontSize*scale;ctx.font=`${fs}px "${s.fontFamily}"`;
-  // shrink-to-fit: never let a caption line exceed the safe frame width (matches engine)
-  {const SAFE=W*0.92,sw=ctx.measureText(" ").width;
+  // shrink-to-fit: keep a caption within the safe frame width. Skip for MANUAL layouts
+  // (user controls breaks) and never shrink below 55% (so the size slider still works).
+  if(!ev.manual){const SAFE=W*0.92,sw=ctx.measureText(" ").width;
    const mw=Math.max(0,...lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*sw));
-   if(mw>SAFE&&mw>0){fs=Math.max(8,Math.floor(fs*SAFE/mw));ctx.font=`${fs}px "${s.fontFamily}"`;}}
+   if(mw>SAFE&&mw>0){fs=Math.max(8,Math.floor(fs*Math.max(SAFE/mw,0.55)));ctx.font=`${fs}px "${s.fontFamily}"`;}}
   ctx.textBaseline="alphabetic";
   const mkey=(customFontName||(s.fontFamily+".ttf"))+"|"+Math.round(fs);
   const em=fontMetricsCache[mkey];
