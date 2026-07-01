@@ -44,11 +44,44 @@ def app_version():
 WORK_ROOT = os.path.join(tempfile.gettempdir(), "captions_studio_work")
 os.makedirs(WORK_ROOT, exist_ok=True)
 
-# styles/fonts live next to the project root
-os.environ.setdefault("CS_STYLES_DIR", os.path.join(ROOT, "styles"))
+# Fonts are bundled with the code. STYLES (user presets), however, must live in a
+# PERSISTENT folder OUTSIDE the code dir — the auto-updater wipes ~/.assembler/code
+# on every update, so keeping presets there loses them. Store them in ~/.assembler/styles.
+_ASSEMBLER_HOME = os.path.join(os.path.expanduser("~"), ".assembler")
+os.environ.setdefault("CS_STYLES_DIR", os.path.join(_ASSEMBLER_HOME, "styles"))
 os.environ.setdefault("CS_FONTS_DIR", os.path.join(ROOT, "fonts"))
 st.STYLES_DIR = os.environ["CS_STYLES_DIR"]
 st.FONTS_DIR = os.environ["CS_FONTS_DIR"]
+
+
+def _seed_and_recover_styles():
+    """Populate the persistent styles dir without ever clobbering a user's own preset.
+
+    Sources, in order (later ones fill only the gaps): built-in presets bundled with
+    the code, then any presets left behind in a previous code copy (code.prev) — this
+    auto-recovers presets that an earlier update wiped from the old in-code styles dir.
+    """
+    import glob as _glob, shutil as _sh
+    dest = st.STYLES_DIR
+    try:
+        os.makedirs(dest, exist_ok=True)
+    except Exception:
+        return
+    sources = [os.path.join(ROOT, "styles"),
+               os.path.join(_ASSEMBLER_HOME, "code.prev", "styles"),
+               os.path.join(_ASSEMBLER_HOME, "code", "styles")]
+    for src in sources:
+        if not os.path.isdir(src) or os.path.abspath(src) == os.path.abspath(dest):
+            continue
+        for f in _glob.glob(os.path.join(src, "*.json")):
+            target = os.path.join(dest, os.path.basename(f))
+            if not os.path.exists(target):   # never overwrite a preset the user still has
+                try:
+                    _sh.copy2(f, target)
+                except Exception:
+                    pass
+
+_seed_and_recover_styles()
 
 # Library lives in a configurable folder (point CS_LIBRARY_DIR / config.json
 # "library_dir" at a shared Drive/Dropbox folder to share it across the team).
