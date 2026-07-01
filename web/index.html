@@ -382,6 +382,8 @@
         <textarea id="keepTogether" rows="2" placeholder="Tai Chi&#10;New York&#10;Muscle Booster" style="font-size:11px;resize:vertical;width:100%"></textarea>
         <button type="button" id="saveRulesBtn" class="ghost" style="float:right;font-size:11px;margin-top:4px" onclick="saveKeepTogether()">💾 Save phrases</button>
         <div style="clear:both"></div>
+        <div class="row" style="margin-top:10px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків, але крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label>
+          <label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
         <div class="row" style="margin-top:10px"><label data-i18n="lblCaptions" title="Показувати титри лише в цьому проміжку часу (порожнє = весь кліп)">Captions in / out</label>
           <div style="display:flex;gap:6px;flex:1.3">
             <input type="number" id="capIn" placeholder="0.0" min="0" step="0.1" style="flex:1" title="від (с)">
@@ -656,7 +658,7 @@ let editingHook=null, packMode="orig";               // packMode: "orig" = origi
 let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","punct"];
 
 const PRESETS={
   "Clean White":{fontFamily:"Arial Black",fontSize:80,textColor:"#ffffff",textCase:"uppercase",strokeOuterW:0,strokeW:0,shadowOn:true,shY:6,shBlur:8,shColor:"#000000",plateOn:false,karaokeOn:false},
@@ -755,7 +757,8 @@ function readControls(){
     plateOn:$("plateOn").checked,plateLine:$("plateLine").checked,plateFull:$("plateFull").checked,plateColor:$("plateColor").value,plateAlpha:+$("plateAlpha").value,platePadX:+$("platePadX").value,platePadY:+$("platePadY").value,plateRadius:+$("plateRadius").value,boxOffsetY:+$("boxOffsetY").value,
     karaokeOn:$("karaokeOn").checked,karaokeColor:$("karaokeColor").value,kpOn:$("kpOn").checked,kpColor:$("kpColor").value,kpPadX:+$("kpPadX").value,kpPadY:+$("kpPadY").value,kpRadius:+$("kpRadius").value,
     gradC0:$("gradC0")?$("gradC0").value:"#ff5a2c",gradC1:$("gradC1")?$("gradC1").value:"#ffd400",gradDir:$("gradDir")?$("gradDir").value:"vertical",gradText:$("gradText")?$("gradText").checked:false,gradActive:$("gradActive")?$("gradActive").checked:false,gradPlate:$("gradPlate")?$("gradPlate").checked:false,
-    scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value};
+    scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value,
+    punct:$("punct")?$("punct").checked:false};
 }
 function writeControls(s){
   const set=(id,v)=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=!!v;else el.value=v;const l=$(id+"V");if(l)l.textContent=v;};
@@ -769,7 +772,7 @@ function writeControls(s){
 function toEngineStyle(s){
   const arr=(h,a=255)=>{const[r,g,b]=hexToRgb(h);return[r,g,b,a];};
   return {font_name:customFontName||(s.fontFamily+".ttf"),font_size:s.fontSize,text_color:arr(s.textColor),
-    text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,
+    text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,punctuation:!!s.punct,
     stroke_on:s.strokeOn!==false,stroke:{width:s.strokeW,color:arr(s.strokeColor)},stroke_outer:{width:s.strokeOuterW,color:arr(s.strokeOuterColor)},
     shadow:{enabled:s.shadowOn,offset_x:s.shX,offset_y:s.shY,glow_blur:s.shBlur,color:arr(s.shColor)},
     plate_shadow:{enabled:s.plateShadowOn,offset_x:s.pshX,offset_y:s.pshY,glow_blur:s.pshBlur,color:arr(s.pshColor)},
@@ -833,13 +836,16 @@ function buildGroups(words,lang,pauseGap){
   for(let i=0;i<n-1;i++){if(bond[i])cur.push(words[i+1]);else{groups.push(cur);cur=[words[i+1]];}}
   groups.push(cur);return groups;
 }
-function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts){
+function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPunct){
   const PAUSE=0.5; maxLines=maxLines||2; lang=lang||"en";
   // genuine sentence end: ? ! … always; a trailing '.' only when it is NOT a dotted
   // abbreviation/acronym ("U.S.", "e.g.") — matches engine _is_sentence_end.
   const isEnd=s=>{const t=(s||"").trim();if(!t)return false;const l=t[t.length-1];
     if(l==="!"||l==="?"||l==="…")return true;if(l!==".")return false;
     return !t.replace(/\.+$/,"").includes(".");};
+  // clean display: mirrors engine _clean_display. keepPunct → keep as transcribed;
+  // otherwise drop a trailing comma + true sentence-end mark, keep abbreviation dots.
+  const cleanDisp=s=>{if(keepPunct)return s;let t=s.replace(/,+$/,"");if(isEnd(t))t=t.replace(/[.!?…]+$/,"");return t;};
   const cutList=(cuts||[]).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
   const cutBetween=(a,b)=>cutList.some(c=>a<c&&c<=b);   // scene cut between two words → new caption
   let raw;
@@ -849,7 +855,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts){
         raw=txt.map((t,i)=>({r:t,start:i*slot,end:(i+1)*slot,brk:null})); }
   // keep sentence-end flag before stripping punctuation
   const words=[];
-  for(const x of raw){const s=(x.r||"").trim();if(!s)continue;const text=s.replace(/[.,!?…]+$/,"");if(text)words.push({text,start:x.start,end:x.end,ends:isEnd(s),brk:x.brk||null});}
+  for(const x of raw){const s=(x.r||"").trim();if(!s)continue;const text=cleanDisp(s);if(text)words.push({text,start:x.start,end:x.end,ends:isEnd(s),brk:x.brk||null});}
   if(!words.length)return[];
   // merge hyphenated fragments into one word (e.g. "segunda-feira")
   const mg=[];for(const w of words){if(mg.length&&(mg[mg.length-1].text.endsWith("-")||w.text.startsWith("-")||w.text==="-")){mg[mg.length-1].text+=w.text;mg[mg.length-1].end=w.end;mg[mg.length-1].ends=w.ends;mg[mg.length-1].brk=w.brk;}else mg.push(w);}
@@ -928,7 +934,7 @@ function render(t,dur){
   const cw=(typeof capWin==="function")?capWin():{in:null,out:null};   // hide captions outside the in/out window
   if((cw.in!=null&&t<cw.in)||(cw.out!=null&&t>=cw.out))return;
   const scale=1;   // no per-format scaling — caption px absolute, identical in every format (matches engine)
-  const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null);
+  const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
   if(!events.length)return;
   let ev=events.find(e=>t>=e.start&&t<e.end);
   if(!ev)return; // silence before first word / after last -> nothing on screen (no random text)
@@ -1324,7 +1330,7 @@ function fromEngineStyle(e){
   const st=e.stroke||{},so=e.stroke_outer||{},sh=e.shadow||{},pl=e.plate||{},ka=e.karaoke||{},kp=e.karaoke_plate||{},gr=e.gradient||{};
   return {fontFamily:(e.font_name||"Poppins-Bold.ttf").replace(/\.(ttf|otf)$/i,""),fontSize:+e.font_size||80,textColor:hx(e.text_color),
     textCase:(e.text_case===""||e.text_case==null)?"none":e.text_case,wrapMode:e.wrap_mode||"chars",maxChars:(e.wrap_mode==="words")?(+e.words_per_line||3):(+e.max_chars_per_line||15),
-    maxLines:+e.max_lines||(e.force_single_line?1:2),marginBottom:+e.margin_bottom||320,lineSpacing:+g(e,"line_spacing",10),boxOffsetY:+g(e,"box_offset_y",0),
+    maxLines:+e.max_lines||(e.force_single_line?1:2),marginBottom:+e.margin_bottom||320,lineSpacing:+g(e,"line_spacing",10),boxOffsetY:+g(e,"box_offset_y",0),punct:!!e.punctuation,
     strokeW:+g(st,"width",0),strokeColor:hx(st.color),strokeOuterW:+g(so,"width",0),strokeOuterColor:hx(so.color),
     shadowOn:!!sh.enabled,shX:+g(sh,"offset_x",0),shY:+g(sh,"offset_y",8),shBlur:+g(sh,"glow_blur",0),shColor:hx(sh.color),
     strokeOn:(e.stroke_on!==false),
@@ -1605,7 +1611,7 @@ function buildVarTabs(){
 const filmVideos={};
 function drawThumbCaption(ctx,W,H,s,words,t){
   if(!s)return;
-  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode,capLang());
+  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode,capLang(),null,!!s.punct);
   if(!events.length)return;
   const ev=events.find(e=>t>=e.start&&t<e.end)||events[0];if(!ev)return;
   const scale=W/1080,fs=(s.fontSize||80)*scale;ctx.font=fs+"px '"+(s.fontFamily||"Arial")+"'";ctx.textBaseline="top";

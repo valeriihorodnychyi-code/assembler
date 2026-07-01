@@ -35,6 +35,22 @@ def _is_sentence_end(raw):
     core = raw.rstrip(".")
     return "." not in core
 
+
+def _clean_display(raw, keep_punct):
+    """Decide how a word's punctuation is shown.
+
+    keep_punct=True  -> keep everything exactly as transcribed (e.g. "U.S. National team.").
+    keep_punct=False -> the clean caption look: drop a trailing comma and a genuine
+                        sentence-ending mark, but PRESERVE dots that belong to an
+                        abbreviation ("U.S.", "e.g.") so they never lose their period.
+    """
+    if keep_punct:
+        return raw
+    t = raw.rstrip(",")
+    if _is_sentence_end(t):
+        t = t.rstrip(".!?…")
+    return t
+
 # English month / weekday names used by the automatic date glue. (Localized
 # month names for es/fr/... can be added later; numbers + units glue already
 # works language-agnostically.)
@@ -169,7 +185,8 @@ def build_groups(words, rules, lang="en", pause_gap=0.5):
 
 
 def build_events(words, limit, text_case="uppercase", replacements=None,
-                 pause_gap=0.5, max_lines=2, wrap_mode="chars", lang="en", rules=None, cuts=None):
+                 pause_gap=0.5, max_lines=2, wrap_mode="chars", lang="en", rules=None,
+                 cuts=None, punctuation=False):
     """Group a flat list of {text,start,end} words into karaoke events.
 
     Each event = a visible 1-2 line chunk + the index of the currently active word.
@@ -186,7 +203,7 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     for w in words:
         raw = _word_text(w).strip()
         ends_sentence = _is_sentence_end(raw)
-        text = raw.rstrip(".,!?…")
+        text = _clean_display(raw, punctuation)
         for old, new in replacements.items():
             text = re.sub(r"\b" + re.escape(old) + r"\b", new, text, flags=re.IGNORECASE)
         if text_case == "uppercase":

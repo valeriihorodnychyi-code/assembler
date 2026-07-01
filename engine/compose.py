@@ -52,6 +52,7 @@ def build_timeline(words, regions, lang="en", cuts=None):
             max_lines=style.get("max_lines", 1 if style.get("force_single_line") else 2),
             lang=lang,
             cuts=cuts,
+            punctuation=style.get("punctuation", False),
         )
         for e in evs:
             tagged.append((e, style))
