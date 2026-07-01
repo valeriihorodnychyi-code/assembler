@@ -1,5 +1,5 @@
 {
-  "version": "1.4.5",
+  "version": "1.5.3",
   "channel": "main",
-  "notes": "Shared library: smarter Google Drive auto-detection (nested folders) + library path now persists across restarts. New 'Update Assembler.command' force-updater for the team. Green Smart-captions section."
+  "notes": "Left panel accordion: opening a section auto-collapses the others, so Transcription and Base text no longer fight for vertical space. Smart-captions moved under Transcription. Plus per-file batch language, collapsed noisy sections, smart remap, scrim."
 }

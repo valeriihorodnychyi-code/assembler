@@ -362,6 +362,19 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     line_widths = [sum(font.getlength(w["text"]) for w in line) + (len(line) - 1) * space_width
                    for line in lines]
 
+    # Scrim: a soft, full-width dark band behind the text so captions stay readable
+    # on bright footage. Drawn FIRST (under plate/shadow/text).
+    scrim = style_cfg.get("scrim", {})
+    if scrim.get("enabled", False):
+        sc_pad = int(int(scrim.get("pad", 40)) * scale_factor)
+        sc_feather = max(1, int(int(scrim.get("feather", 70)) * scale_factor))
+        sc_color = tuple(scrim.get("color", [0, 0, 0, 150]))
+        band = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        ImageDraw.Draw(band).rectangle(
+            [0, int(start_y - sc_pad - box_off), width, int(start_y + total_height + sc_pad - box_off)],
+            fill=sc_color)
+        final_img.alpha_composite(band.filter(ImageFilter.GaussianBlur(sc_feather)))
+
     word_positions, current_y, word_counter, cx = [], start_y, 0, width / 2
     for i, line in enumerate(lines):
         current_x = cx - (line_widths[i] / 2)

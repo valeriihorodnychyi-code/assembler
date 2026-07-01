@@ -27,6 +27,7 @@ DEFAULT_STYLE = {
     "stroke_outer": {"width": 0, "color": [0, 0, 0, 255]},
     "shadow": {"enabled": False, "offset_x": 0, "offset_y": 8, "glow_blur": 0, "color": [0, 0, 0, 255]},
     "plate": {"enabled": False, "per_line": False, "color": [0, 0, 0, 160], "pad_x": 30, "pad_y": 15, "border_radius": 15},
+    "scrim": {"enabled": False, "color": [0, 0, 0, 150], "pad": 40, "feather": 70},  # soft dark band behind text for light footage
     "karaoke": {"enabled": True, "active_color": [255, 212, 0, 255]},
     "karaoke_plate": {"enabled": False, "color": [255, 92, 57, 255], "pad_x": 14, "pad_y": 6, "border_radius": 10},
 }
