@@ -6,6 +6,11 @@
 REPO_ZIP="https://github.com/valeriihorodnychyi-code/assembler/archive/refs/heads/main.zip"
 CODE="$HOME/.assembler/code"
 
+# Force a UTF-8 locale so unzip/ditto never hit "Illegal byte sequence" on any
+# non-ASCII filename that might be in the archive.
+export LANG="en_US.UTF-8"
+export LC_ALL="en_US.UTF-8"
+
 echo "▸ Stopping any running Assembler…"
 pkill -f "Assembler.app"      2>/dev/null
 pkill -f ".assembler/code"    2>/dev/null
@@ -22,7 +27,13 @@ if ! curl -fsSL "$REPO_ZIP" -o "$TMP/code.zip"; then
   echo "✗ Could not download the update (check your internet) — your current version is untouched."
   rm -rf "$TMP"; read -n 1 -s -r -p "Press any key to close."; exit 1
 fi
-unzip -q "$TMP/code.zip" -d "$TMP/x"
+# Prefer macOS-native `ditto` (handles unicode filenames cleanly); fall back to unzip.
+mkdir -p "$TMP/x"
+if command -v ditto >/dev/null 2>&1; then
+  ditto -x -k "$TMP/code.zip" "$TMP/x" 2>/dev/null || unzip -q -o "$TMP/code.zip" -d "$TMP/x"
+else
+  unzip -q -o "$TMP/code.zip" -d "$TMP/x"
+fi
 
 # Find the real code root (the folder that contains server/app.py)
 SRC="$(dirname "$(find "$TMP/x" -maxdepth 3 -path '*/server/app.py' | head -1)")"
