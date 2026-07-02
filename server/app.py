@@ -44,44 +44,67 @@ def app_version():
 WORK_ROOT = os.path.join(tempfile.gettempdir(), "captions_studio_work")
 os.makedirs(WORK_ROOT, exist_ok=True)
 
-# Fonts are bundled with the code. STYLES (user presets), however, must live in a
-# PERSISTENT folder OUTSIDE the code dir — the auto-updater wipes ~/.assembler/code
-# on every update, so keeping presets there loses them. Store them in ~/.assembler/styles.
+# STYLES come in two tiers:
+#   • OFFICIAL — curated presets shipped with the code (ROOT/styles), versioned & read-only.
+#   • CUSTOM   — everyone's saved presets. These live NEXT TO the shared library folder
+#                (<library>/_styles) so the whole team sees each other's styles the same way
+#                they share bodies/packshots. If no shared library is set, they fall back to a
+#                persistent per-machine folder (~/.assembler/styles) that survives updates.
+# The UI merges both tiers (see styles.list_styles), so official + team customs both show up.
 _ASSEMBLER_HOME = os.path.join(os.path.expanduser("~"), ".assembler")
-os.environ.setdefault("CS_STYLES_DIR", os.path.join(_ASSEMBLER_HOME, "styles"))
 os.environ.setdefault("CS_FONTS_DIR", os.path.join(ROOT, "fonts"))
-st.STYLES_DIR = os.environ["CS_STYLES_DIR"]
 st.FONTS_DIR = os.environ["CS_FONTS_DIR"]
 
 
 def _seed_and_recover_styles():
-    """Populate the persistent styles dir without ever clobbering a user's own preset.
+    """Recover genuine custom presets from a previous code copy into the active custom dir.
 
-    Sources, in order (later ones fill only the gaps): built-in presets bundled with
-    the code, then any presets left behind in a previous code copy (code.prev) — this
-    auto-recovers presets that an earlier update wiped from the old in-code styles dir.
+    Only recovers user-made presets (skips names that are official, and never overwrites an
+    existing file), so the shared folder isn't polluted with copies of shipped presets.
     """
     import glob as _glob, shutil as _sh
     dest = st.STYLES_DIR
+    official = set(f[:-5] for f in os.listdir(st.OFFICIAL_STYLES_DIR)
+                   if f.endswith(".json")) if os.path.isdir(st.OFFICIAL_STYLES_DIR) else set()
     try:
         os.makedirs(dest, exist_ok=True)
     except Exception:
         return
-    sources = [os.path.join(ROOT, "styles"),
-               os.path.join(_ASSEMBLER_HOME, "code.prev", "styles"),
+    sources = [os.path.join(_ASSEMBLER_HOME, "code.prev", "styles"),
                os.path.join(_ASSEMBLER_HOME, "code", "styles")]
     for src in sources:
         if not os.path.isdir(src) or os.path.abspath(src) == os.path.abspath(dest):
             continue
         for f in _glob.glob(os.path.join(src, "*.json")):
-            target = os.path.join(dest, os.path.basename(f))
-            if not os.path.exists(target):   # never overwrite a preset the user still has
+            base = os.path.basename(f)
+            if base[:-5] in official:      # official presets come via the merge, don't copy
+                continue
+            target = os.path.join(dest, base)
+            if not os.path.exists(target):  # never overwrite a preset already there
                 try:
                     _sh.copy2(f, target)
                 except Exception:
                     pass
 
-_seed_and_recover_styles()
+
+def _custom_styles_dir():
+    """Where custom/team presets live. Next to a real shared library folder if one is set;
+    otherwise a persistent per-machine folder (never inside the auto-updated code dir)."""
+    lib = os.environ.get("CS_LIBRARY_DIR", "")
+    in_code = os.path.abspath(lib).startswith(os.path.abspath(ROOT) + os.sep) if lib else True
+    if lib and not in_code:
+        return os.path.join(lib, "_styles")   # shared via the same Drive/Dropbox folder
+    return os.path.join(_ASSEMBLER_HOME, "styles")
+
+
+def _apply_styles_dirs():
+    """(Re)point official + custom style dirs. Call after the library folder is resolved
+    or changed at runtime, so styles always follow the shared library."""
+    st.OFFICIAL_STYLES_DIR = os.path.join(ROOT, "styles")
+    st.STYLES_DIR = _custom_styles_dir()
+    os.environ["CS_OFFICIAL_STYLES_DIR"] = st.OFFICIAL_STYLES_DIR
+    os.environ["CS_STYLES_DIR"] = st.STYLES_DIR
+    _seed_and_recover_styles()
 
 # Library lives in a configurable folder (point CS_LIBRARY_DIR / config.json
 # "library_dir" at a shared Drive/Dropbox folder to share it across the team).
@@ -161,6 +184,9 @@ if os.path.exists(_CFG):
     except Exception:
         pass
 
+# Library folder is now final → point styles next to it (or the local fallback) + recover.
+_apply_styles_dirs()
+
 app = FastAPI(title="Captions Studio", version="0.1.0")
 
 
@@ -213,6 +239,7 @@ def save_library_dir(path):
     os.makedirs(path, exist_ok=True)
     os.environ["CS_LIBRARY_DIR"] = path
     library.LIBRARY_DIR = path
+    _apply_styles_dirs()   # styles follow the shared library folder (or fall back locally)
     os.makedirs(os.path.dirname(_PCFG), exist_ok=True)
     cur = {}
     if os.path.exists(_PCFG):

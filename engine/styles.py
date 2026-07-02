@@ -8,7 +8,17 @@ import os
 import json
 
 STYLES_DIR = os.environ.get("CS_STYLES_DIR", "styles")
+# OFFICIAL presets ship with the code (curated by the team, versioned, read-only here).
+# Custom/team presets live in STYLES_DIR (a shared Drive folder or a local fallback).
+# The two are merged when listing so every Assembler shows official + everyone's custom.
+OFFICIAL_STYLES_DIR = os.environ.get("CS_OFFICIAL_STYLES_DIR", "")
 FONTS_DIR = os.environ.get("CS_FONTS_DIR", "fonts")
+
+
+def _json_names(d):
+    if not d or not os.path.isdir(d):
+        return []
+    return [f[:-5] for f in os.listdir(d) if f.endswith(".json")]
 
 DEFAULT_STYLE = {
     "font_name": "Poppins-Bold.ttf",
@@ -57,17 +67,25 @@ def normalize(style: dict) -> dict:
 
 
 def list_styles(styles_dir: str = None) -> list:
+    """Names available to the UI = official (shipped) + custom (shared/local), de-duped.
+    A custom preset that shares a name with an official one wins (user override)."""
     d = styles_dir or STYLES_DIR
-    if not os.path.isdir(d):
-        return []
-    return sorted(f[:-5] for f in os.listdir(d) if f.endswith(".json"))
+    names = set(_json_names(OFFICIAL_STYLES_DIR)) | set(_json_names(d))
+    return sorted(names)
 
 
 def load_style(name: str, styles_dir: str = None) -> dict:
     d = styles_dir or STYLES_DIR
-    path = os.path.join(d, name if name.endswith(".json") else name + ".json")
-    with open(path, "r", encoding="utf-8") as f:
-        return normalize(json.load(f))
+    fname = name if name.endswith(".json") else name + ".json"
+    # custom/shared dir wins over official, so a user override of an official name works
+    for base in (d, OFFICIAL_STYLES_DIR):
+        if not base:
+            continue
+        path = os.path.join(base, fname)
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return normalize(json.load(f))
+    raise FileNotFoundError(name)
 
 
 def save_style(name: str, style: dict, styles_dir: str = None) -> str:
