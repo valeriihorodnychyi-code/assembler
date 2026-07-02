@@ -19,8 +19,9 @@ packaging/vendor/bin/
 # --- user data / heavy media (not code) ---
 library/
 work/
-Heroes/          # capybara-fight game sprites — design prototype only, NOT shipped code.
-                 # kept local; must never re-enter the repo (its unicode filenames broke unzip on update).
+# capybara-fight game sprites — design prototype only, NOT shipped code.
+# kept local; must never re-enter the repo (unicode filenames broke unzip on update).
+Heroes/
 *.mp4
 *.mov
 *.m4v
