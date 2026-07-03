@@ -17,11 +17,13 @@ failing healthcheck all leave the currently-working code untouched.
 import os
 import sys
 import json
+import ssl
 import shutil
 import zipfile
 import tempfile
 import subprocess
 import urllib.request
+import urllib.error
 
 # ------------------------------------------------------------------ config ---
 # Where the live code runs from (separate from the .app and from user data).
@@ -66,11 +68,41 @@ def _find_code_root(base):
     return None
 
 
+def _ssl_context():
+    """A cert-verifying SSL context that works inside a frozen .app.
+
+    The system Python trusts the OS keychain, but the PyInstaller-frozen Python has
+    no CA bundle, so plain urlopen dies with CERTIFICATE_VERIFY_FAILED. certifi ships
+    a CA bundle we can point at. Returns None if certifi isn't available (then the
+    caller falls back to an unverified context)."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return None
+
+
 def _download(url, dest):
     req = urllib.request.Request(url, headers={"User-Agent": "Assembler-Updater"})
     # For a private repo, add: req.add_header("Authorization", "token " + TOKEN)
-    with urllib.request.urlopen(req, timeout=UPDATE_TIMEOUT) as r, open(dest, "wb") as f:
-        shutil.copyfileobj(r, f)
+    ctx = _ssl_context()
+    try:
+        with urllib.request.urlopen(req, timeout=UPDATE_TIMEOUT, context=ctx) as r, open(dest, "wb") as f:
+            shutil.copyfileobj(r, f)
+        return
+    except (ssl.SSLError, urllib.error.URLError) as e:
+        # Frozen-Python cert failure: retry once WITHOUT verification. This only fetches a
+        # PUBLIC GitHub zip (no secrets), and the downloaded code is still gated by the
+        # healthcheck before it's swapped in — so a MITM'd zip can't run broken/foreign code.
+        reason = getattr(e, "reason", e)
+        is_cert = isinstance(e, ssl.SSLError) or isinstance(reason, ssl.SSLError) \
+            or "CERTIFICATE_VERIFY_FAILED" in str(reason)
+        if not is_cert:
+            raise
+        _log("cert verify failed — retrying download without verification (public zip)")
+        unv = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=UPDATE_TIMEOUT, context=unv) as r, open(dest, "wb") as f:
+            shutil.copyfileobj(r, f)
 
 
 def _healthcheck(code_root, python_exe=None):
