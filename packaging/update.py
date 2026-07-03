@@ -137,16 +137,42 @@ def _version_of(code_root):
         return "?"
 
 
+def _ver_tuple(v):
+    try:
+        return tuple(int(x) for x in str(v).split(".")[:3])
+    except Exception:
+        return (0,)
+
+
 def seed_from_baseline(baseline_dir):
-    """First run: copy the code baseline shipped inside the .app into CODE_HOME."""
-    if _is_code_root(CODE_HOME):
-        return
+    """Install the code baseline shipped inside the .app.
+
+    Two cases:
+      • First run (no code yet) → copy the bundled baseline in.
+      • Existing code, but the bundled baseline is NEWER → upgrade OFFLINE from the
+        bundle (no network). This is what makes a physically-handed-out newer .app
+        actually update a teammate whose network blocks the GitHub auto-update.
+    An equal/older bundle is left alone (the installed code may be ahead via GitHub).
+    """
     if not (baseline_dir and _is_code_root(baseline_dir)):
         _log("no usable baseline to seed from")
         return
-    os.makedirs(ASSEMBLER_HOME, exist_ok=True)
-    if os.path.exists(CODE_HOME):
-        shutil.rmtree(CODE_HOME, ignore_errors=True)
+    base_ver = _version_of(baseline_dir)
+    if _is_code_root(CODE_HOME):
+        cur_ver = _version_of(CODE_HOME)
+        if _ver_tuple(base_ver) <= _ver_tuple(cur_ver):
+            return  # installed code is same or newer — keep it
+        _log(f"bundled baseline v{base_ver} newer than installed v{cur_ver} — upgrading offline")
+        prev = CODE_HOME + ".prev"
+        shutil.rmtree(prev, ignore_errors=True)
+        try:
+            os.rename(CODE_HOME, prev)   # keep a rollback copy
+        except Exception:
+            shutil.rmtree(CODE_HOME, ignore_errors=True)
+    else:
+        os.makedirs(ASSEMBLER_HOME, exist_ok=True)
+        if os.path.exists(CODE_HOME):
+            shutil.rmtree(CODE_HOME, ignore_errors=True)
     shutil.copytree(baseline_dir, CODE_HOME)
     _log(f"seeded code from baseline -> v{_version_of(CODE_HOME)}")
 
