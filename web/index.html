@@ -2549,7 +2549,8 @@ function renderBatchStage(){
   if(musicTracks.length)html+="<div style='margin:16px auto 0;max-width:620px;padding:9px 12px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--accent);font-size:12px;text-align:center;color:var(--muted)'>🎵 "+musicTracks.length+" музичн"+(musicTracks.length>1?"і доріжки":"а доріжка")+" · налаштування в панелі <b>Audio</b> ліворуч</div>";
   const n=shown.length;
   html+="<div style='display:flex;gap:12px;justify-content:center;align-items:center;margin-top:22px'><button id='boardBuild' class='primary' style='padding:15px 44px;font-size:17px;font-weight:700;letter-spacing:.3px'>🎬 Render "+n+" video"+(n>1?"s":"")+"</button>"
-    +(hasFinals?"<button id='dlAllBtn' class='primary' style='padding:14px 24px;font-size:15px'>⬇ Завантажити все</button>":"")+"</div>"
+    +(hasFinals?"<button id='dlAllBtn' class='primary' style='padding:14px 24px;font-size:15px'>⬇ Завантажити все</button>":"")
+    +(hasFinals?"<button id='deliverBtn' style='padding:14px 24px;font-size:15px;background:var(--ok);color:#0d0e12;border:none;font-weight:600' title='Скопіювати готові відео у спільну папку Finished Work на Google Drive'>🚀 Send to Finished Work</button>":"")+"</div>"
     +(hasFinals?"<div style='text-align:center;font-size:11px;color:var(--muted);margin-top:6px'>відео + PNG-прев'ю одним архівом · або 🖼 поряд із кожним відео для одиночної картинки</div>":"");
   if(hasFinals){const finals=shown.map(h=>batchFinals[clipKey(h)]).filter(Boolean);
     html+="<div style='max-width:620px;margin:16px auto 0'>"
@@ -2578,6 +2579,19 @@ function renderBatchStage(){
       if(!r.ok)throw new Error((await r.json()).detail||"failed");
       dlBlob(await r.blob(),"Assembler_export.zip");busyDone("Готово");setStatus("Завантажено: відео + PNG-прев'ю.","ok");
     }catch(e){setStatus("Експорт помилка: "+e.message,"err");busyStop();}
+  };
+  // deliver finished videos straight into the shared "Finished Work" Drive folder
+  if($("deliverBtn"))$("deliverBtn").onclick=async()=>{
+    if(!fileId){setStatus("Спершу зроби рендер.","err");return;}
+    const shots=shown.map(h=>{const f=batchFinals[clipKey(h)];if(!f)return null;
+      return {file:f.file,name:creativeName(f.file)};}).filter(Boolean);
+    if(!shots.length){setStatus("Немає готових відео для доставки.","err");return;}
+    setStatus("Відправляю у Finished Work…","",true);busyStart("Доставка у Finished Work…");
+    try{const r=await fetch(API+"/api/deliver_finished",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,shots})});
+      const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+      busyDone("Доставлено");chime("render");
+      setStatus("🚀 Доставлено "+d.delivered+" відео у Finished Work (Google Drive заллє протягом хвилини).","ok");
+    }catch(e){setStatus("Доставка не вдалась: "+e.message+" — перевір, чи синхронізується папка Finished Work у Google Drive (або вкажи її в ⚙ налаштуваннях).","err");busyStop();}
   };
   el.querySelectorAll("[data-rm]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();hooks.splice(+x.dataset.rm,1);renderHookTiles();});
   el.querySelectorAll("[data-rmbody]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();bodyParts.splice(+x.dataset.rmbody,1);if(!bodyParts.length)bodyParts=[""];renderBatchStage();});

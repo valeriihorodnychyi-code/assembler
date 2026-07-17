@@ -187,6 +187,80 @@ if os.path.exists(_CFG):
 # Library folder is now final → point styles next to it (or the local fallback) + recover.
 _apply_styles_dirs()
 
+
+# --- delivery: drop finished creatives into the team "Finished Work" Drive folder ----
+# Local method: the file is copied into the Google-Drive-synced folder; Drive uploads it.
+# No rclone / OAuth needed on a Mac that already syncs Drive (that's the headless-VPS path).
+def _detect_drive_folder(folder_name):
+    import glob as _g
+    home = os.path.expanduser("~")
+    roots = (_g.glob(os.path.join(home, "Library", "CloudStorage", "GoogleDrive-*"))
+             + _g.glob(os.path.join(home, "Library", "CloudStorage", "Dropbox*"))
+             + _g.glob(os.path.join(home, "Google Drive*")))
+    mids = ["Shared drives/*", "Shared drives/*/*", "Спільні диски/*", "Спільні диски/*/*",
+            "My Drive", "My Drive/*", "My Drive/*/*", "", "*"]
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for mid in mids:
+            parts = [p for p in mid.split("/") if p]
+            pat = os.path.join(root, *parts, folder_name) if parts else os.path.join(root, folder_name)
+            hits = sorted(_g.glob(pat))
+            if hits:
+                return hits[0]
+    return None
+
+
+def _resolve_finished_dir():
+    """Where delivered creatives go. Priority: explicit env, config, then auto-detected
+    Drive 'Finished Work' folder. Empty string = delivery off."""
+    d = os.environ.get("CS_FINISHED_DIR", "")
+    if not d:
+        try:
+            if os.path.exists(_PCFG):
+                d = (_json.load(open(_PCFG, encoding="utf-8")).get("finished_dir") or "")
+        except Exception:
+            d = ""
+    if not d:
+        d = _detect_drive_folder("Finished Work") or ""
+    if d:
+        os.environ["CS_FINISHED_DIR"] = os.path.expanduser(d)
+    return os.environ.get("CS_FINISHED_DIR", "")
+
+
+def save_finished_dir(path):
+    path = os.path.expanduser((path or "").strip())
+    if path:
+        os.makedirs(path, exist_ok=True)
+        os.environ["CS_FINISHED_DIR"] = path
+    os.makedirs(os.path.dirname(_PCFG), exist_ok=True)
+    cur = {}
+    if os.path.exists(_PCFG):
+        try:
+            cur = _json.load(open(_PCFG, encoding="utf-8"))
+        except Exception:
+            cur = {}
+    cur["finished_dir"] = path
+    _json.dump(cur, open(_PCFG, "w", encoding="utf-8"), indent=2)
+
+
+def _deliver_to_finished(named_paths):
+    """named_paths = [(src_path, dest_filename)]. Copy each into the Finished Work folder."""
+    dst = os.environ.get("CS_FINISHED_DIR", "")
+    if not dst or not os.path.isdir(dst):
+        return {"ok": False, "delivered": 0, "dir": dst, "reason": "no Finished Work folder set/synced"}
+    n = 0
+    for src, name in named_paths:
+        try:
+            shutil.copy2(src, os.path.join(dst, os.path.basename(name)))
+            n += 1
+        except Exception:
+            pass
+    return {"ok": True, "delivered": n, "dir": dst}
+
+
+_resolve_finished_dir()
+
 app = FastAPI(title="Captions Studio", version="0.1.0")
 
 
@@ -251,10 +325,39 @@ def save_library_dir(path):
     _json.dump(cur, open(_PCFG, "w", encoding="utf-8"), indent=2)
 
 
+class DeliverReq(BaseModel):
+    file_id: str
+    shots: List[dict] = []   # [{"file": "batch_x.mp4", "name": "PROJ-123_hook1_es"}]
+
+
+@app.post("/api/deliver_finished")
+def deliver_finished(req: DeliverReq):
+    """Copy the named finished creatives into the team 'Finished Work' Drive folder
+    (Google Drive for Desktop uploads them). Names use the same creative names as export."""
+    sdir = _session_dir(req.file_id)
+    out = os.path.join(sdir, "output")
+    named = []
+    for s in (req.shots or []):
+        vf = os.path.join(out, os.path.basename(s.get("file", "")))
+        if not os.path.exists(vf):
+            continue
+        nm = _safe_name(s.get("name"), os.path.splitext(os.path.basename(vf))[0])
+        named.append((vf, nm + ".mp4"))
+    if not named:  # no naming info → deliver whatever finals exist, as-is
+        import glob as _g
+        for v in (sorted(_g.glob(os.path.join(out, "batch_*.mp4"))) or sorted(_g.glob(os.path.join(out, "*.mp4")))):
+            named.append((v, os.path.basename(v)))
+    res = _deliver_to_finished(named)
+    if not res["ok"]:
+        raise HTTPException(400, res.get("reason", "delivery unavailable"))
+    return res
+
+
 class KeysReq(BaseModel):
     elevenlabs_api_key: Optional[str] = None
     heygen_api_key: Optional[str] = None
     library_dir: Optional[str] = None
+    finished_dir: Optional[str] = None
 
 
 @app.get("/api/settings")
@@ -264,6 +367,8 @@ def get_settings():
             "heygen_key_present": bool(os.environ.get("HEYGEN_API_KEY")),
             "library_dir": os.environ.get("CS_LIBRARY_DIR", ""),
             "library_exists": os.path.isdir(os.environ.get("CS_LIBRARY_DIR", "")),
+            "finished_dir": os.environ.get("CS_FINISHED_DIR", ""),
+            "finished_exists": os.path.isdir(os.environ.get("CS_FINISHED_DIR", "")),
             "keys_location": _PCFG}
 
 
@@ -272,6 +377,8 @@ def post_settings(body: KeysReq):
     save_keys((body.elevenlabs_api_key or "").strip(), (body.heygen_api_key or "").strip())
     if body.library_dir is not None and body.library_dir.strip():
         save_library_dir(body.library_dir)
+    if body.finished_dir is not None:
+        save_finished_dir(body.finished_dir)
     return {"saved": True,
             "scribe_key_present": bool(os.environ.get("ELEVENLABS_API_KEY")),
             "heygen_key_present": bool(os.environ.get("HEYGEN_API_KEY")),
