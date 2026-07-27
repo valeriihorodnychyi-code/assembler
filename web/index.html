@@ -767,12 +767,17 @@ function readControls(){
     punct:$("punct")?$("punct").checked:false};
 }
 function writeControls(s){
-  const set=(id,v)=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=!!v;else el.value=v;const l=$(id+"V");if(l)l.textContent=v;};
+  const set=(id,v)=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=!!v;else el.value=v;const l=$(id+"V");if(l){if(l.tagName==="INPUT")l.value=v;else l.textContent=v;}};
   for(const k of STYLE_IDS) if(k in s) set(k,s[k]);
   if($("caseSeg"))updateCaseSeg();
   if($("linesSeg"))updateLinesSeg();
   if($("wrapSeg"))updateWrapSeg();
 }
+
+// STICKY STYLE: remember the last style the designer set and restore it on every new
+// file load and on app restart — so captions never snap back to the default preset.
+function saveLastStyle(){try{localStorage.setItem("cs_last_style",JSON.stringify(toEngineStyle(readControls())));}catch(e){}}
+function loadLastStyle(){try{const s=localStorage.getItem("cs_last_style");return s?fromEngineStyle(JSON.parse(s)):null;}catch(e){return null;}}
 
 // convert UI control object -> engine JSON schema
 function toEngineStyle(s){
@@ -1006,7 +1011,7 @@ requestAnimationFrame(loop);
 function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if($("language"))$("language").value="";if(typeof setLangSticker==="function")setLangSticker(null);
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
-  variants={en:{clip:null,videoUrl:url,words:null,style:null,trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
+  variants={en:{clip:null,videoUrl:url,words:null,style:readControls(),trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
   setStatus("Video loaded. Transcribe for captions, or just trim & Send to Compose as-is.","");}
 $("loadBtn").onclick=()=>$("videoInput").click();
 $("sLocBtn").onclick=()=>sendToCompose("loc");
@@ -1246,8 +1251,8 @@ video.addEventListener("play",()=>{if(exactOn)hideExact();});
 video.addEventListener("seeking",()=>{if(exactOn)hideExact();});
 video.addEventListener("seeked",scheduleExact);
 video.addEventListener("pause",scheduleExact);
-$("panelContent").addEventListener("input",scheduleExact);
-$("panelContent").addEventListener("change",scheduleExact);
+$("panelContent").addEventListener("input",()=>{saveLastStyle();scheduleExact();});
+$("panelContent").addEventListener("change",()=>{saveLastStyle();scheduleExact();});
 
 // ---------- fonts ----------
 // register a font file from the server so the canvas preview uses the SAME file the engine renders with
@@ -1278,7 +1283,19 @@ $("fontInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;const f
   setStatus("Font '"+f.name+"' added for preview. Note: to render with it, also drop the file into the app's fonts/ folder.","");};
 
 // ---------- range labels ----------
-document.querySelectorAll("input[type=range]").forEach(r=>{const v=$(r.id+"V");if(v)r.addEventListener("input",()=>v.textContent=r.value);});
+// Value labels next to sliders are EDITABLE number fields: type an exact value, or drag.
+function makeSlidersEditable(){
+  document.querySelectorAll("input[type=range]").forEach(r=>{
+    const lab=$(r.id+"V"); if(!lab||lab.tagName==="INPUT")return;
+    const inp=document.createElement("input");
+    inp.type="number"; inp.id=lab.id; inp.className=(lab.className||"")+" valedit";
+    inp.value=r.value; if(r.min!=="")inp.min=r.min; if(r.max!=="")inp.max=r.max; if(r.step!=="")inp.step=r.step;
+    inp.style.cssText="width:54px;background:transparent;border:0.5px solid var(--line);border-radius:5px;color:inherit;font:inherit;text-align:center;padding:1px 3px";
+    lab.replaceWith(inp);
+    inp.addEventListener("input",()=>{ r.value=inp.value; r.dispatchEvent(new Event("input",{bubbles:true})); });  // typing → move slider + preview + sticky save
+    r.addEventListener("input",()=>{ if(document.activeElement!==inp)inp.value=r.value; });                          // dragging → update the number
+  });
+}
 
 // ---------- auto-grow transcript (full text, no scroll) ----------
 function autoGrow(){const ta=$("transcript");if(!ta||!ta.offsetParent)return;ta.style.height="auto";
@@ -2360,7 +2377,7 @@ function buildStudioLayout(){
   if(tb&&body){tb.style.width="100%";tb.style.marginTop="6px";tb.className="primary";body.appendChild(tb);}
   const ptb=$("packTranscribeBtn");
   if(ptb&&body){ptb.style.width="100%";ptb.style.marginTop="6px";ptb.className="go";body.appendChild(ptb);ptb.onclick=transcribePack;}
-  qp.addEventListener("input",scheduleExact);qp.addEventListener("change",scheduleExact);
+  qp.addEventListener("input",()=>{saveLastStyle();scheduleExact();});qp.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
 }
 // Back-compat shim: old calls like showSection("compose") still work.
 function showSection(sec){setMode(sec==="compose"?"asm":"edit");}
@@ -2672,7 +2689,11 @@ async function init(){
   decorateGroupIcons();
   setMode("edit");
   $("ratioTabs").querySelector("button").click();
-  applyPreset("Karaoke Pop");document.querySelector(".preset").classList.add("active");autoGrow();
+  makeSlidersEditable();   // value labels → editable number fields (must run before we write a style in)
+  const _last=loadLastStyle();
+  if(_last){writeControls(_last);markPreset(null);}   // restore the designer's last style…
+  else{applyPreset("Karaoke Pop");document.querySelector(".preset").classList.add("active");}  // …or the default on a truly fresh install
+  autoGrow();
   try{const r=await fetch(API+"/api/info");const d=await r.json();
     $("encBadge").innerHTML="encoder: <b>"+d.encoder+"</b>"+(d.version?'  ·  v<b>'+d.version+'</b>':'');
     if(d.allowed===false){$("lockScreen").classList.add("show");if(d.machine_id)$("lockMid").textContent=d.machine_id;}
