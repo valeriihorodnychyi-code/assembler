@@ -326,7 +326,7 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     # between words), but over a LONG silence it disappears instead of lingering — no
     # captions hanging on screen while nobody is speaking. HOLD_MAX = the longest gap we
     # bridge; longer gaps keep a short readable tail, then go blank until the next speech.
-    HOLD_MAX = 0.8
+    HOLD_MAX = 1.5   # bridge normal in-scene speech pauses (breath/beat); blank only true dead air
     TAIL = 0.4
     for i in range(len(events) - 1):
         nxt = events[i + 1]["start"]

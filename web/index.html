@@ -912,7 +912,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
     for(let i=0;i<flat.length;i++)events.push({start:flat[i].start,end:(i+1<flat.length?flat[i+1].start:flat[i].end),lines:chunk,active:i,manual:manual});}
   // Match the engine: bridge SHORT pauses (no flicker), but over LONG silence the caption
   // disappears (short tail, then blank) instead of hanging while nobody speaks.
-  const HOLD_MAX=0.8,TAIL=0.4;
+  const HOLD_MAX=1.5,TAIL=0.4;  // bridge normal in-scene pauses; blank only true dead air
   for(let i=0;i<events.length-1;i++){const nxt=events[i+1].start,ne=events[i].end,gap=nxt-ne;
     events[i].end=(gap<=HOLD_MAX)?nxt:Math.min(nxt,ne+TAIL);
     if(events[i].end<=events[i].start)events[i].end=events[i].start+0.1;}
