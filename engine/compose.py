@@ -87,6 +87,26 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
     if hold_last and tagged_events:
         tagged_events[-1][0]["end"] = render_duration
 
+    # Robust subtitle tiling. The subtitle track below is a SEQUENTIAL concat of PNGs
+    # (each with a duration). If any event overlaps the next — which the +0.1s min-duration
+    # guard can cause for densely-timed words (fast speech / Scribe) — the concat timeline
+    # drifts and later captions get pushed past the clip end and DROPPED on render (while the
+    # time-based preview still shows them). Enforce a strict gap-or-touch timeline so every
+    # caption lands exactly on its timecode and nothing falls off.
+    if tagged_events:
+        tagged_events.sort(key=lambda es: float(es[0]["start"]))
+        _clean = []
+        for _i, (e, s) in enumerate(tagged_events):
+            st_ = max(0.0, float(e["start"]))
+            en_ = min(float(e["end"]), render_duration)
+            if _i + 1 < len(tagged_events):
+                en_ = min(en_, float(tagged_events[_i + 1][0]["start"]))
+            if en_ - st_ < 0.02:      # swallowed by an overlap → skip (a 0/neg duration corrupts the concat)
+                continue
+            e["start"], e["end"] = st_, en_
+            _clean.append((e, s))
+        tagged_events = _clean
+
     temp_hook = os.path.join(work_dir, "temp_hook.mp4")
     temp_shadow = os.path.join(work_dir, "temp_shadow.png")
     sub_dir = tempfile.mkdtemp(dir=work_dir)
@@ -159,7 +179,7 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
 
 
 def _concat_body(hook, body, fmt, output_path, work_dir, bitrates):
-    """Append a body clip, normalizing fps/SAR and loudness."""
+    """Append a body clip, normalizing fps/SAR. Source loudness is preserved (no loudnorm)."""
     TARGET_W, TARGET_H = ff.DIMS[fmt]
     body_w, body_h = ff.get_video_size(body)
     inputs = ["-i", hook, "-i", body]
@@ -175,16 +195,14 @@ def _concat_body(hook, body, fmt, output_path, work_dir, bitrates):
               f"crop={TARGET_W}:{TARGET_H},boxblur=40,colorchannelmixer=rr=0.4:gg=0.4:bb=0.4[bbg]; "
               f"[2:v]scale={TARGET_W}:{TARGET_H}[bsh]; [bbg][bsh]overlay=x=0:y=0[bbs]; "
               f"[1:v]scale={vid_w}:{TARGET_H}[bfg]; [bbs][bfg]overlay={x_off}:0,setsar=1,fps=30[v1]; "
-              f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]; "
-              f"[outa]loudnorm=I=-14:TP=-1.5:LRA=11[fa]")
+              f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]")  # keep source loudness — no loudnorm (it boosted audio the user had already cleaned/quieted)
     else:
         fc = (f"[0:v]setsar=1,fps=30[v0]; "
               f"[1:v]scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=increase,"
               f"crop={TARGET_W}:{TARGET_H},setsar=1,fps=30[v1]; "
-              f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]; "
-              f"[outa]loudnorm=I=-14:TP=-1.5:LRA=11[fa]")
+              f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]")  # keep source loudness — no loudnorm (it boosted audio the user had already cleaned/quieted)
 
-    cmd = ["ffmpeg", *inputs, "-filter_complex", fc, "-map", "[outv]", "-map", "[fa]"]
+    cmd = ["ffmpeg", *inputs, "-filter_complex", fc, "-map", "[outv]", "-map", "[outa]"]
     cmd += ff.encoder_quality_args(bitrates["final_export"])
     cmd += ["-c:a", "aac", "-b:a", "192k", output_path, "-y"]
     ff.run(cmd)
@@ -197,7 +215,7 @@ def assemble_segments(clips, fmt, output_path, bitrates=None):
 
     Each clip is scaled/cropped to the target format, normalized to 30fps/SAR 1, then
     concatenated; clips without an audio track get silent audio so concat stays aligned.
-    Loudness is matched across the whole result.
+    Source loudness is preserved (no loudnorm) so pre-cleaned audio isn't boosted back up.
     """
     if not clips:
         raise ValueError("no clips to assemble")
@@ -223,9 +241,9 @@ def assemble_segments(clips, fmt, output_path, bitrates=None):
 
     n = len(clips)
     fc = ("; ".join(vfilters) + "; " + "".join(concat_inputs) +
-          f"concat=n={n}:v=1:a=1[outv][outa]; [outa]loudnorm=I=-14:TP=-1.5:LRA=11[fa]")
+          f"concat=n={n}:v=1:a=1[outv][outa]")   # keep source loudness — no loudnorm (was boosting pre-cleaned audio)
     cmd = ["ffmpeg", *inputs, *silent_inputs, "-filter_complex", fc,
-           "-map", "[outv]", "-map", "[fa]"]
+           "-map", "[outv]", "-map", "[outa]"]
     cmd += ff.encoder_quality_args(bitrates["final_export"])
     cmd += ["-c:a", "aac", "-b:a", "192k", output_path, "-y"]
     ff.run(cmd)
