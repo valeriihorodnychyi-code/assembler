@@ -868,8 +868,9 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
   const words=[];
   for(const x of raw){const s=(x.r||"").trim();if(!s)continue;const text=cleanDisp(s);if(text)words.push({text,start:x.start,end:x.end,ends:isEnd(s),brk:x.brk||null});}
   if(!words.length)return[];
-  // merge hyphenated fragments into one word (e.g. "segunda-feira")
-  const mg=[];for(const w of words){if(mg.length&&(mg[mg.length-1].text.endsWith("-")||w.text.startsWith("-")||w.text==="-")){mg[mg.length-1].text+=w.text;mg[mg.length-1].end=w.end;mg[mg.length-1].ends=w.ends;mg[mg.length-1].brk=w.brk;}else mg.push(w);}
+  // merge dash-joined fragments into one word (e.g. "segunda-feira", "12-" "3-" "30" → "12-3-30")
+  const DASHES="-‐‑‒–—−";const de=t=>t&&DASHES.includes(t[t.length-1]);const ds=t=>t&&DASHES.includes(t[0]);const allDash=t=>t&&[...t].every(c=>DASHES.includes(c));
+  const mg=[];for(const w of words){if(mg.length&&(de(mg[mg.length-1].text)||ds(w.text)||allDash(w.text))){mg[mg.length-1].text+=w.text;mg[mg.length-1].end=w.end;mg[mg.length-1].ends=w.ends;mg[mg.length-1].brk=w.brk;}else mg.push(w);}
   const wordsM=mg;words.length=0;Array.prototype.push.apply(words,wordsM);
   // MANUAL layout (user's own line/chunk breaks) OR automatic phrase+wrap chunking
   let chunks=[];
@@ -909,9 +910,12 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
   const events=[];
   for(const chunk of chunks){const flat=chunk.flat();
     for(let i=0;i<flat.length;i++)events.push({start:flat[i].start,end:(i+1<flat.length?flat[i+1].start:flat[i].end),lines:chunk,active:i,manual:manual});}
-  // Match the engine: make events contiguous so a chunk FREEZES through a pause,
-  // but leave a gap before the first word and after the last (-> blank, not random text).
-  for(let i=0;i<events.length-1;i++){events[i].end=events[i+1].start;if(events[i].end<=events[i].start)events[i].end=events[i].start+0.1;}
+  // Match the engine: bridge SHORT pauses (no flicker), but over LONG silence the caption
+  // disappears (short tail, then blank) instead of hanging while nobody speaks.
+  const HOLD_MAX=0.8,TAIL=0.4;
+  for(let i=0;i<events.length-1;i++){const nxt=events[i+1].start,ne=events[i].end,gap=nxt-ne;
+    events[i].end=(gap<=HOLD_MAX)?nxt:Math.min(nxt,ne+TAIL);
+    if(events[i].end<=events[i].start)events[i].end=events[i].start+0.1;}
   if(events.length&&dur)events[events.length-1].end=Math.max(events[events.length-1].end,dur); // hold last caption to end
   if(cutList.length){for(const e of events){for(const c of cutList){if(e.start<c&&c<e.end){e.end=c;break;}}}}  // clamp end at next cut → no linger over the next shot
   return events;

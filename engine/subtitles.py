@@ -217,11 +217,16 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     if not clean:
         return []
 
-    # 0) Merge hyphenated fragments into one word (e.g. PT "segunda-feira") so a line
-    #    break never splits inside a hyphenated compound.
+    # 0) Merge dash-joined fragments into one word (e.g. PT "segunda-feira", or STT giving
+    #    "12-" "3-" "30" → "12-3-30", "2-" "minut" → "2-minut") so a dash never gets a stray
+    #    space around it and a hyphenated compound never splits across a line. Covers ASCII
+    #    hyphen plus en/em dash and minus sign, which STT engines sometimes emit.
+    _DASHES = "-‐‑‒–—−"  # - ‐ ‑ ‒ – — −
+    def _dash_end(t):   return bool(t) and t[-1] in _DASHES
+    def _dash_start(t): return bool(t) and t[0] in _DASHES
     merged = []
     for w in clean:
-        if merged and (merged[-1]["text"].endswith("-") or w["text"].startswith("-") or w["text"] == "-"):
+        if merged and (_dash_end(merged[-1]["text"]) or _dash_start(w["text"]) or all(c in _DASHES for c in w["text"])):
             merged[-1]["text"] += w["text"]
             merged[-1]["end"] = w["end"]
             merged[-1]["ends_sentence"] = w["ends_sentence"]
@@ -317,9 +322,20 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
             events.append({"start": start_time, "end": end_time,
                            "lines": chunk, "active_word_index": i, "manual": manual_layout})
 
-    # Hard timestamp normalization so overlays never overlap or invert.
+    # Timestamp normalization. A caption bridges a SHORT pause (so it doesn't flicker
+    # between words), but over a LONG silence it disappears instead of lingering — no
+    # captions hanging on screen while nobody is speaking. HOLD_MAX = the longest gap we
+    # bridge; longer gaps keep a short readable tail, then go blank until the next speech.
+    HOLD_MAX = 0.8
+    TAIL = 0.4
     for i in range(len(events) - 1):
-        events[i]["end"] = events[i + 1]["start"]
+        nxt = events[i + 1]["start"]
+        natural_end = events[i]["end"]
+        gap = nxt - natural_end
+        if gap <= HOLD_MAX:
+            events[i]["end"] = nxt                       # bridge the short pause
+        else:
+            events[i]["end"] = min(nxt, natural_end + TAIL)   # brief tail, then blank over the silence
         if events[i]["end"] <= events[i]["start"]:
             events[i]["end"] = events[i]["start"] + 0.1
 
