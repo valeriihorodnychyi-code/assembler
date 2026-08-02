@@ -211,9 +211,11 @@ def _detect_drive_folder(folder_name):
     return None
 
 
-def _resolve_finished_dir():
-    """Where delivered creatives go. Priority: explicit env, config, then auto-detected
-    Drive 'Finished Work' folder. Empty string = delivery off."""
+def _resolve_finished_dir(scan=False):
+    """Where delivered creatives go. Reads env, then config — FAST, no disk scan.
+    Only globs the Drive tree when scan=True, which happens lazily on the first delivery
+    (never at startup), and the result is CACHED to config so it's never scanned again.
+    (Scanning Google Drive at every launch was making the app slow to open.)"""
     d = os.environ.get("CS_FINISHED_DIR", "")
     if not d:
         try:
@@ -221,8 +223,13 @@ def _resolve_finished_dir():
                 d = (_json.load(open(_PCFG, encoding="utf-8")).get("finished_dir") or "")
         except Exception:
             d = ""
-    if not d:
+    if not d and scan:
         d = _detect_drive_folder("Finished Work") or ""
+        if d:
+            try:
+                save_finished_dir(d)   # cache the hit so we never scan the Drive again
+            except Exception:
+                pass
     if d:
         os.environ["CS_FINISHED_DIR"] = os.path.expanduser(d)
     return os.environ.get("CS_FINISHED_DIR", "")
@@ -336,6 +343,8 @@ def deliver_finished(req: DeliverReq):
     (Google Drive for Desktop uploads them). Names use the same creative names as export."""
     sdir = _session_dir(req.file_id)
     out = os.path.join(sdir, "output")
+    if not os.environ.get("CS_FINISHED_DIR", ""):
+        _resolve_finished_dir(scan=True)   # lazy one-time Drive scan on first delivery (then cached)
     named = []
     for s in (req.shots or []):
         vf = os.path.join(out, os.path.basename(s.get("file", "")))
