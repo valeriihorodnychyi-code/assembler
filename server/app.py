@@ -451,6 +451,12 @@ def post_style(body: SaveStyle):
     return {"saved": os.path.basename(path), "styles": st.list_styles()}
 
 
+@app.delete("/api/styles/{name}")
+def delete_style(name: str):
+    st.delete_style(name)
+    return {"deleted": name, "styles": st.list_styles()}
+
+
 class DetectCutsReq(BaseModel):
     file_id: str
     clip: str = "source.mp4"

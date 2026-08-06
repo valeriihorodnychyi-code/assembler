@@ -67,6 +67,9 @@
   .preset.active{border-color:var(--accent)}
   .preset .pv{height:30px;border-radius:6px;background:#0e1119;display:flex;align-items:center;justify-content:center;margin-bottom:5px;overflow:hidden;font-family:"Arial Black",sans-serif;font-weight:800;font-size:13px;color:#fff}
   .preset .pn{font-size:10.5px;color:var(--muted);text-align:center}
+  .presetdel{position:absolute;top:2px;right:2px;width:17px;height:17px;padding:0;line-height:15px;font-size:10px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#c7c9d1;cursor:pointer;opacity:0;transition:opacity .12s}
+  .preset:hover .presetdel{opacity:1}
+  .presetdel:hover{background:var(--accent);color:#fff}
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:7px;overflow:hidden}
   .seg button{flex:1;font-size:12px;color:var(--muted);background:transparent;border:0;border-radius:0;padding:6px}
   .seg button.active{background:var(--accent);color:#fff;font-weight:600}
@@ -109,6 +112,16 @@
   .cut-chip:hover{border-color:var(--accent)}
   .cut-chip button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0}
   .cut-chip button:hover{color:var(--accent)}
+  /* Words view: navigate + highlight (edit stays in Text) */
+  .twords{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:15px;line-height:1.7;min-height:210px;max-height:340px;overflow:auto;outline:none;text-align:left;word-spacing:normal}
+  .twords .w{cursor:pointer;border-radius:4px;padding:0 1px;color:#5f6270;transition:color .18s,background .18s}   /* inactive = dimmed (focus mode) */
+  .twords .w:hover{color:var(--accent)}
+  .twords .w.kt{border-bottom:2px solid rgba(255,90,44,.5)}
+  .twords .w.cur{color:#fff;background:rgba(255,90,44,.22)}   /* the phrase currently on screen */
+  /* Text/Words toggle — compact, distinct from the orange setting segs */
+  #txtViewSeg{flex:0 0 auto;background:#0f1014;border:1px solid var(--line);border-radius:10px;gap:0;overflow:hidden;padding:3px}
+  #txtViewSeg button{flex:0 0 auto;padding:6px 20px;font-size:12.5px;font-weight:600;border:0;border-radius:7px;color:var(--muted);background:transparent}
+  #txtViewSeg button.active{background:var(--accent);color:#fff}
   .row .switch{position:relative;width:38px;height:22px;flex:0 0 38px}
   .switch input{opacity:0;width:0;height:0}
   .slider{position:absolute;inset:0;background:var(--line);border-radius:22px;transition:.2s;cursor:pointer}
@@ -336,9 +349,15 @@
             <button type="button" data-v="large-v3">large-v3</button>
           </div></div>
         <input type="hidden" id="language" value="">
+        <div style="display:flex;justify-content:flex-end;margin:4px 0 7px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
+          <div class="seg" id="txtViewSeg">
+            <button type="button" data-v="text" class="active">Text</button>
+            <button type="button" data-v="words">Words</button>
+          </div></div>
         <div style="position:relative">
           <span id="langSticker" class="lang-sticker" style="display:none"></span>
-          <textarea id="transcript" rows="3" style="max-height:260px;overflow-y:auto;resize:vertical" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
+          <textarea id="transcript" rows="3" style="min-height:210px;max-height:360px;overflow-y:auto;resize:vertical;font-size:15px" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
+          <div id="transcriptWords" class="twords" contenteditable="true" spellcheck="false" style="display:none"></div>
         </div>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
         <div class="row" style="margin-top:8px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків; крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label><label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
@@ -672,6 +691,7 @@
 const $=id=>document.getElementById(id);
 const API="";   // same origin
 let ratio="9:16", customFontName=null, videoFile=null, fileId=null, realWords=null;
+let _capRange=null, txtView="text";   // Words-view: current caption range + active view (text|words)
 let splitOn=false, editingSlot="A", styleB=null;
 let variants={}, activeVar="en", enVideoUrl=null;   // language variants (en + dubbed)
 let editPack=[], activeHook=-1, sharedCtrl=null;     // EDIT batch: pack of original hooks (each: {clip,videoUrl,words,ctrl,lang})
@@ -992,6 +1012,7 @@ function styleAt(t){
 }
 
 function render(t,dur){
+  _capRange=null;   // current on-screen caption time range (for the Words-view highlight)
   const[W,H]=DIMS[ratio];canvas.width=W;canvas.height=H;ctx.clearRect(0,0,W,H);
   if(!videoLoaded){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,"#3a2b4d");g.addColorStop(1,"#1a2740");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
   const s=styleAt(t);
@@ -1002,6 +1023,7 @@ function render(t,dur){
   if(!events.length)return;
   let ev=events.find(e=>t>=e.start&&t<e.end);
   if(!ev)return; // silence before first word / after last -> nothing on screen (no random text)
+  {var _fw=ev.lines.reduce((a,l)=>a.concat(l),[]); _capRange=_fw.length?[_fw[0].start,_fw[_fw.length-1].end]:[ev.start,ev.end];}   // whole caption phrase range → highlight the full phrase, not one word
   const lines=ev.lines.map(l=>l.map(w=>({...w,disp:applyCase(w.text,s.textCase)})));
   let fs=s.fontSize*scale;ctx.font=`${fs}px "${s.fontFamily}"`;
   // shrink-to-fit: keep a caption within the safe frame width. Skip for MANUAL layouts
@@ -1057,7 +1079,7 @@ function loop(ts){let t,dur;
   if(videoLoaded){t=video.currentTime;dur=video.duration||4;$("seek").value=(t/dur)*100;$("timeLbl").textContent=t.toFixed(1)+"s";
     if($("trimRow").style.display!=="none"&&$("trimPlayhead"))$("trimPlayhead").style.left=Math.max(0,Math.min(100,(t/dur)*100))+"%";}
   else{const dt=(ts-lastTs)/1000||0;demoT=(demoT+dt)%4;t=demoT;dur=4;}
-  lastTs=ts;render(t,dur);requestAnimationFrame(loop);}
+  lastTs=ts;render(t,dur);if(typeof updateWordHighlight==="function")updateWordHighlight();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
 
 // ---------- video ----------
@@ -1370,7 +1392,7 @@ function makeSlidersEditable(){
 
 // ---------- auto-grow transcript (full text, no scroll) ----------
 function autoGrow(){const ta=$("transcript");if(!ta||!ta.offsetParent)return;ta.style.height="auto";
-  const cap=260;                                                  // fixed cap: controls below stay visible even with long transcripts
+  const cap=340;                                                  // fixed cap: controls below stay visible even with long transcripts
   ta.style.height=Math.min(Math.max(ta.scrollHeight,120),cap)+"px";
   ta.style.overflowY=(ta.scrollHeight>cap)?"auto":"hidden";}
 $("transcript").addEventListener("input",()=>{
@@ -1430,13 +1452,23 @@ function styleSampleCSS(e){
   return css;
 }
 function presetCard(label,sampleCSS,custom,onClick){
-  const b=document.createElement("div");b.className="preset";b.title=label+(custom?" (custom)":"");
+  const b=document.createElement("div");b.className="preset";b.title=label+(custom?" (custom — редагований, ✕ видалити)":"");b.style.position="relative";
   b.innerHTML="<div class='pv'><span style='"+sampleCSS+"'>Aa</span></div><div class='pn'>"+(custom?"★ ":"")+label+"</div>";
-  b.onclick=()=>{onClick();markPreset(b);};return b;
+  b.onclick=()=>{onClick();markPreset(b);};
+  if(custom){const x=document.createElement("button");x.className="presetdel";x.textContent="✕";x.title="Видалити пресет";
+    x.onclick=(e)=>{e.stopPropagation();deleteStyle(label);};b.appendChild(x);}
+  return b;
+}
+async function deleteStyle(name){
+  if(!confirm("Видалити пресет «"+name+"»?"))return;
+  try{const r=await fetch(API+"/api/styles/"+encodeURIComponent(name),{method:"DELETE"});
+    if(!r.ok)throw new Error("failed");setStatus("Пресет видалено: "+name,"ok");await loadSavedStyles();
+  }catch(e){setStatus("Delete failed: "+e.message,"err");}
 }
 function renderPresetRail(){
   const pw=$("presets");if(!pw)return;pw.innerHTML="";
-  Object.keys(PRESETS).forEach(name=>pw.appendChild(presetCard(name,PRESET_SAMPLE[name]||"color:#fff",false,()=>applyPreset(name))));
+  // a saved custom that shares a built-in's name overrides it (so built-ins become editable)
+  Object.keys(PRESETS).forEach(name=>{if(savedStyles[name])return;pw.appendChild(presetCard(name,PRESET_SAMPLE[name]||"color:#fff",false,()=>applyPreset(name)));});
   Object.keys(savedStyles).forEach(name=>{const e=savedStyles[name];pw.appendChild(presetCard(name,styleSampleCSS(e),true,()=>writeControls(fromEngineStyle(e))));});
   const act=document.createElement("div");act.style.cssText="display:flex;gap:6px;margin-top:8px";
   act.innerHTML="<button id='railSave' style='flex:1;font-size:11px;padding:6px 4px'>＋ Save</button><button id='railImport' style='flex:1;font-size:11px;padding:6px 4px'>⤴ Import</button>";
@@ -1466,6 +1498,43 @@ $("styleFileInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd
 // case segmented control (buttons instead of dropdown)
 function updateCaseSeg(){const v=$("textCase").value;$("caseSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
 $("caseSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("textCase").value=b.dataset.v;updateCaseSeg();scheduleExact();});
+
+// ---------- Words view: click a word = seek, active phrase highlights during playback (editing stays in Text) ----------
+$("txtViewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  $("txtViewSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
+  txtView=b.dataset.v;
+  const ta=$("transcript"), box=$("transcriptWords");
+  if(txtView==="words"){ if(ta)ta.style.display="none"; if(box){box.style.display="block";renderWordsView();} }
+  else { if(ta)ta.style.display=""; if(box)box.style.display="none"; }
+});
+function renderWordsView(){
+  const box=$("transcriptWords"); if(!box)return; box.innerHTML="";
+  (realWords||[]).forEach(w=>{
+    const sp=document.createElement("span");sp.className="w";sp.dataset.start=w.start;
+    sp.textContent=(w.word||w.text||""); sp.title=_fmtCut(+w.start);
+    box.appendChild(sp); box.appendChild(document.createTextNode(" "));
+    if(w.brk==="soft") box.appendChild(document.createElement("br"));
+  });
+}
+// click a word = seek (works while it's also editable); typing edits like the Text field
+(function wireWordsView(){
+  const box=$("transcriptWords"); if(!box)return;
+  box.addEventListener("click",e=>{ const sp=e.target.closest&&e.target.closest(".w"); if(!sp)return;
+    const st=+sp.dataset.start; if(video&&videoLoaded){ try{video.currentTime=st;}catch(_){} if(video.paused){try{render(st,video.duration||0);}catch(_){}} if(typeof scheduleExact==="function")scheduleExact(); } });
+  box.addEventListener("input",()=>{ // edit in-place → re-map onto word timings (same as the Text field)
+    if(realWords&&realWords.length){ realWords=parseBreaksToWords(box.innerText, realWords); if(variants[activeVar])variants[activeVar].words=realWords; }
+    if(typeof scheduleExact==="function")scheduleExact(); });
+  box.addEventListener("blur",()=>{ renderWordsView(); });   // normalize spans after editing
+})();
+function updateWordHighlight(){
+  if(txtView!=="words")return;
+  const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
+  const focused=(document.activeElement===box);
+  const spans=box.querySelectorAll(".w");
+  if(!focused && spans.length!==((realWords||[]).length)){ renderWordsView(); return; }   // refresh after edits/hook switch (never while typing → keeps caret)
+  const r=_capRange;
+  box.querySelectorAll(".w").forEach(sp=>{ const s=+sp.dataset.start; sp.classList.toggle("cur", !!(r && s>=r[0] && s<r[1])); });
+}
 
 // ---------- ratio ----------
 function setRatio(r){if(!DIMS[r])return;ratio=r;
@@ -2441,14 +2510,14 @@ function buildStudioLayout(){
   const pc=$("previewCol");
   [$("viewport"),$("transport"),$("trimRow")].forEach(el=>{if(el)pc.appendChild(el);});
   const ez=document.querySelector(".editzone");
-  if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="width:100%;margin:0 0 8px;font-size:12px;padding:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all lives by the style presets
+  if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all — same compact pill shape as Save preset
   if(ez&&$("saveStyleBtn2")){$("saveStyleBtn2").textContent="＋ Save preset";$("saveStyleBtn2").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("saveStyleBtn2"),ez.children[1]||null);}  // #9 Save preset — compact green pill by the presets
   const qp=$("quickPanel");
   [$("grpTranscribe"),$("grpBaseText"),$("grpSmart")].forEach(el=>{if(el)qp.appendChild(el);});
-  const tb=$("transcribeBtn"),body=$("grpTranscribe")&&$("grpTranscribe").querySelector(".body");
-  if(tb&&body){tb.style.width="100%";tb.style.marginTop="6px";tb.className="primary";body.appendChild(tb);}
+  const tb=$("transcribeBtn"),mr=$("modelRow");
+  if(tb&&mr){tb.style.width="100%";tb.style.margin="6px 0 0";tb.className="primary";mr.insertAdjacentElement("afterend",tb);}   // Transcribe sits with the settings (above the text field)
   const ptb=$("packTranscribeBtn");
-  if(ptb&&body){ptb.style.width="100%";ptb.style.marginTop="6px";ptb.className="go";body.appendChild(ptb);ptb.onclick=transcribePack;}
+  if(ptb&&tb){ptb.style.width="100%";ptb.style.margin="6px 0 0";ptb.className="go";tb.insertAdjacentElement("afterend",ptb);ptb.onclick=transcribePack;}
   qp.addEventListener("input",()=>{saveLastStyle();scheduleExact();});qp.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
   initGrpAccordion();
 }

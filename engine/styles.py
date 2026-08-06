@@ -98,6 +98,17 @@ def save_style(name: str, style: dict, styles_dir: str = None) -> str:
     return path
 
 
+def delete_style(name: str, styles_dir: str = None) -> bool:
+    """Delete a custom style by name from the custom styles dir. Returns True if removed."""
+    d = styles_dir or STYLES_DIR
+    safe = "".join(c for c in name if c.isalnum() or c in (" ", "_", "-")).strip() or "style"
+    path = os.path.join(d, safe + ".json")
+    if os.path.exists(path):
+        os.remove(path)
+        return True
+    return False
+
+
 # Where to look for fonts beyond the bundled fonts/ dir. macOS keeps Arial Black,
 # Helvetica, etc. here, so a style that names "Arial Black.ttf" just works on a Mac
 # without the user copying anything in.
