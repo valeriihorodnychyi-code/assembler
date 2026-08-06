@@ -535,34 +535,15 @@
       </div>
     </details>
 
-    <details class="grp">
-      <summary><span data-i18n="secCustom">Custom styles</span> <span class="chev">›</span></summary>
-      <div class="body">
-        <button class="go" id="saveStyleBtn2" style="width:100%">＋ Save current look to library</button>
-        <button id="importStyleBtn2" style="width:100%;margin-top:6px">⤴ Import a style file (.json)</button>
-        <button class="primary" id="exportJsonBtn" style="width:100%;margin-top:6px">⤓ Download this style as JSON</button>
-        <input type="file" id="styleFileInput" accept=".json,application/json" hidden>
-        <div class="hint">Saved styles live in the shared <b>styles/</b> folder and appear in the Presets rail for the whole team. Import drops a .json into the editor; Download saves a copy to disk.</div>
-      </div>
-    </details>
+    <!-- Custom-styles panel removed — Save & Import now live in the Presets rail. These two elements
+         stay (hidden) because the rail's Save/Import buttons drive them. -->
+    <div style="display:none">
+      <button class="go" id="saveStyleBtn2">＋ Save preset</button>
+      <input type="file" id="styleFileInput" accept=".json,application/json" hidden>
+    </div>
     </section>
 
-    <section class="sec" data-sec="export">
-    <details class="grp">
-      <summary><span data-i18n="secExport">Export one clip (optional)</span> <span class="chev">›</span></summary>
-      <div class="body">
-        <div class="hint">Quick path: bake captions on just the active clip and download it. For the real deliverables use <b>Send to Compose → Render</b>.</div>
-        <div class="row"><label>Render formats</label>
-          <div class="chips" id="fmtChips">
-            <div class="chip on" data-f="9:16">9:16</div><div class="chip soon" data-f="1:1" title="Coming soon">1:1 · soon</div><div class="chip soon" data-f="16:9" title="Coming soon">16:9 · soon</div>
-          </div></div>
-        <div class="row"><label>Smart trim (cut after last word)</label><label class="switch"><input type="checkbox" id="smartTrim"><span class="slider"></span></label></div>
-        <div class="row"><label>Append body clip (if present)</label><label class="switch"><input type="checkbox" id="useBody"><span class="slider"></span></label></div>
-        <button class="go" id="renderBtn2" style="width:100%;margin-top:8px" disabled>🎬 Bake &amp; export this clip</button>
-        <div id="downloads" style="margin-top:10px"></div>
-      </div>
-    </details>
-    </section>
+    <!-- "Export one clip" section removed — the real deliverable path is Send to Compose → Render (the board). -->
 
     <section class="sec" data-sec="localize">
     <details class="grp">
@@ -1488,9 +1469,7 @@ async function saveCurrentStyle(){
   }catch(e){setStatus("Save failed: "+e.message,"err");}
 }
 renderPresetRail();
-$("exportJsonBtn").onclick=()=>{const cfg=toEngineStyle(readControls());const blob=new Blob([JSON.stringify(cfg,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="my_style.json";a.click();};
 $("saveStyleBtn2").onclick=saveCurrentStyle;
-$("importStyleBtn2").onclick=()=>$("styleFileInput").click();
 $("styleFileInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();
   rd.onload=()=>{try{const eng=JSON.parse(rd.result);writeControls(fromEngineStyle(eng));markPreset(null);setStatus("Стиль імпортовано. Натисни ＋ Save, щоб зберегти в бібліотеку.","ok");}catch(err){setStatus("Поганий JSON стилю: "+err.message,"err");}};
   rd.readAsText(f);e.target.value="";};
@@ -1554,10 +1533,6 @@ function autoDetectRatio(){if(!video||!video.videoWidth||!video.videoHeight)retu
   if(editPack.length>0){_packFormats.add(r);
     if(_packFormats.size>1)setStatus("⚠️ У паку змішані формати ("+[..._packFormats].join(", ")+") — краще тримати ОДИН формат на проєкт.","err");}}
 if(typeof video!=="undefined"&&video)video.addEventListener("loadedmetadata",autoDetectRatio);
-
-// ---------- format chips ----------
-$("fmtChips").querySelectorAll(".chip").forEach(c=>c.onclick=()=>{if(c.classList.contains("soon"))return;c.classList.toggle("on");});
-const selectedFormats=()=>[...$("fmtChips").querySelectorAll(".chip.on")].map(c=>c.dataset.f);
 
 // ---------- split styling ----------
 $("splitOn").onchange=e=>{splitOn=e.target.checked;$("splitControls").style.display=splitOn?"block":"none";
@@ -1647,31 +1622,6 @@ async function sendToCompose(target){
   setStatus(added?("Надіслано "+added+" кліп(ів) → "+(target==="loc"?"LOC":"Assemble")+"."):"Вже на дошці.","ok");
 }
 
-// optional power path: bake + export just this one clip (kept in the Render tab)
-async function doSingleRender(){
-  if(!fileId){setStatus("Transcribe first.","err");return;}
-  const fmts=selectedFormats();if(!fmts.length){setStatus("Pick at least one render format.","err");return;}
-  let regions;
-  if(splitOn){const split=+$("splitTime").value;
-    const a=editingSlot==="A"?readControls():(window._styleA||readControls());
-    const b=editingSlot==="B"?readControls():(styleB||readControls());
-    regions=[{start:0,end:split,style:toEngineStyle(a)},{start:split,end:null,style:toEngineStyle(b)}];
-  }else{regions=[{start:0,end:null,style:toEngineStyle(readControls())}];}
-  const v=variants[activeVar]||{clip:"source.mp4",words:realWords};
-  const words=remapWords($("transcript").value, v.words||realWords);
-  setStatus("Rendering "+activeVar.toUpperCase()+" · "+fmts.join(", ")+" … (ffmpeg)","",true);busyStart("Рендерю кліп…");$("renderBtn2").disabled=true;
-  try{const r=await fetch(API+"/api/render",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,clip:v.clip,regions,words,formats:fmts,smart_trim:$("smartTrim").checked,use_body:$("useBody").checked,trim:v.trim||null})});
-    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
-    lastOutputs=d.outputs;lastRenderLang=activeVar;
-    const dl=$("downloads");dl.innerHTML="";
-    d.outputs.forEach(o=>{const a=document.createElement("a");a.href=API+o.url;a.textContent="⬇ "+o.format+"  ("+o.name+")";a.download=o.name;
-      a.style.cssText="display:block;padding:8px;margin:4px 0;background:var(--panel2);border-radius:7px;color:var(--ok);text-decoration:none;font-size:12px";dl.appendChild(a);});
-    refreshAssembleHints();
-    setStatus("Done! "+d.outputs.length+" file(s) exported.","ok");busyDone("Готово");
-  }catch(e){setStatus("Render error: "+e.message,"err");busyStop();}
-  $("renderBtn2").disabled=false;
-}
 $("renderBtn").onclick=sendToCompose;
 
 // ---------- localize: STAGE 1 dub (clean clip + editable text), STAGE 2 render ----------
@@ -2775,7 +2725,6 @@ function renderBatchStage(){
   const bb=el.querySelector("#boardBuild");if(bb)bb.onclick=()=>$("batchAssembleBtn").click();
   if(typeof renderTrackList==="function")renderTrackList();   // keep per-track "Start at" options in sync with segments
 }
-$("renderBtn2").onclick=doSingleRender;
 
 // ---------- init ----------
 // ---------- overlays (PNG / alpha-.mov stickers on the hook) ----------
