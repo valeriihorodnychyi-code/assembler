@@ -95,6 +95,14 @@
   .stepper .ar:hover{color:var(--accent)}
   .valedit{width:44px;background:transparent;border:0.5px solid var(--line);border-radius:5px;color:inherit;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;text-align:center;padding:1px 2px;-moz-appearance:textfield}
   .valedit::-webkit-inner-spin-button,.valedit::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  /* keep-together phrase tablets */
+  .kt-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+  .kt-chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:4px 6px 4px 11px;font-size:12px;color:var(--txt)}
+  .kt-chip button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:12px;line-height:1;padding:0}
+  .kt-chip button:hover{color:var(--accent)}
+  .kt-add{cursor:pointer;color:var(--muted);border-style:dashed;padding:4px 11px}
+  .kt-add:hover{color:var(--accent);border-color:var(--accent)}
+  .kt-input{background:transparent;border:0;color:inherit;font:inherit;width:130px;outline:none}
   .row .switch{position:relative;width:38px;height:22px;flex:0 0 38px}
   .switch input{opacity:0;width:0;height:0}
   .slider{position:absolute;inset:0;background:var(--line);border-radius:22px;transition:.2s;cursor:pointer}
@@ -386,11 +394,9 @@
     <details class="grp" id="grpSmart" style="border-color:#34c759">
       <summary style="color:#34c759"><span>✨ Smart captions</span> <span class="chev">›</span></summary>
       <div class="body">
-        <div class="row" style="align-items:center"><label title="Фрази, які НІКОЛИ не розриваються між рядками/титрами (по одній на рядок). Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label>
-          <button type="button" id="keepExpandBtn" class="ghost" style="font-size:11px" title="Розгорнути / згорнути поле" onclick="toggleKeepExpand()">⤢</button></div>
-        <textarea id="keepTogether" rows="2" placeholder="Tai Chi&#10;New York&#10;Muscle Booster" style="font-size:11px;resize:vertical;width:100%"></textarea>
-        <button type="button" id="saveRulesBtn" class="ghost" style="float:right;font-size:11px;margin-top:4px" onclick="saveKeepTogether()">💾 Save phrases</button>
-        <div style="clear:both"></div>
+        <div class="row" style="align-items:center"><label title="Фрази, які НІКОЛИ не розриваються між рядками/титрами. Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label></div>
+        <div id="ktChips" class="kt-chips"></div>
+        <div class="hint">Ці фрази ніколи не розриваються. Тисни «＋ add», введи й Enter. Зберігається автоматично й переживає апдейти.</div>
         <div class="row" style="margin-top:10px"><label data-i18n="lblCaptions" title="Показувати титри лише в цьому проміжку часу (порожнє = весь кліп)">Captions in / out</label>
           <div style="display:flex;gap:6px;flex:1.3">
             <input type="number" id="capIn" placeholder="0.0" min="0" step="0.1" style="flex:1" title="від (с)">
@@ -805,7 +811,41 @@ const _SYM=new Set(["%","$","€","£","+","&","/","x"]);
 function _isNum(t){return /^[+\-]?[\d.,]*\d/.test(t||"");}
 function capLang(){const v=variants&&variants[activeVar]&&variants[activeVar].lang;return String(v||($("language")&&$("language").value)||"en").toLowerCase();}
 async function loadCaptionRules(){try{CAPTION_RULES=await(await fetch(API+"/api/caption_rules")).json();}catch(e){CAPTION_RULES={};}fillKeepTogether();}
-function fillKeepTogether(){const ta=$("keepTogether");if(ta&&CAPTION_RULES)ta.value=(CAPTION_RULES.keep_together||[]).join("\n");}
+function fillKeepTogether(){ renderKtChips(); }
+async function ktSave(){
+  CAPTION_RULES=CAPTION_RULES||{};
+  try{ await fetch(API+"/api/caption_rules",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(CAPTION_RULES)});}catch(e){}
+  if(typeof scheduleExact==="function")scheduleExact();
+  try{render(video.currentTime||0,video.duration||0);}catch(e){}
+}
+function renderKtChips(){
+  const box=$("ktChips"); if(!box)return; box.innerHTML="";
+  const list=(CAPTION_RULES&&CAPTION_RULES.keep_together)||[];
+  list.forEach((ph,i)=>{
+    const c=document.createElement("span");c.className="kt-chip";c.textContent=ph;
+    const x=document.createElement("button");x.type="button";x.title="Remove";x.textContent="✕";
+    x.onclick=()=>{ CAPTION_RULES.keep_together.splice(i,1); ktSave(); renderKtChips(); };
+    c.appendChild(x); box.appendChild(c);
+  });
+  const add=document.createElement("span");add.className="kt-chip kt-add";add.textContent="＋ add";
+  add.onclick=()=>openKtInput(); box.appendChild(add);
+}
+function openKtInput(){
+  const box=$("ktChips"); if(!box)return;
+  const old=$("ktInputRow"); if(old)old.remove();
+  const row=document.createElement("span");row.id="ktInputRow";row.className="kt-chip";
+  const inp=document.createElement("input");inp.type="text";inp.className="kt-input";inp.placeholder="e.g. U.S. National";
+  const ok=document.createElement("button");ok.type="button";ok.textContent="↵";ok.title="Add";
+  const commit=()=>{ const v=inp.value.trim();
+    if(v){ CAPTION_RULES=CAPTION_RULES||{}; CAPTION_RULES.keep_together=CAPTION_RULES.keep_together||[];
+      if(!CAPTION_RULES.keep_together.includes(v))CAPTION_RULES.keep_together.push(v); ktSave(); }
+    renderKtChips(); };
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault();commit();} else if(e.key==="Escape"){renderKtChips();} });
+  ok.onclick=commit;
+  row.appendChild(inp);row.appendChild(ok);
+  box.insertBefore(row, box.lastChild);   // just before the "＋ add" chip
+  inp.focus();
+}
 function toggleKeepExpand(){const ta=$("keepTogether"),b=$("keepExpandBtn");if(!ta)return;const big=(+ta.rows||2)<=2;ta.rows=big?9:2;if(b)b.textContent=big?"⤡":"⤢";}
 async function saveKeepTogether(){
   const ta=$("keepTogether");if(!ta)return;
