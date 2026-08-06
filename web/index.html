@@ -103,6 +103,12 @@
   .kt-add{cursor:pointer;color:var(--muted);border-style:dashed;padding:4px 11px}
   .kt-add:hover{color:var(--accent);border-color:var(--accent)}
   .kt-input{background:transparent;border:0;color:inherit;font:inherit;width:130px;outline:none}
+  /* scene-cut navigation chips (click = jump, ✕ = remove) */
+  .cut-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+  .cut-chip{display:inline-flex;align-items:center;gap:5px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:3px 6px 3px 9px;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer;color:var(--txt)}
+  .cut-chip:hover{border-color:var(--accent)}
+  .cut-chip button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0}
+  .cut-chip button:hover{color:var(--accent)}
   .row .switch{position:relative;width:38px;height:22px;flex:0 0 38px}
   .switch input{opacity:0;width:0;height:0}
   .slider{position:absolute;inset:0;background:var(--line);border-radius:22px;transition:.2s;cursor:pointer}
@@ -419,6 +425,7 @@
             <input type="range" id="cutSens" min="0.1" max="0.6" step="0.05" value="0.3" style="flex:1" oninput="if($('cutSensV'))$('cutSensV').textContent=(+this.value).toFixed(2)">
             <span id="cutSensV" class="val" style="min-width:30px;text-align:right">0.30</span>
           </div></div>
+        <div id="cutChips" class="cut-chips"></div>
       </div>
     </details>
 
@@ -2257,7 +2264,21 @@ function renderCutTicks(){
     d.onclick=(e)=>{e.stopPropagation();_syncCuts((v.cuts||[]).filter(x=>x!==c));updateCutsLabel();if(typeof scheduleExact==="function")scheduleExact();};
     bar.appendChild(d);});
 }
-function updateCutsLabel(){const v=variants[activeVar];const n=(v&&v.cuts)?v.cuts.length:0;const el=$("cutsLabel");if(el)el.textContent=n?(n+" cuts"):"none";renderCutTicks();}
+function updateCutsLabel(){const v=variants[activeVar];const n=(v&&v.cuts)?v.cuts.length:0;const el=$("cutsLabel");if(el)el.textContent=n?(n+" cuts"):"none";renderCutTicks();renderCutChips();}
+// scene-cut chips: click a chip = jump the playhead to that cut; ✕ = remove it (no zoom needed)
+function _fmtCut(s){const m=Math.floor(s/60),r=s-m*60;return m>0?(m+":"+(r<10?"0":"")+r.toFixed(1)):(r.toFixed(1)+"s");}
+function renderCutChips(){
+  const box=$("cutChips"); if(!box)return; box.innerHTML="";
+  const v=variants[activeVar]; const cuts=(v&&v.cuts)?v.cuts.slice().sort((a,b)=>a-b):[];
+  cuts.forEach(function(c){
+    const chip=document.createElement("span");chip.className="cut-chip";
+    const t=document.createElement("span");t.textContent="🎬 "+_fmtCut(c);chip.appendChild(t);
+    chip.onclick=function(){ if(video&&videoLoaded){ try{video.currentTime=c;}catch(e){} if(video.paused){try{render(c,video.duration||0);}catch(e){}} if(typeof scheduleExact==="function")scheduleExact(); } };
+    const x=document.createElement("button");x.type="button";x.title="Remove cut";x.textContent="✕";
+    x.onclick=function(e){ e.stopPropagation(); const cur=((v&&v.cuts)||[]).filter(function(k){return Math.abs(k-c)>=0.001;}); _syncCuts(cur); updateCutsLabel(); if(typeof scheduleExact==="function")scheduleExact(); };
+    chip.appendChild(x); box.appendChild(chip);
+  });
+}
 function downloadLocs(){
   if(!fileId){setStatus("Немає сесії — спершу зроби локалізації.","err");return;}
   setStatus("Готую архів локалізацій…","",true);
@@ -2421,6 +2442,7 @@ function buildStudioLayout(){
   [$("viewport"),$("transport"),$("trimRow")].forEach(el=>{if(el)pc.appendChild(el);});
   const ez=document.querySelector(".editzone");
   if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="width:100%;margin:0 0 8px;font-size:12px;padding:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all lives by the style presets
+  if(ez&&$("saveStyleBtn2")){$("saveStyleBtn2").style.cssText="width:100%;margin:0 0 8px;font-size:12px;padding:9px";ez.insertBefore($("saveStyleBtn2"),ez.children[1]||null);}  // #9 Save preset always visible, by the presets (already green .go)
   const qp=$("quickPanel");
   [$("grpTranscribe"),$("grpBaseText"),$("grpSmart")].forEach(el=>{if(el)qp.appendChild(el);});
   const tb=$("transcribeBtn"),body=$("grpTranscribe")&&$("grpTranscribe").querySelector(".body");
