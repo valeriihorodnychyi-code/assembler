@@ -321,10 +321,18 @@ def clip_caption_window(tagged, cap_in=None, cap_out=None):
     return out
 
 
-def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None, cuts=None):
+def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None, cuts=None, regions=None):
     """Bake captions onto a single clip (no body). Used by the non-destructive
-    assemble so a hook's captions are burned only at final assembly time."""
-    regions = [{"start": 0, "end": None, "style": st.normalize(style)}]
+    assemble so a hook's captions are burned only at final assembly time.
+
+    `regions` (optional) lets individual phrases carry their own style (#10 per-phrase style):
+    a list of {"start","end"(nullable),"style"} that partitions the timeline. When omitted,
+    the whole clip uses the single `style`."""
+    if regions:
+        regions = [{"start": float(r.get("start", 0)), "end": r.get("end"),
+                    "style": st.normalize(r.get("style") or style)} for r in regions]
+    else:
+        regions = [{"start": 0, "end": None, "style": st.normalize(style)}]
     tagged = build_timeline(words or [], regions, cuts=cuts)
     try:  # hold the last caption to the very end of the clip (otherwise it vanishes on the final frames)
         dur = ff.get_video_duration(clip_path)
@@ -426,7 +434,8 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
                     seg_cuts = [c - lo for c in seg_cuts if lo < c < hi]
                 cap = os.path.join(work_dir, f"cap_{i}.mp4")
                 caption_clip(path, words, seg["style"], fmt, cap, work_dir,
-                             seg.get("cap_in"), seg.get("cap_out"), cuts=seg_cuts)
+                             seg.get("cap_in"), seg.get("cap_out"), cuts=seg_cuts,
+                             regions=seg.get("regions"))
                 path = cap
             if seg.get("overlays"):  # PNG / alpha-.mov stickers on top (reaction style)
                 ovp = os.path.join(work_dir, f"ov_{i}.mp4")

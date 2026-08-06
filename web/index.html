@@ -388,6 +388,11 @@
           <div class="slot-tabs"><button id="slotA" class="active">Editing: Hook</button><button id="slotB">Editing: Body</button></div>
         </div>
         <div class="hint">When on, the timeline before the split uses the Hook style, after it the Body style — both rendered in one ffmpeg pass.</div>
+        <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:11px">
+          <div class="row" style="margin-bottom:3px"><label style="font-weight:600">Per-phrase style</label><button id="phraseRefresh" title="Оновити список фраз" style="font-size:12px;padding:4px 10px">↻</button></div>
+          <div class="hint">Give individual captions their own look: pick a preset for any phrase, the rest keep the base style. Baked into the final render too.</div>
+          <div id="phraseList" style="margin-top:9px;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto"></div>
+        </div>
       </div>
     </details>
 
@@ -1000,13 +1005,67 @@ const canvas=$("canvas"),ctx=canvas.getContext("2d");
 const applyCase=(t,c)=>c==="uppercase"?t.toUpperCase():c==="lowercase"?t.toLowerCase():t;
 
 function styleAt(t){
-  // returns the UI control object that applies at time t (for split preview)
-  if(!splitOn) return readControls();
-  const cur=readControls();
-  const split=+$("splitTime").value;
-  if(editingSlot==="A"){ return t<split ? cur : (styleB||cur); }
-  else{ return t<split ? (window._styleA||cur) : cur; }
+  // returns the UI control object that applies at time t
+  let base;
+  if(!splitOn) base=readControls();
+  else{ const cur=readControls(); const split=+$("splitTime").value;
+    base=(editingSlot==="A") ? (t<split?cur:(styleB||cur)) : (t<split?(window._styleA||cur):cur); }
+  // #10 per-phrase override wins for its own time range
+  const ov=curPhraseStyles();
+  if(ov&&ov.length){ for(const o of ov){ if(t>=o.start&&t<o.end) return o.ctrl; } }
+  return base;
 }
+
+// ---------- #10 per-phrase style: give individual captions their own preset ----------
+function curPhraseStyles(){ const v=variants[activeVar]; if(!v)return []; if(!v.phraseStyles)v.phraseStyles=[]; return v.phraseStyles; }
+function listPhrases(){   // enumerate caption phrases at the base style, with time range + text
+  const s=readControls(), dur=(video&&video.duration)||4;
+  const evs=buildEvents(dur,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
+  const out=[]; let last=null;
+  for(const e of evs){ const fw=e.lines.reduce((a,l)=>a.concat(l),[]); if(!fw.length)continue;
+    const key=(+fw[0].start).toFixed(2);
+    if(!last||last.key!==key){ last={key,start:+fw[0].start,end:+fw[fw.length-1].end,text:fw.map(w=>w.text).join(" ")}; out.push(last); }
+    else last.end=+fw[fw.length-1].end; }
+  return out;
+}
+function presetToCtrl(name){ const base=readControls();
+  if(savedStyles[name]) return fromEngineStyle(savedStyles[name]);
+  if(PRESETS[name]) return {...base,...PRESETS[name]};
+  return base; }
+// engine regions from the per-phrase overrides (partition timeline; base style fills the gaps)
+function buildStyleRegions(baseEngine, ovArr){
+  const ov=(ovArr||[]).slice().sort((a,b)=>a.start-b.start);
+  if(!ov.length) return null;
+  const regions=[]; let cur=0;
+  for(const o of ov){ if(o.start>cur+0.001)regions.push({start:cur,end:o.start,style:baseEngine});
+    regions.push({start:o.start,end:o.end,style:toEngineStyle(o.ctrl)}); cur=o.end; }
+  regions.push({start:cur,end:null,style:baseEngine});
+  return regions;
+}
+function renderPhraseList(){
+  const box=$("phraseList"); if(!box)return;
+  const phrases=listPhrases(), ov=curPhraseStyles();
+  if(!phrases.length){ box.innerHTML="<div class='hint'>Transcribe first — phrases will appear here.</div>"; return; }
+  const names=[...Object.keys(savedStyles),...Object.keys(PRESETS)];
+  box.innerHTML="";
+  phrases.forEach(p=>{
+    const row=document.createElement("div"); row.className="row"; row.style.cssText="gap:8px;align-items:center;margin:0";
+    const lab=document.createElement("div"); lab.style.cssText="flex:1;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer";
+    lab.textContent=p.text; lab.title="↦ "+p.text;
+    lab.onclick=()=>{ if(video&&videoLoaded){try{video.currentTime=p.start;}catch(_){}} };   // click text = jump to that phrase
+    const sel=document.createElement("select"); sel.style.cssText="flex:0 0 130px;font-size:11px";
+    sel.innerHTML="<option value=''>Base</option>"+names.map(n=>`<option value="${n}">${savedStyles[n]?"★ ":""}${n}</option>`).join("");
+    const cur=ov.find(o=>Math.abs(o.start-p.start)<0.05); if(cur&&cur.name)sel.value=cur.name;
+    sel.onchange=()=>{ const arr=curPhraseStyles(); const idx=arr.findIndex(o=>Math.abs(o.start-p.start)<0.05);
+      if(!sel.value){ if(idx>=0)arr.splice(idx,1); }
+      else{ const rec={start:p.start,end:p.end,name:sel.value,ctrl:presetToCtrl(sel.value)}; if(idx>=0)arr[idx]=rec; else arr.push(rec); }
+      if(typeof scheduleExact==="function")scheduleExact(); };
+    row.appendChild(lab); row.appendChild(sel); box.appendChild(row);
+  });
+}
+if($("phraseRefresh"))$("phraseRefresh").onclick=renderPhraseList;
+(function(){const d=$("phraseList")&&$("phraseList").closest("details");   // auto-fill the phrase list when the section opens
+  if(d)d.addEventListener("toggle",()=>{if(d.open)renderPhraseList();});})();
 
 // #12 — the scrim is a single continuous band across the whole caption window; this returns
 // its opacity multiplier at time t: 0 before it starts, ramps IN over `fade` so it's fully on
@@ -1685,6 +1744,7 @@ async function sendToCompose(target){
     const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,trim:v.trim||null,src:"edit",videoUrl:v.videoUrl||null};
     if(v.overlays&&v.overlays.length)hook.overlays=v.overlays.map(o=>({name:o.name,x:o.x,y:o.y,w:o.w,angle:o.angle||0,in:(o.in!=null?o.in:null),out:(o.out!=null?o.out:null)}));
     if(v.words&&v.words.length){hook.words=v.words;hook.ctrl=v.style||null;if(v.style)hook.style=toEngineStyle(v.style);}  // carry words + ctrl so LOC shows a real thumbnail
+    if(v.words&&v.words.length&&v.style&&v.phraseStyles&&v.phraseStyles.length){const _reg=buildStyleRegions(toEngineStyle(v.style),v.phraseStyles);if(_reg)hook.regions=_reg;}  // #10 per-phrase overrides travel to the bake
     if(v.capIn!=null)hook.cap_in=v.capIn;if(v.capOut!=null)hook.cap_out=v.capOut;   // caption in/out window
     if(v.cuts&&v.cuts.length)hook.cuts=v.cuts;   // scene cuts travel with the hook
     hooks.push(hook);added++;});
@@ -1937,7 +1997,7 @@ async function mergeHooks(){
   if(!fileId){setStatus("No session.","err");return;}
   const bake=$("mergeCaps")?$("mergeCaps").checked:true;
   const segs=hooks.map(h=>{const seg={type:"session",ref:h.clip||h.name};
-    if(bake&&h.words&&h.style){seg.words=h.words;seg.style=h.style;
+    if(bake&&h.words&&h.style){seg.words=h.words;seg.style=h.style;if(h.regions)seg.regions=h.regions;
       if(h.cap_in!=null)seg.cap_in=h.cap_in;if(h.cap_out!=null)seg.cap_out=h.cap_out;
       if(h.cuts&&h.cuts.length)seg.cuts=h.cuts;}
     if(h.trim)seg.trim=h.trim;                                   // trim always respected
@@ -2125,7 +2185,7 @@ $("batchAssembleBtn").onclick=async()=>{
   if(!fileId){setStatus("No session.","err");return;}
   const packBase=$("packAsset").value,fmt=ratio;   // project format (9:16 / 1:1 / 16:9)
   const recipes=hooks.map(h=>{const hookSeg={type:"session",ref:h.clip||h.name};
-    if(h.words&&h.style){hookSeg.words=h.words;hookSeg.style=h.style;}  // live hook → bake captions now
+    if(h.words&&h.style){hookSeg.words=h.words;hookSeg.style=h.style;if(h.regions)hookSeg.regions=h.regions;}  // live hook → bake captions now (+ per-phrase overrides)
     if(h.cap_in!=null)hookSeg.cap_in=h.cap_in;if(h.cap_out!=null)hookSeg.cap_out=h.cap_out;  // caption in/out window
     if(h.cuts&&h.cuts.length)hookSeg.cuts=h.cuts;   // scene cuts → captions clipped at cuts
     if(h.trim)hookSeg.trim=h.trim;                                     // cut clip at assemble

@@ -1052,6 +1052,7 @@ def api_batch_assemble(req: BatchReq):
                                        f"(type={s.get('type')}). The clip may belong to a different/older session.")
                 # non-destructive: a segment may carry caption-data baked at assemble time
                 segs.append({"clip": p, "words": s.get("words"), "style": s.get("style"),
+                             "regions": s.get("regions"),   # #10 per-phrase style overrides (optional)
                              "trim": s.get("trim"), "fade_in": s.get("fade_in"),
                              "cap_in": s.get("cap_in"), "cap_out": s.get("cap_out"),
                              "cuts": s.get("cuts"),
