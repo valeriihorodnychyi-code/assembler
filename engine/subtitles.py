@@ -486,6 +486,12 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     sh_y = int(int(sh.get("offset_y", 10)) * scale_factor)
     sh_c = tuple(sh.get("color", [0, 0, 0, 255]))
     sh_blur = int(int(sh.get("glow_blur", 0)) * scale_factor)
+    sh2 = style_cfg.get("shadow2", {})                     # optional SECOND word shadow (layered under the first)
+    shadow2_on = sh2.get("enabled", False)
+    sh2_x = int(int(sh2.get("offset_x", 0)) * scale_factor)
+    sh2_y = int(int(sh2.get("offset_y", 4)) * scale_factor)
+    sh2_c = tuple(sh2.get("color", [0, 0, 0, 255]))
+    sh2_blur = int(int(sh2.get("glow_blur", 0)) * scale_factor)
     psh = style_cfg.get("plate_shadow", {})                # PLATE / word-plate drop shadow — its own controls
     plate_shadow_on = psh.get("enabled", False)
     psh_x = int(int(psh.get("offset_x", 0)) * scale_factor)
@@ -599,19 +605,24 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     so_w = int(int(style_cfg.get("stroke_outer", {}).get("width", 0)) * scale_factor) if stroke_master else 0
     so_c = tuple(style_cfg.get("stroke_outer", {}).get("color", [0, 0, 0, 255]))
 
-    # TEXT shadow (words) — drawn ABOVE the plate so words under a plate can still cast a shadow
-    if shadow_on:
+    # TEXT shadow (words) — drawn ABOVE the plate so words under a plate can still cast a shadow.
+    # Second shadow first (layered underneath), then the primary shadow on top of it.
+    def _draw_word_shadow(off_x, off_y, col, blur):
         st = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         sd = ImageDraw.Draw(st)
         for x, y, text, _ in word_positions:
             sw = so_w if so_w > 0 else s_w
             if sw > 0:
-                sd.text((x + sh_x, y + sh_y), text, font=font, fill=sh_c, stroke_width=sw, stroke_fill=sh_c)
+                sd.text((x + off_x, y + off_y), text, font=font, fill=col, stroke_width=sw, stroke_fill=col)
             else:
-                sd.text((x + sh_x, y + sh_y), text, font=font, fill=sh_c)
-        if sh_blur > 0:
-            st = st.filter(ImageFilter.GaussianBlur(sh_blur))
+                sd.text((x + off_x, y + off_y), text, font=font, fill=col)
+        if blur > 0:
+            st = st.filter(ImageFilter.GaussianBlur(blur))
         final_img.alpha_composite(st)
+    if shadow2_on:
+        _draw_word_shadow(sh2_x, sh2_y, sh2_c, sh2_blur)
+    if shadow_on:
+        _draw_word_shadow(sh_x, sh_y, sh_c, sh_blur)
 
     if so_w > 0:
         for x, y, text, _ in word_positions:

@@ -38,6 +38,7 @@ DEFAULT_STYLE = {
     "stroke": {"width": 0, "color": [0, 0, 0, 255]},
     "stroke_outer": {"width": 0, "color": [0, 0, 0, 255]},
     "shadow": {"enabled": False, "offset_x": 0, "offset_y": 8, "glow_blur": 0, "color": [0, 0, 0, 255]},   # shadow on the WORDS (works even under a plate)
+    "shadow2": {"enabled": False, "offset_x": 0, "offset_y": 4, "glow_blur": 0, "color": [0, 0, 0, 255]},  # optional SECOND word shadow, layered under the first (double-shadow look)
     "plate_shadow": {"enabled": False, "offset_x": 0, "offset_y": 8, "glow_blur": 0, "color": [0, 0, 0, 255]},  # drop shadow of the plate / word-plate
     "plate": {"enabled": False, "per_line": False, "color": [0, 0, 0, 160], "pad_x": 30, "pad_y": 15, "border_radius": 15},
     "scrim": {"enabled": False, "color": [0, 0, 0, 150], "pad": 40, "feather": 70},  # soft dark band behind text for light footage
