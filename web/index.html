@@ -71,8 +71,8 @@
   .seg button{flex:1;font-size:12px;color:var(--muted);background:transparent;border:0;border-radius:0;padding:6px}
   .seg button.active{background:var(--accent);color:#fff;font-weight:600}
   .grp{background:var(--bg);border:0.5px solid var(--line);border-radius:12px;margin:12px 12px 0;overflow:hidden;position:relative}
-  .hdrsw{position:absolute;top:9px;right:36px;z-index:3;margin:0}   /* section Enable toggle in the header — quick on/off without opening */
-  .grp>summary{padding:13px 14px;font-weight:600;font-size:13px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:9px;user-select:none}
+  .hdrsw{position:absolute;top:50%;right:34px;transform:translateY(-50%);z-index:3;margin:0;width:38px;height:22px;flex:0 0 38px}   /* section Enable toggle in the header — visible open or closed, left of the chevron */
+  .grp>summary{padding:13px 14px;font-weight:600;font-size:13px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:9px;user-select:none;position:relative}
   .grp>summary:hover{background:#1b1e27}
   .grp[open]>summary{color:#fff}
   .grp>summary::-webkit-details-marker{display:none}
@@ -415,8 +415,7 @@
     </details>
 
     <details class="grp">
-      <summary><span data-i18n="secStroke">Stroke</span> <span class="chev">›</span></summary>
-      <label class="switch hdrsw" title="Enable Stroke"><input type="checkbox" id="strokeOn" checked><span class="slider"></span></label>
+      <summary><span data-i18n="secStroke">Stroke</span> <label class="switch hdrsw" title="Enable Stroke" onclick="hdrTgl(event,this)"><input type="checkbox" id="strokeOn" checked><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Inner</label><input type="range" id="strokeW" min="0" max="20" value="0"><span class="val" id="strokeWV">0</span></div>
         <div class="row"><label>Color</label><input type="color" id="strokeColor" value="#000000"></div>
@@ -427,8 +426,7 @@
     </details>
 
     <details class="grp">
-      <summary><span data-i18n="secShadow">Shadow / glow</span> <span class="chev">›</span></summary>
-      <label class="switch hdrsw" title="Enable Shadow"><input type="checkbox" id="shadowOn"><span class="slider"></span></label>
+      <summary><span data-i18n="secShadow">Shadow / glow</span> <label class="switch hdrsw" title="Enable Shadow" onclick="hdrTgl(event,this)"><input type="checkbox" id="shadowOn"><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Offset X</label><input type="range" id="shX" min="-40" max="40" value="0"><span class="val" id="shXV">0</span></div>
         <div class="row"><label>Offset Y</label><input type="range" id="shY" min="-40" max="40" value="8"><span class="val" id="shYV">8</span></div>
@@ -438,8 +436,7 @@
     </details>
 
     <details class="grp">
-      <summary><span data-i18n="secScrim">Scrim (readability on light bg)</span> <span class="chev">›</span></summary>
-      <label class="switch hdrsw" title="Enable Scrim"><input type="checkbox" id="scrimOn"><span class="slider"></span></label>
+      <summary><span data-i18n="secScrim">Scrim (readability on light bg)</span> <label class="switch hdrsw" title="Enable Scrim" onclick="hdrTgl(event,this)"><input type="checkbox" id="scrimOn"><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Color</label><input type="color" id="scrimColor" value="#000000"></div>
         <div class="row"><label>Strength</label><input type="range" id="scrimAlpha" min="0" max="255" value="150"><span class="val" id="scrimAlphaV">150</span></div>
@@ -448,8 +445,7 @@
     </details>
 
     <details class="grp">
-      <summary><span data-i18n="secPlate">Plate (text background)</span> <span class="chev">›</span></summary>
-      <label class="switch hdrsw" title="Enable Plate"><input type="checkbox" id="plateOn"><span class="slider"></span></label>
+      <summary><span data-i18n="secPlate">Plate (text background)</span> <label class="switch hdrsw" title="Enable Plate" onclick="hdrTgl(event,this)"><input type="checkbox" id="plateOn"><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Per-line (plate behind each line)</label><label class="switch"><input type="checkbox" id="plateLine"><span class="slider"></span></label></div>
         <div class="row"><label>Full-width (edge to edge)</label><label class="switch"><input type="checkbox" id="plateFull"><span class="slider"></span></label></div>
@@ -485,8 +481,7 @@
     </details>
 
     <details class="grp">
-      <summary><span data-i18n="secKaraoke">Karaoke (word highlight)</span> <span class="chev">›</span></summary>
-      <label class="switch hdrsw" title="Enable Karaoke highlight"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label>
+      <summary><span data-i18n="secKaraoke">Karaoke (word highlight)</span> <label class="switch hdrsw" title="Enable Karaoke highlight" onclick="hdrTgl(event,this)"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Color</label><input type="color" id="karaokeColor" value="#ffd400"></div>
         <div class="row"><label>Word plate</label><label class="switch"><input type="checkbox" id="kpOn"><span class="slider"></span></label></div>
@@ -1292,6 +1287,14 @@ $("fontInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;const f
   setStatus("Font '"+f.name+"' added for preview. Note: to render with it, also drop the file into the app's fonts/ folder.","");};
 
 // ---------- range labels ----------
+// Section header Enable toggle: flip the checkbox without opening/closing the <details>.
+function hdrTgl(e,lab){
+  e.preventDefault(); e.stopPropagation();
+  const cb=lab.querySelector("input");
+  cb.checked=!cb.checked;
+  cb.dispatchEvent(new Event("input",{bubbles:true}));   // fires the panel listener → preview + sticky save
+  cb.dispatchEvent(new Event("change",{bubbles:true}));
+}
 // Value labels next to sliders are EDITABLE number fields: type an exact value, or drag.
 function makeSlidersEditable(){
   document.querySelectorAll("input[type=range]").forEach(r=>{
