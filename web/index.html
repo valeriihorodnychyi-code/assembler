@@ -916,7 +916,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
   for(let i=0;i<events.length-1;i++){const nxt=events[i+1].start,ne=events[i].end,gap=nxt-ne;
     events[i].end=(gap<=HOLD_MAX)?nxt:Math.min(nxt,ne+TAIL);
     if(events[i].end<=events[i].start)events[i].end=events[i].start+0.1;}
-  if(events.length&&dur)events[events.length-1].end=Math.max(events[events.length-1].end,dur); // hold last caption to end
+  if(events.length){var _L=events[events.length-1];_L.end=Math.min(_L.end,_L.start+HOLD_MAX);if(_L.end<=_L.start)_L.end=_L.start+0.4;} // don't hang the last caption over trailing footage/packshot — readable tail only (a cut below trims further)
   if(cutList.length){for(const e of events){for(const c of cutList){if(e.start<c&&c<e.end){e.end=c;break;}}}}  // clamp end at next cut → no linger over the next shot
   return events;
 }

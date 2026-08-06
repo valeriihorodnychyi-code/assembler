@@ -339,6 +339,16 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
         if events[i]["end"] <= events[i]["start"]:
             events[i]["end"] = events[i]["start"] + 0.1
 
+    # The LAST event is skipped by the loop above (no "next"). Transcribers frequently stretch
+    # the final word's end all the way to the end of the audio, so the last caption freezes over
+    # trailing footage / the packshot. Cap it to a readable tail after its last word starts; a
+    # real scene cut (below) can trim it further.
+    if events:
+        L = events[-1]
+        L["end"] = min(L["end"], L["start"] + HOLD_MAX)
+        if L["end"] <= L["start"]:
+            L["end"] = L["start"] + 0.4
+
     # Clamp a caption's end to the next scene cut so a frozen caption never lingers
     # over the next shot (the post-cut words already start a fresh caption above).
     if cuts:
