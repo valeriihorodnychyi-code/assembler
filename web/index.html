@@ -29,6 +29,13 @@
   .viewport{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);background:#000;max-width:100%}
   .viewport video{display:block;max-height:72vh;max-width:100%}  /* bounded to its grid column — can never overlap the side panels */
   .viewport canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  /* #3 — drag the caption up/down right on the preview (vertical only → Bottom margin) */
+  #capDrag{position:absolute;left:0;width:100%;display:none;cursor:ns-resize;z-index:5;touch-action:none}
+  #capDrag::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:42px;height:5px;border-radius:3px;background:transparent;transition:background .12s,box-shadow .12s}
+  #capDrag:hover{background:rgba(255,90,44,.06)}
+  #capDrag:hover::after{background:rgba(255,255,255,.6);box-shadow:0 1px 4px rgba(0,0,0,.55)}
+  #capDrag.dragging{background:rgba(255,90,44,.12)}
+  #capDrag.dragging::after{background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.6)}
   .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:340px;height:470px;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;padding:20px}
   .dropzone.drag{border-color:var(--accent);color:var(--txt)}
   .dropzone .big{font-size:42px}
@@ -300,6 +307,7 @@
         <canvas id="canvas" hidden></canvas>
         <img id="exactImg" alt="" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none">
         <div id="exactBadge" style="position:absolute;top:8px;right:8px;display:none;font-size:10px;background:rgba(34,197,94,.9);color:#06210f;font-weight:700;padding:2px 7px;border-radius:5px">✓ exact</div>
+        <div id="capDrag" title="Тягни титр вгору / вниз, щоб змінити висоту"></div>
         <div id="overlayLayer"></div>
       </div>
       <div id="filmstrip"></div>
@@ -995,6 +1003,7 @@ function styleAt(t){
 function render(t,dur){
   _capRange=null;   // current on-screen caption time range (for the Words-view highlight)
   const[W,H]=DIMS[ratio];canvas.width=W;canvas.height=H;ctx.clearRect(0,0,W,H);
+  {const _cd=$("capDrag");if(_cd)_cd.style.display="none";}   // #3 drag-band hidden unless a caption is actually on screen (set below)
   if(!videoLoaded){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,"#3a2b4d");g.addColorStop(1,"#1a2740");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
   const s=styleAt(t);
   const cw=(typeof capWin==="function")?capWin():{in:null,out:null};   // hide captions outside the in/out window
@@ -1028,6 +1037,10 @@ function render(t,dur){
   const pos=[];let y=startY;
   for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,wide:ctx.measureText(w.disp).width});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
   const boff=(s.boxOffsetY||0)*scale;
+  // #3 — park the invisible drag-band over the caption text so you can grab & move it vertically
+  {const _cd=$("capDrag");if(_cd){const _pad=lineH*0.4;
+    const _top=Math.max(0,startY-_pad),_bot=Math.min(H,startY+totalH+_pad);
+    _cd.style.top=(_top/H*100)+"%";_cd.style.height=(Math.max(0,_bot-_top)/H*100)+"%";_cd.style.display="block";}}
   if(s.scrimOn){const pad=40*scale,f=Math.max(1,(s.scrimFeather||70)*scale);
     const y0=startY-pad-boff-f,y1=startY+totalH+pad-boff+f,Hh=Math.max(1,y1-y0);
     const gr=ctx.createLinearGradient(0,y0,0,y1),c=n=>rgba(s.scrimColor,n);
@@ -1062,6 +1075,30 @@ function loop(ts){let t,dur;
   else{const dt=(ts-lastTs)/1000||0;demoT=(demoT+dt)%4;t=demoT;dur=4;}
   lastTs=ts;render(t,dur);if(typeof updateWordHighlight==="function")updateWordHighlight();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
+
+// #3 — drag the caption up/down on the preview to set the Bottom margin (vertical only).
+// The live canvas follows automatically (loop re-renders every frame); we just move the slider.
+(function(){const cd=$("capDrag");if(!cd)return;
+  cd.addEventListener("pointerdown",ev=>{
+    const sl=$("marginBottom");if(!sl)return;
+    ev.preventDefault();
+    const vp=$("viewport").getBoundingClientRect();
+    const H=DIMS[ratio][1];                          // canvas height in the current format
+    const startVal=+sl.value, sy=ev.clientY;
+    const mn=+sl.min||0, mx=+sl.max||1700;
+    cd.classList.add("dragging");
+    try{cd.setPointerCapture(ev.pointerId);}catch(_){}
+    const mv=e2=>{
+      const dyCanvas=(e2.clientY-sy)*(H/vp.height);  // screen px → canvas px
+      let v=Math.round(startVal-dyCanvas);           // drag down = caption lower = smaller margin
+      v=Math.max(mn,Math.min(mx,v));
+      sl.value=v;
+      sl.dispatchEvent(new Event("input",{bubbles:true}));   // slider's own listener syncs the number field; loop re-renders the canvas; panelContent listener persists + refreshes exact
+    };
+    const up=()=>{cd.classList.remove("dragging");document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);};
+    document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);
+  });
+})();
 
 // ---------- video ----------
 function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if($("language"))$("language").value="";if(typeof setLangSticker==="function")setLangSticker(null);
@@ -1205,7 +1242,7 @@ function updateEditButtons(){
   const pack=editPack.length>0, editing=!!editingHook, locpack=pack&&packMode==="loc";
   const show=(id,on)=>{const e=$(id);if(e)e.style.display=on?"inline-block":"none";};
   show("renderBtn",!pack&&!editing);show("sLocBtn",!pack&&!editing);
-  show("sendPackAsmBtn",pack&&!editing&&!locpack);show("sendPackBtn",false);show("copyAllBtn",pack&&!editing);
+  show("sendPackAsmBtn",pack&&!editing&&!locpack);show("sendPackBtn",false);show("copyAllBtn",pack);   // Style→all: available whenever a pack is loaded, incl. while editing a hook (that's exactly when you want to propagate)
   show("saveLocPackBtn",locpack&&!editing);
   show("saveHookBtn",editing);
   const tb=$("transcribeBtn");if(tb)tb.textContent="① Transcribe";   // single = active hook only
@@ -2558,8 +2595,7 @@ const I18N={
   secStyleRegions:{ua:"Зони стилю (хук / боді)",en:"Style regions (hook / body)"},
   secStroke:{ua:"Обведення",en:"Stroke"}, secShadow:{ua:"Тінь / світіння",en:"Shadow / glow"},
   secPlate:{ua:"Плашка (фон тексту)",en:"Plate (text background)"}, secKaraoke:{ua:"Караоке (підсвітка слова)",en:"Karaoke (word highlight)"},
-  secOverlays:{ua:"Оверлеї · PNG / .mov",en:"Overlays · PNG / .mov"}, secCustom:{ua:"Кастомні стилі",en:"Custom styles"},
-  secExport:{ua:"Експорт одного кліпа (опц.)",en:"Export one clip (optional)"}, secLocalize:{ua:"Локалізація",en:"Localize"},
+  secOverlays:{ua:"Оверлеї · PNG / .mov",en:"Overlays · PNG / .mov"}, secLocalize:{ua:"Локалізація",en:"Localize"},
   grpTranscription:{ua:"Транскрипція",en:"Transcription"}, grpBaseText:{ua:"Базовий текст",en:"Base text"},
   lblEngine:{ua:"Рушій",en:"Engine"}, lblModel:{ua:"Модель Whisper",en:"Whisper model"},
   lblCase:{ua:"Регістр",en:"Case"}, lblWrap:{ua:"Перенос рядків",en:"Line wrap"}, lblLines:{ua:"Рядків на екрані",en:"Lines on screen"},
