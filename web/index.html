@@ -2442,7 +2442,7 @@ function buildStudioLayout(){
   [$("viewport"),$("transport"),$("trimRow")].forEach(el=>{if(el)pc.appendChild(el);});
   const ez=document.querySelector(".editzone");
   if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="width:100%;margin:0 0 8px;font-size:12px;padding:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all lives by the style presets
-  if(ez&&$("saveStyleBtn2")){$("saveStyleBtn2").style.cssText="width:100%;margin:0 0 8px;font-size:12px;padding:9px";ez.insertBefore($("saveStyleBtn2"),ez.children[1]||null);}  // #9 Save preset always visible, by the presets (already green .go)
+  if(ez&&$("saveStyleBtn2")){$("saveStyleBtn2").textContent="＋ Save preset";$("saveStyleBtn2").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("saveStyleBtn2"),ez.children[1]||null);}  // #9 Save preset — compact green pill by the presets
   const qp=$("quickPanel");
   [$("grpTranscribe"),$("grpBaseText"),$("grpSmart")].forEach(el=>{if(el)qp.appendChild(el);});
   const tb=$("transcribeBtn"),body=$("grpTranscribe")&&$("grpTranscribe").querySelector(".body");
