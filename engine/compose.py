@@ -62,7 +62,7 @@ def build_timeline(words, regions, lang="en", cuts=None):
 
 def render_format(video_path, tagged_events, fmt, output_path, work_dir,
                   body_path=None, scale_factors=None, bitrates=None, smart_trim=False,
-                  hold_last=True):
+                  hold_last=False):
     """Render a single aspect ratio to output_path."""
     scale_factors = scale_factors or st.DEFAULT_SCALE_FACTORS
     bitrates = bitrates or {"temp_hook": "35M", "final_export": "8M"}
@@ -83,7 +83,9 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
             e, s = tagged_events[-1]
             e["end"] = render_duration
 
-    # Keep the last caption on screen until the clip ends (no blank tail after speech).
+    # Optional legacy behaviour (off by default): keep the last caption until the clip ends.
+    # Default is OFF so the last caption respects its capped end from build_events and never
+    # freezes over trailing b-roll / the packshot.
     if hold_last and tagged_events:
         tagged_events[-1][0]["end"] = render_duration
 

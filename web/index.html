@@ -70,7 +70,8 @@
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:7px;overflow:hidden}
   .seg button{flex:1;font-size:12px;color:var(--muted);background:transparent;border:0;border-radius:0;padding:6px}
   .seg button.active{background:var(--accent);color:#fff;font-weight:600}
-  .grp{background:var(--bg);border:0.5px solid var(--line);border-radius:12px;margin:12px 12px 0;overflow:hidden}
+  .grp{background:var(--bg);border:0.5px solid var(--line);border-radius:12px;margin:12px 12px 0;overflow:hidden;position:relative}
+  .hdrsw{position:absolute;top:9px;right:36px;z-index:3;margin:0}   /* section Enable toggle in the header — quick on/off without opening */
   .grp>summary{padding:13px 14px;font-weight:600;font-size:13px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:9px;user-select:none}
   .grp>summary:hover{background:#1b1e27}
   .grp[open]>summary{color:#fff}
@@ -86,6 +87,12 @@
   .row input[type=color]{width:34px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0;flex:none}
   .row select{flex:1.3;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 6px;font-size:12px}
   .val{font-size:11px;color:var(--muted);width:34px;text-align:right;flex:none}
+  /* numeric stepper: side arrows ‹ › + mono value + mouse-wheel (replaces tiny native spinners) */
+  .stepper{display:inline-flex;align-items:center;gap:2px;flex:none}
+  .stepper .ar{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0 3px;user-select:none}
+  .stepper .ar:hover{color:var(--accent)}
+  .valedit{width:44px;background:transparent;border:0.5px solid var(--line);border-radius:5px;color:inherit;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;text-align:center;padding:1px 2px;-moz-appearance:textfield}
+  .valedit::-webkit-inner-spin-button,.valedit::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   .row .switch{position:relative;width:38px;height:22px;flex:0 0 38px}
   .switch input{opacity:0;width:0;height:0}
   .slider{position:absolute;inset:0;background:var(--line);border-radius:22px;transition:.2s;cursor:pointer}
@@ -318,8 +325,8 @@
           <textarea id="transcript" rows="3" style="max-height:260px;overflow-y:auto;resize:vertical" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
         </div>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
-        <div class="row" style="margin-top:8px"><label>Manual line breaks</label><label class="switch"><input type="checkbox" id="manualBreaks"><span class="slider"></span></label></div>
-        <div class="hint" id="manualHint" style="display:none"><b>Enter</b> = new line · <b>empty line</b> = new caption screen. Your exact splits are used (no auto-wrap).</div>
+        <div class="row" style="margin-top:8px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків; крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label><label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
+        <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
       </div>
     </details>
     </section>
@@ -382,8 +389,6 @@
         <textarea id="keepTogether" rows="2" placeholder="Tai Chi&#10;New York&#10;Muscle Booster" style="font-size:11px;resize:vertical;width:100%"></textarea>
         <button type="button" id="saveRulesBtn" class="ghost" style="float:right;font-size:11px;margin-top:4px" onclick="saveKeepTogether()">💾 Save phrases</button>
         <div style="clear:both"></div>
-        <div class="row" style="margin-top:10px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків, але крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label>
-          <label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
         <div class="row" style="margin-top:10px"><label data-i18n="lblCaptions" title="Показувати титри лише в цьому проміжку часу (порожнє = весь кліп)">Captions in / out</label>
           <div style="display:flex;gap:6px;flex:1.3">
             <input type="number" id="capIn" placeholder="0.0" min="0" step="0.1" style="flex:1" title="від (с)">
@@ -411,8 +416,8 @@
 
     <details class="grp">
       <summary><span data-i18n="secStroke">Stroke</span> <span class="chev">›</span></summary>
+      <label class="switch hdrsw" title="Enable Stroke"><input type="checkbox" id="strokeOn" checked><span class="slider"></span></label>
       <div class="body">
-        <div class="row"><label>Enable</label><label class="switch"><input type="checkbox" id="strokeOn" checked><span class="slider"></span></label></div>
         <div class="row"><label>Inner</label><input type="range" id="strokeW" min="0" max="20" value="0"><span class="val" id="strokeWV">0</span></div>
         <div class="row"><label>Color</label><input type="color" id="strokeColor" value="#000000"></div>
         <div class="row"><label>Outer</label><input type="range" id="strokeOuterW" min="0" max="30" value="0"><span class="val" id="strokeOuterWV">0</span></div>
@@ -423,8 +428,8 @@
 
     <details class="grp">
       <summary><span data-i18n="secShadow">Shadow / glow</span> <span class="chev">›</span></summary>
+      <label class="switch hdrsw" title="Enable Shadow"><input type="checkbox" id="shadowOn"><span class="slider"></span></label>
       <div class="body">
-        <div class="row"><label>Enable</label><label class="switch"><input type="checkbox" id="shadowOn"><span class="slider"></span></label></div>
         <div class="row"><label>Offset X</label><input type="range" id="shX" min="-40" max="40" value="0"><span class="val" id="shXV">0</span></div>
         <div class="row"><label>Offset Y</label><input type="range" id="shY" min="-40" max="40" value="8"><span class="val" id="shYV">8</span></div>
         <div class="row"><label>Blur</label><input type="range" id="shBlur" min="0" max="60" value="0"><span class="val" id="shBlurV">0</span></div>
@@ -434,8 +439,8 @@
 
     <details class="grp">
       <summary><span data-i18n="secScrim">Scrim (readability on light bg)</span> <span class="chev">›</span></summary>
+      <label class="switch hdrsw" title="Enable Scrim"><input type="checkbox" id="scrimOn"><span class="slider"></span></label>
       <div class="body">
-        <div class="row"><label>Enable</label><label class="switch"><input type="checkbox" id="scrimOn"><span class="slider"></span></label></div>
         <div class="row"><label>Color</label><input type="color" id="scrimColor" value="#000000"></div>
         <div class="row"><label>Strength</label><input type="range" id="scrimAlpha" min="0" max="255" value="150"><span class="val" id="scrimAlphaV">150</span></div>
         <div class="row"><label>Softness</label><input type="range" id="scrimFeather" min="10" max="200" value="70"><span class="val" id="scrimFeatherV">70</span></div>
@@ -444,8 +449,8 @@
 
     <details class="grp">
       <summary><span data-i18n="secPlate">Plate (text background)</span> <span class="chev">›</span></summary>
+      <label class="switch hdrsw" title="Enable Plate"><input type="checkbox" id="plateOn"><span class="slider"></span></label>
       <div class="body">
-        <div class="row"><label>Enable</label><label class="switch"><input type="checkbox" id="plateOn"><span class="slider"></span></label></div>
         <div class="row"><label>Per-line (plate behind each line)</label><label class="switch"><input type="checkbox" id="plateLine"><span class="slider"></span></label></div>
         <div class="row"><label>Full-width (edge to edge)</label><label class="switch"><input type="checkbox" id="plateFull"><span class="slider"></span></label></div>
         <div class="row"><label>Color</label><input type="color" id="plateColor" value="#000000"></div>
@@ -481,8 +486,8 @@
 
     <details class="grp">
       <summary><span data-i18n="secKaraoke">Karaoke (word highlight)</span> <span class="chev">›</span></summary>
+      <label class="switch hdrsw" title="Enable Karaoke highlight"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label>
       <div class="body">
-        <div class="row"><label>Active word color</label><label class="switch"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label></div>
         <div class="row"><label>Color</label><input type="color" id="karaokeColor" value="#ffd400"></div>
         <div class="row"><label>Word plate</label><label class="switch"><input type="checkbox" id="kpOn"><span class="slider"></span></label></div>
         <div class="row"><label>Plate color</label><input type="color" id="kpColor" value="#ff3a22"></div>
@@ -874,7 +879,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
   const wordsM=mg;words.length=0;Array.prototype.push.apply(words,wordsM);
   // MANUAL layout (user's own line/chunk breaks) OR automatic phrase+wrap chunking
   let chunks=[];
-  const manual=words.some(w=>w.brk);   // brk presence drives manual layout — matches the engine exactly
+  const manual=words.some(w=>w.brk==="line"||w.brk==="chunk");   // only legacy explicit layout is "manual"; "soft" stays auto-wrapped
   if(manual){
     let lines=[],line=[];
     for(const w of words){line.push(w);
@@ -884,7 +889,7 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
     if(lines.length)chunks.push(lines);
   }else{
     const phrases=[];let cur=[];
-    for(const w of words){if(cur.length){const p=cur[cur.length-1];if(p.ends||(w.start-p.end)>PAUSE||cutBetween(p.start,w.start)){phrases.push(cur);cur=[];}}cur.push(w);}
+    for(const w of words){if(cur.length){const p=cur[cur.length-1];if(p.ends||p.brk||(w.start-p.end)>PAUSE||cutBetween(p.start,w.start)){phrases.push(cur);cur=[];}}cur.push(w);}
     if(cur.length)phrases.push(cur);
     const lim=Math.max(1,limit||((wrapMode==="words")?3:15));   // parity with engine: chars OR words
     const minw=+((CAPTION_RULES||{}).min_last_line_words||0)||0;
@@ -1088,7 +1093,7 @@ async function transcribePack(){
   // empty pre-transcribe; saving would wipe the freshly-recognized words).
   const ah=(activeHook>=0)?editPack[activeHook]:null;
   if(ah){realWords=ah.words;if(variants.en){variants.en.words=ah.words;variants.en.lang=ah.lang;}
-    $("transcript").value=(ah.words||[]).map(w=>w.word||w.text).join(" ");autoGrow();
+    $("transcript").value=wordsToText(ah.words);autoGrow();
     if(typeof setLangSticker==="function")setLangSticker(ah.lang);
     if(typeof scheduleExact==="function")scheduleExact();}
   updateEditButtons();
@@ -1114,7 +1119,7 @@ function selectHook(i){
   if($("language"))$("language").value=h.lang||""; // force the hook's language on re-transcribe
   enVideoUrl=h.videoUrl;realWords=h.words;
   video.src=h.videoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};
-  $("transcript").value=(h.words||[]).map(w=>w.word||w.text).join(" ");autoGrow();
+  $("transcript").value=wordsToText(h.words);autoGrow();
   writeControls(h.ctrl);
   if(typeof loadCapWin==="function"){loadCapWin(h);variants.en.capIn=(h.cap_in!=null?h.cap_in:null);variants.en.capOut=(h.cap_out!=null?h.cap_out:null);}
   if(typeof setLangSticker==="function")setLangSticker(h.lang);
@@ -1290,14 +1295,24 @@ $("fontInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;const f
 // Value labels next to sliders are EDITABLE number fields: type an exact value, or drag.
 function makeSlidersEditable(){
   document.querySelectorAll("input[type=range]").forEach(r=>{
-    const lab=$(r.id+"V"); if(!lab||lab.tagName==="INPUT")return;
+    const lab=$(r.id+"V"); if(!lab||lab.dataset.stp)return;
+    const step=parseFloat(r.step)||1;
+    const min=(r.min!==""?parseFloat(r.min):-Infinity), max=(r.max!==""?parseFloat(r.max):Infinity);
+    const wrap=document.createElement("span"); wrap.className="stepper";
+    const dec=document.createElement("button"); dec.type="button"; dec.className="ar"; dec.textContent="‹"; dec.tabIndex=-1;
     const inp=document.createElement("input");
-    inp.type="number"; inp.id=lab.id; inp.className=(lab.className||"")+" valedit";
-    inp.value=r.value; if(r.min!=="")inp.min=r.min; if(r.max!=="")inp.max=r.max; if(r.step!=="")inp.step=r.step;
-    inp.style.cssText="width:54px;background:transparent;border:0.5px solid var(--line);border-radius:5px;color:inherit;font:inherit;text-align:center;padding:1px 3px";
-    lab.replaceWith(inp);
-    inp.addEventListener("input",()=>{ r.value=inp.value; r.dispatchEvent(new Event("input",{bubbles:true})); });  // typing → move slider + preview + sticky save
-    r.addEventListener("input",()=>{ if(document.activeElement!==inp)inp.value=r.value; });                          // dragging → update the number
+    inp.type="number"; inp.id=lab.id; inp.className="valedit"; inp.value=r.value; inp.dataset.stp="1";
+    if(r.min!=="")inp.min=r.min; if(r.max!=="")inp.max=r.max; if(r.step!=="")inp.step=r.step;
+    const incB=document.createElement("button"); incB.type="button"; incB.className="ar"; incB.textContent="›"; incB.tabIndex=-1;
+    wrap.appendChild(dec); wrap.appendChild(inp); wrap.appendChild(incB);
+    lab.replaceWith(wrap);
+    const push=()=>{ r.value=inp.value; r.dispatchEvent(new Event("input",{bubbles:true})); };   // typing/arrow/wheel → move slider + preview + sticky save
+    inp.addEventListener("input",push);
+    r.addEventListener("input",()=>{ if(document.activeElement!==inp)inp.value=r.value; });        // dragging the slider → update the number
+    const bump=d=>{ let v=parseFloat(inp.value); if(isNaN(v))v=parseFloat(r.value)||0;
+      v=Math.min(max,Math.max(min,+(v+d*step).toFixed(4))); inp.value=v; push(); };
+    dec.onclick=()=>bump(-1); incB.onclick=()=>bump(1);
+    wrap.addEventListener("wheel",e=>{ e.preventDefault(); bump(e.deltaY<0?1:-1); },{passive:false});   // mouse-wheel over the control
   });
 }
 
@@ -1310,41 +1325,27 @@ $("transcript").addEventListener("input",()=>{
   autoGrow();
   // live: re-map edited text onto the existing word timecodes so the caption preview updates
   if(realWords&&realWords.length){
-    if($("manualBreaks").checked)applyManualBreaks();
-    else realWords=remapWords($("transcript").value, realWords);
+    realWords=parseBreaksToWords($("transcript").value, realWords);
     if(variants[activeVar])variants[activeVar].words=realWords;
   }
+  if(typeof scheduleExact==="function")scheduleExact();
 });
-// MANUAL BREAKS: the text area's own layout drives the caption.
-// Enter = line break, blank line = new caption chunk. Each word carries a brk flag
-// that BOTH the live preview and the ffmpeg engine honour (so render == preview).
-function applyManualBreaks(){
-  const text=$("transcript").value;
-  const chunks=text.split(/\n[ \t]*\n+/).filter(c=>c.trim().length);
-  const toks=[],brks=[];
-  chunks.forEach((ch,ci)=>{
-    const lines=ch.split(/\n/).filter(l=>l.trim().length);
-    lines.forEach((ln,li)=>{
-      const ws=ln.trim().split(/\s+/).filter(Boolean);
-      ws.forEach((w,wi)=>{
-        let brk=null;
-        if(wi===ws.length-1) brk=(li===lines.length-1)?(ci<chunks.length-1?"chunk":null):"line";
-        toks.push(w);brks.push(brk);
-      });
-    });
-  });
-  const mapped=remapWords(toks.join(" "), realWords);
-  realWords=mapped.map((w,i)=>({...w,brk:brks[i]||null}));
+// Caption break markers: a NEWLINE (Enter) or a '*' between words forces a new caption at
+// that spot — invisible in the burned caption, layout-independent. Sets brk="soft" on the
+// word before the marker; the auto-wrapper (JS + engine) treats it as a hard boundary but
+// keeps wrapping within each segment. Replaces the old Manual-line-breaks toggle.
+function parseBreaksToWords(text, base){
+  let t=String(text||"").replace(/\r/g,"").replace(/\n+/g,"  ").replace(/\*/g,"  ");
+  const parts=t.split(/\s+/).filter(Boolean);
+  const toks=[], brkAfter=[];
+  for(const p of parts){ if(p===""){ if(toks.length) brkAfter[toks.length-1]=true; } else toks.push(p); }
+  const mapped=remapWords(toks.join(" "), base);
+  if(!mapped) return base;
+  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":null}));
 }
-$("manualBreaks").onchange=()=>{
-  const on=$("manualBreaks").checked;
-  $("manualHint").style.display=on?"block":"none";
-  if(realWords&&realWords.length){
-    if(on)applyManualBreaks();
-    else realWords=realWords.map(w=>({...w,brk:null}));
-    if(variants[activeVar])variants[activeVar].words=realWords;
-  }
-};
+// Rebuild the transcript text FROM words, showing soft breaks as newlines (so reopening a
+// hook restores where the designer split).
+function wordsToText(ws){let out="";(ws||[]).forEach(w=>{out+=(w.word||w.text||"");out+=(w.brk==="soft")?"\n":" ";});return out.trim();}
 
 // ---------- presets + custom styles ----------
 let savedStyles={};   // name -> engine-schema JSON (loaded from the shared styles/ folder)
@@ -1489,7 +1490,7 @@ $("transcribeBtn").onclick=async()=>{
       if(activeHook>=0&&editPack[activeHook])editPack[activeHook].words=d.words;
       if(editingHook)editingHook.words=d.words;
     }
-    realWords=d.words;$("transcript").value=realWords.map(w=>w.word||w.text).join(" ");autoGrow();
+    realWords=d.words;$("transcript").value=wordsToText(realWords);autoGrow();
     if(typeof setLangSticker==="function")setLangSticker(d.language);
     setStatus("Транскрибовано "+realWords.length+" слів ("+(d.language||"")+").","ok");busyDone("Транскрибовано");
     $("renderBtn").disabled=false;if($("renderBtn2"))$("renderBtn2").disabled=false;if($("localizeBtn"))$("localizeBtn").disabled=false;
@@ -1688,7 +1689,7 @@ function loadVariant(key){
   realWords=v.words;
   if(v.videoUrl){video.src=v.videoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};}
   writeControls(v.style);
-  $("transcript").value=(v.words||[]).map(w=>w.word||w.text).join(" ");autoGrow();
+  $("transcript").value=wordsToText(v.words);autoGrow();
   buildVarTabs();renderOverlays();renderOverlayList();
   setStatus("Editing "+key.toUpperCase()+" version. Style & text here apply to this language only.","");
 }
@@ -2278,7 +2279,7 @@ function editLocHook(h){
   if($("language"))$("language").value=h.lang||""; // force re-transcribe to the localized language (not auto-detect → EN)
   video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;};videoLoaded=true;
-  $("transcript").value=(h.words||[]).map(w=>w.word||w.text).join(" ");
+  $("transcript").value=wordsToText(h.words);
   writeControls(ctrl);
   if(typeof loadCapWin==="function"){loadCapWin(h);variants.en.capIn=(h.cap_in!=null?h.cap_in:null);variants.en.capOut=(h.cap_out!=null?h.cap_out:null);}
   if(typeof setLangSticker==="function")setLangSticker(h.lang);

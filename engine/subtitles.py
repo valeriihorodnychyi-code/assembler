@@ -238,7 +238,7 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     # 1) MANUAL layout (the user's own line/chunk breaks) takes priority when present;
     #    otherwise fall back to automatic phrase + max-chars wrapping.
     chunks = []
-    manual_layout = any(w.get("brk") for w in clean)
+    manual_layout = any(w.get("brk") in ("line", "chunk") for w in clean)  # only legacy explicit layout; "soft" stays auto-wrapped
     if manual_layout:
         lines, line = [], []
         for w in clean:
@@ -261,7 +261,8 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
         for w in clean:
             if cur:
                 prev = cur[-1]
-                if (prev["ends_sentence"] or (w["start"] - prev["end"]) > pause_gap
+                if (prev["ends_sentence"] or prev.get("brk") == "soft"
+                        or (w["start"] - prev["end"]) > pause_gap
                         or _cut_between(prev["start"], w["start"])):
                     phrases.append(cur)
                     cur = []

@@ -105,6 +105,25 @@ def _apply_styles_dirs():
     os.environ["CS_OFFICIAL_STYLES_DIR"] = st.OFFICIAL_STYLES_DIR
     os.environ["CS_STYLES_DIR"] = st.STYLES_DIR
     _seed_and_recover_styles()
+    _apply_caption_rules_path()
+
+
+def _apply_caption_rules_path():
+    """Keep the caption-rules file (keep-together / glue / widows) OUTSIDE the auto-updated
+    code dir so custom phrases survive updates. Lives next to the shared library when one is
+    set (so the whole team shares them), else in the persistent per-machine home. Seeded once
+    from the shipped defaults so built-in rules aren't lost."""
+    base = os.path.dirname(_custom_styles_dir())            # <library> or ~/.assembler
+    dst = os.path.join(base, "caption_rules.json")
+    try:
+        os.makedirs(base, exist_ok=True)
+        if not os.path.exists(dst):
+            shipped = os.path.join(ROOT, "caption_rules.json")
+            if os.path.exists(shipped):
+                shutil.copy(shipped, dst)
+        os.environ["CS_CAPTION_RULES"] = dst
+    except OSError:
+        pass  # fall back to the shipped path (subtitles._rules_path default)
 
 # Library lives in a configurable folder (point CS_LIBRARY_DIR / config.json
 # "library_dir" at a shared Drive/Dropbox folder to share it across the team).
@@ -570,8 +589,9 @@ def api_preview_frame(req: PreviewFrameReq):
     tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}],
                                     lang=(req.lang or "en"), cuts=req.cuts)
     events = [e for e, _ in tagged]
-    if events and req.dur:
-        events[-1]["end"] = max(events[-1]["end"], req.dur)  # hold last caption to clip end
+    # NOTE: do NOT extend the last caption to the clip end — build_events already gives it a
+    # readable tail (and trims at a scene cut). Extending here made 'exact' hang the last
+    # caption over trailing footage / the packshot.
     ev = next((e for e in events if req.time >= e["start"] and req.time < e["end"]), None)
     if ev is None:
         return Response(status_code=204)  # nothing on screen at this moment
