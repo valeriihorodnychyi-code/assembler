@@ -131,9 +131,35 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
               f"crop={TARGET_W}:{TARGET_H},setsar=1[bg]; ")
         sub_idx = 1
 
+    # #12 Continuous scrim: when scrim is on, render it as ONE faded band spanning the whole
+    # caption window instead of a hard per-caption band. It fades IN before the first caption
+    # and OUT after the last, so it no longer "pops" with the first title and never blinks
+    # between captions. The text PNGs then skip their own scrim (draw_scrim=False).
+    base_label = "[bg]"
+    scrim_cfg = (tagged_events[0][1].get("scrim") if tagged_events else None) or {}
+    use_scrim = bool(scrim_cfg.get("enabled")) and bool(tagged_events)
+    if use_scrim:
+        win_start = min(float(e["start"]) for e, _ in tagged_events)
+        win_end = min(render_duration, max(float(e["end"]) for e, _ in tagged_events))
+        fade = max(0.0, float(scrim_cfg.get("fade", 0.25)))
+        scrim_start = max(0.0, win_start - fade)          # fully faded in by the time the first caption appears
+        tallest = max((e for e, _ in tagged_events), key=lambda e: len(e.get("lines", [])))
+        scrim_png = os.path.join(sub_dir, "scrim.png")
+        render_subtitle_png(dict(tallest), scrim_png, TARGET_W, TARGET_H,
+                            st.resolve_font(tagged_events[0][1].get("font_name")),
+                            tagged_events[0][1], scale, scrim_only=True)
+        cmd += ["-loop", "1", "-t", f"{render_duration}", "-i", scrim_png]
+        _fin = max(0.001, fade)
+        fc += (f"[{sub_idx}:v]format=yuva420p,"
+               f"fade=t=in:st={scrim_start:.3f}:d={_fin:.3f}:alpha=1,"
+               f"fade=t=out:st={win_end:.3f}:d={_fin:.3f}:alpha=1[scr]; "
+               f"[bg][scr]overlay=0:0[bgsc]; ")
+        base_label = "[bgsc]"
+        sub_idx += 1
+
     # Subtitle stream via concat demuxer (one overlay for the whole track).
     if not tagged_events:
-        last_v = "[bg]"
+        last_v = base_label
     else:
         blank = os.path.join(sub_dir, "blank.png")
         Image.new("RGBA", (TARGET_W, TARGET_H), (0, 0, 0, 0)).save(blank)
@@ -147,7 +173,8 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
                 png = f"sub_{i}.png"
                 font = st.resolve_font(style.get("font_name"))
                 render_subtitle_png(event, os.path.join(sub_dir, png),
-                                    TARGET_W, TARGET_H, font, style, scale)
+                                    TARGET_W, TARGET_H, font, style, scale,
+                                    draw_scrim=not use_scrim)
                 f.write(f"file '{png}'\n")
                 f.write(f"duration {event['end'] - event['start']:.3f}\n")
                 current = event["end"]
@@ -156,7 +183,7 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
                 f.write(f"duration {render_duration - current:.3f}\n")
             f.write("file 'blank.png'\n")  # ffmpeg requires the last entry duplicated
         cmd += ["-f", "concat", "-safe", "0", "-i", subs_txt]
-        fc += f"[bg][{sub_idx}:v]overlay=0:0:format=rgb[final_v]"
+        fc += f"{base_label}[{sub_idx}:v]overlay=0:0:format=rgb[final_v]"
         last_v = "[final_v]"
 
     has_body = bool(body_path and os.path.exists(body_path))

@@ -41,7 +41,7 @@ DEFAULT_STYLE = {
     "shadow2": {"enabled": False, "offset_x": 0, "offset_y": 4, "glow_blur": 0, "color": [0, 0, 0, 255]},  # optional SECOND word shadow, layered under the first (double-shadow look)
     "plate_shadow": {"enabled": False, "offset_x": 0, "offset_y": 8, "glow_blur": 0, "color": [0, 0, 0, 255]},  # drop shadow of the plate / word-plate
     "plate": {"enabled": False, "per_line": False, "color": [0, 0, 0, 160], "pad_x": 30, "pad_y": 15, "border_radius": 15},
-    "scrim": {"enabled": False, "color": [0, 0, 0, 150], "pad": 40, "feather": 70},  # soft dark band behind text for light footage
+    "scrim": {"enabled": False, "color": [0, 0, 0, 150], "pad": 40, "feather": 70, "fade": 0.25},  # soft dark band behind text for light footage; fade = seconds it eases in before the first caption / out after the last
     "gradient": {"colors": [[255, 90, 44, 255], [255, 212, 0, 255]], "direction": "vertical",
                  "on_text": False, "on_active": False, "on_plate": False},
     "karaoke": {"enabled": True, "active_color": [255, 212, 0, 255]},

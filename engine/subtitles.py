@@ -417,7 +417,8 @@ def _linear_gradient(w, h, c0, c1, direction="vertical"):
     return ramp.resize((w, h))   # vertical (top -> bottom)
 
 
-def render_subtitle_png(event, filename, width, height, font_path, style_cfg, scale_factor=1.0):
+def render_subtitle_png(event, filename, width, height, font_path, style_cfg, scale_factor=1.0,
+                        draw_scrim=True, scrim_only=False):
     """Render a single karaoke event to a transparent PNG (pixel-faithful to preview)."""
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     final_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
@@ -459,8 +460,11 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
 
     # Scrim: a soft, full-width dark band behind the text so captions stay readable
     # on bright footage. Drawn FIRST (under plate/shadow/text).
+    # In the continuous-fade path (see render_format) the scrim is rendered as its OWN
+    # faded overlay layer, so text PNGs pass draw_scrim=False; scrim_only=True renders just
+    # the band (for that shared overlay). Legacy/exact single-frame calls keep draw_scrim=True.
     scrim = style_cfg.get("scrim", {})
-    if scrim.get("enabled", False):
+    if (scrim.get("enabled", False) and draw_scrim) or scrim_only:
         sc_pad = int(int(scrim.get("pad", 40)) * scale_factor)
         sc_feather = max(1, int(int(scrim.get("feather", 70)) * scale_factor))
         sc_color = tuple(scrim.get("color", [0, 0, 0, 150]))
@@ -469,6 +473,9 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
             [0, int(start_y - sc_pad - box_off), width, int(start_y + total_height + sc_pad - box_off)],
             fill=sc_color)
         final_img.alpha_composite(band.filter(ImageFilter.GaussianBlur(sc_feather)))
+    if scrim_only:                     # band-only layer for the continuous faded scrim — no text/plate
+        final_img.save(filename)
+        return
 
     word_positions, current_y, word_counter, cx = [], start_y, 0, width / 2
     for i, line in enumerate(lines):
