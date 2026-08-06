@@ -2386,6 +2386,21 @@ function buildStudioLayout(){
   const ptb=$("packTranscribeBtn");
   if(ptb&&body){ptb.style.width="100%";ptb.style.marginTop="6px";ptb.className="go";body.appendChild(ptb);ptb.onclick=transcribePack;}
   qp.addEventListener("input",()=>{saveLastStyle();scheduleExact();});qp.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+  initGrpAccordion();
+}
+// Accordion: opening a section collapses its siblings in the same column, so the open one
+// always fits and nothing gets pushed off / hidden.
+function initGrpAccordion(){
+  document.querySelectorAll("details.grp").forEach(function(d){
+    if(d.dataset.acc)return; d.dataset.acc="1";
+    d.addEventListener("toggle",function(){
+      if(!d.open)return;
+      const p=d.parentElement; if(!p)return;
+      Array.prototype.forEach.call(p.children,function(o){
+        if(o!==d && o.tagName==="DETAILS" && o.classList.contains("grp")) o.open=false;
+      });
+    });
+  });
 }
 // Back-compat shim: old calls like showSection("compose") still work.
 function showSection(sec){setMode(sec==="compose"?"asm":"edit");}
