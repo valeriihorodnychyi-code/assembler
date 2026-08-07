@@ -70,7 +70,11 @@ def _seed_and_recover_styles():
         os.makedirs(dest, exist_ok=True)
     except Exception:
         return
-    sources = [os.path.join(_ASSEMBLER_HOME, "code.prev", "styles"),
+    # Also recover from the persistent local MIRROR (~/.assembler/styles). Every saved preset is
+    # mirrored there (see post_style), so if the shared Drive folder gets wiped by corporate
+    # retention/sync, the next launch re-seeds the customs from the local copy.
+    sources = [os.path.join(_ASSEMBLER_HOME, "styles"),
+               os.path.join(_ASSEMBLER_HOME, "code.prev", "styles"),
                os.path.join(_ASSEMBLER_HOME, "code", "styles")]
     for src in sources:
         if not os.path.isdir(src) or os.path.abspath(src) == os.path.abspath(dest):
@@ -427,9 +431,17 @@ def shutdown():
     return {"ok": True}
 
 
+def _official_names():
+    d = st.OFFICIAL_STYLES_DIR
+    if not d or not os.path.isdir(d):
+        return []
+    return sorted(f[:-5] for f in os.listdir(d) if f.endswith(".json"))
+
+
 @app.get("/api/styles")
 def get_styles():
-    return {"styles": st.list_styles()}
+    # `official` = the shipped defaults (repo styles/); the UI shows these WITHOUT a ★.
+    return {"styles": st.list_styles(), "official": _official_names()}
 
 
 @app.get("/api/styles/{name}")
@@ -448,12 +460,22 @@ class SaveStyle(BaseModel):
 @app.post("/api/styles")
 def post_style(body: SaveStyle):
     path = st.save_style(body.name, body.style)
+    # Durability: always keep a local mirror (~/.assembler/styles) so a wiped shared Drive
+    # folder can't lose the team's presets — they re-seed from here on the next launch.
+    try:
+        mirror = os.path.join(_ASSEMBLER_HOME, "styles")
+        if os.path.abspath(mirror) != os.path.abspath(st.STYLES_DIR):
+            os.makedirs(mirror, exist_ok=True)
+            shutil.copy2(path, os.path.join(mirror, os.path.basename(path)))
+    except Exception:
+        pass
     return {"saved": os.path.basename(path), "styles": st.list_styles()}
 
 
 @app.delete("/api/styles/{name}")
 def delete_style(name: str):
     st.delete_style(name)
+    st.delete_style(name, styles_dir=os.path.join(_ASSEMBLER_HOME, "styles"))  # also drop the local mirror so it doesn't re-seed
     return {"deleted": name, "styles": st.list_styles()}
 
 
