@@ -1,0 +1,142 @@
+{
+  "font_name": "Oswald-Bold.ttf",
+  "font_size": 80,
+  "text_color": [
+    255,
+    255,
+    255,
+    255
+  ],
+  "text_case": "uppercase",
+  "wrap_mode": "chars",
+  "max_chars_per_line": 15,
+  "words_per_line": 3,
+  "max_lines": 2,
+  "line_spacing": -10,
+  "margin_bottom": 750,
+  "box_offset_y": 0,
+  "force_single_line": false,
+  "punctuation": false,
+  "stroke_on": true,
+  "stroke": {
+    "width": 0,
+    "color": [
+      0,
+      0,
+      0,
+      255
+    ]
+  },
+  "stroke_outer": {
+    "width": 0,
+    "color": [
+      0,
+      0,
+      0,
+      255
+    ]
+  },
+  "shadow": {
+    "enabled": true,
+    "offset_x": 0,
+    "offset_y": 8,
+    "glow_blur": 0,
+    "color": [
+      0,
+      0,
+      0,
+      255
+    ]
+  },
+  "shadow2": {
+    "enabled": false,
+    "offset_x": 0,
+    "offset_y": 4,
+    "glow_blur": 0,
+    "color": [
+      0,
+      0,
+      0,
+      255
+    ]
+  },
+  "plate_shadow": {
+    "enabled": false,
+    "offset_x": 0,
+    "offset_y": 8,
+    "glow_blur": 0,
+    "color": [
+      0,
+      0,
+      0,
+      255
+    ]
+  },
+  "plate": {
+    "enabled": false,
+    "per_line": false,
+    "full_width": false,
+    "color": [
+      0,
+      0,
+      0,
+      160
+    ],
+    "pad_x": 30,
+    "pad_y": 15,
+    "border_radius": 15
+  },
+  "scrim": {
+    "enabled": false,
+    "color": [
+      0,
+      0,
+      0,
+      55
+    ],
+    "pad": 40,
+    "feather": 153,
+    "fade": 0.25
+  },
+  "karaoke": {
+    "enabled": true,
+    "active_color": [
+      255,
+      255,
+      255,
+      255
+    ]
+  },
+  "gradient": {
+    "colors": [
+      [
+        255,
+        90,
+        44,
+        255
+      ],
+      [
+        255,
+        212,
+        0,
+        255
+      ]
+    ],
+    "direction": "vertical",
+    "on_text": false,
+    "on_active": false,
+    "on_plate": false
+  },
+  "karaoke_plate": {
+    "enabled": true,
+    "color": [
+      213,
+      40,
+      1,
+      255
+    ],
+    "pad_x": 14,
+    "pad_y": 6,
+    "border_radius": 8
+  }
+}
