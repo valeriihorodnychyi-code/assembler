@@ -327,7 +327,7 @@
       <button id="playBtn" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 16px">▶</button>
       <button id="frameFwd" title="+1 кадр (→)" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 12px">⟩</button>
       <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
-      <span class="val" id="timeLbl" style="width:auto">0.0s</span>
+      <span class="val" id="timeLbl" style="display:inline-block;min-width:56px;text-align:left;font-variant-numeric:tabular-nums">0.0s</span>
       <button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
       <button id="safeToggle" title="Safe zones for social (TikTok / Reels / Shorts) — keeps captions clear of the platform UI. Guide only, not exported." style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">⧉ Safe</button>
     </div>
@@ -1079,7 +1079,7 @@ function scrimFactor(t,events,fade){
 }
 function render(t,dur){
   _capRange=null;   // current on-screen caption time range (for the Words-view highlight)
-  const[W,H]=DIMS[ratio];canvas.width=W;canvas.height=H;ctx.clearRect(0,0,W,H);
+  const[W,H]=DIMS[ratio];if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}else{ctx.clearRect(0,0,W,H);}   // only resize the backing store on format change; otherwise just clear (no per-frame reflow/churn)
   {const _cd=$("capDrag");if(_cd)_cd.style.display="none";}   // #3 drag-band hidden unless a caption is actually on screen (set below)
   if(!videoLoaded){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,"#3a2b4d");g.addColorStop(1,"#1a2740");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
   const s=styleAt(t);
