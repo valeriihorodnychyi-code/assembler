@@ -1,5 +1,5 @@
 {
-  "version": "1.9.20",
+  "version": "1.9.21",
   "channel": "main",
-  "notes": "Fix: the UI no longer shakes during playback. The time counter under the preview had an auto width, so its number changed width every frame (e.g. 9.9s → 10.0s) and nudged the whole centred layout. It now has a fixed width with tabular figures, and the preview canvas only resizes on a format change (not every frame)."
+  "notes": "New: '⭳ Save as app default (base)' button by the presets. It writes the current look straight into the shipped styles/ folder, so after you Commit + Push it becomes a permanent base preset (no star) that travels with every update and every repackaged .app."
 }

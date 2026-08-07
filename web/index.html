@@ -1556,6 +1556,7 @@ function wordsToText(ws){let out="";(ws||[]).forEach(w=>{out+=(w.word||w.text||"
 // ---------- presets + custom styles ----------
 let savedStyles={};   // name -> engine-schema JSON (loaded from the shared styles/ folder)
 let officialNames=new Set();   // names that ship with the code (repo styles/) → shown WITHOUT a ★, not deletable
+let IS_MAINTAINER=false;       // true only in the git-clone dev run (run.command from the repo); gates the 'Save as app default' button
 function markPreset(b){document.querySelectorAll(".preset").forEach(p=>p.classList.remove("active"));if(b)b.classList.add("active");}
 function applyPreset(name){const p={...PRESETS[name]};delete p.fontFamily;/* keep chosen font */["shadowOn","plateOn","kpOn","karaokeOn"].forEach(id=>{$(id).checked=false;});writeControls(p);}
 // inverse of toEngineStyle: engine JSON -> UI controls (so a loaded style fills the editor)
@@ -1604,10 +1605,14 @@ function renderPresetRail(){
   const hasStyles=Object.keys(savedStyles).length>0;
   if(!hasStyles) Object.keys(PRESETS).forEach(name=>pw.appendChild(presetCard(name,PRESET_SAMPLE[name]||"color:#fff",false,()=>applyPreset(name))));   // safety net only when styles/ folder is empty
   Object.keys(savedStyles).forEach(name=>{const e=savedStyles[name];const isOff=officialNames.has(name);pw.appendChild(presetCard(name,styleSampleCSS(e),!isOff,()=>writeControls(fromEngineStyle(e))));});   // official (shipped) → no ★; team customs → ★ + ✕
-  const act=document.createElement("div");act.style.cssText="display:flex;gap:6px;margin-top:8px";
-  act.innerHTML="<button id='railSave' style='flex:1;font-size:11px;padding:6px 4px'>＋ Save</button><button id='railImport' style='flex:1;font-size:11px;padding:6px 4px'>⤴ Import</button>";
+  const act=document.createElement("div");act.style.cssText="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px";
+  act.innerHTML="<button id='railSave' style='flex:1;font-size:11px;padding:6px 4px'>＋ Save</button>"+
+    "<button id='railImport' style='flex:1;font-size:11px;padding:6px 4px'>⤴ Import</button>"+
+    // 'Save as app default' only makes sense in the maintainer's repo clone — hidden everywhere else
+    (IS_MAINTAINER?"<button id='railBase' style='flex:1 1 100%;font-size:11px;padding:6px 4px' title='Зберегти поточний вигляд як БАЗОВИЙ пресет (у styles/): їде з кожним апдейтом і в кожну збірку .app. Далі Commit + Push у GitHub Desktop.'>⭳ Save as app default (base)</button>":"");
   pw.appendChild(act);
   $("railSave").onclick=saveCurrentStyle;$("railImport").onclick=()=>$("styleFileInput").click();
+  if($("railBase"))$("railBase").onclick=saveAsDefault;
 }
 async function loadSavedStyles(){
   try{const d=await(await fetch(API+"/api/styles")).json();const names=d.styles||[];savedStyles={};officialNames=new Set(d.official||[]);
@@ -1620,6 +1625,16 @@ async function saveCurrentStyle(){
   try{const r=await fetch(API+"/api/styles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,style:toEngineStyle(readControls())})});
     if(!r.ok)throw new Error((await r.json()).detail||"failed");setStatus("Стиль збережено: "+name,"ok");await loadSavedStyles();
   }catch(e){setStatus("Save failed: "+e.message,"err");}
+}
+// Save the current look into the SHIPPED defaults (repo styles/) so it becomes a permanent base
+// preset — survives every update and repackage. Then the maintainer Commits + Pushes it.
+async function saveAsDefault(){
+  const name=(prompt("Назва базового пресета (їде з апдейтами й у збірку .app):","")||"").trim();if(!name)return;
+  try{const r=await fetch(API+"/api/styles/official",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,style:toEngineStyle(readControls())})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+    setStatus("Збережено в базу → styles/"+d.saved+". Тепер Commit + Push у GitHub Desktop, щоб зафіксувати назавжди.","ok");
+    await loadSavedStyles();
+  }catch(e){setStatus("Save-as-default failed: "+e.message,"err");}
 }
 renderPresetRail();
 $("saveStyleBtn2").onclick=saveCurrentStyle;
@@ -2981,6 +2996,7 @@ async function init(){
   else{applyPreset(FALLBACK_PRESET);const _p=document.querySelector(".preset");if(_p)_p.classList.add("active");}  // …or the safety-net default on a truly fresh install
   autoGrow();
   try{const r=await fetch(API+"/api/info");const d=await r.json();
+    IS_MAINTAINER=!!d.maintainer;if(typeof renderPresetRail==="function")renderPresetRail();   // reveal the 'Save as app default' button only in the repo clone
     $("encBadge").innerHTML="encoder: <b>"+d.encoder+"</b>"+(d.version?'  ·  v<b>'+d.version+'</b>':'');
     if(d.allowed===false){$("lockScreen").classList.add("show");if(d.machine_id)$("lockMid").textContent=d.machine_id;}
     if(!d.scribe_key_present){const b=$("engineSeg")&&$("engineSeg").querySelector('button[data-v=scribe]');if(b){b.disabled=true;b.title="No ElevenLabs API key";b.style.opacity=".4";}}

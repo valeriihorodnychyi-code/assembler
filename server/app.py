@@ -332,6 +332,10 @@ def info():
         "machine_id": machine_id(),
         "allowed": license_ok(),
         "version": app_version(),
+        # true only in the maintainer's git clone (run.command from the repo). The packaged .app
+        # and auto-updated code have no .git, so the 'Save as app default' button is hidden there
+        # (it would write into the bundle and never reach GitHub).
+        "maintainer": os.path.isdir(os.path.join(ROOT, ".git")),
     }
 
 
@@ -477,6 +481,18 @@ def delete_style(name: str):
     st.delete_style(name)
     st.delete_style(name, styles_dir=os.path.join(_ASSEMBLER_HOME, "styles"))  # also drop the local mirror so it doesn't re-seed
     return {"deleted": name, "styles": st.list_styles()}
+
+
+@app.post("/api/styles/official")
+def post_official_style(body: SaveStyle):
+    """Save a style into the SHIPPED defaults (repo styles/) so it becomes a permanent base
+    preset — it travels with every code update and gets bundled into every repackaged .app.
+    Writes into the code's styles/ folder; the maintainer then Commits + Pushes it on GitHub."""
+    d = st.OFFICIAL_STYLES_DIR
+    os.makedirs(d, exist_ok=True)
+    path = st.save_style(body.name, body.style, styles_dir=d)
+    return {"saved": os.path.basename(path), "dir": d,
+            "official": _official_names(), "styles": st.list_styles()}
 
 
 class DetectCutsReq(BaseModel):
