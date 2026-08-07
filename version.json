@@ -1,5 +1,5 @@
 {
   "version": "1.9.21",
   "channel": "main",
-  "notes": "New: '⭳ Save as app default (base)' button by the presets. It writes the current look straight into the shipped styles/ folder, so after you Commit + Push it becomes a permanent base preset (no star) that travels with every update and every repackaged .app."
+  "notes": "New: '⭳ Save as app default (base)' button by the presets — writes the current look straight into the shipped styles/ folder, so after Commit + Push it becomes a permanent base preset (no star) that travels with every update and every repackaged .app. The button only appears in the maintainer's repo clone; it's hidden in the packaged app and auto-updated code (where it couldn't reach GitHub)."
 }
