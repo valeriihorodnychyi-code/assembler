@@ -41,6 +41,9 @@
   #capDrag:hover::after{background:rgba(255,255,255,.6);box-shadow:0 1px 4px rgba(0,0,0,.55)}
   #capDrag.dragging{background:rgba(255,90,44,.12)}
   #capDrag.dragging::after{background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.6)}
+  /* social safe-zone guide overlay (preview only, never exported) */
+  #safeZones{position:absolute;inset:0;pointer-events:none;z-index:4}
+  #safeToggle.on{background:var(--accent);color:#fff;border-color:var(--accent)}
   .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:340px;height:470px;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;padding:20px}
   .dropzone.drag{border-color:var(--accent);color:var(--txt)}
   .dropzone .big{font-size:42px}
@@ -314,6 +317,7 @@
         <img id="exactImg" alt="" style="position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none">
         <div id="exactBadge" style="position:absolute;top:8px;right:8px;display:none;font-size:10px;background:rgba(34,197,94,.9);color:#06210f;font-weight:700;padding:2px 7px;border-radius:5px">✓ exact</div>
         <div id="capDrag" title="Тягни титр вгору / вниз, щоб змінити висоту"></div>
+        <div id="safeZones" style="display:none"></div>
         <div id="overlayLayer"></div>
       </div>
       <div id="filmstrip"></div>
@@ -325,6 +329,7 @@
       <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
       <span class="val" id="timeLbl" style="width:auto">0.0s</span>
       <button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
+      <button id="safeToggle" title="Safe zones for social (TikTok / Reels / Shorts) — keeps captions clear of the platform UI. Guide only, not exported." style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">⧉ Safe</button>
     </div>
     <div id="trimRow" style="display:none;max-width:520px;margin:8px auto 0;flex-direction:column;gap:6px">
       <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)">
@@ -813,7 +818,7 @@ function toEngineStyle(s){
     text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,punctuation:!!s.punct,
     stroke_on:s.strokeOn!==false,stroke:{width:s.strokeW,color:arr(s.strokeColor)},stroke_outer:{width:s.strokeOuterW,color:arr(s.strokeOuterColor)},
     shadow:{enabled:s.shadowOn,offset_x:s.shX,offset_y:s.shY,glow_blur:s.shBlur,color:arr(s.shColor)},
-    shadow2:{enabled:s.shadow2On,offset_x:s.sh2X,offset_y:s.sh2Y,glow_blur:s.sh2Blur,color:arr(s.sh2Color)},
+    shadow2:{enabled:s.shadowOn&&s.shadow2On,offset_x:s.sh2X,offset_y:s.sh2Y,glow_blur:s.sh2Blur,color:arr(s.sh2Color)},
     plate_shadow:{enabled:s.plateShadowOn,offset_x:s.pshX,offset_y:s.pshY,glow_blur:s.pshBlur,color:arr(s.pshColor)},
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
     scrim:{enabled:s.scrimOn,color:arr(s.scrimColor,s.scrimAlpha),pad:40,feather:s.scrimFeather,fade:s.scrimFade},
@@ -1140,7 +1145,7 @@ function render(t,dur){
   if(s.kpOn){ctx.save();pshadow();
     for(const p of pos)if(p.active){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:asc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;const top=(p.y+asc)-ga;const h=ga+gd;ctx.fillStyle=s.gradPlate?capGrad():rgba(s.kpColor,255);rr(p.x-s.kpPadX*scale,top-s.kpPadY*scale-boff,p.wide+s.kpPadX*2*scale,h+s.kpPadY*2*scale,s.kpRadius*scale);ctx.fill();}
     ctx.restore();}
-  if(s.shadow2On){ctx.save();ctx.shadowColor=rgba(s.sh2Color,255);ctx.shadowBlur=s.sh2Blur*scale;ctx.shadowOffsetX=s.sh2X*scale;ctx.shadowOffsetY=s.sh2Y*scale;ctx.fillStyle=rgba(s.sh2Color,255);for(const p of pos)ctx.fillText(p.disp,p.x,p.y+asc);ctx.restore();}   // #11 second word shadow — drawn UNDER the first for a layered double-shadow look
+  if(s.shadowOn&&s.shadow2On){ctx.save();ctx.shadowColor=rgba(s.sh2Color,255);ctx.shadowBlur=s.sh2Blur*scale;ctx.shadowOffsetX=s.sh2X*scale;ctx.shadowOffsetY=s.sh2Y*scale;ctx.fillStyle=rgba(s.sh2Color,255);for(const p of pos)ctx.fillText(p.disp,p.x,p.y+asc);ctx.restore();}   // #11 second word shadow — gated by the master Shadow toggle, drawn UNDER the first
   if(s.shadowOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of pos)ctx.fillText(p.disp,p.x,p.y+asc);ctx.restore();}   // word shadow — over the plate too
   if(s.strokeOn!==false){
     if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)ctx.strokeText(p.disp,p.x,p.y+asc);}
@@ -1427,6 +1432,28 @@ async function fetchExact(){
   }catch(e){}
 }
 $("exactToggle").onclick=()=>{exactOn=!exactOn;$("exactToggle").classList.toggle("on",exactOn);if(exactOn)fetchExact();else hideExact();};
+
+// ---------- social safe-zone guide (preview only; a design guide, never burned into the export) ----------
+// Shades the areas each platform's UI covers (top bar, bottom caption/CTA, right action rail) so you
+// keep titles inside the clear centre. Margins are per-format; toggle on/off with the ⧉ Safe button.
+let safeOn=false;
+const SAFE_MARGINS={"9:16":{t:.06,b:.20,l:.03,r:.12},"1:1":{t:.07,b:.14,l:.05,r:.10},"16:9":{t:.08,b:.10,l:.05,r:.05}};
+function renderSafeZones(){
+  const box=$("safeZones"); if(!box)return;
+  if(!safeOn){box.style.display="none";box.innerHTML="";return;}
+  box.style.display="block";
+  const m=SAFE_MARGINS[ratio]||SAFE_MARGINS["9:16"];
+  const T=(m.t*100).toFixed(1),B=(m.b*100).toFixed(1),L=(m.l*100).toFixed(1),R=(m.r*100).toFixed(1);
+  const sh="position:absolute;background:rgba(0,0,0,.45)";
+  box.innerHTML=
+    `<div style="${sh};left:0;right:0;top:0;height:${T}%"></div>`+
+    `<div style="${sh};left:0;right:0;bottom:0;height:${B}%"></div>`+
+    `<div style="${sh};top:${T}%;bottom:${B}%;left:0;width:${L}%"></div>`+
+    `<div style="${sh};top:${T}%;bottom:${B}%;right:0;width:${R}%"></div>`+
+    `<div style="position:absolute;top:${T}%;bottom:${B}%;left:${L}%;right:${R}%;border:1.5px dashed rgba(255,255,255,.65);border-radius:3px"></div>`+
+    `<div style="position:absolute;top:calc(${T}% + 4px);left:calc(${L}% + 6px);font:700 9.5px/1 system-ui,sans-serif;letter-spacing:1.5px;color:rgba(255,255,255,.7)">SAFE</div>`;
+}
+$("safeToggle").onclick=()=>{safeOn=!safeOn;$("safeToggle").classList.toggle("on",safeOn);renderSafeZones();};
 video.addEventListener("play",()=>{if(exactOn)hideExact();});
 video.addEventListener("seeking",()=>{if(exactOn)hideExact();});
 video.addEventListener("seeked",scheduleExact);
@@ -1649,7 +1676,8 @@ function setRatio(r){if(!DIMS[r])return;ratio=r;
   if(typeof drawFrame==="function")try{drawFrame();}catch(e){}
   if(typeof scheduleExact==="function")scheduleExact();
   if(typeof refreshAssembleHints==="function")refreshAssembleHints();
-  if(typeof renderBatchStage==="function"&&currentMode==="asm")renderBatchStage();}
+  if(typeof renderBatchStage==="function"&&currentMode==="asm")renderBatchStage();
+  if(typeof renderSafeZones==="function")renderSafeZones();}   // re-fit safe-zone bands to the new format
 $("ratioTabs").querySelectorAll("button").forEach(b=>{b.onclick=()=>{setRatio(b.dataset.r);setStatus("Формат: "+ratio,"");};});
 // Auto-detect format from the loaded video so captions scale to the right aspect.
 function autoDetectRatio(){if(!video||!video.videoWidth||!video.videoHeight)return;

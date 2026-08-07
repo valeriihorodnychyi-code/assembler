@@ -1,5 +1,5 @@
 {
-  "version": "1.9.18",
+  "version": "1.9.19",
   "channel": "main",
-  "notes": "Export button on the captions screen (pulses for one video; a pack pulses Assemble instead). Per-phrase style — give any caption its own preset. Scrim now fades in/out and no longer pops with the first caption. Second word shadow. Drag the caption up/down on the preview. Style→all restored. Presets cleaned up: defaults come from styles/*.json (no star, editable on GitHub), customs are mirrored locally so a Drive wipe can't lose them."
+  "notes": "Fix: the master Shadow toggle now turns the second shadow layer off too. New: social Safe zones — a ⧉ Safe button under the preview shades the areas TikTok/Reels/Shorts UI covers (top bar, bottom caption/CTA, right action rail) so you keep titles in the clear centre. Per-format, toggle on/off, guide only (never exported)."
 }

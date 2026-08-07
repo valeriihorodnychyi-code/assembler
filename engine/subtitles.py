@@ -494,7 +494,7 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     sh_c = tuple(sh.get("color", [0, 0, 0, 255]))
     sh_blur = int(int(sh.get("glow_blur", 0)) * scale_factor)
     sh2 = style_cfg.get("shadow2", {})                     # optional SECOND word shadow (layered under the first)
-    shadow2_on = sh2.get("enabled", False)
+    shadow2_on = sh2.get("enabled", False) and shadow_on   # master Shadow toggle gates the second shadow too
     sh2_x = int(int(sh2.get("offset_x", 0)) * scale_factor)
     sh2_y = int(int(sh2.get("offset_y", 4)) * scale_factor)
     sh2_c = tuple(sh2.get("color", [0, 0, 0, 255]))
