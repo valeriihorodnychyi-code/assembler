@@ -44,6 +44,8 @@
   /* social safe-zone guide overlay (preview only, never exported) */
   #safeZones{position:absolute;inset:0;pointer-events:none;z-index:4}
   #safeToggle.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  /* skewed green 'beta' tag, like the language sticker */
+  .beta-tag{position:absolute;top:-7px;right:8px;z-index:3;font-family:'Caveat',cursive;font-size:15px;font-weight:700;color:#06210f;background:#22c55e;border-radius:7px;padding:0 9px;transform:rotate(3deg);box-shadow:0 3px 10px rgba(0,0,0,.35);letter-spacing:.5px;pointer-events:none}
   .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:340px;height:470px;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;padding:20px}
   .dropzone.drag{border-color:var(--accent);color:var(--txt)}
   .dropzone .big{font-size:42px}
@@ -556,6 +558,22 @@
       </div>
     </details>
 
+    <details class="grp" style="position:relative">
+      <span class="beta-tag">beta</span>
+      <summary><span>Animation</span> <span class="chev">›</span></summary>
+      <div class="body">
+        <div class="hint">Words animate in around when they're spoken. Preview only for now — not yet in the final render.</div>
+        <div class="row"><label>Type</label>
+          <select id="animType" style="flex:1">
+            <option value="none">None</option>
+            <option value="pop">Pop (scale-in)</option>
+            <option value="rise">Rise (slide-up)</option>
+            <option value="type">Typewriter (word-by-word)</option>
+          </select></div>
+        <div class="row"><label>Speed (s)</label><input type="range" id="animSpeed" min="0.08" max="0.8" step="0.02" value="0.25"><span class="val" id="animSpeedV">0.25</span></div>
+      </div>
+    </details>
+
     <details class="grp">
       <summary><span data-i18n="secOverlays">Overlays · PNG / .mov</span> <span class="chev">›</span></summary>
       <div class="body">
@@ -710,7 +728,7 @@ let editingHook=null, packMode="orig";               // packMode: "orig" = origi
 let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","punct"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","punct"];
 
 // Defaults now live as .json in the repo styles/ folder (official, no ★) + team customs (★).
 // This single hardcoded preset is only a SAFETY NET: shown when the styles folder is empty, so
@@ -796,6 +814,7 @@ function readControls(){
     karaokeOn:$("karaokeOn").checked,karaokeColor:$("karaokeColor").value,kpOn:$("kpOn").checked,kpColor:$("kpColor").value,kpPadX:+$("kpPadX").value,kpPadY:+$("kpPadY").value,kpRadius:+$("kpRadius").value,
     gradC0:$("gradC0")?$("gradC0").value:"#ff5a2c",gradC1:$("gradC1")?$("gradC1").value:"#ffd400",gradDir:$("gradDir")?$("gradDir").value:"vertical",gradText:$("gradText")?$("gradText").checked:false,gradActive:$("gradActive")?$("gradActive").checked:false,gradPlate:$("gradPlate")?$("gradPlate").checked:false,
     scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value,scrimFade:+($("scrimFade")?$("scrimFade").value:0.25),
+    animType:$("animType")?$("animType").value:"none",animSpeed:+($("animSpeed")?$("animSpeed").value:0.25),
     punct:$("punct")?$("punct").checked:false};
 }
 function writeControls(s){
@@ -822,6 +841,7 @@ function toEngineStyle(s){
     plate_shadow:{enabled:s.plateShadowOn,offset_x:s.pshX,offset_y:s.pshY,glow_blur:s.pshBlur,color:arr(s.pshColor)},
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
     scrim:{enabled:s.scrimOn,color:arr(s.scrimColor,s.scrimAlpha),pad:40,feather:s.scrimFeather,fade:s.scrimFade},
+    animation:{type:s.animType||"none",speed:s.animSpeed},
     karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},
     gradient:{colors:[arr(s.gradC0),arr(s.gradC1)],direction:s.gradDir||"vertical",on_text:!!s.gradText,on_active:!!s.gradActive,on_plate:!!s.gradPlate},
     karaoke_plate:{enabled:s.kpOn,color:arr(s.kpColor),pad_x:s.kpPadX,pad_y:s.kpPadY,border_radius:s.kpRadius}};
@@ -1123,8 +1143,25 @@ function render(t,dur){
   const spaceW=ctx.measureText(" ").width;
   let gi=0;const lw=lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*spaceW);
   const pos=[];let y=startY;
-  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,wide:ctx.measureText(w.disp).width});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
+  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,wide:ctx.measureText(w.disp).width,start:w.start});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
   const boff=(s.boxOffsetY||0)*scale;
+  // --- Animated captions (BETA, preview only): each word eases in around its own spoken time ---
+  const animType=s.animType||"none", animDur=Math.max(0.05,+s.animSpeed||0.25);
+  const _eOutCubic=x=>1-Math.pow(1-x,3);
+  const _eOutBack=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2);};
+  function animAt(p){
+    if(animType==="none")return{a:1,sc:1,dy:0};
+    const ws=(typeof p.start==="number")?p.start:ev.start;
+    if(animType==="type")return{a:(t>=ws)?1:0,sc:1,dy:0};
+    const prog=Math.max(0,Math.min(1,(t-ws)/animDur));
+    if(animType==="rise")return{a:prog,sc:1,dy:(1-_eOutCubic(prog))*22*scale};
+    return{a:prog,sc:0.55+0.45*_eOutBack(prog),dy:0};   // pop (scale-in with slight overshoot)
+  }
+  function awrap(p,fn){const st=animAt(p);if(st.a<=0)return;
+    if(st.a===1&&st.sc===1&&st.dy===0){fn();return;}    // static word → draw directly (no overhead)
+    ctx.save();ctx.globalAlpha*=st.a;
+    if(st.sc!==1||st.dy!==0){const cx=p.x+p.wide/2,cy=p.y+asc;ctx.translate(cx,cy+st.dy);ctx.scale(st.sc,st.sc);ctx.translate(-cx,-cy);}
+    fn();ctx.restore();}
   // #3 — park the invisible drag-band over the caption text so you can grab & move it vertically
   {const _cd=$("capDrag");if(_cd){const _pad=lineH*0.4;
     const _top=Math.max(0,startY-_pad),_bot=Math.min(H,startY+totalH+_pad);
@@ -1145,13 +1182,13 @@ function render(t,dur){
   if(s.kpOn){ctx.save();pshadow();
     for(const p of pos)if(p.active){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:asc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;const top=(p.y+asc)-ga;const h=ga+gd;ctx.fillStyle=s.gradPlate?capGrad():rgba(s.kpColor,255);rr(p.x-s.kpPadX*scale,top-s.kpPadY*scale-boff,p.wide+s.kpPadX*2*scale,h+s.kpPadY*2*scale,s.kpRadius*scale);ctx.fill();}
     ctx.restore();}
-  if(s.shadowOn&&s.shadow2On){ctx.save();ctx.shadowColor=rgba(s.sh2Color,255);ctx.shadowBlur=s.sh2Blur*scale;ctx.shadowOffsetX=s.sh2X*scale;ctx.shadowOffsetY=s.sh2Y*scale;ctx.fillStyle=rgba(s.sh2Color,255);for(const p of pos)ctx.fillText(p.disp,p.x,p.y+asc);ctx.restore();}   // #11 second word shadow — gated by the master Shadow toggle, drawn UNDER the first
-  if(s.shadowOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of pos)ctx.fillText(p.disp,p.x,p.y+asc);ctx.restore();}   // word shadow — over the plate too
+  if(s.shadowOn&&s.shadow2On){ctx.save();ctx.shadowColor=rgba(s.sh2Color,255);ctx.shadowBlur=s.sh2Blur*scale;ctx.shadowOffsetX=s.sh2X*scale;ctx.shadowOffsetY=s.sh2Y*scale;ctx.fillStyle=rgba(s.sh2Color,255);for(const p of pos)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // #11 second word shadow — gated by the master Shadow toggle, drawn UNDER the first
+  if(s.shadowOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of pos)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // word shadow — over the plate too
   if(s.strokeOn!==false){
-    if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)ctx.strokeText(p.disp,p.x,p.y+asc);}
-    if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of pos)ctx.strokeText(p.disp,p.x,p.y+asc);}
+    if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
+    if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
   }
-  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):rgba(s.textColor,255));ctx.fillText(p.disp,p.x,p.y+asc);}
+  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):rgba(s.textColor,255));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
 }
 function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
 
@@ -1575,7 +1612,8 @@ function fromEngineStyle(e){
     plateOn:!!pl.enabled,plateLine:!!pl.per_line,plateFull:!!pl.full_width,plateColor:hx(pl.color),plateAlpha:(pl.color&&pl.color[3]!=null)?pl.color[3]:160,platePadX:+g(pl,"pad_x",30),platePadY:+g(pl,"pad_y",15),plateRadius:+g(pl,"border_radius",15),
     karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
     gradC0:hx((gr.colors&&gr.colors[0])||[255,90,44,255]),gradC1:hx((gr.colors&&gr.colors[1])||[255,212,0,255]),gradDir:gr.direction||"vertical",gradText:!!gr.on_text,gradActive:!!gr.on_active,gradPlate:!!gr.on_plate,
-    scrimOn:!!(e.scrim&&e.scrim.enabled),scrimColor:hx((e.scrim&&e.scrim.color)||[0,0,0,150]),scrimAlpha:(e.scrim&&e.scrim.color&&e.scrim.color[3]!=null)?e.scrim.color[3]:150,scrimFeather:+g(e.scrim||{},"feather",70),scrimFade:+g(e.scrim||{},"fade",0.25)};
+    scrimOn:!!(e.scrim&&e.scrim.enabled),scrimColor:hx((e.scrim&&e.scrim.color)||[0,0,0,150]),scrimAlpha:(e.scrim&&e.scrim.color&&e.scrim.color[3]!=null)?e.scrim.color[3]:150,scrimFeather:+g(e.scrim||{},"feather",70),scrimFade:+g(e.scrim||{},"fade",0.25),
+    animType:(e.animation&&e.animation.type)||"none",animSpeed:+g(e.animation||{},"speed",0.25)};
 }
 // mini "Aa" sample CSS derived from an engine style
 function styleSampleCSS(e){

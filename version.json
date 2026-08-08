@@ -1,5 +1,5 @@
 {
-  "version": "1.9.21",
+  "version": "1.9.22",
   "channel": "main",
-  "notes": "New: '⭳ Save as app default (base)' button by the presets — writes the current look straight into the shipped styles/ folder, so after Commit + Push it becomes a permanent base preset (no star) that travels with every update and every repackaged .app. The button only appears in the maintainer's repo clone; it's hidden in the packaged app and auto-updated code (where it couldn't reach GitHub)."
+  "notes": "New (BETA, preview only): Animation section — words ease in around when they're spoken. Three types: Pop (scale-in), Rise (slide-up), Typewriter (word-by-word), plus a Speed control. Marked 'beta' (green tag) because it shows in the live preview but is not yet baked into the final render."
 }
