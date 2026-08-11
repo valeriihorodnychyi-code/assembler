@@ -1146,14 +1146,21 @@ function render(t,dur){
   for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,wide:ctx.measureText(w.disp).width,start:w.start});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
   const boff=(s.boxOffsetY||0)*scale;
   // --- Animated captions (BETA, preview only): each word eases in around its own spoken time ---
-  const animType=s.animType||"none", animDur=Math.max(0.05,+s.animSpeed||0.25);
+  // SAFETY: animation ONLY runs while the video is actually PLAYING. Paused / scrubbing / exact /
+  // at rest → captions are always fully visible. And a word with an unknown/invalid timecode is
+  // never hidden. So animation can never make captions "disappear".
+  const _playing=(typeof video!=="undefined" && video && videoLoaded && !video.paused);
+  const animType=(_playing && s.animType && s.animType!=="none") ? s.animType : "none";
+  const animDur=Math.max(0.05,+s.animSpeed||0.25);
   const _eOutCubic=x=>1-Math.pow(1-x,3);
   const _eOutBack=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2);};
   function animAt(p){
     if(animType==="none")return{a:1,sc:1,dy:0};
-    const ws=(typeof p.start==="number")?p.start:ev.start;
+    const ws=(typeof p.start==="number"&&isFinite(p.start))?p.start:null;
+    if(ws===null)return{a:1,sc:1,dy:0};                  // unknown timing → always visible
     if(animType==="type")return{a:(t>=ws)?1:0,sc:1,dy:0};
     const prog=Math.max(0,Math.min(1,(t-ws)/animDur));
+    if(!isFinite(prog))return{a:1,sc:1,dy:0};
     if(animType==="rise")return{a:prog,sc:1,dy:(1-_eOutCubic(prog))*22*scale};
     return{a:prog,sc:0.55+0.45*_eOutBack(prog),dy:0};   // pop (scale-in with slight overshoot)
   }
