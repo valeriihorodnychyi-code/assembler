@@ -1,5 +1,5 @@
 {
-  "version": "1.9.22",
+  "version": "1.9.23",
   "channel": "main",
-  "notes": "New (BETA, preview only): Animation section — words ease in around when they're spoken. Three types: Pop (scale-in), Rise (slide-up), Typewriter (word-by-word), plus a Speed control. Marked 'beta' (green tag) because it shows in the live preview but is not yet baked into the final render."
+  "notes": "Fix: the default caption presets now ship baked into the app itself, so the whole team always has the full library even if the styles/ folder or Google Drive doesn't reach them (a folder preset of the same name still overrides it, so editing defaults keeps working). Fix: the beta Animation can no longer hide captions — it only plays while the video is actually playing; paused/scrubbing/exact and any word with unknown timing always show fully."
 }
