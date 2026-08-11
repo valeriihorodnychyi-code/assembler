@@ -1658,12 +1658,23 @@ function renderPresetRail(){
   Object.keys(BUILTIN_STYLES).forEach(name=>{if(shown.has(name))return;const e=BUILTIN_STYLES[name];pw.appendChild(presetCard(name,styleSampleCSS(e),false,()=>writeControls(fromEngineStyle(e))));});
   const act=document.createElement("div");act.style.cssText="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px";
   act.innerHTML="<button id='railSave' style='flex:1;font-size:11px;padding:6px 4px'>＋ Save</button>"+
-    "<button id='railImport' style='flex:1;font-size:11px;padding:6px 4px'>⤴ Import</button>"+
+    "<button id='railImport' style='flex:1;font-size:11px;padding:6px 4px' title='Завантажити чийсь стиль-файл (.json)'>⤴ Import</button>"+
+    "<button id='railExport' style='flex:1;font-size:11px;padding:6px 4px' title='Вивантажити поточний стиль у .json — щоб надіслати колезі'>⤓ Export</button>"+
     // 'Save as app default' only makes sense in the maintainer's repo clone — hidden everywhere else
     (IS_MAINTAINER?"<button id='railBase' style='flex:1 1 100%;font-size:11px;padding:6px 4px' title='Зберегти поточний вигляд як БАЗОВИЙ пресет (у styles/): їде з кожним апдейтом і в кожну збірку .app. Далі Commit + Push у GitHub Desktop.'>⭳ Save as app default (base)</button>":"");
   pw.appendChild(act);
   $("railSave").onclick=saveCurrentStyle;$("railImport").onclick=()=>$("styleFileInput").click();
+  $("railExport").onclick=exportCurrentStyle;
   if($("railBase"))$("railBase").onclick=saveAsDefault;
+}
+// Export the current editor style to a .json file the designer can send to a teammate (who Imports it).
+function exportCurrentStyle(){
+  const name=(prompt("Назва файлу стилю:","my_style")||"").trim()||"my_style";
+  const cfg=toEngineStyle(readControls());
+  const blob=new Blob([JSON.stringify(cfg,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name.replace(/\.json$/i,"")+".json";
+  document.body.appendChild(a);a.click();a.remove();
+  setStatus("Стиль вивантажено: "+a.download+" — можна кидати колезі, він відкриє через ⤴ Import.","ok");
 }
 async function loadSavedStyles(){
   try{const d=await(await fetch(API+"/api/styles")).json();const names=d.styles||[];savedStyles={};officialNames=new Set(d.official||[]);
@@ -1862,8 +1873,12 @@ async function doExport(){
       body:JSON.stringify({file_id:fileId,clip:v.clip||"source.mp4",regions,words,formats:[ratio],
         smart_trim:false,use_body:false,trim:v.trim||null,cuts:v.cuts||null})});
     const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
-    (d.outputs||[]).forEach(o=>{const a=document.createElement("a");a.href=API+o.url;a.download=o.name;document.body.appendChild(a);a.click();a.remove();});
-    setStatus("Exported "+((d.outputs||[]).length)+" file(s). 🎬","ok");busyDone("Готово");
+    // MarTech flow: the _nSub clip comes INTO Assembler for captioning; the subtitled version
+    // must be delivered as <name>.mp4 — i.e. the same name with the _nSub suffix removed.
+    const srcName=((videoFile&&videoFile.name)||v.clip||"creative.mp4").replace(/\.[^.]+$/,"");
+    const outBase=srcName.replace(/_nSub$/i,"");
+    (d.outputs||[]).forEach((o,i)=>{const a=document.createElement("a");a.href=API+o.url;a.download=outBase+(i?("_"+i):"")+".mp4";document.body.appendChild(a);a.click();a.remove();});
+    setStatus("Exported: "+outBase+".mp4  (суфікс _nSub прибрано) 🎬","ok");busyDone("Готово");
   }catch(e){setStatus("Export error: "+e.message,"err");busyStop();}
   if(eb)eb.disabled=false;
 }

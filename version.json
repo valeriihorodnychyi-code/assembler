@@ -1,5 +1,5 @@
 {
   "version": "1.9.23",
   "channel": "main",
-  "notes": "Fix: the default caption presets now ship baked into the app itself, so the whole team always has the full library even if the styles/ folder or Google Drive doesn't reach them (a folder preset of the same name still overrides it, so editing defaults keeps working). Fix: the beta Animation can no longer hide captions — it only plays while the video is actually playing; paused/scrubbing/exact and any word with unknown timing always show fully."
+  "notes": "Fix: the default caption presets now ship baked into the app itself, so the whole team always has the full library even if the styles/ folder or Google Drive doesn't reach them (a folder preset of the same name still overrides it, so editing defaults keeps working). Fix: the beta Animation can no longer hide captions — it only plays while the video is actually playing; paused/scrubbing/exact and any word with unknown timing always show fully. New: '⤓ Export' button by the presets — save the current style to a .json file to share with a teammate, who loads it with '⤴ Import'. MarTech flow: when you export a captioned creative, the file is named after the source with the _nSub suffix removed (Creative_nSub.mp4 in → Creative.mp4 out)."
 }
