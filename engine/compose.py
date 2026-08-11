@@ -334,12 +334,9 @@ def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=Non
     else:
         regions = [{"start": 0, "end": None, "style": st.normalize(style)}]
     tagged = build_timeline(words or [], regions, cuts=cuts)
-    try:  # hold the last caption to the very end of the clip (otherwise it vanishes on the final frames)
-        dur = ff.get_video_duration(clip_path)
-        if tagged and dur:
-            tagged[-1][0]["end"] = max(tagged[-1][0]["end"], dur)
-    except Exception:
-        pass
+    # NOTE: do NOT hold the last caption to the clip end — build_events already gives it a short
+    # readable tail (and trims at a scene cut). Forcing end=duration made the last caption hang
+    # over trailing footage / the packshot (the #8 bug); the same fix now applies to this path.
     tagged = clip_caption_window(tagged, cap_in, cap_out)
     render_format(clip_path, [(dict(e), s) for e, s in tagged], fmt, output_path,
                   work_dir, body_path=None)

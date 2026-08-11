@@ -1110,7 +1110,11 @@ function render(t,dur){
   const cw=(typeof capWin==="function")?capWin():{in:null,out:null};   // hide captions outside the in/out window
   if((cw.in!=null&&t<cw.in)||(cw.out!=null&&t>=cw.out))return;
   const scale=1;   // no per-format scaling — caption px absolute, identical in every format (matches engine)
-  const events=buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
+  // Layout comes from the SERVER (build_timeline) when we have real transcribed words → preview
+  // chunking/line-breaks are identical to the final render. Falls back to the local JS engine for
+  // the demo/pre-transcription placeholder (and if the server layout hasn't arrived yet).
+  const events=(realWords&&realWords.length&&serverLayout)?serverLayout
+    :buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
   if(!events.length)return;
   // #12 continuous faded scrim: opacity from the window fade, drawn even in gaps / pre-roll
   const _scFade=(s.scrimFade!=null?s.scrimFade:0.25);
@@ -1463,7 +1467,27 @@ video.addEventListener("loadedmetadata",syncTrim);
 // ---------- exact preview: engine-rendered frame, OPTIONAL toggle (default off) ----------
 let exactTimer=null, exactOn=false;
 function hideExact(){$("exactImg").style.display="none";$("exactBadge").style.display="none";$("canvas").style.opacity="1";}
-function scheduleExact(){if(!exactOn)return;clearTimeout(exactTimer);exactTimer=setTimeout(fetchExact,300);}
+function scheduleExact(){scheduleLayout();if(!exactOn)return;clearTimeout(exactTimer);exactTimer=setTimeout(fetchExact,300);}
+
+// SINGLE SOURCE OF TRUTH for caption layout: the server (build_timeline) decides word→caption
+// chunking + line breaks; the preview only DRAWS those events. Kills preview≠render drift.
+// Debounced like exact; the live canvas keeps redrawing from the cached events every frame,
+// and styling (colors/stroke/shadow/animation) stays instant client-side.
+let serverLayout=null, _layoutTimer=null, _layoutSeq=0;
+function scheduleLayout(){clearTimeout(_layoutTimer);_layoutTimer=setTimeout(fetchLayout,250);}
+async function fetchLayout(){
+  const words=realWords;
+  if(!words||!words.length){serverLayout=null;return;}   // demo/pre-transcription → JS buildEvents fallback
+  const baseEng=toEngineStyle(readControls());
+  const regions=(typeof buildStyleRegions==="function")?buildStyleRegions(baseEng,(typeof curPhraseStyles==="function"?curPhraseStyles():[])):null;
+  const cuts=(variants[activeVar]&&variants[activeVar].cuts)||null;
+  const seq=++_layoutSeq;
+  try{const r=await fetch(API+"/api/layout",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({words,regions:regions||null,base_style:baseEng,cuts,lang:capLang()})});
+    if(!r.ok)return; const d=await r.json(); if(seq!==_layoutSeq)return;   // superseded by a newer request
+    serverLayout=(d&&d.events)?d.events:null;
+  }catch(e){/* network hiccup → keep last layout (or JS fallback) */}
+}
 async function fetchExact(){
   if(!exactOn)return;
   if($("batchStage").style.display==="block")return;

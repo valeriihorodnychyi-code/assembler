@@ -649,6 +649,38 @@ def api_preview_frame(req: PreviewFrameReq):
     return Response(content=data, media_type="image/png")
 
 
+class LayoutReq(BaseModel):
+    words: list = []                              # word dicts (with optional brk="soft")
+    regions: Optional[list] = None                # [{"start","end","style"}]; else single base_style region
+    base_style: Optional[dict] = None
+    cuts: Optional[List[float]] = None
+    lang: str = "en"
+
+
+@app.post("/api/layout")
+def api_layout(req: LayoutReq):
+    """SINGLE SOURCE OF TRUTH for caption layout. The browser preview calls this to get the
+    exact same event/line chunking the final render uses (build_timeline → build_events), so
+    what you see == what you get. The preview only DRAWS these events; it no longer computes
+    its own chunking. Styling stays client-side (colors/stroke/shadow/animation)."""
+    base = st.normalize(req.base_style or {})
+    if req.regions:
+        regions = [{"start": float(r.get("start", 0)), "end": r.get("end"),
+                    "style": st.normalize(r.get("style") or (req.base_style or {}))} for r in req.regions]
+    else:
+        regions = [{"start": 0, "end": None, "style": base}]
+    tagged = compose.build_timeline(req.words or [], regions, lang=(req.lang or "en"), cuts=req.cuts)
+    events = []
+    for e, _s in tagged:
+        events.append({
+            "start": e["start"], "end": e["end"],
+            "active": e.get("active_word_index", 0), "manual": bool(e.get("manual", False)),
+            "lines": [[{"text": w.get("text", ""), "start": w.get("start", 0), "end": w.get("end", 0)}
+                       for w in line] for line in e.get("lines", [])],
+        })
+    return {"events": events}
+
+
 class RenderReq(BaseModel):
     file_id: str
     regions: list                  # [{"start","end","style"}]
