@@ -824,9 +824,19 @@ function readControls(){
 function writeControls(s){
   const set=(id,v)=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=!!v;else el.value=v;const l=$(id+"V");if(l){if(l.tagName==="INPUT")l.value=v;else l.textContent=v;}};
   for(const k of STYLE_IDS) if(k in s) set(k,s[k]);
+  if("fontFamily" in s && s.fontFamily) applyStyleFont(s.fontFamily);   // sync dropdown + customFontName + load font so preview AND render use the style's font (not a stale one)
   if($("caseSeg"))updateCaseSeg();
   if($("linesSeg"))updateLinesSeg();
   if($("wrapSeg"))updateWrapSeg();
+}
+// Make the whole font pipeline follow a style's font: match the dropdown option by family,
+// then setFont (which sets #fontFamily + customFontName + loads the face). Without this, a
+// preset's font set only #fontFamily while a STALE customFontName still overrode the render.
+function applyStyleFont(family){
+  const sel=$("fontSelect"); let file=null;
+  if(sel){for(const o of sel.options){ if(o.value.replace(/\.(ttf|otf|ttc)$/i,"")===family){file=o.value;break;} }}
+  if(file){ sel.value=file; setFont(file); }
+  else { $("fontFamily").value=family; customFontName=family+".ttf"; }   // font not in /fonts → best-effort (render tries <family>.ttf)
 }
 
 // STICKY STYLE: remember the last style the designer set and restore it on every new
@@ -1738,7 +1748,7 @@ $("txtViewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
   txtView=b.dataset.v;
   const ta=$("transcript"), box=$("transcriptWords");
   if(txtView==="words"){ if(ta)ta.style.display="none"; if(box){box.style.display="block";renderWordsView();} }
-  else { if(ta)ta.style.display=""; if(box)box.style.display="none"; }
+  else { if(ta){ if(realWords&&realWords.length)ta.value=wordsToText(realWords); ta.style.display=""; if(typeof autoGrow==="function")autoGrow(); } if(box)box.style.display="none"; }   // switching to Text → show the latest words (incl. Words-tab edits)
 });
 function renderWordsView(){
   const box=$("transcriptWords"); if(!box)return; box.innerHTML="";
@@ -1755,7 +1765,8 @@ function renderWordsView(){
   box.addEventListener("click",e=>{ const sp=e.target.closest&&e.target.closest(".w"); if(!sp)return;
     const st=+sp.dataset.start; if(video&&videoLoaded){ try{video.currentTime=st;}catch(_){} if(video.paused){try{render(st,video.duration||0);}catch(_){}} if(typeof scheduleExact==="function")scheduleExact(); } });
   box.addEventListener("input",()=>{ // edit in-place → re-map onto word timings (same as the Text field)
-    if(realWords&&realWords.length){ realWords=parseBreaksToWords(box.innerText, realWords); if(variants[activeVar])variants[activeVar].words=realWords; }
+    if(realWords&&realWords.length){ realWords=parseBreaksToWords(box.innerText, realWords); if(variants[activeVar])variants[activeVar].words=realWords;
+      const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords); }   // mirror edits into the Text field so BOTH tabs + export/layout use the same words
     if(typeof scheduleExact==="function")scheduleExact(); });
   box.addEventListener("blur",()=>{ renderWordsView(); });   // normalize spans after editing
 })();
@@ -1890,7 +1901,7 @@ async function doExport(){
   }
   const baseEng=toEngineStyle(readControls());
   const regions=buildStyleRegions(baseEng,(v.phraseStyles||[]))||[{start:0,end:null,style:baseEng}];
-  const words=(v.words&&v.words.length)?remapWords($("transcript").value,v.words):null;
+  const words=(v.words&&v.words.length)?v.words:null;   // same single source as the preview/layout (incl. Words-tab edits + breaks) → render matches
   const eb=$("exportBtn"); if(eb)eb.disabled=true;
   setStatus("Exporting "+ratio+" … (ffmpeg)","",true);busyStart("Експортую відео…");
   try{const r=await fetch(API+"/api/render",{method:"POST",headers:{"Content-Type":"application/json"},
