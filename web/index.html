@@ -1338,7 +1338,7 @@ async function transcribePack(){
 function saveActiveHook(){
   if(activeHook<0||activeHook>=editPack.length)return;
   const h=editPack[activeHook];
-  try{const rw=remapWords($("transcript").value,h.words);if(rw)h.words=rw;}catch(e){}
+  try{const rw=parseBreaksToWords($("transcript").value,h.words);if(rw)h.words=rw;}catch(e){}
   h.ctrl=readControls();h.style=toEngineStyle(h.ctrl);   // h is a board hook → board stays current
 }
 function selectHook(i){
@@ -1875,7 +1875,7 @@ async function sendToCompose(target){
   }
   // save current edits into the active variant (only if it actually has captions)
   if(variants[activeVar]&&variants[activeVar].words&&variants[activeVar].words.length){
-    variants[activeVar].style=readControls();variants[activeVar].words=remapWords($("transcript").value,variants[activeVar].words);}
+    variants[activeVar].style=readControls();variants[activeVar].words=parseBreaksToWords($("transcript").value,variants[activeVar].words);}
   const langs=Object.keys(variants);let added=0;
   langs.forEach(l=>{const v=variants[l];if(!v||!v.clip||hooks.some(h=>h.clip===v.clip))return;
     const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,trim:v.trim||null,src:"edit",videoUrl:v.videoUrl||null};
@@ -2051,7 +2051,7 @@ function buildFilmstrip(){
 function loadVariant(key){
   if(key===activeVar||!variants[key])return;
   // save current edits into the outgoing variant
-  if(variants[activeVar]){variants[activeVar].style=readControls();variants[activeVar].words=remapWords($("transcript").value,variants[activeVar].words);}
+  if(variants[activeVar]){variants[activeVar].style=readControls();variants[activeVar].words=parseBreaksToWords($("transcript").value,variants[activeVar].words);}
   activeVar=key;const v=variants[key];
   realWords=v.words;
   if(v.videoUrl){video.src=v.videoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};}
@@ -2504,7 +2504,7 @@ function ensureOriginalsOnBoard(){
   // fold live edits into the active variant first
   if(variants[activeVar]&&variants[activeVar].words&&variants[activeVar].words.length){
     try{variants[activeVar].style=readControls();
-        const rw=remapWords($("transcript").value,variants[activeVar].words);if(rw)variants[activeVar].words=rw;}catch(e){}
+        const rw=parseBreaksToWords($("transcript").value,variants[activeVar].words);if(rw)variants[activeVar].words=rw;}catch(e){}
   }
   let added=0;
   Object.keys(variants).forEach(l=>{const v=variants[l];
@@ -2670,7 +2670,7 @@ function editLocHook(h){
 }
 function saveEditingHook(){
   if(!editingHook)return;
-  try{const rw=remapWords($("transcript").value,editingHook.words);if(rw)editingHook.words=rw;}catch(e){}
+  try{const rw=parseBreaksToWords($("transcript").value,editingHook.words);if(rw)editingHook.words=rw;}catch(e){}
   const ctrl=readControls();editingHook.ctrl=ctrl;editingHook.style=toEngineStyle(ctrl);
   editingHook=null;updateEditButtons();
   renderHookTiles();setMode("loc");
