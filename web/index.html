@@ -1913,6 +1913,7 @@ async function doExport(){
     const srcName=((videoFile&&videoFile.name)||v.clip||"creative.mp4").replace(/\.[^.]+$/,"");
     const outBase=srcName.replace(/_nSub$/i,"");
     (d.outputs||[]).forEach((o,i)=>{const a=document.createElement("a");a.href=API+o.url;a.download=outBase+(i?("_"+i):"")+".mp4";document.body.appendChild(a);a.click();a.remove();});
+    (d.outputs||[]).forEach(o=>exportedNames.add(o.name));   // remember these so the board doesn't re-add them as duplicate hooks
     setStatus("Exported: "+outBase+".mp4  (суфікс _nSub прибрано) 🎬","ok");busyDone("Готово");
   }catch(e){setStatus("Export error: "+e.message,"err");busyStop();}
   if(eb)eb.disabled=false;
@@ -2114,6 +2115,10 @@ $("quitBtn").onclick=async()=>{
 // ---------- batch board ----------
 const LANG_COLORS={en:"#888780",es:"#EF9F27",de:"#378ADD",fr:"#D4537E",it:"#97C459",pt:"#D85A30"};
 let hooks=[];   // [{name, lang, clip, words?, style?}]
+const exportedNames=new Set();   // files exported from Edit — never auto-added to the board as hooks (they'd duplicate the clip you just captioned)
+const SESSION_PREFIX="session:";                  // a Body part that points at a session clip (a hook reused as a body) instead of a library asset
+const isSessionRef=b=>typeof b==="string"&&b.startsWith(SESSION_PREFIX);
+const sessionRefName=b=>isSessionRef(b)?b.slice(SESSION_PREFIX.length):b;
 let bodyParts=[""];   // body segments on the board (base names; "" = empty slot). Concatenated in order.
 let batchFinals={};   // {recipeName: {url, file}} — built creatives, shown on the board
 let creativeNames={};   // {finalFile: custom export name} — applied to video + PNG in the export zip
@@ -2200,7 +2205,9 @@ $("batchFiles").onchange=async e=>{
 async function pullSessionHooks(silent){
   if(!fileId){if(!silent)setStatus("No session yet — transcribe/render or import files first.","err");return;}
   try{const r=await fetch(API+"/api/session_outputs/"+fileId);const d=await r.json();
-    let added=0;(d.outputs||[]).forEach(n=>{if(!hooks.some(h=>h.clip===n)){hooks.push({name:n,clip:n,lang:langFromName(n),src:"added"});added++;}});
+    let added=0;(d.outputs||[]).forEach(n=>{
+      if(exportedNames.has(n))return;                       // a file WE just exported from Edit — not a new hook (it duplicated the clip you were editing)
+      if(!hooks.some(h=>h.clip===n)){hooks.push({name:n,clip:n,lang:langFromName(n),src:"added"});added++;}});
     renderHookTiles();
     if(added>0)setStatus("Added "+added+" rendered hook(s) from this session to the board.","ok");
     else if(!silent)setStatus("No new rendered hooks to add.","");
@@ -2357,7 +2364,9 @@ $("batchAssembleBtn").onclick=async()=>{
     if(h.trim)hookSeg.trim=h.trim;                                     // cut clip at assemble
     if(h.overlays&&h.overlays.length)hookSeg.overlays=h.overlays;       // PNG/.mov stickers baked on the hook
     const segs=[hookSeg];
-    bodyParts.forEach(bp=>{if(bp){const b=libItemFor(bp,h.lang,"body");if(b)segs.push({type:"library",ref:b.id});}});  // each body part, in order, per-language
+    bodyParts.forEach(bp=>{if(!bp)return;
+      if(isSessionRef(bp)){segs.push({type:"session",ref:sessionRefName(bp)});return;}   // a hook reused as a body part (hook + hook + hook)
+      const b=libItemFor(bp,h.lang,"body");if(b)segs.push({type:"library",ref:b.id});});  // each body part, in order, per-language
     if(packBase){const p=libItemFor(packBase,h.lang,"packshot");if(p){const ps={type:"library",ref:p.id};if($("packFade")&&$("packFade").checked)ps.fade_in=0.5;segs.push(ps);}}
     return {name:(h.name||h.clip).replace(/\.[^.]+$/,""),format:fmt,segments:segs};});
   const music=musicTracks.length?{tracks:musicTracks.map(t=>({name:t.name,startSeg:t.startSeg,in:t.inSec,out:(t.dur&&t.outSec<t.dur-0.05)?t.outSec:1e6,volume:t.vol,duck:t.duck}))}:null;
@@ -2905,13 +2914,15 @@ function libThumbURL(base,type){const it=libItemFor(base,"en",type)||libItemFor(
 function fmtBox(w){const d=DIMS[ratio]||[1080,1920];return "width:"+w+"px;aspect-ratio:"+d[0]+"/"+d[1]+";object-fit:cover;border-radius:7px;display:block;margin:0 auto;background:#0e1119";}
 function addTile(kind){return "<div data-add='"+kind+"' style='cursor:pointer;padding:11px;border-radius:10px;border:1px dashed var(--line);text-align:center;font-size:12px;color:var(--muted)'>＋ "+(kind==='hook'?'add hook':'add body part')+"</div>";}
 function pickTile(kind,base,slot,removable){
-  const th=base?libThumbURL(base,kind):null;
+  const sess=isSessionRef(base);
+  const label=sess?sessionRefName(base):base;
+  const th=(base&&!sess)?libThumbURL(base,kind):null;
   const vert=(DIMS[ratio]||[1080,1920])[1]>=(DIMS[ratio]||[1080,1920])[0];
   const rm=removable?"<span data-rmbody='"+slot+"' title='remove' style='position:absolute;top:6px;right:9px;color:var(--muted);cursor:pointer;font-size:13px;z-index:2'>✕</span>":"";
   const num=(kind==='body')?"<span style='position:absolute;top:8px;left:9px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--accent2);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;z-index:2'>"+(slot+1)+"</span>":"";
   const inner=base
-    ?((th?"<img src='"+th+"' style='"+fmtBox(vert?96:172)+"'>":"<div style='"+fmtBox(vert?96:172)+"'></div>")
-      +"<div style='color:var(--muted);margin-top:7px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+base+"</div>")
+    ?((th?"<img src='"+th+"' style='"+fmtBox(vert?96:172)+"'>":"<div style='"+fmtBox(vert?96:172)+";display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px'>"+(sess?"🎬 clip":"")+"</div>")
+      +"<div style='color:var(--muted);margin-top:7px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+label+"</div>")
     :"<div style='color:var(--muted);font-size:12px;padding:42px 6px'>+ click to choose</div>";
   return "<div class='picktile' data-pick='"+kind+"' data-slot='"+(slot==null?'':slot)+"' title='click to choose' style='position:relative;cursor:pointer;padding:12px;border-radius:10px;background:var(--panel2);border:"+((kind==='body'&&base)?'2px solid var(--accent2)':'0.5px solid var(--line)')+";text-align:center;font-size:12px'>"+num+rm+inner+"</div>";
 }
@@ -2949,7 +2960,7 @@ function renderBatchStage(){
   const shown=hooks;
   const hasFinals=shown.some(h=>batchFinals[clipKey(h)]);
   // hook tile with a × to remove it right on the board
-  const hookTile=(h,i)=>"<div title='"+(h.src==="edit"?"з Edit":"додано вручну")+"' style='display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;background:var(--panel2);border-left:4px solid "+srcColor(h.src)+";font-size:12px'><span style='background:"+langColor(h.lang)+";color:#0d0e12;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(h.lang||"?").toUpperCase()+"</span><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+h.name+"</span><span data-rm='"+i+"' title='remove' style='cursor:pointer;color:var(--muted);padding:0 2px;font-size:13px'>✕</span></div>";
+  const hookTile=(h,i)=>"<div title='"+(h.src==="edit"?"з Edit":"додано вручну")+"' style='display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;background:var(--panel2);border-left:4px solid "+srcColor(h.src)+";font-size:12px'><span style='background:"+langColor(h.lang)+";color:#0d0e12;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(h.lang||"?").toUpperCase()+"</span><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+h.name+"</span><span data-tobody='"+i+"' title='Use as a Body part → (lets you build hook + hook + hook)' style='cursor:pointer;color:var(--accent2);padding:0 3px;font-size:15px;font-weight:700'>▸</span><span data-rm='"+i+"' title='remove' style='cursor:pointer;color:var(--muted);padding:0 2px;font-size:13px'>✕</span></div>";
   const hookLegend="<div style='font-size:10px;margin-top:3px'><span style='color:var(--ok)'>●</span> Edit&nbsp;&nbsp;<span style='color:var(--accent2)'>●</span> додані</div>";
   const hookCol=col("Hooks ("+shown.length+")"+hookLegend,shown.map((h,i)=>hookTile(h,i)).join("")+addTile("hook"));
   const packName=$("packAsset").value;
@@ -3015,6 +3026,14 @@ function renderBatchStage(){
   };
   el.querySelectorAll("[data-rm]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();hooks.splice(+x.dataset.rm,1);renderHookTiles();});
   el.querySelectorAll("[data-rmbody]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();bodyParts.splice(+x.dataset.rmbody,1);if(!bodyParts.length)bodyParts=[""];renderBatchStage();});
+  // ▸ on a hook tile: reuse that clip as a BODY part, so a creative can be hook + hook + hook
+  // (not only hook + a library body). Session clips are stored with a "session:" marker.
+  el.querySelectorAll("[data-tobody]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();
+    const h=hooks[+x.dataset.tobody];if(!h)return;
+    const ref=SESSION_PREFIX+(h.clip||h.name);
+    const slot=bodyParts.findIndex(b=>!b);                       // fill an empty slot first, else append
+    if(slot>=0)bodyParts[slot]=ref;else bodyParts.push(ref);
+    renderBatchStage();setStatus("«"+h.name+"» додано як Body-частину.","ok");});
   el.querySelectorAll("[data-pick]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();openPicker(t.dataset.pick,t,t.dataset.slot===''?null:+t.dataset.slot);});
   el.querySelectorAll("[data-add]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();if(t.dataset.add==='hook'){$("batchFiles").click();}else{bodyParts.push("");renderBatchStage();}});
   const bb=el.querySelector("#boardBuild");if(bb)bb.onclick=()=>$("batchAssembleBtn").click();
