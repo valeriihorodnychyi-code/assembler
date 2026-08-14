@@ -725,6 +725,12 @@
       <button id="benchRun" class="go" style="font-size:12px;padding:6px 12px">⏱ Run speed test</button>
     </div>
     <div id="benchOut" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+    <div class="mlbl" style="margin-top:14px">Assembly cache</div>
+    <div class="hint">Normalized clips (bodies/packshots) that make repeat assembles fast. Safe to clear — they're rebuilt on the next render.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+      <span id="cacheInfo" style="flex:1;font-size:12px;color:var(--muted)">…</span>
+      <button id="cacheClear" class="ghost" style="font-size:12px;padding:6px 12px">🧹 Clear cache</button>
+    </div>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
       <button class="ghost" id="settingsClose">Close</button>
       <button class="primary" id="settingsSave">Save keys</button>
@@ -817,7 +823,21 @@ async function loadSettings(){
     if(d.allowed===false)$("lockScreen").classList.add("show");
   }catch(e){}
 }
-$("settingsBtn").onclick=()=>{$("settingsModal").classList.add("show");loadSettings();};
+$("settingsBtn").onclick=()=>{$("settingsModal").classList.add("show");loadSettings();refreshCacheInfo();};
+// Assembly cache: show how much disk the normalized clips take, and let the user wipe it.
+async function refreshCacheInfo(){
+  const el=$("cacheInfo");if(!el)return;
+  try{const d=await(await fetch(API+"/api/cache")).json();
+    el.textContent=(d.files||0)+" file(s) · "+(d.mb||0)+" MB";el.title=d.dir||"";
+  }catch(e){el.textContent="—";}
+}
+if($("cacheClear"))$("cacheClear").onclick=async()=>{
+  const b=$("cacheClear");b.disabled=true;
+  try{const d=await(await fetch(API+"/api/cache/clear",{method:"POST"})).json();
+    setStatus("Кеш очищено: "+d.removed+" файл(ів), звільнено "+d.freed_mb+" MB.","ok");
+  }catch(e){setStatus("Не вдалось очистити кеш: "+e.message,"err");}
+  b.disabled=false;refreshCacheInfo();
+};
 // Built-in speed test: gives the two numbers needed to size cloud render capacity
 // (realtime factor + clips/min at N at once), per machine, without the terminal.
 if($("benchRun"))$("benchRun").onclick=async()=>{

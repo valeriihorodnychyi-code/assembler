@@ -788,6 +788,38 @@ def api_render(req: RenderReq):
     ]}
 
 
+@app.get("/api/cache")
+def api_cache_info():
+    """Size of the normalized-clip cache (what makes repeat assembles fast)."""
+    d = compose._cache_dir()
+    n = tot = 0
+    for f in os.listdir(d) if os.path.isdir(d) else []:
+        p = os.path.join(d, f)
+        if os.path.isfile(p):
+            n += 1
+            tot += os.path.getsize(p)
+    return {"dir": d, "files": n, "mb": round(tot / 1e6, 1)}
+
+
+@app.post("/api/cache/clear")
+def api_cache_clear():
+    """Wipe the cache. Safe: clips are simply normalized again on the next assemble."""
+    d = compose._cache_dir()
+    freed = n = 0
+    for f in os.listdir(d) if os.path.isdir(d) else []:
+        p = os.path.join(d, f)
+        try:
+            if os.path.isfile(p):
+                sz = os.path.getsize(p)
+                os.remove(p)
+                freed += sz
+                n += 1
+        except Exception:
+            pass
+    _log_timing("cache_clear", 0, f"removed={n} freed_mb={round(freed/1e6,1)}")
+    return {"removed": n, "freed_mb": round(freed / 1e6, 1), "dir": d}
+
+
 class NormalizeReq(BaseModel):
     file_id: str
     clip: str = "source.mp4"

@@ -557,10 +557,15 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         return
 
     word_positions, current_y, word_counter, cx = [], start_y, 0, width / 2
+    # Typewriter animation: words appear one by one as they're spoken. Positions are computed from
+    # the FULL caption (so the layout never shifts) but words after the active one aren't drawn —
+    # this matches the preview, and costs nothing: the engine already renders one PNG per word.
+    typewriter = ((style_cfg.get("animation") or {}).get("type") == "type")
     for i, line in enumerate(lines):
         current_x = cx - (line_widths[i] / 2)
         for w in line:
-            word_positions.append((current_x, current_y, w["text"], word_counter == active_idx))
+            if not (typewriter and word_counter > active_idx):
+                word_positions.append((current_x, current_y, w["text"], word_counter == active_idx))
             current_x += font.getlength(w["text"]) + space_width
             word_counter += 1
         current_y += line_height + line_spacing
