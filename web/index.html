@@ -282,6 +282,7 @@
       </div>
       <button id="transcribeBtn" data-i18n="transcribe" disabled>① Transcribe</button>
       <button id="packTranscribeBtn" style="display:none" title="Транскрибувати всі не-транскрибовані хуки паку обраною моделлю (мова — авто)">① Transcribe pack</button>
+      <button id="normalizeBtn" style="display:none" title="Prepare this clip for assembly — no captions, just conform it to the project format (so the board can join it fast, without re-encoding)">⚙ Normalize</button>
       <button id="exportBtn" style="display:none" title="Export the current video with its captions baked in">⬇ Export</button>
       <button class="primary" id="renderBtn" data-i18n="sendAsm" disabled>Send to Assemble →</button>
       <button id="sLocBtn" data-i18n="toLoc" style="display:none">→ LOC</button>
@@ -575,6 +576,23 @@
     </details>
 
     <details class="grp">
+      <summary><span>Headline · text overlay</span> <label class="switch hdrsw" title="Enable headline" onclick="hdrTgl(event,this)"><input type="checkbox" id="hlOn"><span class="slider"></span></label><span class="chev">›</span></summary>
+      <div class="body">
+        <div class="hint">A static text block burned over the video. It stays <b>text</b>, so every language can carry its own copy — that's what makes headlines localizable (unlike a PNG).</div>
+        <textarea id="hlText" rows="2" placeholder="LIMITED OFFER&#10;ENDS MARCH 14" style="width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+        <div class="hint">Enter = new line. Text for the active language (<b id="hlLangTag">EN</b>).</div>
+        <div class="row"><label>Size</label><input type="range" id="hlSize" min="30" max="240" value="110"><span class="val" id="hlSizeV">110</span></div>
+        <div class="row"><label>Color</label><input type="color" id="hlColor" value="#ffffff"></div>
+        <div class="row"><label>Vertical position</label><input type="range" id="hlY" min="0.03" max="0.95" step="0.01" value="0.16"><span class="val" id="hlYV">0.16</span></div>
+        <div class="row"><label>Outline</label><input type="range" id="hlStroke" min="0" max="24" value="6"><span class="val" id="hlStrokeV">6</span></div>
+        <div class="row"><label>Plate behind</label><label class="switch"><input type="checkbox" id="hlPlate"><span class="slider"></span></label></div>
+        <div class="row"><label>Show from (s)</label><input type="number" id="hlIn" step="0.1" placeholder="0" style="flex:1"></div>
+        <div class="row"><label>Show to (s)</label><input type="number" id="hlOut" step="0.1" placeholder="end" style="flex:1"></div>
+        <div id="hlLangs" style="margin-top:9px"></div>
+      </div>
+    </details>
+
+    <details class="grp">
       <summary><span data-i18n="secOverlays">Overlays · PNG / .mov</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Add</label><input type="file" id="overlayFile" accept="image/*,video/*" style="flex:1.3;font-size:11px"></div>
@@ -699,6 +717,14 @@
     <input type="text" id="libDir" placeholder="/Users/…/Assembler Library  (порожнє = лишити поточний)">
     <div class="hint" id="libStatus" style="margin-top:6px"></div>
     <div class="hint" id="keysStatus" style="margin-top:9px"></div>
+    <div class="mlbl" style="margin-top:14px">Render speed test</div>
+    <div class="hint">Renders the loaded clip a few times and reports how fast this Mac is. Numbers also land in <b>~/.assembler/timings.csv</b>. The machine is busy while it runs.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+      <label style="font-size:12px;color:var(--muted)">at once</label>
+      <select id="benchConc" style="flex:0 0 70px;font-size:12px"><option value="1">1</option><option value="2">2</option><option value="4">4</option></select>
+      <button id="benchRun" class="go" style="font-size:12px;padding:6px 12px">⏱ Run speed test</button>
+    </div>
+    <div id="benchOut" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
     <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
       <button class="ghost" id="settingsClose">Close</button>
       <button class="primary" id="settingsSave">Save keys</button>
@@ -792,6 +818,24 @@ async function loadSettings(){
   }catch(e){}
 }
 $("settingsBtn").onclick=()=>{$("settingsModal").classList.add("show");loadSettings();};
+// Built-in speed test: gives the two numbers needed to size cloud render capacity
+// (realtime factor + clips/min at N at once), per machine, without the terminal.
+if($("benchRun"))$("benchRun").onclick=async()=>{
+  const v=variants[activeVar];
+  if(!fileId||!(v&&v.clip)){$("benchOut").innerHTML="<span style='color:var(--accent)'>Завантаж відео і зроби Transcribe (або Export), щоб кліп був у сесії.</span>";return;}
+  const b=$("benchRun"),o=$("benchOut");b.disabled=true;
+  const conc=+($("benchConc")?$("benchConc").value:1);
+  o.textContent="Рендерю тестові прогони… машина зайнята.";
+  try{const r=await fetch(API+"/api/benchmark",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:v.clip,repeat:2,concurrency:conc})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+    o.innerHTML="<b style='color:var(--ok)'>"+d.realtime_factor+"x realtime</b> · "
+      +d.clips_per_min+" clips/min at "+d.concurrency+" at once<br>"
+      +"clip "+d.video_seconds+"s → "+d.median_render_seconds+"s per render (median of "+d.runs+")<br>"
+      +"<span style='color:var(--muted)'>"+d.encoder+" · "+d.cores+" cores · machine "+d.machine+"</span>";
+  }catch(e){o.innerHTML="<span style='color:var(--accent)'>Не вдалось: "+e.message+"</span>";}
+  b.disabled=false;
+};
 $("settingsClose").onclick=()=>$("settingsModal").classList.remove("show");
 $("settingsModal").onclick=e=>{if(e.target===$("settingsModal"))$("settingsModal").classList.remove("show");};
 $("copyMid").onclick=()=>{try{navigator.clipboard.writeText($("machineId").textContent);setStatus("Machine ID copied.","ok");}catch(e){}};
@@ -1222,7 +1266,11 @@ function loop(ts){let t,dur;
   if(videoLoaded){t=video.currentTime;dur=video.duration||4;$("seek").value=(t/dur)*100;$("timeLbl").textContent=t.toFixed(1)+"s";
     if($("trimRow").style.display!=="none"&&$("trimPlayhead"))$("trimPlayhead").style.left=Math.max(0,Math.min(100,(t/dur)*100))+"%";}
   else{const dt=(ts-lastTs)/1000||0;demoT=(demoT+dt)%4;t=demoT;dur=4;}
-  lastTs=ts;render(t,dur);if(typeof updateWordHighlight==="function")updateWordHighlight();requestAnimationFrame(loop);}
+  lastTs=ts;render(t,dur);
+  // headline sits on top of the captions and only inside its own [in,out] window
+  if(typeof drawHeadline==="function"){const c=(typeof hlCfg==="function")?hlCfg(activeVar):null;
+    if(c&&(c.in==null||t>=c.in)&&(c.out==null||t<=c.out))try{drawHeadline();}catch(e){}}
+  if(typeof updateWordHighlight==="function")updateWordHighlight();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
 
 // #3 — drag the caption up/down on the preview to set the Bottom margin (vertical only).
@@ -1398,6 +1446,7 @@ function updateEditButtons(){
   // more than one video (a pack) → Export hides and the Assemble button pulses instead.
   const eb=$("exportBtn"), showExp=(!pack&&!editing&&videoLoaded);
   show("exportBtn",showExp); if(eb)eb.classList.toggle("pulse-cta",showExp);
+  show("normalizeBtn",showExp);   // same situations as Export: one loaded clip in Edit
   const ap=$("sendPackAsmBtn"); if(ap)ap.classList.toggle("pulse-cta",pack&&!editing&&!locpack);
   const tb=$("transcribeBtn");if(tb)tb.textContent="① Transcribe";   // single = active hook only
   const ptb=$("packTranscribeBtn");                                   // pack = all pending, shown only when there's a pack to do
@@ -1514,6 +1563,66 @@ async function fetchExact(){
   }catch(e){}
 }
 $("exactToggle").onclick=()=>{exactOn=!exactOn;$("exactToggle").classList.toggle("on",exactOn);if(exactOn)fetchExact();else hideExact();};
+
+// ---------- Headline: a static TEXT overlay, one copy per language (localizable) ----------
+let hlTexts={};    // {lang: "headline copy"} — the text is per-language, the look is shared
+function hlCfg(lang){
+  const on=$("hlOn")&&$("hlOn").checked;
+  const L=lang||activeVar||"en";
+  const txt=(hlTexts[L]!=null?hlTexts[L]:(hlTexts.en||""));
+  if(!on||!String(txt).trim())return null;
+  const num=(id,d)=>{const e=$(id);const v=e?parseFloat(e.value):NaN;return isNaN(v)?d:v;};
+  const rgb=hexToRgb($("hlColor")?$("hlColor").value:"#ffffff");
+  const inS=$("hlIn")&&$("hlIn").value!==""?parseFloat($("hlIn").value):null;
+  const outS=$("hlOut")&&$("hlOut").value!==""?parseFloat($("hlOut").value):null;
+  return {text:txt,size:num("hlSize",110),color:[rgb[0],rgb[1],rgb[2],255],y:num("hlY",0.16),
+    in:inS,out:outS,case:"uppercase",line_spacing:8,max_width:0.86,
+    font_name:customFontName||(($("fontFamily")?$("fontFamily").value:"Poppins-Bold")+".ttf"),
+    stroke:{width:num("hlStroke",6),color:[0,0,0,255]},
+    plate:{enabled:!!($("hlPlate")&&$("hlPlate").checked),color:[0,0,0,150],pad_x:26,pad_y:14,border_radius:14}};
+}
+// canvas preview of the headline — mirrors render_headline_png (centre at y, wrap at max_width)
+function drawHeadline(){
+  const c=hlCfg(activeVar);if(!c)return;
+  const[W,H]=DIMS[ratio];
+  const fam=($("fontFamily")?$("fontFamily").value:"Poppins-Bold");
+  ctx.save();ctx.font=c.size+'px "'+fam+'"';ctx.textBaseline="alphabetic";
+  const maxW=c.max_width*W, lines=[];
+  String(c.text).replace(/\r/g,"").split("\n").forEach(para=>{
+    const ws=para.toUpperCase().split(/\s+/).filter(Boolean);
+    if(!ws.length){lines.push("");return;}
+    let cur="";
+    ws.forEach(w=>{const cand=(cur?cur+" ":"")+w;
+      if(cur&&ctx.measureText(cand).width>maxW){lines.push(cur);cur=w;}else cur=cand;});
+    if(cur)lines.push(cur);});
+  const m=ctx.measureText("Ag");
+  const asc=(m.fontBoundingBoxAscent!=null)?m.fontBoundingBoxAscent:c.size*0.8;
+  const lh=asc+((m.fontBoundingBoxDescent!=null)?m.fontBoundingBoxDescent:c.size*0.22);
+  const total=lines.length*lh+(lines.length-1)*c.line_spacing;
+  let top=c.y*H-total/2;
+  if(c.plate.enabled){const bw=Math.max(0,...lines.map(l=>ctx.measureText(l).width));
+    ctx.fillStyle=rgba("#000000",150);rr(W/2-bw/2-26,top-14,bw+52,total+28,14);ctx.fill();}
+  lines.forEach(ln=>{const w=ctx.measureText(ln).width,x=W/2-w/2,base=top+asc;
+    if(c.stroke.width>0){ctx.lineJoin="round";ctx.strokeStyle="rgba(0,0,0,1)";ctx.lineWidth=c.stroke.width*2;ctx.strokeText(ln,x,base);}
+    ctx.fillStyle="rgb("+c.color[0]+","+c.color[1]+","+c.color[2]+")";ctx.fillText(ln,x,base);
+    top+=lh+c.line_spacing;});
+  ctx.restore();
+}
+function renderHlLangs(){
+  const box=$("hlLangs");if(!box)return;
+  const tag=$("hlLangTag");if(tag)tag.textContent=(activeVar||"en").toUpperCase();
+  const langs=Object.keys(variants||{}).filter(l=>l!==activeVar);
+  if(!langs.length){box.innerHTML="";return;}
+  box.innerHTML="<div class='hint' style='margin-bottom:5px'>Other languages — give each its own headline:</div>"+
+    langs.map(l=>"<div class='row' style='margin:3px 0'><label style='flex:0 0 42px'>"+l.toUpperCase()+"</label>"+
+      "<input data-hll='"+l+"' value=\""+String(hlTexts[l]||"").replace(/"/g,"&quot;").replace(/\n/g," / ")+"\" placeholder='same as EN' style='flex:1;font-size:12px'></div>").join("");
+  box.querySelectorAll("[data-hll]").forEach(inp=>inp.oninput=()=>{hlTexts[inp.dataset.hll]=inp.value;});
+}
+(function wireHeadline(){
+  const t=$("hlText");if(!t)return;
+  t.addEventListener("input",()=>{hlTexts[activeVar||"en"]=t.value;});
+  const d=t.closest("details");if(d)d.addEventListener("toggle",()=>{if(d.open){t.value=hlTexts[activeVar||"en"]||"";renderHlLangs();}});
+})();
 
 // ---------- social safe-zone guide (preview only; a design guide, never burned into the export) ----------
 // Shades the areas each platform's UI covers (top bar, bottom caption/CTA, right action rail) so you
@@ -1906,7 +2015,7 @@ async function doExport(){
   setStatus("Exporting "+ratio+" … (ffmpeg)","",true);busyStart("Експортую відео…");
   try{const r=await fetch(API+"/api/render",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({file_id:fileId,clip:v.clip||"source.mp4",regions,words,formats:[ratio],
-        smart_trim:false,use_body:false,trim:v.trim||null,cuts:v.cuts||null})});
+        smart_trim:false,use_body:false,trim:v.trim||null,cuts:v.cuts||null,headline:hlCfg(activeVar)})});
     const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
     // MarTech flow: the _nSub clip comes INTO Assembler for captioning; the subtitled version
     // must be delivered as <name>.mp4 — i.e. the same name with the _nSub suffix removed.
@@ -1918,6 +2027,34 @@ async function doExport(){
   }catch(e){setStatus("Export error: "+e.message,"err");busyStop();}
   if(eb)eb.disabled=false;
 }
+// Normalize: conform a "wild" clip (Kling / Freepik / Higgsfield — 720p, 24fps, odd audio) to the
+// project format WITHOUT captions, and drop it on the board ready to assemble. Because it then
+// matches the other segments, the board joins it with stream copy instead of re-encoding.
+async function doNormalize(){
+  if(!videoFile && !fileId){setStatus("Load a video first.","err");return;}
+  const v=variants[activeVar]||(variants[activeVar]={clip:null,words:null,style:readControls(),trim:null});
+  if(!v.clip && videoFile){
+    setStatus("Uploading clip…","",true);
+    try{const fd=new FormData();fd.append("file",videoFile);fd.append("file_id",fileId||"");
+      const r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});const d=await r.json();
+      fileId=d.file_id;v.clip=d.name;}catch(e){setStatus("Upload failed: "+e.message,"err");return;}
+  }
+  const nb=$("normalizeBtn"); if(nb)nb.disabled=true;
+  setStatus("Normalizing for assembly…","",true);busyStart("Готую відео до збірки…");
+  try{const r=await fetch(API+"/api/normalize",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:v.clip||"source.mp4",format:ratio})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+    exportedNames.add(d.name);                                  // it's ours; don't let the board re-add it twice
+    if(!hooks.some(h=>h.clip===d.name))hooks.push({name:d.name,clip:d.name,lang:langFromName(d.name),src:"added"});
+    renderHookTiles();
+    setStatus(d.already_conformed
+      ? ("Кліп уже у форматі проєкту — готовий до збірки (" + d.name + ")")
+      : ("Готово за "+d.seconds+"s → "+d.name+" ("+d.size_mb+" MB). Додано на дошку, склеїться без перекодування."),"ok");
+    busyDone("Готово");
+  }catch(e){setStatus("Normalize error: "+e.message,"err");busyStop();}
+  if(nb)nb.disabled=false;
+}
+$("normalizeBtn").onclick=doNormalize;
 $("exportBtn").onclick=doExport;
 $("renderBtn").onclick=sendToCompose;
 
@@ -2359,6 +2496,7 @@ $("batchAssembleBtn").onclick=async()=>{
   const packBase=$("packAsset").value,fmt=ratio;   // project format (9:16 / 1:1 / 16:9)
   const recipes=hooks.map(h=>{const hookSeg={type:"session",ref:h.clip||h.name};
     if(h.words&&h.style){hookSeg.words=h.words;hookSeg.style=h.style;if(h.regions)hookSeg.regions=h.regions;}  // live hook → bake captions now (+ per-phrase overrides)
+    {const _hl=hlCfg(h.lang);if(_hl)hookSeg.headline=_hl;}   // headline text for THIS hook's language (localized copy)
     if(h.cap_in!=null)hookSeg.cap_in=h.cap_in;if(h.cap_out!=null)hookSeg.cap_out=h.cap_out;  // caption in/out window
     if(h.cuts&&h.cuts.length)hookSeg.cuts=h.cuts;   // scene cuts → captions clipped at cuts
     if(h.trim)hookSeg.trim=h.trim;                                     // cut clip at assemble
@@ -2376,7 +2514,18 @@ $("batchAssembleBtn").onclick=async()=>{
     const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
     batchFinals={};d.results.forEach(o=>batchFinals[o.name]=o);   // show on the board
     renderBatchStage();
-    $("batchResults").textContent=d.results.length+" video(s) ready — download them on the board →";
+    // keep the speed numbers on screen (they're the capacity-planning standard, also in ~/.assembler/timings.csv)
+    const _s=d.stats;
+    $("batchResults").innerHTML=d.results.length+" video(s) ready — download them on the board →"+
+      (_s?("<div style='margin-top:6px;font-size:12px;color:var(--ok)'>⏱ "+_s.wall_seconds+"s total · "
+        +_s.seconds_per_creative+"s per creative · "+(_s.creatives_per_min||"?")+" creatives/min"
+        +(_s.realtime_factor?(" · "+_s.realtime_factor+"x realtime"):"")
+        +"<span style='color:var(--muted)'> ("+_s.encoder+", "+_s.cores+" cores)</span>"
+        // shows whether the fast stream-copy join ran — if it says re-encoded, the reason is right there
+        +(_s.fast_joins!=null?("<br><span style='color:"+(_s.fast_joins?"var(--ok)":"var(--accent)")+"'>joins: "
+          +_s.fast_joins+" fast-copy · "+_s.reencoded_joins+" re-encoded"
+          +(_s.fallback_reason?(" — "+_s.fallback_reason):"")+"</span>"):"")
+        +"</div>"):"");
     const errs=d.errors&&Object.keys(d.errors).length?(" Errors: "+Object.entries(d.errors).map(([k,v])=>k+": "+v).join("; ")):"";
     setStatus("Built "+d.results.length+" video(s)."+errs,errs?"err":"ok");
     if(d.results.length){chime("render");busyDone("Зібрано "+d.results.length+" відео");}else busyStop();

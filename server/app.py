@@ -155,6 +155,28 @@ if os.path.exists(_PCFG):
         pass
 
 
+def _log_timing(op, secs, meta=""):
+    """Append one timing row to ~/.assembler/timings.csv.
+
+    On-screen timers vanish with the toast; this file is the durable record used to
+    benchmark machines (local Mac vs a cloud worker) and to size render capacity.
+    Columns: when, op, seconds, encoder, machine, notes
+    """
+    try:
+        os.makedirs(_ASSEMBLER_HOME, exist_ok=True)
+        p = os.path.join(_ASSEMBLER_HOME, "timings.csv")
+        new = not os.path.exists(p)
+        with open(p, "a", encoding="utf-8") as f:
+            if new:
+                f.write("timestamp,op,seconds,encoder,machine,notes\n")
+            import datetime as _dt
+            enc = ffmpeg_utils.video_encoder()
+            note = str(meta).replace(",", ";").replace("\n", " ")[:300]
+            f.write(f"{_dt.datetime.now().isoformat(timespec='seconds')},{op},{secs:.2f},{enc},{machine_id()},{note}\n")
+    except Exception:
+        pass
+
+
 def machine_id():
     """Short stable per-laptop id (from the MAC). A soft licensing deterrent — not real DRM."""
     return _hashlib.sha256(str(_uuid.getnode()).encode()).hexdigest()[:12]
@@ -691,6 +713,7 @@ class RenderReq(BaseModel):
     clip: str = "source.mp4"        # which clip in the session to caption (e.g. dub_es.mp4)
     trim: Optional[list] = None     # [start, end] seconds — same trim the Compose board applies
     cuts: Optional[List[float]] = None  # scene cuts → captions clipped at cuts
+    headline: Optional[dict] = None     # static TEXT overlay {text,size,color,y,in,out,...} — localizable per language
 
 
 @app.post("/api/render")
@@ -740,20 +763,145 @@ def api_render(req: RenderReq):
             lo, hi = float(req.trim[0]), float(req.trim[1])
             req.cuts = [c - lo for c in req.cuts if lo < c < hi]
 
+    import time as _t
+    _t0 = _t.time()
     try:
         outputs = compose.render(
             src, words or [], req.regions, req.formats, out_dir,
             bodies=bodies, default_body=default_body, smart_trim=req.smart_trim,
-            out_prefix=out_prefix, cuts=req.cuts,
+            out_prefix=out_prefix, cuts=req.cuts, headline=req.headline,
         )
     except Exception as e:
         raise HTTPException(500, f"Render failed: {e}")
+    try:   # durable timing record (see ~/.assembler/timings.csv)
+        _dur = ffmpeg_utils.get_video_duration(src) or 0
+        _rt = (_t.time() - _t0) / _dur if _dur else 0
+        _log_timing("render", _t.time() - _t0,
+                    f"clip={clip} fmts={'+'.join(req.formats)} vid_s={_dur:.1f} realtime_x={_rt:.2f} words={len(words or [])}")
+    except Exception:
+        pass
 
     return {"outputs": [
         {"format": req.formats[i], "url": f"/download/{req.file_id}/{os.path.basename(p)}",
          "name": os.path.basename(p)}
         for i, p in enumerate(outputs)
     ]}
+
+
+class NormalizeReq(BaseModel):
+    file_id: str
+    clip: str = "source.mp4"
+    format: str = "9:16"
+
+
+@app.post("/api/normalize")
+def api_normalize(req: NormalizeReq):
+    """Prepare a 'wild' clip for assembly — no captions, just conform it to the project's
+    render parameters (size / 30fps / h264 yuv420p / aac 44.1k stereo).
+
+    Why: clips straight out of Kling / Freepik / Higgsfield can be 720p, 24fps, odd audio.
+    Normalizing once means the board can join them with STREAM COPY (fast, no quality loss)
+    instead of re-encoding everything. Cached, so re-running is instant.
+    """
+    import time as _t
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip '{req.clip}' not found in session")
+    out_dir = os.path.join(sdir, "output")
+    os.makedirs(out_dir, exist_ok=True)
+    t0 = _t.time()
+    try:
+        norm = compose.normalize_clip(src, req.format)
+    except Exception as e:
+        raise HTTPException(500, f"Normalize failed: {e}")
+    stem = os.path.splitext(os.path.basename(src))[0]
+    name = f"{stem}_norm.mp4"
+    dst = os.path.join(out_dir, name)
+    if os.path.abspath(norm) != os.path.abspath(dst):
+        shutil.copyfile(norm, dst)
+    el = _t.time() - t0
+    already = (os.path.abspath(norm) == os.path.abspath(src))   # source already matched the target
+    _log_timing("normalize", el, f"clip={os.path.basename(src)} fmt={req.format} already_ok={already}")
+    return {"name": name, "url": f"/download/{req.file_id}/{name}",
+            "seconds": round(el, 2), "already_conformed": already,
+            "size_mb": round(os.path.getsize(dst) / 1e6, 2) if os.path.exists(dst) else 0}
+
+
+class BenchReq(BaseModel):
+    file_id: str
+    clip: str = "source.mp4"
+    repeat: int = 2
+    concurrency: int = 1     # 1 = sequential; >1 renders that many copies at once
+
+
+@app.post("/api/benchmark")
+def api_benchmark(req: BenchReq):
+    """Measure this machine's render speed on a REAL clip from the session.
+
+    Returns the two numbers used to size render capacity:
+      realtime_factor  — render seconds per second of video (lower = faster)
+      clips_per_min    — throughput at the requested concurrency
+    Also appends to ~/.assembler/timings.csv so results accumulate per machine.
+    """
+    import time as _t
+    import concurrent.futures as _cf
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip '{req.clip}' not found in session")
+    dur = ffmpeg_utils.get_video_duration(src) or 0
+    if dur <= 0:
+        raise HTTPException(400, "Could not read clip duration")
+    # A realistic, machine-independent caption load derived from the clip length.
+    n_words = max(1, int(dur * 2.2))
+    slot = dur / n_words
+    sample = ["THIS", "IS", "YOUR", "BODY", "AFTER", "REGULAR", "WALKING", "AND", "IT", "WORKS"]
+    words = [{"word": sample[i % len(sample)], "start": round(i * slot, 3),
+              "end": round((i + 1) * slot, 3)} for i in range(n_words)]
+    style = st.normalize({"font_size": 90, "max_chars_per_line": 16, "max_lines": 2,
+                          "stroke_on": True, "stroke_outer": {"width": 8, "color": [0, 0, 0, 255]},
+                          "karaoke": {"enabled": True}})
+
+    def one():
+        work = tempfile.mkdtemp(prefix="cs_bench_", dir=WORK_ROOT)
+        out = os.path.join(work, "b.mp4")
+        t0 = _t.time()
+        compose.caption_clip(src, words, style, "9:16", out, work)
+        el = _t.time() - t0
+        try:
+            shutil.rmtree(work, ignore_errors=True)
+        except Exception:
+            pass
+        return el
+
+    reps = max(1, min(5, int(req.repeat)))
+    conc = max(1, min(8, int(req.concurrency)))
+    t_all = _t.time()
+    times = []
+    if conc == 1:
+        for _ in range(reps):
+            times.append(one())
+    else:
+        with _cf.ThreadPoolExecutor(max_workers=conc) as ex:   # ffmpeg runs as a subprocess
+            times = list(ex.map(lambda _i: one(), range(reps * conc)))
+    wall = _t.time() - t_all
+    times.sort()
+    med = times[len(times) // 2]
+    jobs = len(times)
+    res = {"clip": os.path.basename(src), "video_seconds": round(dur, 2),
+           "runs": jobs, "concurrency": conc,
+           "median_render_seconds": round(med, 2),
+           "realtime_factor": round(med / dur, 3),
+           "wall_seconds": round(wall, 2),
+           "clips_per_min": round(jobs / (wall / 60), 1),
+           "encoder": ffmpeg_utils.video_encoder(),
+           "cores": os.cpu_count(), "machine": machine_id()}
+    _log_timing("benchmark", wall,
+                f"clip={res['clip']} vid_s={res['video_seconds']} runs={jobs} conc={conc} "
+                f"median_s={res['median_render_seconds']} realtime_x={res['realtime_factor']} "
+                f"clips_per_min={res['clips_per_min']} cores={res['cores']}")
+    return res
 
 
 class DubReq(BaseModel):
@@ -1056,6 +1204,12 @@ class BatchReq(BaseModel):
 def api_batch_assemble(req: BatchReq):
     """Assemble many creatives at once. Each recipe = an ordered list of segments
     (each pulled from the library or the current session)."""
+    import time as _tb
+    _batch_t0 = _tb.time()
+    try:
+        compose.reset_concat_stats()   # so the response can report whether the fast join ran
+    except Exception:
+        pass
     sdir = _session_dir(req.file_id)
     out_dir = os.path.join(sdir, "output")
     os.makedirs(out_dir, exist_ok=True)
@@ -1123,6 +1277,7 @@ def api_batch_assemble(req: BatchReq):
                 # non-destructive: a segment may carry caption-data baked at assemble time
                 segs.append({"clip": p, "words": s.get("words"), "style": s.get("style"),
                              "regions": s.get("regions"),   # #10 per-phrase style overrides (optional)
+                             "headline": s.get("headline"),  # static localizable text overlay
                              "trim": s.get("trim"), "fade_in": s.get("fade_in"),
                              "cap_in": s.get("cap_in"), "cap_out": s.get("cap_out"),
                              "cuts": s.get("cuts"),
@@ -1131,12 +1286,53 @@ def api_batch_assemble(req: BatchReq):
                 raise RuntimeError("recipe has no segments")
             safe = "".join(c for c in name if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_") or "creative"
             outp = os.path.join(out_dir, f"batch_{safe}.mp4")
+            import time as _t
+            _s0 = _t.time()
             compose.assemble_recipe(segs, r.get("format", "9:16"), outp, music=music)
+            try:
+                _od = ffmpeg_utils.get_video_duration(outp) or 0
+                _log_timing("assemble", _t.time() - _s0,
+                            f"creative={safe} segs={len(segs)} out_s={_od:.1f} "
+                            f"realtime_x={((_t.time()-_s0)/_od if _od else 0):.2f} fmt={r.get('format','9:16')}")
+            except Exception:
+                pass
             results.append({"name": name, "url": f"/download/{req.file_id}/{os.path.basename(outp)}",
                             "file": os.path.basename(outp)})
         except Exception as e:
             errors[name] = str(e)
-    return {"results": results, "errors": errors}
+    # BATCH TIMING — this is the number that matters for capacity: the real production job
+    # (N hooks with captions + a long body → N finished creatives). Note the body is
+    # re-encoded once per creative, so a long body dominates the cost.
+    try:
+        import time as _t2
+        _wall = _t2.time() - _batch_t0
+        _tot_out = 0.0
+        for _r in results:
+            try:
+                _tot_out += ffmpeg_utils.get_video_duration(os.path.join(out_dir, _r["file"])) or 0
+            except Exception:
+                pass
+        _n = max(1, len(results))
+        _stats = {"creatives": len(results), "wall_seconds": round(_wall, 2),
+                  "seconds_per_creative": round(_wall / _n, 2),
+                  "output_seconds_total": round(_tot_out, 1),
+                  "realtime_factor": round(_wall / _tot_out, 3) if _tot_out else None,
+                  "creatives_per_min": round(_n / (_wall / 60), 1) if _wall > 0 else None,
+                  "encoder": ffmpeg_utils.video_encoder(), "cores": os.cpu_count()}
+        try:   # did the fast (stream-copy) join actually run, or did we fall back?
+            _cs = getattr(compose, "CONCAT_STATS", {})
+            _stats["fast_joins"] = _cs.get("copy", 0)
+            _stats["reencoded_joins"] = _cs.get("reencode", 0)
+            _stats["fallback_reason"] = _cs.get("why", "")
+        except Exception:
+            pass
+        _log_timing("batch", _wall,
+                    f"creatives={_stats['creatives']} per_creative_s={_stats['seconds_per_creative']} "
+                    f"out_s_total={_stats['output_seconds_total']} realtime_x={_stats['realtime_factor']} "
+                    f"per_min={_stats['creatives_per_min']} cores={_stats['cores']}")
+        return {"results": results, "errors": errors, "stats": _stats}
+    except Exception:
+        return {"results": results, "errors": errors}
 
 
 @app.get("/download/{fid}/{name}")

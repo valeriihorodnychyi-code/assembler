@@ -7,11 +7,13 @@ hardware-encoded path on Mac (see ffmpeg_utils.video_encoder).
 import os
 import shutil
 import tempfile
+import hashlib
+import subprocess
 from PIL import Image
 
 from . import ffmpeg_utils as ff
 from . import styles as st
-from .subtitles import build_events, render_subtitle_png, generate_shadow_asset
+from .subtitles import build_events, render_subtitle_png, generate_shadow_asset, render_headline_png
 
 
 def _region_for(t, regions):
@@ -62,7 +64,7 @@ def build_timeline(words, regions, lang="en", cuts=None):
 
 def render_format(video_path, tagged_events, fmt, output_path, work_dir,
                   body_path=None, scale_factors=None, bitrates=None, smart_trim=False,
-                  hold_last=False):
+                  hold_last=False, headline=None):
     """Render a single aspect ratio to output_path."""
     scale_factors = scale_factors or st.DEFAULT_SCALE_FACTORS
     bitrates = bitrates or {"temp_hook": "35M", "final_export": "8M"}
@@ -185,6 +187,25 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
         cmd += ["-f", "concat", "-safe", "0", "-i", subs_txt]
         fc += f"{base_label}[{sub_idx}:v]overlay=0:0:format=rgb[final_v]"
         last_v = "[final_v]"
+        sub_idx += 1
+
+    # Static TEXT headline (localizable: each language version passes its own string). Rendered
+    # to a full-frame transparent PNG so it lands exactly where it was placed, then overlaid for
+    # its [in, out] window. Drawn ON TOP of the captions.
+    if headline and str(headline.get("text", "")).strip():
+        hl_png = os.path.join(sub_dir, "headline.png")
+        render_headline_png(headline["text"], hl_png, TARGET_W, TARGET_H,
+                            st.resolve_font(headline.get("font_name")), headline)
+        cmd += ["-loop", "1", "-t", f"{render_duration}", "-i", hl_png]
+        hi_, ho_ = headline.get("in"), headline.get("out")
+        en = ""
+        if hi_ is not None or ho_ is not None:
+            lo = float(hi_) if hi_ is not None else 0.0
+            hi = float(ho_) if ho_ is not None else 1e9
+            en = f":enable='between(t,{lo},{hi})'"
+        _sep = "" if (not fc.strip() or fc.strip().endswith(";")) else "; "
+        fc += f"{_sep}{last_v}[{sub_idx}:v]overlay=0:0:format=auto{en}[hl_v]"
+        last_v = "[hl_v]"
 
     has_body = bool(body_path and os.path.exists(body_path))
     hook_bitrate = bitrates["temp_hook"] if has_body else bitrates["final_export"]
@@ -239,7 +260,99 @@ def _concat_body(hook, body, fmt, output_path, work_dir, bitrates):
         os.remove(temp_shadow)
 
 
-def assemble_segments(clips, fmt, output_path, bitrates=None):
+# How the last assembles were joined — so the UI can show whether the fast (stream-copy)
+# path actually ran, instead of us guessing why a batch didn't get faster.
+CONCAT_STATS = {"copy": 0, "reencode": 0, "why": ""}
+
+
+def reset_concat_stats():
+    CONCAT_STATS.update({"copy": 0, "reencode": 0, "why": ""})
+
+
+def _cache_dir():
+    """Persistent cache for normalized clips (outside the auto-updated code dir)."""
+    d = os.environ.get("CS_CACHE_DIR") or os.path.join(os.path.expanduser("~"), ".assembler", "cache")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _stream_params(path):
+    """(w, h, fps, vcodec, pix_fmt, acodec, sample_rate, channels) — used to decide whether a
+    clip can be concatenated with STREAM COPY (no re-encode)."""
+    try:
+        out = subprocess.run(
+            [ff.FFPROBE, "-v", "error", "-show_entries",
+             "stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt,sample_rate,channels",
+             "-of", "json", path], capture_output=True, text=True, check=True).stdout
+        import json as _j
+        v = a = {}
+        for s in _j.loads(out).get("streams", []):
+            if s.get("codec_type") == "video" and not v:
+                v = s
+            elif s.get("codec_type") == "audio" and not a:
+                a = s
+        num, den = (v.get("r_frame_rate", "30/1").split("/") + ["1"])[:2]
+        fps = round(float(num) / float(den or 1), 3) if float(den or 1) else 0
+        return (v.get("width"), v.get("height"), fps, v.get("codec_name"), v.get("pix_fmt"),
+                a.get("codec_name"), a.get("sample_rate"), a.get("channels"))
+    except Exception:
+        return None
+
+
+def _concat_target(fmt):
+    TW, TH = ff.DIMS[fmt]
+    vcodec = "h264"           # both libx264 and videotoolbox produce h264
+    return (TW, TH, 30.0, vcodec, "yuv420p", "aac", "44100", 2)
+
+
+def _is_concat_ready(path, fmt):
+    p = _stream_params(path)
+    if not p:
+        return False
+    t = _concat_target(fmt)
+    return (p[0] == t[0] and p[1] == t[1] and abs((p[2] or 0) - t[2]) < 0.05
+            and p[3] == t[3] and p[4] == t[4]
+            and p[5] == t[5] and str(p[6]) == t[6] and int(p[7] or 0) == t[7])
+
+
+def normalize_clip(path, fmt, bitrates=None):
+    """Encode a clip ONCE into the exact target params, cached by content signature.
+
+    This is what stops a finished body from being re-encoded for every creative: the body is
+    normalized a single time (and reused from cache afterwards), then creatives are assembled
+    with stream copy — faster AND no generational quality loss on the body.
+    """
+    if _is_concat_ready(path, fmt):
+        return path
+    bitrates = bitrates or {"final_export": "8M"}
+    try:
+        stt = os.stat(path)
+    except OSError:
+        return path
+    sig = f"{os.path.abspath(path)}|{stt.st_size}|{int(stt.st_mtime)}|{fmt}|{bitrates.get('final_export')}|{ff.video_encoder()}|v1"
+    key = hashlib.sha1(sig.encode()).hexdigest()[:16]
+    out = os.path.join(_cache_dir(), f"norm_{key}.mp4")
+    if os.path.exists(out) and os.path.getsize(out) > 1000:
+        return out
+    TW, TH = ff.DIMS[fmt]
+    dur = ff.get_video_duration(path) or 0
+    has_a = ff.has_audio_stream(path)
+    inputs = ["-i", path]
+    if not has_a:
+        inputs += ["-f", "lavfi", "-t", f"{max(dur, 0.1)}", "-i", "anullsrc=r=44100:cl=stereo"]
+    tmp = out + ".part.mp4"
+    cmd = ([ff.FFMPEG, *inputs, "-filter_complex",
+            f"[0:v]scale={TW}:{TH}:force_original_aspect_ratio=increase,"
+            f"crop={TW}:{TH},setsar=1,fps=30[v]",
+            "-map", "[v]", "-map", ("0:a" if has_a else "1:a"),
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p"]
+           + ff.encoder_quality_args(bitrates["final_export"]) + [tmp, "-y"])
+    ff.run(cmd)
+    os.replace(tmp, out)
+    return out
+
+
+def assemble_segments(clips, fmt, output_path, bitrates=None, fast=True):
     """Concat N clips (hook+hook+body+packshot…) into one creative, single pass.
 
     Each clip is scaled/cropped to the target format, normalized to 30fps/SAR 1, then
@@ -250,6 +363,41 @@ def assemble_segments(clips, fmt, output_path, bitrates=None):
         raise ValueError("no clips to assemble")
     bitrates = bitrates or {"final_export": "8M"}
     TW, TH = ff.DIMS[fmt]
+
+    # FAST PATH: normalize each clip once (cached — a finished body is encoded a single time,
+    # not once per creative) and then concatenate with STREAM COPY. Much faster on batches and
+    # the body keeps its original quality. Falls back to the full re-encode below on any issue.
+    if fast:
+        try:
+            norm = [normalize_clip(c, fmt, bitrates) for c in clips]
+            not_ready = [os.path.basename(p) for p in norm if not _is_concat_ready(p, fmt)]
+            if not_ready:
+                CONCAT_STATS["why"] = "params mismatch: " + ", ".join(not_ready[:3])
+            if not not_ready:
+                lst_dir = tempfile.mkdtemp(prefix="cs_concat_")
+                lst = os.path.join(lst_dir, "list.txt")
+                with open(lst, "w", encoding="utf-8") as fh:
+                    for p in norm:
+                        fh.write("file '" + os.path.abspath(p).replace("'", "'\\''") + "'\n")
+                ff.run([ff.FFMPEG, "-f", "concat", "-safe", "0", "-i", lst,
+                        "-c", "copy", "-movflags", "+faststart", output_path, "-y"])
+                shutil.rmtree(lst_dir, ignore_errors=True)
+                # VERIFY: a stream copy can "succeed" yet produce a wrong-length / drifting file
+                # (mismatched timebases, AAC priming, edit lists). If the result isn't the sum of
+                # its parts, throw it away and fall through to the safe re-encode below.
+                expect = sum(ff.get_video_duration(p) or 0 for p in norm)
+                got = ff.get_video_duration(output_path) or 0
+                ok_len = expect <= 0 or abs(got - expect) <= max(0.5, expect * 0.02)
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 1000 and ok_len:
+                    CONCAT_STATS["copy"] += 1
+                    return output_path
+                CONCAT_STATS["why"] = f"length {got:.2f}s != expected {expect:.2f}s"
+                print(f"[assemble] fast concat rejected (len {got:.2f}s vs expected {expect:.2f}s) — re-encoding",
+                      flush=True)
+        except Exception as e:
+            CONCAT_STATS["why"] = f"{type(e).__name__}: {e}"
+            print(f"[assemble] fast concat unavailable ({type(e).__name__}: {e}) — re-encoding", flush=True)
+    CONCAT_STATS["reencode"] += 1
 
     inputs, silent_inputs, vfilters, concat_inputs = [], [], [], []
     for c in clips:
@@ -321,7 +469,7 @@ def clip_caption_window(tagged, cap_in=None, cap_out=None):
     return out
 
 
-def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None, cuts=None, regions=None):
+def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None, cuts=None, regions=None, headline=None):
     """Bake captions onto a single clip (no body). Used by the non-destructive
     assemble so a hook's captions are burned only at final assembly time.
 
@@ -339,7 +487,7 @@ def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=Non
     # over trailing footage / the packshot (the #8 bug); the same fix now applies to this path.
     tagged = clip_caption_window(tagged, cap_in, cap_out)
     render_format(clip_path, [(dict(e), s) for e, s in tagged], fmt, output_path,
-                  work_dir, body_path=None)
+                  work_dir, body_path=None, headline=headline)
     return output_path
 
 
@@ -432,7 +580,7 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
                 cap = os.path.join(work_dir, f"cap_{i}.mp4")
                 caption_clip(path, words, seg["style"], fmt, cap, work_dir,
                              seg.get("cap_in"), seg.get("cap_out"), cuts=seg_cuts,
-                             regions=seg.get("regions"))
+                             regions=seg.get("regions"), headline=seg.get("headline"))
                 path = cap
             if seg.get("overlays"):  # PNG / alpha-.mov stickers on top (reaction style)
                 ovp = os.path.join(work_dir, f"ov_{i}.mp4")
@@ -617,7 +765,7 @@ def assemble(hook_path, body_path, fmt, output_path, work_dir=None, bitrates=Non
 
 def render(video_path, words, regions, formats, output_dir, work_dir=None,
            bodies=None, default_body=None, scale_factors=None, bitrates=None,
-           smart_trim=False, out_prefix="caption", cuts=None):
+           smart_trim=False, out_prefix="caption", cuts=None, headline=None):
     """Top-level render. Returns list of output file paths (one per format).
 
     `regions`: list of {"start","end","style"} OR pass a single style via
@@ -638,7 +786,7 @@ def render(video_path, words, regions, formats, output_dir, work_dir=None,
             per_fmt = [(dict(e), s) for e, s in tagged]
             render_format(video_path, per_fmt, fmt, out, work_dir,
                           body_path=body, scale_factors=scale_factors,
-                          bitrates=bitrates, smart_trim=smart_trim)
+                          bitrates=bitrates, smart_trim=smart_trim, headline=headline)
             outputs.append(out)
     finally:
         if own_work:

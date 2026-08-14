@@ -417,6 +417,85 @@ def _linear_gradient(w, h, c0, c1, direction="vertical"):
     return ramp.resize((w, h))   # vertical (top -> bottom)
 
 
+def render_headline_png(text, filename, width, height, font_path, cfg):
+    """Render a static TEXT overlay (a headline) to a full-frame transparent PNG.
+
+    Unlike captions this is not word-timed: it's a fixed block of text the designer places
+    once. Because it stays TEXT (not baked pixels), each language version can carry its own
+    string — that's what makes headlines localizable.
+
+    cfg: {size, color:[r,g,b,a], y (0..1 of height = centre of the block), align,
+          stroke:{width,color}, plate:{enabled,color,pad_x,pad_y,border_radius},
+          max_width (0..1 of width, for auto-wrap), line_spacing, case}
+    """
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    size = int(cfg.get("size", 90))
+    font = load_font(font_path, size)
+    col = tuple(cfg.get("color", [255, 255, 255, 255]))
+    case = (cfg.get("case") or "").lower()
+    txt = str(text or "")
+    if case == "uppercase":
+        txt = txt.upper()
+    elif case == "lowercase":
+        txt = txt.lower()
+    if not txt.strip():
+        img.save(filename)
+        return
+    # wrap: honour explicit newlines, then greedily fit each paragraph into max_width
+    max_w = float(cfg.get("max_width", 0.86)) * width
+    lines = []
+    for para in txt.replace("\r", "").split("\n"):
+        words, cur = para.split(), ""
+        if not words:
+            lines.append("")
+            continue
+        for w in words:
+            cand = (cur + " " + w).strip()
+            if cur and d.textlength(cand, font=font) > max_w:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = cand
+        if cur:
+            lines.append(cur)
+    asc, desc = font.getmetrics()
+    lh = asc + desc
+    sp = int(cfg.get("line_spacing", 8))
+    total = len(lines) * lh + (len(lines) - 1) * sp
+    top = int(float(cfg.get("y", 0.18)) * height - total / 2)
+    widths = [d.textlength(ln, font=font) for ln in lines]
+    align = (cfg.get("align") or "center").lower()
+
+    def line_x(w):
+        if align == "left":
+            return int((width - max_w) / 2)
+        if align == "right":
+            return int(width - (width - max_w) / 2 - w)
+        return int((width - w) / 2)
+
+    plate = cfg.get("plate") or {}
+    if plate.get("enabled"):
+        px = int(plate.get("pad_x", 26)); py = int(plate.get("pad_y", 14))
+        rad = int(plate.get("border_radius", 14))
+        pc = tuple(plate.get("color", [0, 0, 0, 150]))
+        bw = max(widths) if widths else 0
+        x0 = line_x(bw) - px
+        d.rounded_rectangle([x0, top - py, x0 + bw + px * 2, top + total + py], radius=rad, fill=pc)
+    stroke = cfg.get("stroke") or {}
+    sw = int(stroke.get("width", 0))
+    sc = tuple(stroke.get("color", [0, 0, 0, 255]))
+    y = top
+    for ln, w in zip(lines, widths):
+        x = line_x(w)
+        if sw > 0:
+            d.text((x, y), ln, font=font, fill=col, stroke_width=sw, stroke_fill=sc)
+        else:
+            d.text((x, y), ln, font=font, fill=col)
+        y += lh + sp
+    img.save(filename)
+
+
 def render_subtitle_png(event, filename, width, height, font_path, style_cfg, scale_factor=1.0,
                         draw_scrim=True, scrim_only=False):
     """Render a single karaoke event to a transparent PNG (pixel-faithful to preview)."""
