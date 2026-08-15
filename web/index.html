@@ -581,19 +581,11 @@
     </details>
 
     <details class="grp">
-      <summary><span>Headline · text overlay</span> <label class="switch hdrsw" title="Enable headline" onclick="hdrTgl(event,this)"><input type="checkbox" id="hlOn"><span class="slider"></span></label><span class="chev">›</span></summary>
+      <summary><span>Titles · text overlays</span> <label class="switch hdrsw" title="Enable titles" onclick="hdrTgl(event,this)"><input type="checkbox" id="hlOn"><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
-        <div class="hint">A static text block burned over the video. It stays <b>text</b>, so every language can carry its own copy — that's what makes headlines localizable (unlike a PNG).</div>
-        <textarea id="hlText" rows="2" placeholder="LIMITED OFFER&#10;ENDS MARCH 14" style="width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
-        <div class="hint">Enter = new line. Text for the active language (<b id="hlLangTag">EN</b>).</div>
-        <div class="row"><label>Size</label><input type="range" id="hlSize" min="30" max="240" value="110"><span class="val" id="hlSizeV">110</span></div>
-        <div class="row"><label>Color</label><input type="color" id="hlColor" value="#ffffff"></div>
-        <div class="row"><label>Vertical position</label><input type="range" id="hlY" min="0.03" max="0.95" step="0.01" value="0.16"><span class="val" id="hlYV">0.16</span></div>
-        <div class="row"><label>Outline</label><input type="range" id="hlStroke" min="0" max="24" value="6"><span class="val" id="hlStrokeV">6</span></div>
-        <div class="row"><label>Plate behind</label><label class="switch"><input type="checkbox" id="hlPlate"><span class="slider"></span></label></div>
-        <div class="row"><label>Show from (s)</label><input type="number" id="hlIn" step="0.1" placeholder="0" style="flex:1"></div>
-        <div class="row"><label>Show to (s)</label><input type="number" id="hlOut" step="0.1" placeholder="end" style="flex:1"></div>
-        <div id="hlLangs" style="margin-top:9px"></div>
+        <div class="hint">Static text burned over the video — any font, size, position and its own on/off timing. It stays <b>text</b>, so each language keeps its own copy (that's what makes titles localizable, unlike a PNG). Add as many as you need.</div>
+        <div id="titleList" style="display:flex;flex-direction:column;gap:10px"></div>
+        <button id="titleAdd" class="go" style="width:100%;margin-top:9px;font-size:12px;padding:7px">＋ Add title</button>
       </div>
     </details>
 
@@ -1380,8 +1372,7 @@ function loop(ts){let t,dur;
   else{const dt=(ts-lastTs)/1000||0;demoT=(demoT+dt)%4;t=demoT;dur=4;}
   lastTs=ts;render(t,dur);
   // headline sits on top of the captions and only inside its own [in,out] window
-  if(typeof drawHeadline==="function"){const c=(typeof hlCfg==="function")?hlCfg(activeVar):null;
-    if(c&&(c.in==null||t>=c.in)&&(c.out==null||t<=c.out))try{drawHeadline();}catch(e){}}
+  if(typeof drawTitles==="function")try{drawTitles(t);}catch(e){}
   if(typeof updateWordHighlight==="function")updateWordHighlight();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
 
@@ -1677,28 +1668,42 @@ async function fetchExact(){
 }
 $("exactToggle").onclick=()=>{exactOn=!exactOn;$("exactToggle").classList.toggle("on",exactOn);if(exactOn)fetchExact();else hideExact();};
 
-// ---------- Headline: a static TEXT overlay, one copy per language (localizable) ----------
-let hlTexts={};    // {lang: "headline copy"} — the text is per-language, the look is shared
-function hlCfg(lang){
-  const on=$("hlOn")&&$("hlOn").checked;
-  const L=lang||activeVar||"en";
-  const txt=(hlTexts[L]!=null?hlTexts[L]:(hlTexts.en||""));
-  if(!on||!String(txt).trim())return null;
-  const num=(id,d)=>{const e=$(id);const v=e?parseFloat(e.value):NaN;return isNaN(v)?d:v;};
-  const rgb=hexToRgb($("hlColor")?$("hlColor").value:"#ffffff");
-  const inS=$("hlIn")&&$("hlIn").value!==""?parseFloat($("hlIn").value):null;
-  const outS=$("hlOut")&&$("hlOut").value!==""?parseFloat($("hlOut").value):null;
-  return {text:txt,size:num("hlSize",110),color:[rgb[0],rgb[1],rgb[2],255],y:num("hlY",0.16),
-    in:inS,out:outS,case:"uppercase",line_spacing:8,max_width:0.86,
-    font_name:customFontName||(($("fontFamily")?$("fontFamily").value:"Poppins-Bold")+".ttf"),
-    stroke:{width:num("hlStroke",6),color:[0,0,0,255]},
-    plate:{enabled:!!($("hlPlate")&&$("hlPlate").checked),color:[0,0,0,150],pad_x:26,pad_y:14,border_radius:14}};
+// ---------- Titles: static TEXT overlays. Several per creative, each with its own font, look
+// and in/out window; the copy is stored PER LANGUAGE, which is what makes them localizable. ----
+let titles=[];     // [{texts:{lang:str}, font, size, color, y, stroke, plate, in, out, align}]
+let _titleSeq=0;
+function newTitle(){
+  return {id:++_titleSeq, texts:{}, font:"", size:110, color:"#ffffff", y:0.16,
+          stroke:6, plate:false, in:"", out:"", align:"center", caseMode:"uppercase"};
 }
-// canvas preview of the headline — mirrors render_headline_png (centre at y, wrap at max_width)
-function drawHeadline(){
-  const c=hlCfg(activeVar);if(!c)return;
+function titleText(t,lang){const L=lang||activeVar||"en";
+  return (t.texts[L]!=null&&String(t.texts[L]).trim())?t.texts[L]:(t.texts.en||"");}
+function titleCfg(t,lang){
+  const txt=titleText(t,lang);
+  if(!$("hlOn")||!$("hlOn").checked||!String(txt).trim())return null;
+  const rgb=hexToRgb(t.color||"#ffffff");
+  const font=t.font||customFontName||(($("fontFamily")?$("fontFamily").value:"Poppins-Bold")+".ttf");
+  return {text:txt,size:+t.size||110,color:[rgb[0],rgb[1],rgb[2],255],y:+t.y||0.16,
+    in:(t.in===""||t.in==null)?null:parseFloat(t.in),
+    out:(t.out===""||t.out==null)?null:parseFloat(t.out),
+    case:t.caseMode||"uppercase",line_spacing:8,max_width:0.86,align:t.align||"center",
+    font_name:font,
+    stroke:{width:+t.stroke||0,color:[0,0,0,255]},
+    plate:{enabled:!!t.plate,color:[0,0,0,150],pad_x:26,pad_y:14,border_radius:14}};
+}
+// all titles for a language, ready for the engine (used by preview, Export and the board)
+function titlesCfg(lang){return titles.map(t=>titleCfg(t,lang)).filter(Boolean);}
+function hlCfg(lang){const l=titlesCfg(lang);return l.length?l:null;}   // back-compat for callers
+// canvas preview: draw every title that's inside its window at time t (mirrors render_headline_png)
+function drawTitles(t){
+  titlesCfg(activeVar).forEach(c=>{
+    if((c.in!=null&&t<c.in)||(c.out!=null&&t>c.out))return;
+    drawOneTitle(c);
+  });
+}
+function drawOneTitle(c){
   const[W,H]=DIMS[ratio];
-  const fam=($("fontFamily")?$("fontFamily").value:"Poppins-Bold");
+  const fam=(c.font_name||"").replace(/^.*\//,"").replace(/\.(ttf|otf|ttc)$/i,"")||($("fontFamily")?$("fontFamily").value:"Poppins-Bold");
   ctx.save();ctx.font=c.size+'px "'+fam+'"';ctx.textBaseline="alphabetic";
   const maxW=c.max_width*W, lines=[];
   String(c.text).replace(/\r/g,"").split("\n").forEach(para=>{
@@ -1721,16 +1726,54 @@ function drawHeadline(){
     top+=lh+c.line_spacing;});
   ctx.restore();
 }
-function renderHlLangs(){
-  const box=$("hlLangs");if(!box)return;
-  const tag=$("hlLangTag");if(tag)tag.textContent=(activeVar||"en").toUpperCase();
-  const langs=Object.keys(variants||{}).filter(l=>l!==activeVar);
-  if(!langs.length){box.innerHTML="";return;}
-  box.innerHTML="<div class='hint' style='margin-bottom:5px'>Other languages — give each its own headline:</div>"+
-    langs.map(l=>"<div class='row' style='margin:3px 0'><label style='flex:0 0 42px'>"+l.toUpperCase()+"</label>"+
-      "<input data-hll='"+l+"' value=\""+String(hlTexts[l]||"").replace(/"/g,"&quot;").replace(/\n/g," / ")+"\" placeholder='same as EN' style='flex:1;font-size:12px'></div>").join("");
-  box.querySelectorAll("[data-hll]").forEach(inp=>inp.oninput=()=>{hlTexts[inp.dataset.hll]=inp.value;});
+// ---- Titles UI: one card per title (text for the active language + look + timing) ----
+function fontOptionsHTML(sel){
+  const src=$("fontSelect");if(!src)return "";
+  let html="<option value=''>same as captions</option>";
+  [...src.querySelectorAll("option")].forEach(o=>{
+    if(!o.value)return;
+    const grp=o.parentElement&&o.parentElement.tagName==="OPTGROUP"?(o.parentElement.label+" "):"";
+    html+="<option value='"+o.value+"'"+(sel===o.value?" selected":"")+">"+grp+o.textContent+"</option>";});
+  return html;
 }
+function renderTitles(){
+  const box=$("titleList");if(!box)return;
+  if(!titles.length){box.innerHTML="<div class='hint'>Ще немає тайтлів. Тисни «＋ Add title».</div>";return;}
+  const L=(activeVar||"en").toUpperCase();
+  box.innerHTML=titles.map((t,i)=>
+    "<div style='padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)'>"
+    +"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px'>"
+    +"<b style='font-size:11.5px;color:var(--accent2)'>Title "+(i+1)+" · text for "+L+"</b>"
+    +"<span data-trm='"+i+"' title='Remove title' style='cursor:pointer;color:var(--muted);font-size:13px'>✕</span></div>"
+    +"<textarea data-ttext='"+i+"' rows='2' placeholder='LIMITED OFFER&#10;ENDS MARCH 14' style='width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px;font-size:13px;font-family:inherit;resize:vertical'>"
+    +String(titleText(t,activeVar)||"").replace(/</g,"&lt;")+"</textarea>"
+    +"<div class='row' style='margin-top:6px'><label>Font</label><select data-tfont='"+i+"' style='flex:1.3;font-size:11.5px'>"+fontOptionsHTML(t.font)+"</select></div>"
+    +"<div class='row'><label>Size</label><input type='range' data-tsize='"+i+"' min='30' max='240' value='"+(t.size||110)+"'><span class='val'>"+(t.size||110)+"</span></div>"
+    +"<div class='row'><label>Vertical</label><input type='range' data-ty='"+i+"' min='0.03' max='0.95' step='0.01' value='"+(t.y||0.16)+"'><span class='val'>"+(t.y||0.16)+"</span></div>"
+    +"<div class='row'><label>Color</label><input type='color' data-tcolor='"+i+"' value='"+(t.color||"#ffffff")+"'>"
+    +"<label style='flex:0 0 auto;margin-left:10px'>Plate</label><label class='switch'><input type='checkbox' data-tplate='"+i+"'"+(t.plate?" checked":"")+"><span class='slider'></span></label></div>"
+    +"<div class='row'><label>Outline</label><input type='range' data-tstroke='"+i+"' min='0' max='24' value='"+(t.stroke||0)+"'><span class='val'>"+(t.stroke||0)+"</span></div>"
+    +"<div class='row'><label>Show from / to (s)</label>"
+    +"<input type='number' step='0.1' data-tin='"+i+"' value='"+(t.in!==""&&t.in!=null?t.in:"")+"' placeholder='0' style='flex:1'>"
+    +"<input type='number' step='0.1' data-tout='"+i+"' value='"+(t.out!==""&&t.out!=null?t.out:"")+"' placeholder='end' style='flex:1;margin-left:6px'></div>"
+    +"</div>").join("");
+  const upd=(sel,key,cast)=>box.querySelectorAll("["+sel+"]").forEach(el=>{
+    const i=+el.getAttribute(sel);
+    const h=()=>{titles[i][key]=cast?cast(el.type==="checkbox"?el.checked:el.value):el.value;
+      const v=el.parentElement&&el.parentElement.querySelector(".val");if(v)v.textContent=el.value;
+      if(typeof scheduleExact==="function")scheduleExact();};
+    el.oninput=h; if(el.tagName==="SELECT")el.onchange=h;});
+  box.querySelectorAll("[data-ttext]").forEach(el=>el.oninput=()=>{
+    titles[+el.dataset.ttext].texts[activeVar||"en"]=el.value;
+    if(typeof scheduleExact==="function")scheduleExact();});
+  upd("data-tfont","font"); upd("data-tsize","size",Number); upd("data-ty","y",Number);
+  upd("data-tcolor","color"); upd("data-tstroke","stroke",Number);
+  upd("data-tplate","plate",Boolean); upd("data-tin","in"); upd("data-tout","out");
+  box.querySelectorAll("[data-trm]").forEach(x=>x.onclick=()=>{titles.splice(+x.dataset.trm,1);renderTitles();renderLocTitles();});
+}
+(function(){const d=$("titleList")&&$("titleList").closest("details");
+  if(d)d.addEventListener("toggle",()=>{if(d.open)renderTitles();});})();
+if($("titleAdd"))$("titleAdd").onclick=()=>{titles.push(newTitle());if($("hlOn"))$("hlOn").checked=true;renderTitles();renderLocTitles();};
 // Make it obvious that only Typewriter survives the render: warn right under the picker when a
 // preview-only animation is selected, so nobody ships a creative expecting Pop/Rise to be there.
 function updateAnimWarn(){
@@ -1744,11 +1787,25 @@ function updateAnimWarn(){
   w.textContent="⚠ Прев'ю-онлі: у фінальний рендер ця анімація НЕ потрапить (слова просто зʼявляться). Робоча — Typewriter.";
 }
 if($("animType"))$("animType").addEventListener("change",updateAnimWarn);
-(function wireHeadline(){
-  const t=$("hlText");if(!t)return;
-  t.addEventListener("input",()=>{hlTexts[activeVar||"en"]=t.value;});
-  const d=t.closest("details");if(d)d.addEventListener("toggle",()=>{if(d.open){t.value=hlTexts[activeVar||"en"]||"";renderHlLangs();}});
-})();
+// LOC tab: translate every title into every language in one grid (titles × languages)
+function renderLocTitles(){
+  const box=$("locTitles");if(!box)return;
+  const langs=Object.keys(variants||{});
+  if(!titles.length||langs.length<2){box.innerHTML="";return;}
+  box.innerHTML="<div style='margin-top:18px;padding-top:14px;border-top:1px solid var(--line)'>"
+    +"<div style='font-size:12px;color:var(--muted);margin-bottom:8px'>📝 <b style='color:var(--txt)'>Переклад тайтлів</b> — текст у кадрі не перекладається дубляжем, впиши його для кожної мови:</div>"
+    +titles.map((t,i)=>"<div style='margin-bottom:10px'>"
+      +"<div style='font-size:11.5px;color:var(--accent2);margin-bottom:4px'>Title "+(i+1)+" · <span style='color:var(--muted)'>"
+      +String(titleText(t,"en")||"—").replace(/</g,"&lt;").replace(/\n/g," / ")+"</span></div>"
+      +langs.map(l=>"<div style='display:flex;gap:8px;align-items:center;margin:3px 0'>"
+        +"<span style='flex:0 0 46px;font-size:11px;color:var(--muted)'>"+l.toUpperCase()+"</span>"
+        +"<input data-lt='"+i+"' data-ll='"+l+"' value=\""+String(t.texts[l]||"").replace(/"/g,"&quot;").replace(/\n/g," / ")
+        +"\" placeholder='"+(l==="en"?"текст оригіналу":"same as EN")+"' style='flex:1;font-size:12px'></div>").join("")
+      +"</div>").join("")+"</div>";
+  box.querySelectorAll("[data-lt]").forEach(inp=>inp.oninput=()=>{
+    titles[+inp.dataset.lt].texts[inp.dataset.ll]=inp.value;
+    if(typeof renderTitles==="function")renderTitles();});
+}
 
 // ---------- social safe-zone guide (preview only; a design guide, never burned into the export) ----------
 // Shades the areas each platform's UI covers (top bar, bottom caption/CTA, right action rail) so you
@@ -1789,12 +1846,37 @@ async function registerServerFont(file){
   return family;
 }
 async function setFont(file){const family=await registerServerFont(file);$("fontFamily").value=family;customFontName=file;}
+// Weight order for a tidy dropdown (many weights of one family is the normal case)
+const WEIGHT_ORDER=["Thin","ExtraLight","UltraLight","Light","Book","Regular","Normal","Text","Medium",
+  "SemiBold","DemiBold","Bold","ExtraBold","UltraBold","Black","Heavy"];
+function fontParts(path){
+  const file=path.split("/").pop().replace(/\.(ttf|otf|ttc)$/i,"");
+  const folder=path.includes("/")?path.split("/")[0]:"";
+  const m=file.match(/^(.*?)[-_ ]?((?:Extra|Ultra|Semi|Demi)?(?:Thin|Light|Book|Regular|Normal|Text|Medium|Bold|Black|Heavy)(?:\s*Italic)?|Italic)$/i);
+  let family=folder||(m?m[1]:file), weight=m?m[2]:"Regular";
+  family=family.replace(/[-_]+/g," ").replace(/\d+pt/i,"").trim()||file;
+  weight=weight.replace(/([a-z])([A-Z])/g,"$1 $2").trim();
+  return {family,weight};
+}
 async function populateFonts(fonts){
   const sel=$("fontSelect");sel.innerHTML="";
   if(!fonts||!fonts.length){sel.innerHTML="<option>no fonts in /fonts</option>";return;}
   // preload all so switching is instant and preview is faithful
   await Promise.all(fonts.map(registerServerFont));
-  fonts.forEach(f=>{const o=document.createElement("option");o.value=f;o.textContent=f.replace(/\.(ttf|otf|ttc)$/i,"").replace(/[-_]/g," ");sel.appendChild(o);});
+  // group by family so a family with many weights reads as one block, not a wall of files
+  const groups={};
+  fonts.forEach(f=>{const {family,weight}=fontParts(f);(groups[family]=groups[family]||[]).push({f,weight});});
+  Object.keys(groups).sort((a,b)=>a.localeCompare(b)).forEach(fam=>{
+    const items=groups[fam].sort((a,b)=>{
+      const ia=WEIGHT_ORDER.findIndex(w=>w.toLowerCase()===a.weight.replace(/\s+/g,"").toLowerCase());
+      const ib=WEIGHT_ORDER.findIndex(w=>w.toLowerCase()===b.weight.replace(/\s+/g,"").toLowerCase());
+      return (ia<0?99:ia)-(ib<0?99:ib)||a.weight.localeCompare(b.weight);});
+    const holder=(items.length>1)?document.createElement("optgroup"):sel;
+    if(items.length>1)holder.label=fam;
+    items.forEach(({f,weight})=>{const o=document.createElement("option");o.value=f;
+      o.textContent=(items.length>1)?weight:(fam+" "+weight).trim();holder.appendChild(o);});
+    if(items.length>1)sel.appendChild(holder);
+  });
   const pref=fonts.find(f=>/poppins-bold/i.test(f))||fonts.find(f=>/bold/i.test(f))||fonts[0];
   sel.value=pref;await setFont(pref);
 }
@@ -2742,6 +2824,7 @@ function renderLocStage(){
       +'<div id="locRows" style="flex:1;min-width:0"></div>'
       +(haveLoc?'<button class="primary big-go" style="flex:0 0 auto;align-self:center;font-size:19px;padding:18px 26px" onclick="setMode(\'asm\')">▦ Send to Assemble →</button>':'')
     +'</div>'
+    +'<div id="locTitles"></div>'
     +'<div id="locQuiz" style="display:none;position:fixed;left:24px;bottom:96px;z-index:135;max-width:360px"></div>'
     +'</div>';
   const LC=$("locLangs");
@@ -2749,6 +2832,7 @@ function renderLocStage(){
     const chip=document.createElement("div");chip.className="chip";chip.dataset.l=l;chip.style.cssText="flex:0 0 auto;font-size:14px;padding:9px 15px";chip.textContent=c.flag+" "+l.toUpperCase();
     chip.onclick=()=>chip.classList.toggle("on");LC.appendChild(chip);});
   $("locGoBtn").onclick=localizePack;
+  if(typeof renderLocTitles==="function")renderLocTitles();   // titles × languages translation grid
   if($("locBackupBtn"))$("locBackupBtn").onclick=downloadLocs;
   const rows=$("locRows");
   if(!srcs.length){rows.innerHTML='<div style="color:var(--muted);font-size:12px">—</div>';}

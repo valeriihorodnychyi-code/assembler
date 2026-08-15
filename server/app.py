@@ -369,10 +369,19 @@ def _session_dir(fid: str) -> str:
 
 
 def list_fonts():
+    """Every font in fonts/, including SUBFOLDERS — so a family can live in its own folder
+    (fonts/Poppins/Poppins-SemiBold.ttf) and stay tidy on GitHub. Returns paths relative to
+    fonts/ ('Poppins/Poppins-Bold.ttf' or just 'Oswald-Bold.ttf' for flat files)."""
     d = st.FONTS_DIR
     if not os.path.isdir(d):
         return []
-    return sorted(f for f in os.listdir(d) if f.lower().endswith((".ttf", ".otf", ".ttc")))
+    out = []
+    for base, dirs, files in os.walk(d):
+        dirs[:] = [x for x in dirs if not x.startswith(".")]
+        for f in files:
+            if f.lower().endswith((".ttf", ".otf", ".ttc")) and not f.startswith("."):
+                out.append(os.path.relpath(os.path.join(base, f), d))
+    return sorted(out, key=str.lower)
 
 
 @app.get("/api/info")

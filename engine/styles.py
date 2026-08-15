@@ -137,10 +137,20 @@ def resolve_font(font_name: str, fonts_dir: str = None):
         return font_name
 
     base = os.path.basename(font_name)
-    # 1) bundled fonts dir
+    # 1a) exact path inside fonts/ (supports subfolders: "Poppins/Poppins-Bold.ttf")
+    rel = os.path.join(d, font_name)
+    if os.sep in font_name and os.path.exists(rel):
+        return rel
+    # 1b) flat file in fonts/
     local = os.path.join(d, base)
     if os.path.exists(local):
         return local
+    # 1c) same filename anywhere under fonts/ — so styles saved before a font was moved into a
+    # family subfolder keep working (font_name is stored as a bare filename in older presets)
+    if os.path.isdir(d):
+        for _b, _dirs, _files in os.walk(d):
+            if base in _files:
+                return os.path.join(_b, base)
     # 2) system font dirs (exact filename match, recursive)
     for root_dir in SYSTEM_FONT_DIRS:
         if not os.path.isdir(root_dir):

@@ -203,23 +203,27 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
         last_v = "[final_v]"
         sub_idx += 1
 
-    # Static TEXT headline (localizable: each language version passes its own string). Rendered
-    # to a full-frame transparent PNG so it lands exactly where it was placed, then overlaid for
-    # its [in, out] window. Drawn ON TOP of the captions.
-    if headline and str(headline.get("text", "")).strip():
-        hl_png = os.path.join(sub_dir, "headline.png")
-        render_headline_png(headline["text"], hl_png, TARGET_W, TARGET_H,
-                            st.resolve_font(headline.get("font_name")), headline)
+    # Static TEXT titles (localizable: each language version passes its own strings). Each title
+    # is rendered to a full-frame transparent PNG — so it lands exactly where it was placed — and
+    # overlaid for its own [in, out] window. Drawn ON TOP of the captions. `headline` accepts a
+    # single dict or a LIST, so a creative can carry several titles with independent timing.
+    _titles = headline if isinstance(headline, (list, tuple)) else ([headline] if headline else [])
+    _titles = [t for t in _titles if t and str(t.get("text", "")).strip()]
+    for _ti, _t in enumerate(_titles):
+        hl_png = os.path.join(sub_dir, f"title_{_ti}.png")
+        render_headline_png(_t["text"], hl_png, TARGET_W, TARGET_H,
+                            st.resolve_font(_t.get("font_name")), _t)
         cmd += ["-loop", "1", "-t", f"{render_duration}", "-i", hl_png]
-        hi_, ho_ = headline.get("in"), headline.get("out")
+        hi_, ho_ = _t.get("in"), _t.get("out")
         en = ""
         if hi_ is not None or ho_ is not None:
             lo = float(hi_) if hi_ is not None else 0.0
             hi = float(ho_) if ho_ is not None else 1e9
             en = f":enable='between(t,{lo},{hi})'"
         _sep = "" if (not fc.strip() or fc.strip().endswith(";")) else "; "
-        fc += f"{_sep}{last_v}[{sub_idx}:v]overlay=0:0:format=auto{en}[hl_v]"
-        last_v = "[hl_v]"
+        fc += f"{_sep}{last_v}[{sub_idx}:v]overlay=0:0:format=auto{en}[hl{_ti}]"
+        last_v = f"[hl{_ti}]"
+        sub_idx += 1
 
     has_body = bool(body_path and os.path.exists(body_path))
     hook_bitrate = bitrates["temp_hook"] if has_body else bitrates["final_export"]
