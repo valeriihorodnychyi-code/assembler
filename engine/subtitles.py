@@ -466,8 +466,14 @@ def render_headline_png(text, filename, width, height, font_path, cfg):
     top = int(float(cfg.get("y", 0.18)) * height - total / 2)
     widths = [d.textlength(ln, font=font) for ln in lines]
     align = (cfg.get("align") or "center").lower()
+    # free horizontal placement: x = fraction of width for the block's CENTRE (set by dragging the
+    # title on the preview). When absent, fall back to the align rule (backwards compatible).
+    xc = cfg.get("x")
+    xc = float(xc) if xc not in (None, "") else None
 
     def line_x(w):
+        if xc is not None:
+            return int(xc * width - w / 2)
         if align == "left":
             return int((width - max_w) / 2)
         if align == "right":
@@ -485,6 +491,25 @@ def render_headline_png(text, filename, width, height, font_path, cfg):
     stroke = cfg.get("stroke") or {}
     sw = int(stroke.get("width", 0))
     sc = tuple(stroke.get("color", [0, 0, 0, 255]))
+    # optional drop shadow / glow, same controls as captions
+    sh = cfg.get("shadow") or {}
+    if sh.get("enabled"):
+        sx, sy = int(sh.get("offset_x", 0)), int(sh.get("offset_y", 8))
+        blur = int(sh.get("glow_blur", 0))
+        shc = tuple(sh.get("color", [0, 0, 0, 255]))
+        sl = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(sl)
+        yy = top
+        for ln, w in zip(lines, widths):
+            xx = line_x(w)
+            if sw > 0:
+                sd.text((xx + sx, yy + sy), ln, font=font, fill=shc, stroke_width=sw, stroke_fill=shc)
+            else:
+                sd.text((xx + sx, yy + sy), ln, font=font, fill=shc)
+            yy += lh + sp
+        if blur > 0:
+            sl = sl.filter(ImageFilter.GaussianBlur(blur))
+        img.alpha_composite(sl)
     y = top
     for ln, w in zip(lines, widths):
         x = line_x(w)
@@ -493,6 +518,14 @@ def render_headline_png(text, filename, width, height, font_path, cfg):
         else:
             d.text((x, y), ln, font=font, fill=col)
         y += lh + sp
+    # optional tilt, rotated around the title block's own centre (positive = clockwise, like the
+    # canvas preview and the sticker overlays), so the title stays where it was placed
+    ang = float(cfg.get("angle", 0) or 0)
+    if abs(ang) > 0.01:
+        bw = max(widths) if widths else 0
+        cx = line_x(bw) + bw / 2.0
+        cy = top + total / 2.0
+        img = img.rotate(-ang, resample=Image.BICUBIC, center=(cx, cy))
     img.save(filename)
 
 

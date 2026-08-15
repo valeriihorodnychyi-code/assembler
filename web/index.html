@@ -1373,6 +1373,15 @@ function loop(ts){let t,dur;
   lastTs=ts;render(t,dur);
   // headline sits on top of the captions and only inside its own [in,out] window
   if(typeof drawTitles==="function")try{drawTitles(t);}catch(e){}
+  // overlays (PNG/.mov stickers) must appear/disappear on their in/out in the PREVIEW too —
+  // the render already respected the window, the preview kept them on screen the whole clip.
+  {const _ol=$("overlayLayer");
+   if(_ol)[...(_ol.children||[])].forEach(el=>{
+     const i=el.dataset?el.dataset.ovin:"", o=el.dataset?el.dataset.ovout:"";
+     const lo=(i===""||i==null)?null:parseFloat(i), hi=(o===""||o==null)?null:parseFloat(o);
+     const shown=!((lo!=null&&t<lo)||(hi!=null&&t>hi));
+     el.style.visibility=shown?"visible":"hidden";   // visibility (not display) keeps drag handles stable
+   });}
   if(typeof updateWordHighlight==="function")updateWordHighlight();requestAnimationFrame(loop);}
 requestAnimationFrame(loop);
 
@@ -1656,9 +1665,9 @@ async function fetchExact(){
   if($("batchStage").style.display==="block")return;
   if(!videoLoaded||!video.paused)return;   // a settled frame in any format (9:16 / 1:1 / 16:9)
   const v=variants[activeVar];
-  if(!v||!v.words||!v.words.length)return;
+  if(!v||((!v.words||!v.words.length)&&!(typeof titlesCfg==="function"&&titlesCfg(activeVar).length)))return;
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null})});
+      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(activeVar)})});
     if(r.status===204){hideExact();return;}
     if(!r.ok)return;
     const url=URL.createObjectURL(await r.blob());const img=$("exactImg");
@@ -1674,7 +1683,10 @@ let titles=[];     // [{texts:{lang:str}, font, size, color, y, stroke, plate, i
 let _titleSeq=0;
 function newTitle(){
   return {id:++_titleSeq, texts:{}, font:"", size:110, color:"#ffffff", y:0.16,
-          stroke:6, plate:false, in:"", out:"", align:"center", caseMode:"uppercase"};
+          stroke:6, strokeColor:"#000000", plate:false, plateColor:"#000000", plateAlpha:150,
+          platePadX:26, platePadY:14, plateRadius:14,
+          shadow:false, shX:0, shY:8, shBlur:0, shColor:"#000000",
+          in:"", out:"", align:"center", caseMode:"uppercase", lineSpacing:8, maxWidth:0.86, angle:0, x:0.5};
 }
 function titleText(t,lang){const L=lang||activeVar||"en";
   return (t.texts[L]!=null&&String(t.texts[L]).trim())?t.texts[L]:(t.texts.en||"");}
@@ -1683,31 +1695,40 @@ function titleCfg(t,lang){
   if(!$("hlOn")||!$("hlOn").checked||!String(txt).trim())return null;
   const rgb=hexToRgb(t.color||"#ffffff");
   const font=t.font||customFontName||(($("fontFamily")?$("fontFamily").value:"Poppins-Bold")+".ttf");
+  const sRGB=hexToRgb(t.strokeColor||"#000000"), pRGB=hexToRgb(t.plateColor||"#000000"), shRGB=hexToRgb(t.shColor||"#000000");
   return {text:txt,size:+t.size||110,color:[rgb[0],rgb[1],rgb[2],255],y:+t.y||0.16,
     in:(t.in===""||t.in==null)?null:parseFloat(t.in),
     out:(t.out===""||t.out==null)?null:parseFloat(t.out),
-    case:t.caseMode||"uppercase",line_spacing:8,max_width:0.86,align:t.align||"center",
+    case:t.caseMode||"uppercase",line_spacing:(t.lineSpacing!=null?+t.lineSpacing:8),
+    max_width:(t.maxWidth!=null?+t.maxWidth:0.86),align:t.align||"center",angle:+(t.angle||0),x:(t.x!=null?+t.x:0.5),
     font_name:font,
-    stroke:{width:+t.stroke||0,color:[0,0,0,255]},
-    plate:{enabled:!!t.plate,color:[0,0,0,150],pad_x:26,pad_y:14,border_radius:14}};
+    stroke:{width:+t.stroke||0,color:[sRGB[0],sRGB[1],sRGB[2],255]},
+    shadow:{enabled:!!t.shadow,offset_x:+(t.shX||0),offset_y:+(t.shY!=null?t.shY:8),
+            glow_blur:+(t.shBlur||0),color:[shRGB[0],shRGB[1],shRGB[2],255]},
+    plate:{enabled:!!t.plate,color:[pRGB[0],pRGB[1],pRGB[2],(t.plateAlpha!=null?+t.plateAlpha:150)],
+           pad_x:+(t.platePadX!=null?t.platePadX:26),pad_y:+(t.platePadY!=null?t.platePadY:14),
+           border_radius:+(t.plateRadius!=null?t.plateRadius:14)}};
 }
 // all titles for a language, ready for the engine (used by preview, Export and the board)
 function titlesCfg(lang){return titles.map(t=>titleCfg(t,lang)).filter(Boolean);}
 function hlCfg(lang){const l=titlesCfg(lang);return l.length?l:null;}   // back-compat for callers
 // canvas preview: draw every title that's inside its window at time t (mirrors render_headline_png)
+let _titleBoxes=[];   // {i,x,y,w,h} in canvas px — lets you grab a title right on the preview
 function drawTitles(t){
-  titlesCfg(activeVar).forEach(c=>{
+  _titleBoxes=[];
+  titlesCfg(activeVar).forEach((c,i)=>{
     if((c.in!=null&&t<c.in)||(c.out!=null&&t>c.out))return;
-    drawOneTitle(c);
+    drawOneTitle(c,i);
   });
 }
-function drawOneTitle(c){
+function drawOneTitle(c,idx){
   const[W,H]=DIMS[ratio];
   const fam=(c.font_name||"").replace(/^.*\//,"").replace(/\.(ttf|otf|ttc)$/i,"")||($("fontFamily")?$("fontFamily").value:"Poppins-Bold");
   ctx.save();ctx.font=c.size+'px "'+fam+'"';ctx.textBaseline="alphabetic";
   const maxW=c.max_width*W, lines=[];
+  const cased=s=>c.case==="uppercase"?s.toUpperCase():(c.case==="lowercase"?s.toLowerCase():s);
   String(c.text).replace(/\r/g,"").split("\n").forEach(para=>{
-    const ws=para.toUpperCase().split(/\s+/).filter(Boolean);
+    const ws=cased(para).split(/\s+/).filter(Boolean);
     if(!ws.length){lines.push("");return;}
     let cur="";
     ws.forEach(w=>{const cand=(cur?cur+" ":"")+w;
@@ -1718,14 +1739,67 @@ function drawOneTitle(c){
   const lh=asc+((m.fontBoundingBoxDescent!=null)?m.fontBoundingBoxDescent:c.size*0.22);
   const total=lines.length*lh+(lines.length-1)*c.line_spacing;
   let top=c.y*H-total/2;
+  const cRGB=a=>"rgb("+a[0]+","+a[1]+","+a[2]+")";
+  const lineX=w=>(c.x!=null)?(c.x*W-w/2):(c.align==="left"?(W-maxW)/2:(c.align==="right"?(W-(W-maxW)/2-w):(W/2-w/2)));
+  if(c.angle){   // tilt around the block's own centre — same pivot as the engine
+    const _bw=Math.max(0,...lines.map(l=>ctx.measureText(l).width));
+    const _cx=lineX(_bw)+_bw/2, _cy=top+total/2;
+    ctx.translate(_cx,_cy);ctx.rotate(c.angle*Math.PI/180);ctx.translate(-_cx,-_cy);
+  }
   if(c.plate.enabled){const bw=Math.max(0,...lines.map(l=>ctx.measureText(l).width));
-    ctx.fillStyle=rgba("#000000",150);rr(W/2-bw/2-26,top-14,bw+52,total+28,14);ctx.fill();}
-  lines.forEach(ln=>{const w=ctx.measureText(ln).width,x=W/2-w/2,base=top+asc;
-    if(c.stroke.width>0){ctx.lineJoin="round";ctx.strokeStyle="rgba(0,0,0,1)";ctx.lineWidth=c.stroke.width*2;ctx.strokeText(ln,x,base);}
-    ctx.fillStyle="rgb("+c.color[0]+","+c.color[1]+","+c.color[2]+")";ctx.fillText(ln,x,base);
+    const px=c.plate.pad_x,py=c.plate.pad_y,pa=(c.plate.color[3]!=null?c.plate.color[3]:150);
+    ctx.fillStyle="rgba("+c.plate.color[0]+","+c.plate.color[1]+","+c.plate.color[2]+","+(pa/255).toFixed(2)+")";
+    rr(lineX(bw)-px,top-py,bw+px*2,total+py*2,c.plate.border_radius);ctx.fill();}
+  if(c.shadow&&c.shadow.enabled){   // same shadow controls as the captions
+    ctx.save();ctx.shadowColor=cRGB(c.shadow.color);ctx.shadowBlur=c.shadow.glow_blur||0;
+    ctx.shadowOffsetX=c.shadow.offset_x||0;ctx.shadowOffsetY=c.shadow.offset_y||0;
+    ctx.fillStyle=cRGB(c.shadow.color);
+    let sy=top;lines.forEach(ln=>{ctx.fillText(ln,lineX(ctx.measureText(ln).width),sy+asc);sy+=lh+c.line_spacing;});
+    ctx.restore();}
+  lines.forEach(ln=>{const w=ctx.measureText(ln).width,x=lineX(w),base=top+asc;
+    if(c.stroke.width>0){ctx.lineJoin="round";ctx.strokeStyle=cRGB(c.stroke.color);ctx.lineWidth=c.stroke.width*2;ctx.strokeText(ln,x,base);}
+    ctx.fillStyle=cRGB(c.color);ctx.fillText(ln,x,base);
     top+=lh+c.line_spacing;});
   ctx.restore();
+  // remember where this title sits, so it can be grabbed and dragged on the preview
+  if(idx!=null){const bw=Math.max(0,...lines.map(l=>ctx.measureText(l).width));
+    const bx=lineX(bw), by=(c.y*H-total/2);
+    _titleBoxes.push({i:idx,x:bx,y:by,w:bw||120,h:total||c.size});}
 }
+// Drag a title anywhere on the preview (like the stickers): grabs the title under the cursor and
+// moves it in BOTH axes; the Horizontal/Vertical sliders follow live.
+(function wireTitleDrag(){
+  const vp=$("viewport");if(!vp)return;
+  const hit=(cx,cy)=>{
+    const r=vp.getBoundingClientRect();const[W,H]=DIMS[ratio];
+    const px=(cx-r.left)*(W/r.width), py=(cy-r.top)*(H/r.height);
+    for(let k=_titleBoxes.length-1;k>=0;k--){const b=_titleBoxes[k];
+      const pad=Math.max(18,b.h*0.25);
+      if(px>=b.x-pad&&px<=b.x+b.w+pad&&py>=b.y-pad&&py<=b.y+b.h+pad)return b;}
+    return null;
+  };
+  vp.addEventListener("pointermove",e=>{ if(!_dragT)vp.style.cursor=hit(e.clientX,e.clientY)?"move":""; });
+  let _dragT=null;
+  vp.addEventListener("pointerdown",e=>{
+    const b=hit(e.clientX,e.clientY); if(!b)return;
+    const t=titles[b.i]; if(!t)return;
+    e.preventDefault(); e.stopPropagation();   // don't let the caption-height drag also start
+    const r=vp.getBoundingClientRect(), [W,H]=DIMS[ratio];
+    const sx=e.clientX, sy=e.clientY, x0=(t.x!=null?+t.x:0.5), y0=(+t.y||0.16);
+    _dragT=t; vp.style.cursor="grabbing";
+    const mv=e2=>{
+      t.x=Math.max(0.02,Math.min(0.98,x0+(e2.clientX-sx)/r.width));
+      t.y=Math.max(0.02,Math.min(0.98,y0+(e2.clientY-sy)/r.height));
+      const box=$("titleList");                                 // keep the sliders in sync live
+      if(box){const xs=box.querySelector("[data-tx='"+b.i+"']"),ys=box.querySelector("[data-ty='"+b.i+"']");
+        if(xs){xs.value=t.x.toFixed(2);const v=xs.parentElement.querySelector(".val");if(v)v.textContent=t.x.toFixed(2);}
+        if(ys){ys.value=t.y.toFixed(2);const v=ys.parentElement.querySelector(".val");if(v)v.textContent=t.y.toFixed(2);}}
+    };
+    const up=()=>{_dragT=null;vp.style.cursor="";document.removeEventListener("pointermove",mv);
+      document.removeEventListener("pointerup",up);if(typeof scheduleExact==="function")scheduleExact();};
+    document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);
+  },true);
+})();
 // ---- Titles UI: one card per title (text for the active language + look + timing) ----
 function fontOptionsHTML(sel){
   const src=$("fontSelect");if(!src)return "";
@@ -1744,18 +1818,39 @@ function renderTitles(){
     "<div style='padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)'>"
     +"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px'>"
     +"<b style='font-size:11.5px;color:var(--accent2)'>Title "+(i+1)+" · text for "+L+"</b>"
-    +"<span data-trm='"+i+"' title='Remove title' style='cursor:pointer;color:var(--muted);font-size:13px'>✕</span></div>"
+    +"<span><span data-tcopy='"+i+"' title='Взяти шрифт/колір/обведення/тінь/плашку з поточного стилю титрів' style='cursor:pointer;color:var(--accent2);font-size:11px;margin-right:9px'>⧉ style from captions</span>"
+    +"<span data-trm='"+i+"' title='Remove title' style='cursor:pointer;color:var(--muted);font-size:13px'>✕</span></span></div>"
     +"<textarea data-ttext='"+i+"' rows='2' placeholder='LIMITED OFFER&#10;ENDS MARCH 14' style='width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px;font-size:13px;font-family:inherit;resize:vertical'>"
     +String(titleText(t,activeVar)||"").replace(/</g,"&lt;")+"</textarea>"
     +"<div class='row' style='margin-top:6px'><label>Font</label><select data-tfont='"+i+"' style='flex:1.3;font-size:11.5px'>"+fontOptionsHTML(t.font)+"</select></div>"
     +"<div class='row'><label>Size</label><input type='range' data-tsize='"+i+"' min='30' max='240' value='"+(t.size||110)+"'><span class='val'>"+(t.size||110)+"</span></div>"
     +"<div class='row'><label>Vertical</label><input type='range' data-ty='"+i+"' min='0.03' max='0.95' step='0.01' value='"+(t.y||0.16)+"'><span class='val'>"+(t.y||0.16)+"</span></div>"
+    +"<div class='row'><label>Horizontal</label><input type='range' data-tx='"+i+"' min='0.02' max='0.98' step='0.01' value='"+(t.x!=null?t.x:0.5)+"'><span class='val'>"+(t.x!=null?t.x:0.5)+"</span></div>"
+    +"<div class='row'><label>Tilt °</label><input type='range' data-tang='"+i+"' min='-45' max='45' step='1' value='"+(t.angle||0)+"'><span class='val'>"+(t.angle||0)+"</span></div>"
     +"<div class='row'><label>Color</label><input type='color' data-tcolor='"+i+"' value='"+(t.color||"#ffffff")+"'>"
     +"<label style='flex:0 0 auto;margin-left:10px'>Plate</label><label class='switch'><input type='checkbox' data-tplate='"+i+"'"+(t.plate?" checked":"")+"><span class='slider'></span></label></div>"
     +"<div class='row'><label>Outline</label><input type='range' data-tstroke='"+i+"' min='0' max='24' value='"+(t.stroke||0)+"'><span class='val'>"+(t.stroke||0)+"</span></div>"
     +"<div class='row'><label>Show from / to (s)</label>"
     +"<input type='number' step='0.1' data-tin='"+i+"' value='"+(t.in!==""&&t.in!=null?t.in:"")+"' placeholder='0' style='flex:1'>"
     +"<input type='number' step='0.1' data-tout='"+i+"' value='"+(t.out!==""&&t.out!=null?t.out:"")+"' placeholder='end' style='flex:1;margin-left:6px'></div>"
+    // full styling, same controls as the captions — collapsed so the card stays readable
+    +"<details style='margin-top:6px'><summary style='cursor:pointer;font-size:11.5px;color:var(--muted)'>⚙ More styling</summary><div style='padding-top:6px'>"
+    +"<div class='row'><label>Case</label><select data-tcase='"+i+"' style='flex:1;font-size:11.5px'>"
+    +["uppercase","lowercase","none"].map(v=>"<option value='"+v+"'"+((t.caseMode||"uppercase")===v?" selected":"")+">"+v+"</option>").join("")+"</select></div>"
+    +"<div class='row'><label>Align</label><select data-talign='"+i+"' style='flex:1;font-size:11.5px'>"
+    +["center","left","right"].map(v=>"<option value='"+v+"'"+((t.align||"center")===v?" selected":"")+">"+v+"</option>").join("")+"</select></div>"
+    +"<div class='row'><label>Line spacing</label><input type='range' data-tls='"+i+"' min='-20' max='60' value='"+(t.lineSpacing!=null?t.lineSpacing:8)+"'><span class='val'>"+(t.lineSpacing!=null?t.lineSpacing:8)+"</span></div>"
+    +"<div class='row'><label>Text width</label><input type='range' data-tmw='"+i+"' min='0.3' max='0.98' step='0.02' value='"+(t.maxWidth!=null?t.maxWidth:0.86)+"'><span class='val'>"+(t.maxWidth!=null?t.maxWidth:0.86)+"</span></div>"
+    +"<div class='row'><label>Outline color</label><input type='color' data-tsc='"+i+"' value='"+(t.strokeColor||"#000000")+"'></div>"
+    +"<div class='row'><label>Shadow</label><label class='switch'><input type='checkbox' data-tsh='"+i+"'"+(t.shadow?" checked":"")+"><span class='slider'></span></label></div>"
+    +"<div class='row'><label>Shadow X / Y</label><input type='number' data-tshx='"+i+"' value='"+(t.shX||0)+"' style='flex:1'><input type='number' data-tshy='"+i+"' value='"+(t.shY!=null?t.shY:8)+"' style='flex:1;margin-left:6px'></div>"
+    +"<div class='row'><label>Shadow blur</label><input type='range' data-tshb='"+i+"' min='0' max='60' value='"+(t.shBlur||0)+"'><span class='val'>"+(t.shBlur||0)+"</span></div>"
+    +"<div class='row'><label>Shadow color</label><input type='color' data-tshc='"+i+"' value='"+(t.shColor||"#000000")+"'></div>"
+    +"<div class='row'><label>Plate color / alpha</label><input type='color' data-tpc='"+i+"' value='"+(t.plateColor||"#000000")+"'>"
+    +"<input type='range' data-tpa='"+i+"' min='0' max='255' value='"+(t.plateAlpha!=null?t.plateAlpha:150)+"' style='margin-left:6px'></div>"
+    +"<div class='row'><label>Plate pad X / Y</label><input type='number' data-tppx='"+i+"' value='"+(t.platePadX!=null?t.platePadX:26)+"' style='flex:1'><input type='number' data-tppy='"+i+"' value='"+(t.platePadY!=null?t.platePadY:14)+"' style='flex:1;margin-left:6px'></div>"
+    +"<div class='row'><label>Plate radius</label><input type='range' data-tpr='"+i+"' min='0' max='60' value='"+(t.plateRadius!=null?t.plateRadius:14)+"'><span class='val'>"+(t.plateRadius!=null?t.plateRadius:14)+"</span></div>"
+    +"</div></details>"
     +"</div>").join("");
   const upd=(sel,key,cast)=>box.querySelectorAll("["+sel+"]").forEach(el=>{
     const i=+el.getAttribute(sel);
@@ -1767,8 +1862,17 @@ function renderTitles(){
     titles[+el.dataset.ttext].texts[activeVar||"en"]=el.value;
     if(typeof scheduleExact==="function")scheduleExact();});
   upd("data-tfont","font"); upd("data-tsize","size",Number); upd("data-ty","y",Number);
-  upd("data-tcolor","color"); upd("data-tstroke","stroke",Number);
+  upd("data-tcolor","color"); upd("data-tstroke","stroke",Number); upd("data-tang","angle",Number); upd("data-tx","x",Number);
   upd("data-tplate","plate",Boolean); upd("data-tin","in"); upd("data-tout","out");
+  // ⚙ More styling
+  upd("data-tcase","caseMode"); upd("data-talign","align");
+  upd("data-tls","lineSpacing",Number); upd("data-tmw","maxWidth",Number);
+  upd("data-tsc","strokeColor");
+  upd("data-tsh","shadow",Boolean); upd("data-tshx","shX",Number); upd("data-tshy","shY",Number);
+  upd("data-tshb","shBlur",Number); upd("data-tshc","shColor");
+  upd("data-tpc","plateColor"); upd("data-tpa","plateAlpha",Number);
+  upd("data-tppx","platePadX",Number); upd("data-tppy","platePadY",Number); upd("data-tpr","plateRadius",Number);
+  box.querySelectorAll("[data-tcopy]").forEach(x=>x.onclick=()=>{copyCaptionStyleToTitle(+x.dataset.tcopy);});
   box.querySelectorAll("[data-trm]").forEach(x=>x.onclick=()=>{titles.splice(+x.dataset.trm,1);renderTitles();renderLocTitles();});
 }
 (function(){const d=$("titleList")&&$("titleList").closest("details");
@@ -1788,6 +1892,23 @@ function updateAnimWarn(){
 }
 if($("animType"))$("animType").addEventListener("change",updateAnimWarn);
 // LOC tab: translate every title into every language in one grid (titles × languages)
+// Take the look of the CURRENT caption style into a title — one click, then tweak.
+// (Captions and titles stay separate objects: captions are word-timed with wrap rules,
+// a title is a static block you place yourself.)
+function copyCaptionStyleToTitle(i){
+  const t=titles[i];if(!t)return;
+  const s=readControls();
+  t.font=customFontName||((s.fontFamily||"Poppins-Bold")+".ttf");
+  t.color=s.textColor; t.caseMode=(s.textCase==="none")?"none":s.textCase;
+  t.stroke=(+s.strokeOuterW||+s.strokeW||0); t.strokeColor=(+s.strokeOuterW?s.strokeOuterColor:s.strokeColor)||"#000000";
+  t.shadow=!!s.shadowOn; t.shX=+s.shX||0; t.shY=(s.shY!=null?+s.shY:8); t.shBlur=+s.shBlur||0; t.shColor=s.shColor||"#000000";
+  t.plate=!!s.plateOn; t.plateColor=s.plateColor||"#000000"; t.plateAlpha=(s.plateAlpha!=null?+s.plateAlpha:150);
+  t.platePadX=(s.platePadX!=null?+s.platePadX:26); t.platePadY=(s.platePadY!=null?+s.platePadY:14);
+  t.plateRadius=(s.plateRadius!=null?+s.plateRadius:14);
+  t.lineSpacing=(s.lineSpacing!=null?+s.lineSpacing:8);
+  renderTitles(); if(typeof scheduleExact==="function")scheduleExact();
+  setStatus("Стиль титрів скопійовано в Title "+(i+1)+".","ok");
+}
 function renderLocTitles(){
   const box=$("locTitles");if(!box)return;
   const langs=Object.keys(variants||{});
@@ -3450,8 +3571,8 @@ function renderOverlayList(){
     +"<input type='number' class='ov-in' data-i='"+i+"' value='"+(o.in!=null?o.in:"")+"' placeholder='0' min='0' step='0.1' style='width:60px'>"
     +"<input type='number' class='ov-out' data-i='"+i+"' value='"+(o.out!=null?o.out:"")+"' placeholder='end' min='0' step='0.1' style='width:60px'></div></div>").join(""):"<span>No overlays.</span>";
   box.querySelectorAll("[data-ovrm]").forEach(x=>x.onclick=()=>{curOverlays().splice(+x.dataset.ovrm,1);renderOverlays();renderOverlayList();});
-  box.querySelectorAll(".ov-in").forEach(inp=>inp.oninput=()=>{const v=parseFloat(inp.value);curOverlays()[+inp.dataset.i].in=isNaN(v)?null:v;});
-  box.querySelectorAll(".ov-out").forEach(inp=>inp.oninput=()=>{const v=parseFloat(inp.value);curOverlays()[+inp.dataset.i].out=isNaN(v)?null:v;});
+  box.querySelectorAll(".ov-in").forEach(inp=>inp.oninput=()=>{const v=parseFloat(inp.value);curOverlays()[+inp.dataset.i].in=isNaN(v)?null:v;renderOverlays();});
+  box.querySelectorAll(".ov-out").forEach(inp=>inp.oninput=()=>{const v=parseFloat(inp.value);curOverlays()[+inp.dataset.i].out=isNaN(v)?null:v;renderOverlays();});
 }
 function renderOverlays(){
   const layer=$("overlayLayer");if(!layer)return;layer.innerHTML="";
@@ -3464,6 +3585,7 @@ function renderOverlays(){
     const url=API+"/clip/"+fileId+"/"+encodeURIComponent(o.name);
     it.innerHTML=(o.video?"<video src='"+url+"' autoplay loop muted playsinline></video>":"<img src='"+url+"'>")
       +"<div class='ovRm' data-ovx='"+i+"'>✕</div><div class='ovHandle'></div><div class='ovRot'></div>";
+    it.dataset.ovin=(o.in!=null?o.in:"");it.dataset.ovout=(o.out!=null?o.out:"");   // so the preview can honour in/out
     layer.appendChild(it);
     it.querySelector(".ovRot").addEventListener("pointerdown",ev=>{ev.preventDefault();ev.stopPropagation();
       const r=it.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;

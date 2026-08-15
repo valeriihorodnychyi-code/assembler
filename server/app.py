@@ -692,6 +692,7 @@ class PreviewFrameReq(BaseModel):
     cap_out: Optional[float] = None
     lang: str = "en"                  # language for auto-caption stopword rules
     cuts: Optional[List[float]] = None  # scene-cut times → captions don't cross a cut
+    titles: Optional[list] = None      # static text overlays, so 'exact' shows them like the render
 
 
 @app.get("/api/font_metrics")
@@ -723,12 +724,30 @@ def api_preview_frame(req: PreviewFrameReq):
         # so without it the caption could blink off on the very last frames of the preview.
         events[-1]["end"] = max(float(events[-1]["end"]), float(req.dur) + 0.2)
     ev = next((e for e in events if req.time >= e["start"] and req.time < e["end"]), None)
-    if ev is None:
+    # titles visible at this moment — 'exact' must show them too, otherwise the preview looks
+    # emptier than the render (which does burn them in)
+    act_titles = [t for t in (req.titles or [])
+                  if t and str(t.get("text", "")).strip()
+                  and (t.get("in") is None or req.time >= float(t["in"]))
+                  and (t.get("out") is None or req.time <= float(t["out"]))]
+    if ev is None and not act_titles:
         return Response(status_code=204)  # nothing on screen at this moment
     import tempfile
+    from PIL import Image as _Img
     tmp = tempfile.mktemp(suffix=".png")
     font = st.resolve_font(style.get("font_name"))
-    subtitles.render_subtitle_png(ev, tmp, TW, TH, font, style, scale)
+    if ev is not None:
+        subtitles.render_subtitle_png(ev, tmp, TW, TH, font, style, scale)
+    else:
+        _Img.new("RGBA", (TW, TH), (0, 0, 0, 0)).save(tmp)
+    if act_titles:                                   # composite each title over the caption layer
+        base = _Img.open(tmp).convert("RGBA")
+        for _i, t in enumerate(act_titles):
+            tp = tempfile.mktemp(suffix=".png")
+            subtitles.render_headline_png(t["text"], tp, TW, TH, st.resolve_font(t.get("font_name")), t)
+            base.alpha_composite(_Img.open(tp).convert("RGBA"))
+            os.remove(tp)
+        base.save(tmp)
     with open(tmp, "rb") as f:
         data = f.read()
     os.remove(tmp)
