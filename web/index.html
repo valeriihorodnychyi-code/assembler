@@ -584,8 +584,10 @@
       <summary><span>Titles · text overlays</span> <label class="switch hdrsw" title="Enable titles" onclick="hdrTgl(event,this)"><input type="checkbox" id="hlOn"><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="hint">Static text burned over the video — any font, size, position and its own on/off timing. It stays <b>text</b>, so each language keeps its own copy (that's what makes titles localizable, unlike a PNG). Add as many as you need.</div>
+        <div id="titleScope" class="hint" style="display:none;color:var(--accent2);font-weight:600"></div>
         <div id="titleList" style="display:flex;flex-direction:column;gap:10px"></div>
         <button id="titleAdd" class="go" style="width:100%;margin-top:9px;font-size:12px;padding:7px">＋ Add title</button>
+        <button id="titleAll" style="display:none;width:100%;margin-top:6px;font-size:12px;padding:7px" title="Скопіювати тайтли цього кліпа на всі кліпи паку">⧉ Titles → всі кліпи паку</button>
       </div>
     </details>
 
@@ -1271,7 +1273,7 @@ function render(t,dur){
   // Layout comes from the SERVER (build_timeline) when we have real transcribed words → preview
   // chunking/line-breaks are identical to the final render. Falls back to the local JS engine for
   // the demo/pre-transcription placeholder (and if the server layout hasn't arrived yet).
-  const events=(realWords&&realWords.length&&serverLayout)?serverLayout
+  const events=(realWords&&realWords.length&&serverLayout&&_layoutKey===layoutKey())?serverLayout
     :buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
   if(!events.length)return;
   // #12 continuous faded scrim: opacity from the window fade, drawn even in gaps / pre-roll
@@ -1414,6 +1416,7 @@ function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="or
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();updateEditButtons();};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
   variants={en:{clip:null,videoUrl:url,words:null,style:readControls(),trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
+  if(typeof invalidateLayout==="function")invalidateLayout();
   setStatus("Video loaded. Transcribe for captions, or just trim & Send to Compose as-is.","");}
 $("loadBtn").onclick=()=>$("videoInput").click();
 $("sLocBtn").onclick=()=>sendToCompose("loc");
@@ -1451,7 +1454,8 @@ async function batchOriginals(files){
       fileId=d.file_id;const clip=d.name;
       const hk={name:clip,clip:clip,lang:((typeof langFromName==="function"&&langFromName(f.name))||""),  // tile colour only, best-effort
                 videoUrl:URL.createObjectURL(f),words:null,ctrl:JSON.parse(JSON.stringify(sharedCtrl)),
-                style:toEngineStyle(sharedCtrl),src:"edit"};
+                style:toEngineStyle(sharedCtrl),src:"edit",
+                titles:(titles.length?cloneTitles():null),titlesOn:titlesOn()};   // whatever titles were set up carry into every clip of the pack; edit each clip separately after
       if(!hooks.some(h=>h.clip===clip))hooks.push(hk);
       editPack.push(hk);ok++;
     }catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
@@ -1500,6 +1504,7 @@ function saveActiveHook(){
   const h=editPack[activeHook];
   try{const rw=parseBreaksToWords($("transcript").value,h.words);if(rw)h.words=rw;}catch(e){}
   h.ctrl=readControls();h.style=toEngineStyle(h.ctrl);   // h is a board hook → board stays current
+  h.titles=cloneTitles();h.titlesOn=titlesOn();          // titles belong to THIS clip
 }
 function selectHook(i){
   if(i<0||i>=editPack.length)return;
@@ -1514,10 +1519,12 @@ function selectHook(i){
   video.src=h.videoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};
   $("transcript").value=wordsToText(h.words);autoGrow();
   writeControls(h.ctrl);
+  loadClipTitles(h);                                     // this clip's own titles (each video in a pack has its own)
   if(typeof loadCapWin==="function"){loadCapWin(h);variants.en.capIn=(h.cap_in!=null?h.cap_in:null);variants.en.capOut=(h.cap_out!=null?h.cap_out:null);}
   if(typeof setLangSticker==="function")setLangSticker(h.lang);
   $("transcribeBtn").disabled=false;$("renderBtn").disabled=false;
   renderHookStrip();renderGroupBar();updateEditButtons();
+  if(typeof invalidateLayout==="function")invalidateLayout();   // drop the previous clip's caption layout at once
   if(typeof exactOn!=="undefined"&&exactOn)scheduleExact();
 }
 function renderHookStrip(){
@@ -1528,6 +1535,10 @@ function renderHookStrip(){
     const card=document.createElement("div");card.className="fcard"+(i===activeHook?" active":"");card.title="Поправити хук "+(i+1);
     const cv=document.createElement("canvas");cv.width=180;cv.height=320;card.appendChild(cv);
     const badge=document.createElement("div");badge.className="fb";badge.textContent=(i+1);card.appendChild(badge);
+    if(h.titles&&h.titles.length){const tb=document.createElement("div");   // this clip has its own titles
+      tb.textContent="T"+(h.titles.length>1?h.titles.length:"");tb.title=h.titles.length+" тайтл(и) на цьому кліпі";
+      tb.style.cssText="position:absolute;top:4px;right:4px;font:700 9px/1 system-ui;padding:3px 4px;border-radius:5px;background:var(--accent2);color:#08120c";
+      card.appendChild(tb);}
     card.onclick=()=>selectHook(i);
     fs.appendChild(card);
     drawThumb(cv,{videoUrl:h.videoUrl,words:h.words,style:h.ctrl},"hook"+i);
@@ -1537,7 +1548,8 @@ function sendPack(target){
   if(!editPack.length)return;
   saveActiveHook();let added=0;
   editPack.forEach(h=>{if(hooks.some(x=>x.clip===h.clip))return;
-    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.words,style:toEngineStyle(h.ctrl),src:"edit"});added++;});
+    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.words,style:toEngineStyle(h.ctrl),src:"edit",
+                titles:(h.titles!=null?JSON.parse(JSON.stringify(h.titles)):null),titlesOn:(h.titlesOn!==false)});added++;});
   renderHookTiles();setMode(target==="asm"?"asm":"loc");
   setStatus("Пак ("+editPack.length+") → "+(target==="asm"?"Assemble":"LOC")+".","ok");
 }
@@ -1644,11 +1656,21 @@ function scheduleExact(){scheduleLayout();if(!exactOn)return;clearTimeout(exactT
 // chunking + line breaks; the preview only DRAWS those events. Kills preview≠render drift.
 // Debounced like exact; the live canvas keeps redrawing from the cached events every frame,
 // and styling (colors/stroke/shadow/animation) stays instant client-side.
-let serverLayout=null, _layoutTimer=null, _layoutSeq=0;
+let serverLayout=null, _layoutTimer=null, _layoutSeq=0, _layoutKey="";
+// Which clip/word-set the cached layout belongs to. Switching clips in a pack (or language
+// versions) MUST NOT keep drawing the previous clip's captions — the key mismatch drops the
+// stale layout instantly and a fresh one is fetched.
+function layoutKey(){
+  const v=(variants&&variants[activeVar])||{};
+  const w=realWords||[];
+  return [activeVar,v.clip||v.videoUrl||"",w.length,(w[0]&&w[0].text)||"",(w[w.length-1]&&w[w.length-1].text)||""].join("|");
+}
+function invalidateLayout(){serverLayout=null;_layoutKey="";clearTimeout(_layoutTimer);fetchLayout();}
 function scheduleLayout(){clearTimeout(_layoutTimer);_layoutTimer=setTimeout(fetchLayout,250);}
 async function fetchLayout(){
   const words=realWords;
-  if(!words||!words.length){serverLayout=null;return;}   // demo/pre-transcription → JS buildEvents fallback
+  const key=layoutKey();
+  if(!words||!words.length){serverLayout=null;_layoutKey="";return;}   // demo/pre-transcription → JS buildEvents fallback
   const baseEng=toEngineStyle(readControls());
   const regions=(typeof buildStyleRegions==="function")?buildStyleRegions(baseEng,(typeof curPhraseStyles==="function"?curPhraseStyles():[])):null;
   const cuts=(variants[activeVar]&&variants[activeVar].cuts)||null;
@@ -1657,7 +1679,8 @@ async function fetchLayout(){
       body:JSON.stringify({words,regions:regions||null,base_style:baseEng,cuts,lang:capLang(),
         duration:((video&&video.duration)||0)})});
     if(!r.ok)return; const d=await r.json(); if(seq!==_layoutSeq)return;   // superseded by a newer request
-    serverLayout=(d&&d.events)?d.events:null;
+    if(key!==layoutKey())return;                                          // clip changed while we waited → don't cache it
+    serverLayout=(d&&d.events)?d.events:null; _layoutKey=key;
   }catch(e){/* network hiccup → keep last layout (or JS fallback) */}
 }
 async function fetchExact(){
@@ -1665,9 +1688,9 @@ async function fetchExact(){
   if($("batchStage").style.display==="block")return;
   if(!videoLoaded||!video.paused)return;   // a settled frame in any format (9:16 / 1:1 / 16:9)
   const v=variants[activeVar];
-  if(!v||((!v.words||!v.words.length)&&!(typeof titlesCfg==="function"&&titlesCfg(activeVar).length)))return;
+  if(!v||((!v.words||!v.words.length)&&!(typeof titlesCfg==="function"&&titlesCfg(tLang()).length)))return;
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(activeVar)})});
+      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(tLang())})});
     if(r.status===204){hideExact();return;}
     if(!r.ok)return;
     const url=URL.createObjectURL(await r.blob());const img=$("exactImg");
@@ -1690,9 +1713,11 @@ function newTitle(){
 }
 function titleText(t,lang){const L=lang||activeVar||"en";
   return (t.texts[L]!=null&&String(t.texts[L]).trim())?t.texts[L]:(t.texts.en||"");}
-function titleCfg(t,lang){
+function titlesOn(){return !!($("hlOn")&&$("hlOn").checked);}
+function titleCfg(t,lang){return titleCfgOf(t,lang,titlesOn());}
+function titleCfgOf(t,lang,on){
   const txt=titleText(t,lang);
-  if(!$("hlOn")||!$("hlOn").checked||!String(txt).trim())return null;
+  if(!on||!String(txt).trim())return null;
   const rgb=hexToRgb(t.color||"#ffffff");
   const font=t.font||customFontName||(($("fontFamily")?$("fontFamily").value:"Poppins-Bold")+".ttf");
   const sRGB=hexToRgb(t.strokeColor||"#000000"), pRGB=hexToRgb(t.plateColor||"#000000"), shRGB=hexToRgb(t.shColor||"#000000");
@@ -1712,11 +1737,66 @@ function titleCfg(t,lang){
 // all titles for a language, ready for the engine (used by preview, Export and the board)
 function titlesCfg(lang){return titles.map(t=>titleCfg(t,lang)).filter(Boolean);}
 function hlCfg(lang){const l=titlesCfg(lang);return l.length?l:null;}   // back-compat for callers
+// --- titles are PER CLIP: each hook carries its own list (h.titles) + its own on/off (h.titlesOn).
+// `titles` above is just the working copy of the clip currently open in EDIT.
+function cloneTitles(arr){return JSON.parse(JSON.stringify(arr||titles||[]));}
+function titlesCfgFrom(arr,lang,on){return (arr||[]).map(t=>titleCfgOf(t,lang,on!==false)).filter(Boolean);}
+// a localized hook (dub_<stem>_<lang>.mp4) inherits the titles of the clip it came from,
+// so translating a title once in LOC covers every language version of that clip.
+function locSourceOf(h){
+  const c=(h&&h.clip)||"";
+  let m=/^dub_(.+)_[a-z]{2}\.[a-z0-9]+$/i.exec(c);
+  if(m)return hooks.find(x=>x.src==="edit"&&x.clip&&x.clip.replace(/\.[^.]+$/,"")===m[1])||null;
+  if(/^dub_[a-z]{2}\.[a-z0-9]+$/i.test(c))return hooks.find(x=>x.src==="edit"&&x.clip==="source.mp4")||null;
+  return null;
+}
+// the title list that must be baked onto THIS hook (own → its source's → the global working copy)
+function titlesForHook(h){
+  if(h&&h.titles!=null)return {list:h.titles,on:(h.titlesOn!==false)};
+  const src=locSourceOf(h);
+  if(src&&src.titles!=null)return {list:src.titles,on:(src.titlesOn!==false)};
+  return {list:titles,on:titlesOn()};
+}
+function hookHeadline(h,lang){
+  const{list,on}=titlesForHook(h);
+  const cfg=titlesCfgFrom(list,lang||(h&&h.lang)||"en",on);
+  return cfg.length?cfg:null;
+}
+// which language's title copy the editor is showing/editing (a localized clip edits ITS language,
+// even though the editor calls the open variant "en" internally)
+let _titleLang=null;
+function tLang(){return _titleLang||activeVar||"en";}
+// swap the working title list when another clip is opened
+function loadClipTitles(h){
+  _titleLang=(h&&h.lang)||null;
+  const src=(h&&h.titles!=null)?h:locSourceOf(h);
+  titles=(src&&src.titles!=null)?JSON.parse(JSON.stringify(src.titles)):[];
+  if($("hlOn"))$("hlOn").checked=src?(src.titlesOn!==false):false;
+  if(typeof renderTitles==="function")renderTitles();
+  if(typeof renderLocTitles==="function")renderLocTitles();
+}
+// every title tweak lands on the open clip immediately, so the board/Assemble never
+// bakes a stale list (no need to switch clips first to "save")
+function syncTitlesToClip(){
+  const h=(typeof activeHook!=="undefined"&&activeHook>=0&&editPack[activeHook])?editPack[activeHook]
+          :((typeof editingHook!=="undefined"&&editingHook)?editingHook:null);
+  if(!h)return;
+  h.titles=cloneTitles();h.titlesOn=titlesOn();
+}
+// copy the open clip's titles onto every clip of the pack (the Style→all of titles)
+function copyTitlesToAll(){
+  if(!editPack.length){setStatus("Пак не завантажений — нема на що копіювати.","err");return;}
+  saveActiveHook();
+  const on=titlesOn();
+  editPack.forEach(h=>{h.titles=cloneTitles();h.titlesOn=on;});
+  renderHookStrip();
+  setStatus("Тайтли ("+titles.length+") скопійовано на всі "+editPack.length+" кліпів 🎯","ok");
+}
 // canvas preview: draw every title that's inside its window at time t (mirrors render_headline_png)
 let _titleBoxes=[];   // {i,x,y,w,h} in canvas px — lets you grab a title right on the preview
 function drawTitles(t){
   _titleBoxes=[];
-  titlesCfg(activeVar).forEach((c,i)=>{
+  titlesCfg(tLang()).forEach((c,i)=>{
     if((c.in!=null&&t<c.in)||(c.out!=null&&t>c.out))return;
     drawOneTitle(c,i);
   });
@@ -1796,7 +1876,8 @@ function drawOneTitle(c,idx){
         if(ys){ys.value=t.y.toFixed(2);const v=ys.parentElement.querySelector(".val");if(v)v.textContent=t.y.toFixed(2);}}
     };
     const up=()=>{_dragT=null;vp.style.cursor="";document.removeEventListener("pointermove",mv);
-      document.removeEventListener("pointerup",up);if(typeof scheduleExact==="function")scheduleExact();};
+      document.removeEventListener("pointerup",up);syncTitlesToClip();
+      if(typeof scheduleExact==="function")scheduleExact();};
     document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);
   },true);
 })();
@@ -1812,8 +1893,18 @@ function fontOptionsHTML(sel){
 }
 function renderTitles(){
   const box=$("titleList");if(!box)return;
+  // whose titles are on screen: in a pack each clip has its own list
+  {const sc=$("titleScope"), ta=$("titleAll"), inPack=(typeof editPack!=="undefined"&&editPack.length>0);
+   if(ta)ta.style.display=inPack?"block":"none";
+   if(sc){
+     if(inPack&&activeHook>=0){sc.style.display="block";
+       sc.textContent="Тайтли кліпа "+(activeHook+1)+"/"+editPack.length+" ("+tLang().toUpperCase()+") — у кожного кліпа свої.";}
+     else if(typeof editingHook!=="undefined"&&editingHook){sc.style.display="block";
+       sc.textContent="Тайтли кліпа «"+(editingHook.name||editingHook.clip)+"» ("+tLang().toUpperCase()+").";}
+     else{sc.style.display="none";}
+   }}
   if(!titles.length){box.innerHTML="<div class='hint'>Ще немає тайтлів. Тисни «＋ Add title».</div>";return;}
-  const L=(activeVar||"en").toUpperCase();
+  const L=tLang().toUpperCase();
   box.innerHTML=titles.map((t,i)=>
     "<div style='padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)'>"
     +"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:6px'>"
@@ -1821,7 +1912,7 @@ function renderTitles(){
     +"<span><span data-tcopy='"+i+"' title='Взяти шрифт/колір/обведення/тінь/плашку з поточного стилю титрів' style='cursor:pointer;color:var(--accent2);font-size:11px;margin-right:9px'>⧉ style from captions</span>"
     +"<span data-trm='"+i+"' title='Remove title' style='cursor:pointer;color:var(--muted);font-size:13px'>✕</span></span></div>"
     +"<textarea data-ttext='"+i+"' rows='2' placeholder='LIMITED OFFER&#10;ENDS MARCH 14' style='width:100%;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px;font-size:13px;font-family:inherit;resize:vertical'>"
-    +String(titleText(t,activeVar)||"").replace(/</g,"&lt;")+"</textarea>"
+    +String(titleText(t,tLang())||"").replace(/</g,"&lt;")+"</textarea>"
     +"<div class='row' style='margin-top:6px'><label>Font</label><select data-tfont='"+i+"' style='flex:1.3;font-size:11.5px'>"+fontOptionsHTML(t.font)+"</select></div>"
     +"<div class='row'><label>Size</label><input type='range' data-tsize='"+i+"' min='30' max='240' value='"+(t.size||110)+"'><span class='val'>"+(t.size||110)+"</span></div>"
     +"<div class='row'><label>Vertical</label><input type='range' data-ty='"+i+"' min='0.03' max='0.95' step='0.01' value='"+(t.y||0.16)+"'><span class='val'>"+(t.y||0.16)+"</span></div>"
@@ -1856,11 +1947,14 @@ function renderTitles(){
     const i=+el.getAttribute(sel);
     const h=()=>{titles[i][key]=cast?cast(el.type==="checkbox"?el.checked:el.value):el.value;
       const v=el.parentElement&&el.parentElement.querySelector(".val");if(v)v.textContent=el.value;
+      syncTitlesToClip();
       if(typeof scheduleExact==="function")scheduleExact();};
     el.oninput=h; if(el.tagName==="SELECT")el.onchange=h;});
   box.querySelectorAll("[data-ttext]").forEach(el=>el.oninput=()=>{
-    titles[+el.dataset.ttext].texts[activeVar||"en"]=el.value;
-    if(typeof scheduleExact==="function")scheduleExact();});
+    titles[+el.dataset.ttext].texts[tLang()]=el.value;
+    syncTitlesToClip();
+    if(typeof scheduleExact==="function")scheduleExact();
+    if(typeof renderLocTitles==="function")renderLocTitles();});
   upd("data-tfont","font"); upd("data-tsize","size",Number); upd("data-ty","y",Number);
   upd("data-tcolor","color"); upd("data-tstroke","stroke",Number); upd("data-tang","angle",Number); upd("data-tx","x",Number);
   upd("data-tplate","plate",Boolean); upd("data-tin","in"); upd("data-tout","out");
@@ -1873,11 +1967,17 @@ function renderTitles(){
   upd("data-tpc","plateColor"); upd("data-tpa","plateAlpha",Number);
   upd("data-tppx","platePadX",Number); upd("data-tppy","platePadY",Number); upd("data-tpr","plateRadius",Number);
   box.querySelectorAll("[data-tcopy]").forEach(x=>x.onclick=()=>{copyCaptionStyleToTitle(+x.dataset.tcopy);});
-  box.querySelectorAll("[data-trm]").forEach(x=>x.onclick=()=>{titles.splice(+x.dataset.trm,1);renderTitles();renderLocTitles();});
+  box.querySelectorAll("[data-trm]").forEach(x=>x.onclick=()=>{titles.splice(+x.dataset.trm,1);syncTitlesToClip();renderTitles();renderLocTitles();
+    if(typeof scheduleExact==="function")scheduleExact();});
 }
 (function(){const d=$("titleList")&&$("titleList").closest("details");
   if(d)d.addEventListener("toggle",()=>{if(d.open)renderTitles();});})();
-if($("titleAdd"))$("titleAdd").onclick=()=>{titles.push(newTitle());if($("hlOn"))$("hlOn").checked=true;renderTitles();renderLocTitles();};
+if($("titleAdd"))$("titleAdd").onclick=()=>{titles.push(newTitle());if($("hlOn"))$("hlOn").checked=true;
+  if(activeHook>=0&&editPack[activeHook]){editPack[activeHook].titles=cloneTitles();editPack[activeHook].titlesOn=true;}
+  if(editingHook){editingHook.titles=cloneTitles();editingHook.titlesOn=true;}
+  renderTitles();renderLocTitles();};
+if($("titleAll"))$("titleAll").onclick=copyTitlesToAll;
+if($("hlOn"))$("hlOn").addEventListener("change",()=>{syncTitlesToClip();if(typeof scheduleExact==="function")scheduleExact();});
 // Make it obvious that only Typewriter survives the render: warn right under the picker when a
 // preview-only animation is selected, so nobody ships a creative expecting Pop/Rise to be there.
 function updateAnimWarn(){
@@ -1906,26 +2006,50 @@ function copyCaptionStyleToTitle(i){
   t.platePadX=(s.platePadX!=null?+s.platePadX:26); t.platePadY=(s.platePadY!=null?+s.platePadY:14);
   t.plateRadius=(s.plateRadius!=null?+s.plateRadius:14);
   t.lineSpacing=(s.lineSpacing!=null?+s.lineSpacing:8);
+  syncTitlesToClip();
   renderTitles(); if(typeof scheduleExact==="function")scheduleExact();
   setStatus("Стиль титрів скопійовано в Title "+(i+1)+".","ok");
 }
+// Titles are text, so they must be TRANSLATED — a dub can't do it. This grid lists every clip
+// on the LOC board that has titles, and for each title a row per target language. The copy is
+// stored on the SOURCE clip (texts{lang}), so every language version of that clip picks its own
+// line at render time — nothing to re-apply after localizing.
 function renderLocTitles(){
   const box=$("locTitles");if(!box)return;
-  const langs=Object.keys(variants||{});
-  if(!titles.length||langs.length<2){box.innerHTML="";return;}
+  const picked=Array.from(document.querySelectorAll('#locLangs .chip.on')).map(c=>c.dataset.l);
+  const langs=["en"].concat(picked.length?picked:TARGET_LANGS);
+  // the real board objects (locSources() hands out copies — edits must land on the hooks themselves)
+  const board=(typeof hooks!=="undefined"?hooks:[]).filter(h=>h.src==="edit");
+  board.forEach(h=>{if(h.titles==null&&titles.length){h.titles=cloneTitles();h.titlesOn=titlesOn();}});   // pin the working list per clip → clips stay independent
+  const srcs=board.filter(h=>h.titles&&h.titles.length);
+  if(!srcs.length){
+    box.innerHTML="<div style='margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)'>"
+      +"📝 <b style='color:var(--txt)'>Переклад тайтлів</b> — тут з'являться поля перекладу, як тільки на кліпі в EDIT буде хоч один тайтл "
+      +"(<i>Titles · text overlays</i>). Дубляж не перекладає текст у кадрі — його вписуєш сам.</div>";
+    return;}
+  const label=s=>String(s.name||s.clip||"").replace(/\.[^.]+$/,"");
   box.innerHTML="<div style='margin-top:18px;padding-top:14px;border-top:1px solid var(--line)'>"
-    +"<div style='font-size:12px;color:var(--muted);margin-bottom:8px'>📝 <b style='color:var(--txt)'>Переклад тайтлів</b> — текст у кадрі не перекладається дубляжем, впиши його для кожної мови:</div>"
-    +titles.map((t,i)=>"<div style='margin-bottom:10px'>"
-      +"<div style='font-size:11.5px;color:var(--accent2);margin-bottom:4px'>Title "+(i+1)+" · <span style='color:var(--muted)'>"
-      +String(titleText(t,"en")||"—").replace(/</g,"&lt;").replace(/\n/g," / ")+"</span></div>"
-      +langs.map(l=>"<div style='display:flex;gap:8px;align-items:center;margin:3px 0'>"
-        +"<span style='flex:0 0 46px;font-size:11px;color:var(--muted)'>"+l.toUpperCase()+"</span>"
-        +"<input data-lt='"+i+"' data-ll='"+l+"' value=\""+String(t.texts[l]||"").replace(/"/g,"&quot;").replace(/\n/g," / ")
-        +"\" placeholder='"+(l==="en"?"текст оригіналу":"same as EN")+"' style='flex:1;font-size:12px'></div>").join("")
-      +"</div>").join("")+"</div>";
+    +"<div style='font-size:12px;color:var(--muted);margin-bottom:10px'>📝 <b style='color:var(--txt)'>Переклад тайтлів</b> — дубляж не перекладає текст у кадрі. Впиши копію для кожної мови; порожнє поле = візьме EN.</div>"
+    +srcs.map((s,si)=>{
+      const list=s.titles;
+      return "<div style='margin-bottom:14px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)'>"
+      +"<div style='font-size:12px;font-weight:700;margin-bottom:7px'>🎬 "+label(s).replace(/</g,"&lt;")+"</div>"
+      +list.map((t,i)=>"<div style='margin-bottom:9px'>"
+        +"<div style='font-size:11.5px;color:var(--accent2);margin-bottom:4px'>Title "+(i+1)+" · <span style='color:var(--muted)'>"
+        +String(titleText(t,"en")||"—").replace(/</g,"&lt;").replace(/\n/g," / ")+"</span></div>"
+        +langs.map(l=>"<div style='display:flex;gap:8px;align-items:center;margin:3px 0'>"
+          +"<span style='flex:0 0 46px;font-size:11px;color:var(--muted)'>"+l.toUpperCase()+"</span>"
+          +"<input data-ls='"+si+"' data-lt='"+i+"' data-ll='"+l+"' value=\""+String(t.texts[l]||"").replace(/"/g,"&quot;").replace(/\n/g," / ")
+          +"\" placeholder='"+(l==="en"?"текст оригіналу":"same as EN")+"' style='flex:1;font-size:12px'></div>").join("")
+        +"</div>").join("")+"</div>";}).join("")
+    +"</div>";
   box.querySelectorAll("[data-lt]").forEach(inp=>inp.oninput=()=>{
-    titles[+inp.dataset.lt].texts[inp.dataset.ll]=inp.value;
-    if(typeof renderTitles==="function")renderTitles();});
+    const s=srcs[+inp.dataset.ls];if(!s||!s.titles)return;
+    const t=s.titles[+inp.dataset.lt];if(!t)return;
+    t.texts[inp.dataset.ll]=inp.value;
+    // if that clip is the one open in EDIT, keep its working copy in step
+    const openH=(activeHook>=0&&editPack[activeHook])?editPack[activeHook]:editingHook;
+    if(openH&&openH.clip===s.clip){titles=JSON.parse(JSON.stringify(s.titles));if(typeof renderTitles==="function")renderTitles();}});
 }
 
 // ---------- social safe-zone guide (preview only; a design guide, never burned into the export) ----------
@@ -2322,6 +2446,7 @@ async function sendToCompose(target){
     if(v.words&&v.words.length&&v.style&&v.phraseStyles&&v.phraseStyles.length){const _reg=buildStyleRegions(toEngineStyle(v.style),v.phraseStyles);if(_reg)hook.regions=_reg;}  // #10 per-phrase overrides travel to the bake
     if(v.capIn!=null)hook.cap_in=v.capIn;if(v.capOut!=null)hook.cap_out=v.capOut;   // caption in/out window
     if(v.cuts&&v.cuts.length)hook.cuts=v.cuts;   // scene cuts travel with the hook
+    if(titles.length){hook.titles=cloneTitles();hook.titlesOn=titlesOn();}   // this clip's own titles travel with it
     hooks.push(hook);added++;});
   renderHookTiles();setMode(target==="loc"?"loc":"asm");
   setStatus(added?("Надіслано "+added+" кліп(ів) → "+(target==="loc"?"LOC":"Assemble")+"."):"Вже на дошці.","ok");
@@ -2344,7 +2469,7 @@ async function doExport(){
   setStatus("Exporting "+ratio+" … (ffmpeg)","",true);busyStart("Експортую відео…");
   try{const r=await fetch(API+"/api/render",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({file_id:fileId,clip:v.clip||"source.mp4",regions,words,formats:[ratio],
-        smart_trim:false,use_body:false,trim:v.trim||null,cuts:v.cuts||null,headline:hlCfg(activeVar)})});
+        smart_trim:false,use_body:false,trim:v.trim||null,cuts:v.cuts||null,headline:hlCfg(tLang())})});
     const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
     // MarTech flow: the _nSub clip comes INTO Assembler for captioning; the subtitled version
     // must be delivered as <name>.mp4 — i.e. the same name with the _nSub suffix removed.
@@ -2525,6 +2650,7 @@ function loadVariant(key){
   writeControls(v.style);
   $("transcript").value=wordsToText(v.words);autoGrow();
   buildVarTabs();renderOverlays();renderOverlayList();
+  if(typeof invalidateLayout==="function")invalidateLayout();   // this language's own layout, not the previous one's
   setStatus("Editing "+key.toUpperCase()+" version. Style & text here apply to this language only.","");
 }
 
@@ -2825,7 +2951,7 @@ $("batchAssembleBtn").onclick=async()=>{
   const packBase=$("packAsset").value,fmt=ratio;   // project format (9:16 / 1:1 / 16:9)
   const recipes=hooks.map(h=>{const hookSeg={type:"session",ref:h.clip||h.name};
     if(h.words&&h.style){hookSeg.words=h.words;hookSeg.style=h.style;if(h.regions)hookSeg.regions=h.regions;}  // live hook → bake captions now (+ per-phrase overrides)
-    {const _hl=hlCfg(h.lang);if(_hl)hookSeg.headline=_hl;}   // headline text for THIS hook's language (localized copy)
+    {const _hl=hookHeadline(h,h.lang);if(_hl)hookSeg.headline=_hl;}   // THIS clip's own titles, in THIS hook's language (localized copy)
     if(h.cap_in!=null)hookSeg.cap_in=h.cap_in;if(h.cap_out!=null)hookSeg.cap_out=h.cap_out;  // caption in/out window
     if(h.cuts&&h.cuts.length)hookSeg.cuts=h.cuts;   // scene cuts → captions clipped at cuts
     if(h.trim)hookSeg.trim=h.trim;                                     // cut clip at assemble
@@ -2951,7 +3077,7 @@ function renderLocStage(){
   const LC=$("locLangs");
   TARGET_LANGS.forEach(l=>{const c=LOC_LANGS[l];if(!c)return;
     const chip=document.createElement("div");chip.className="chip";chip.dataset.l=l;chip.style.cssText="flex:0 0 auto;font-size:14px;padding:9px 15px";chip.textContent=c.flag+" "+l.toUpperCase();
-    chip.onclick=()=>chip.classList.toggle("on");LC.appendChild(chip);});
+    chip.onclick=()=>{chip.classList.toggle("on");if(typeof renderLocTitles==="function")renderLocTitles();};LC.appendChild(chip);});
   $("locGoBtn").onclick=localizePack;
   if(typeof renderLocTitles==="function")renderLocTitles();   // titles × languages translation grid
   if($("locBackupBtn"))$("locBackupBtn").onclick=downloadLocs;
@@ -3001,6 +3127,7 @@ function ensureOriginalsOnBoard(){
     if(!v||!v.clip||/^dub_/i.test(v.clip)||hooks.some(h=>h.clip===v.clip))return;   // skip loc clips + dupes
     const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,
                 trim:v.trim||null,src:"edit",videoUrl:v.videoUrl||null};
+    if(titles.length){hook.titles=cloneTitles();hook.titlesOn=titlesOn();}   // titles of this clip → localizable in LOC
     if(v.words&&v.words.length){hook.words=v.words;hook.ctrl=v.style||null;if(v.style)hook.style=toEngineStyle(v.style);}
     if(v.capIn!=null)hook.cap_in=v.capIn;if(v.capOut!=null)hook.cap_out=v.capOut;
     if(v.cuts&&v.cuts.length)hook.cuts=v.cuts;
@@ -3152,9 +3279,11 @@ function editLocHook(h){
   video.onloadedmetadata=()=>{videoLoaded=true;};videoLoaded=true;
   $("transcript").value=wordsToText(h.words);
   writeControls(ctrl);
+  loadClipTitles(h);   // titles of this clip, in ITS language (inherited from the source if untouched)
   if(typeof loadCapWin==="function"){loadCapWin(h);variants.en.capIn=(h.cap_in!=null?h.cap_in:null);variants.en.capOut=(h.cap_out!=null?h.cap_out:null);}
   if(typeof setLangSticker==="function")setLangSticker(h.lang);
   updateEditButtons();
+  if(typeof invalidateLayout==="function")invalidateLayout();
   setMode("edit");autoGrow();
   setStatus("Правиш локалізований хук «"+(h.name||h.clip)+"» ("+(h.lang||"").toUpperCase()+"). Натисни 💾 Save back → повернешся в LOC.","");
 }
@@ -3162,7 +3291,8 @@ function saveEditingHook(){
   if(!editingHook)return;
   try{const rw=parseBreaksToWords($("transcript").value,editingHook.words);if(rw)editingHook.words=rw;}catch(e){}
   const ctrl=readControls();editingHook.ctrl=ctrl;editingHook.style=toEngineStyle(ctrl);
-  editingHook=null;updateEditButtons();
+  editingHook.titles=cloneTitles();editingHook.titlesOn=titlesOn();   // its own titles (incl. this language's copy)
+  editingHook=null;_titleLang=null;updateEditButtons();
   renderHookTiles();setMode("loc");
   setStatus("Збережено — локалізований хук оновлено.","ok");
 }
