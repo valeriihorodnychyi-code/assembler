@@ -660,15 +660,19 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
                 path = tp
                 if words:
                     words = shift_words(words, float(trim[0]), float(trim[1]))
-            if words and seg.get("style"):
+            # A segment gets a pixel pass when it has captions to bake OR a title to burn in.
+            # Titles alone must still be baked (a clip can carry a headline without captions —
+            # e.g. Merge hooks with caption baking off, or a clip that was never transcribed).
+            if (words and seg.get("style")) or seg.get("headline"):
                 seg_cuts = seg.get("cuts")
                 if seg_cuts and trim:   # re-base scene cuts to the trimmed clip, like words
                     lo, hi = float(trim[0]), float(trim[1])
                     seg_cuts = [c - lo for c in seg_cuts if lo < c < hi]
                 cap = os.path.join(work_dir, f"cap_{i}.mp4")
-                caption_clip(path, words, seg["style"], fmt, cap, work_dir,
+                caption_clip(path, words or [], seg.get("style") or {}, fmt, cap, work_dir,
                              seg.get("cap_in"), seg.get("cap_out"), cuts=seg_cuts,
-                             regions=seg.get("regions"), headline=seg.get("headline"))
+                             regions=(seg.get("regions") if words else None),
+                             headline=seg.get("headline"))
                 path = cap
             if seg.get("overlays"):  # PNG / alpha-.mov stickers on top (reaction style)
                 ovp = os.path.join(work_dir, f"ov_{i}.mp4")

@@ -2778,6 +2778,7 @@ async function mergeHooks(){
       if(h.cuts&&h.cuts.length)seg.cuts=h.cuts;}
     if(h.trim)seg.trim=h.trim;                                   // trim always respected
     if(h.overlays&&h.overlays.length)seg.overlays=h.overlays;    // stickers always baked
+    {const _hl=hookHeadline(h,h.lang);if(_hl)seg.headline=_hl;}  // titles always baked too (like stickers), independent of the caption toggle
     return seg;});
   const name="Merged_hook"+(++mergeSeq>1?("_"+mergeSeq):"");
   const recipe={name,format:ratio,segments:segs};
