@@ -88,6 +88,12 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
     # Optional legacy behaviour (off by default): keep the last caption until the clip ends.
     # Default is OFF so the last caption respects its capped end from build_events and never
     # freezes over trailing b-roll / the packshot.
+    # Per-style switch too: "Hold last caption to the end" lives in the style JSON, so a preset
+    # remembers it. Off = the last caption gets a short readable tail (default, keeps it off
+    # packshots/next scenes); on = it stays until the clip ends (good for a hook that ends on a
+    # frame where the text should remain).
+    if not hold_last and tagged_events:
+        hold_last = bool((tagged_events[0][1] or {}).get("hold_last"))
     if hold_last and tagged_events:
         tagged_events[-1][0]["end"] = render_duration
 
@@ -99,10 +105,13 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
     # caption lands exactly on its timecode and nothing falls off.
     if tagged_events:
         tagged_events.sort(key=lambda es: float(es[0]["start"]))
+        # ceiling for a caption's end: normally the clip length, but "hold last caption to end"
+        # needs slack past it (the encoded file runs a few frames longer than the probed input)
+        _max_end = render_duration
         _clean = []
         for _i, (e, s) in enumerate(tagged_events):
             st_ = max(0.0, float(e["start"]))
-            en_ = min(float(e["end"]), render_duration)
+            en_ = min(float(e["end"]), _max_end)
             if _i + 1 < len(tagged_events):
                 en_ = min(en_, float(tagged_events[_i + 1][0]["start"]))
             if en_ - st_ < 0.02:      # swallowed by an overlap → skip (a 0/neg duration corrupts the concat)
@@ -183,7 +192,12 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
             if render_duration > current:
                 f.write("file 'blank.png'\n")
                 f.write(f"duration {render_duration - current:.3f}\n")
-            f.write("file 'blank.png'\n")  # ffmpeg requires the last entry duplicated
+            # The concat demuxer needs the final entry repeated, and overlay's eof_action=repeat
+            # then holds THAT frame over any extra frames the encoder adds past the probed
+            # duration. So repeat the last CAPTION when holding it to the end (otherwise the
+            # caption blinked off on the final frames); repeat blank in the normal case.
+            _tail = f"sub_{len(tagged_events) - 1}.png" if (hold_last and render_duration <= current) else "blank.png"
+            f.write(f"file '{_tail}'\n")
         cmd += ["-f", "concat", "-safe", "0", "-i", subs_txt]
         fc += f"{base_label}[{sub_idx}:v]overlay=0:0:format=rgb[final_v]"
         last_v = "[final_v]"
@@ -264,9 +278,16 @@ def _concat_body(hook, body, fmt, output_path, work_dir, bitrates):
 # path actually ran, instead of us guessing why a batch didn't get faster.
 CONCAT_STATS = {"copy": 0, "reencode": 0, "why": ""}
 
+# Per-operation seconds for the last run, so the board can show WHERE the time went
+# (bake pixels vs prepare clips vs join) instead of one opaque total.
+OP_TIMES = {"captions_bake": 0.0, "normalize": 0.0, "join_copy": 0.0, "join_reencode": 0.0,
+            "cache_hits": 0, "joined_seconds": 0.0}
+
 
 def reset_concat_stats():
     CONCAT_STATS.update({"copy": 0, "reencode": 0, "why": ""})
+    OP_TIMES.update({"captions_bake": 0.0, "normalize": 0.0, "join_copy": 0.0,
+                     "join_reencode": 0.0, "cache_hits": 0, "joined_seconds": 0.0})
 
 
 def _cache_dir():
@@ -274,6 +295,55 @@ def _cache_dir():
     d = os.environ.get("CS_CACHE_DIR") or os.path.join(os.path.expanduser("~"), ".assembler", "cache")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+CACHE_MAX_AGE_DAYS = float(os.environ.get("CS_CACHE_MAX_AGE_DAYS", "30"))
+CACHE_MAX_GB = float(os.environ.get("CS_CACHE_MAX_GB", "20"))
+
+
+def prune_cache(max_age_days=None, max_gb=None):
+    """Keep the cache from growing forever: drop entries unused for N days, then, if it's still
+    over the size budget, drop the least-recently-used until it fits. Deleting a cache entry is
+    always safe — the clip is simply normalized again next time."""
+    max_age_days = CACHE_MAX_AGE_DAYS if max_age_days is None else max_age_days
+    max_gb = CACHE_MAX_GB if max_gb is None else max_gb
+    d = _cache_dir()
+    removed = freed = 0
+    try:
+        import time as _t
+        now = _t.time()
+        files = []
+        for f in os.listdir(d):
+            p = os.path.join(d, f)
+            if not os.path.isfile(p) or not f.startswith("norm_"):
+                continue
+            stt = os.stat(p)
+            files.append([p, stt.st_size, max(stt.st_atime, stt.st_mtime)])
+        # 1) too old (not used recently)
+        keep = []
+        for p, size, used in files:
+            if max_age_days > 0 and (now - used) > max_age_days * 86400:
+                os.remove(p)
+                removed += 1
+                freed += size
+            else:
+                keep.append([p, size, used])
+        # 2) still over budget → oldest-used first
+        budget = max_gb * 1e9
+        total = sum(s for _p, s, _u in keep)
+        if budget > 0 and total > budget:
+            for p, size, _u in sorted(keep, key=lambda x: x[2]):
+                if total <= budget:
+                    break
+                os.remove(p)
+                removed += 1
+                freed += size
+                total -= size
+    except Exception as e:
+        print(f"[cache] prune skipped ({type(e).__name__}: {e})", flush=True)
+    if removed:
+        print(f"[cache] pruned {removed} file(s), freed {freed/1e6:.0f} MB", flush=True)
+    return {"removed": removed, "freed_mb": round(freed / 1e6, 1)}
 
 
 def _stream_params(path):
@@ -333,6 +403,7 @@ def normalize_clip(path, fmt, bitrates=None):
     key = hashlib.sha1(sig.encode()).hexdigest()[:16]
     out = os.path.join(_cache_dir(), f"norm_{key}.mp4")
     if os.path.exists(out) and os.path.getsize(out) > 1000:
+        OP_TIMES["cache_hits"] += 1        # served from cache → this clip cost nothing this run
         return out
     TW, TH = ff.DIMS[fmt]
     dur = ff.get_video_duration(path) or 0
@@ -347,7 +418,10 @@ def normalize_clip(path, fmt, bitrates=None):
             "-map", "[v]", "-map", ("0:a" if has_a else "1:a"),
             "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p"]
            + ff.encoder_quality_args(bitrates["final_export"]) + [tmp, "-y"])
+    import time as _t
+    _t0 = _t.time()
     ff.run(cmd)
+    OP_TIMES["normalize"] += _t.time() - _t0
     os.replace(tmp, out)
     return out
 
@@ -379,8 +453,11 @@ def assemble_segments(clips, fmt, output_path, bitrates=None, fast=True):
                 with open(lst, "w", encoding="utf-8") as fh:
                     for p in norm:
                         fh.write("file '" + os.path.abspath(p).replace("'", "'\\''") + "'\n")
+                import time as _tj
+                _j0 = _tj.time()
                 ff.run([ff.FFMPEG, "-f", "concat", "-safe", "0", "-i", lst,
                         "-c", "copy", "-movflags", "+faststart", output_path, "-y"])
+                OP_TIMES["join_copy"] += _tj.time() - _j0
                 shutil.rmtree(lst_dir, ignore_errors=True)
                 # VERIFY: a stream copy can "succeed" yet produce a wrong-length / drifting file
                 # (mismatched timebases, AAC priming, edit lists). If the result isn't the sum of
@@ -390,6 +467,7 @@ def assemble_segments(clips, fmt, output_path, bitrates=None, fast=True):
                 ok_len = expect <= 0 or abs(got - expect) <= max(0.5, expect * 0.02)
                 if os.path.exists(output_path) and os.path.getsize(output_path) > 1000 and ok_len:
                     CONCAT_STATS["copy"] += 1
+                    OP_TIMES["joined_seconds"] += got   # video seconds that avoided a re-encode
                     return output_path
                 CONCAT_STATS["why"] = f"length {got:.2f}s != expected {expect:.2f}s"
                 print(f"[assemble] fast concat rejected (len {got:.2f}s vs expected {expect:.2f}s) — re-encoding",
@@ -423,7 +501,10 @@ def assemble_segments(clips, fmt, output_path, bitrates=None, fast=True):
            "-map", "[outv]", "-map", "[outa]"]
     cmd += ff.encoder_quality_args(bitrates["final_export"])
     cmd += ["-c:a", "aac", "-b:a", "192k", output_path, "-y"]
+    import time as _tr
+    _r0 = _tr.time()
     ff.run(cmd)
+    OP_TIMES["join_reencode"] += _tr.time() - _r0
     return output_path
 
 
@@ -486,8 +567,11 @@ def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=Non
     # readable tail (and trims at a scene cut). Forcing end=duration made the last caption hang
     # over trailing footage / the packshot (the #8 bug); the same fix now applies to this path.
     tagged = clip_caption_window(tagged, cap_in, cap_out)
+    import time as _tc
+    _c0 = _tc.time()
     render_format(clip_path, [(dict(e), s) for e, s in tagged], fmt, output_path,
                   work_dir, body_path=None, headline=headline)
+    OP_TIMES["captions_bake"] += _tc.time() - _c0   # the only true pixel render in the batch
     return output_path
 
 

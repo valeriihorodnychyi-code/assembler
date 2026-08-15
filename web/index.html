@@ -44,6 +44,7 @@
   /* social safe-zone guide overlay (preview only, never exported) */
   #safeZones{position:absolute;inset:0;pointer-events:none;z-index:4}
   #safeToggle.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .statTab.active{background:var(--accent2);color:#fff}
   /* skewed green 'beta' tag, like the language sticker */
   .beta-tag{position:absolute;top:-7px;right:8px;z-index:3;font-family:'Caveat',cursive;font-size:15px;font-weight:700;color:#06210f;background:#22c55e;border-radius:7px;padding:0 9px;transform:rotate(3deg);box-shadow:0 3px 10px rgba(0,0,0,.35);letter-spacing:.5px;pointer-events:none}
   .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:340px;height:470px;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;padding:20px}
@@ -449,6 +450,10 @@
         <div class="row" style="align-items:center"><label title="Фрази, які НІКОЛИ не розриваються між рядками/титрами. Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label></div>
         <div id="ktChips" class="kt-chips"></div>
         <div class="hint">Ці фрази ніколи не розриваються. Тисни «＋ add», введи й Enter. Зберігається автоматично й переживає апдейти.</div>
+        <div class="row" style="align-items:center;margin-top:11px"><label title="Автозаміни в транскрипті: числа словами вже стають цифрами, а тут можна додати свої (percent → %, dollars → $, workouts → wo). Застосовується і до Whisper, і до Scribe.">Text swaps</label></div>
+        <div id="trChips" class="kt-chips"></div>
+        <div class="hint">Застосовується одразу після транскрайбу (обидва рушії). Числа словами → цифри вже вбудовано.</div>
+        <div class="row" style="margin-top:10px"><label title="ON: останній титр тримається до кінця кліпа (коли хук закінчується кадром, де текст має лишитись). OFF (типово): короткий хвіст — титр не наїжджає на пекшот чи наступну сцену. Зберігається в пресеті.">Hold last caption to end</label><label class="switch"><input type="checkbox" id="holdLast"><span class="slider"></span></label></div>
         <div class="row" style="margin-top:10px"><label data-i18n="lblCaptions" title="Показувати титри лише в цьому проміжку часу (порожнє = весь кліп)">Captions in / out</label>
           <div style="display:flex;gap:6px;flex:1.3">
             <input type="number" id="capIn" placeholder="0.0" min="0" step="0.1" style="flex:1" title="від (с)">
@@ -563,13 +568,13 @@
       <span class="beta-tag">beta</span>
       <summary><span>Animation</span> <span class="chev">›</span></summary>
       <div class="body">
-        <div class="hint">Words animate in around when they're spoken. Preview only for now — not yet in the final render.</div>
+        <div class="hint">Words animate in around when they're spoken. <b style="color:var(--ok)">Typewriter is the only one that also renders</b> — Pop and Rise are preview-only for now (they need per-frame rendering), so don't ship with them yet.</div>
         <div class="row"><label>Type</label>
           <select id="animType" style="flex:1">
             <option value="none">None</option>
-            <option value="pop">Pop (scale-in)</option>
-            <option value="rise">Rise (slide-up)</option>
-            <option value="type">Typewriter (word-by-word)</option>
+            <option value="type">✓ Typewriter (word-by-word) — works in render</option>
+            <option value="pop">Pop (scale-in) — preview only</option>
+            <option value="rise">Rise (slide-up) — preview only</option>
           </select></div>
         <div class="row"><label>Speed (s)</label><input type="range" id="animSpeed" min="0.08" max="0.8" step="0.02" value="0.25"><span class="val" id="animSpeedV">0.25</span></div>
       </div>
@@ -725,6 +730,14 @@
       <button id="benchRun" class="go" style="font-size:12px;padding:6px 12px">⏱ Run speed test</button>
     </div>
     <div id="benchOut" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+    <div class="mlbl" style="margin-top:14px">Time spent (all sessions)</div>
+    <div class="hint">Accumulated from <b>~/.assembler/timings.csv</b> — survives restarts.</div>
+    <div style="display:flex;gap:6px;margin-top:7px">
+      <button class="ghost statTab active" data-range="today" style="font-size:11px;padding:5px 10px">Today</button>
+      <button class="ghost statTab" data-range="week" style="font-size:11px;padding:5px 10px">7 days</button>
+      <button class="ghost statTab" data-range="all" style="font-size:11px;padding:5px 10px">All time</button>
+    </div>
+    <div id="statsOut" style="margin-top:8px;font-size:12px;color:var(--muted)">…</div>
     <div class="mlbl" style="margin-top:14px">Assembly cache</div>
     <div class="hint">Normalized clips (bodies/packshots) that make repeat assembles fast. Safe to clear — they're rebuilt on the next render.</div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
@@ -760,7 +773,7 @@ let editingHook=null, packMode="orig";               // packMode: "orig" = origi
 let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","punct"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct"];
 
 // Defaults now live as .json in the repo styles/ folder (official, no ★) + team customs (★).
 // This single hardcoded preset is only a SAFETY NET: shown when the styles folder is empty, so
@@ -823,7 +836,44 @@ async function loadSettings(){
     if(d.allowed===false)$("lockScreen").classList.add("show");
   }catch(e){}
 }
-$("settingsBtn").onclick=()=>{$("settingsModal").classList.add("show");loadSettings();refreshCacheInfo();};
+$("settingsBtn").onclick=()=>{$("settingsModal").classList.add("show");loadSettings();refreshCacheInfo();refreshStats();};
+// Accumulated time board (Settings): per-operation totals for today / 7 days / all time,
+// plus how often the assembly cache spared a re-encode.
+let _statsData=null, _statsRange="today";
+const OP_LABEL={transcribe:"Transcribe",render:"Captions bake / Export",assemble:"Assemble (per creative)",
+  batch:"Board runs",normalize:"Normalize",dub:"Localize",benchmark:"Speed tests",cache_clear:"Cache cleared"};
+function fmtDur(s){s=+s||0;if(s<60)return (Math.round(s*10)/10)+"s";
+  const m=Math.floor(s/60);if(m<60)return m+"m "+Math.round(s%60)+"s";return Math.floor(m/60)+"h "+(m%60)+"m";}
+function renderStats(){
+  const el=$("statsOut");if(!el)return;
+  if(!_statsData){el.textContent="—";return;}
+  const b=_statsData[_statsRange]||{};
+  const ops=Object.keys(b).sort((a,c)=>b[c].total_seconds-b[a].total_seconds);
+  if(!ops.length){el.innerHTML="<i>Ще немає записів за цей період.</i>";return;}
+  const total=ops.reduce((a,k)=>a+b[k].total_seconds,0);
+  let html="<div style='display:flex;flex-direction:column;gap:4px'>";
+  ops.forEach(k=>{const v=b[k];
+    html+="<div style='display:flex;justify-content:space-between;gap:10px'><span>"+(OP_LABEL[k]||k)
+      +" <span style='opacity:.6'>×"+v.count+"</span></span>"
+      +"<span style='color:var(--txt);font-variant-numeric:tabular-nums'>"+fmtDur(v.total_seconds)
+      +" <span style='opacity:.6'>(медіана "+fmtDur(v.median_seconds)+")</span></span></div>";});
+  html+="</div><div style='margin-top:6px;padding-top:6px;border-top:1px solid var(--line);color:var(--txt)'>Разом: <b>"+fmtDur(total)+"</b></div>";
+  const c=_statsData.cache||{};
+  if(c.hit_rate_pct!=null){
+    html+="<div style='margin-top:6px;color:var(--ok)'>Кеш склейок: "+c.hit_rate_pct+"% без перекоду ("
+      +c.fast_joins+" copy / "+c.reencoded_joins+" re-encode)"
+      +(c.encoding_avoided_seconds?("<br>≈ "+fmtDur(c.encoding_avoided_seconds)+" перекодування зекономлено"
+        +(c.encode_realtime_factor?(" <span style='opacity:.6'>(за виміряною швидкістю "+c.encode_realtime_factor+"x)</span>"):"")):"")
+      +"</div>";}
+  el.innerHTML=html;
+}
+async function refreshStats(){
+  try{_statsData=await(await fetch(API+"/api/stats")).json();}catch(e){_statsData=null;}
+  renderStats();
+}
+document.querySelectorAll(".statTab").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".statTab").forEach(x=>x.classList.toggle("active",x===b));
+  _statsRange=b.dataset.range;renderStats();});
 // Assembly cache: show how much disk the normalized clips take, and let the user wipe it.
 async function refreshCacheInfo(){
   const el=$("cacheInfo");if(!el)return;
@@ -883,6 +933,7 @@ function readControls(){
     gradC0:$("gradC0")?$("gradC0").value:"#ff5a2c",gradC1:$("gradC1")?$("gradC1").value:"#ffd400",gradDir:$("gradDir")?$("gradDir").value:"vertical",gradText:$("gradText")?$("gradText").checked:false,gradActive:$("gradActive")?$("gradActive").checked:false,gradPlate:$("gradPlate")?$("gradPlate").checked:false,
     scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value,scrimFade:+($("scrimFade")?$("scrimFade").value:0.25),
     animType:$("animType")?$("animType").value:"none",animSpeed:+($("animSpeed")?$("animSpeed").value:0.25),
+    holdLast:$("holdLast")?$("holdLast").checked:false,
     punct:$("punct")?$("punct").checked:false};
 }
 function writeControls(s){
@@ -919,7 +970,7 @@ function toEngineStyle(s){
     plate_shadow:{enabled:s.plateShadowOn,offset_x:s.pshX,offset_y:s.pshY,glow_blur:s.pshBlur,color:arr(s.pshColor)},
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
     scrim:{enabled:s.scrimOn,color:arr(s.scrimColor,s.scrimAlpha),pad:40,feather:s.scrimFeather,fade:s.scrimFade},
-    animation:{type:s.animType||"none",speed:s.animSpeed},
+    animation:{type:s.animType||"none",speed:s.animSpeed},hold_last:!!s.holdLast,
     karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},
     gradient:{colors:[arr(s.gradC0),arr(s.gradC1)],direction:s.gradDir||"vertical",on_text:!!s.gradText,on_active:!!s.gradActive,on_plate:!!s.gradPlate},
     karaoke_plate:{enabled:s.kpOn,color:arr(s.kpColor),pad_x:s.kpPadX,pad_y:s.kpPadY,border_radius:s.kpRadius}};
@@ -934,7 +985,7 @@ const _SYM=new Set(["%","$","€","£","+","&","/","x"]);
 function _isNum(t){return /^[+\-]?[\d.,]*\d/.test(t||"");}
 function capLang(){const v=variants&&variants[activeVar]&&variants[activeVar].lang;return String(v||($("language")&&$("language").value)||"en").toLowerCase();}
 async function loadCaptionRules(){try{CAPTION_RULES=await(await fetch(API+"/api/caption_rules")).json();}catch(e){CAPTION_RULES={};}fillKeepTogether();}
-function fillKeepTogether(){ renderKtChips(); }
+function fillKeepTogether(){ renderKtChips(); if(typeof renderTrChips==="function")renderTrChips(); }
 async function ktSave(){
   CAPTION_RULES=CAPTION_RULES||{};
   try{ await fetch(API+"/api/caption_rules",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(CAPTION_RULES)});}catch(e){}
@@ -952,6 +1003,45 @@ function renderKtChips(){
   });
   const add=document.createElement("span");add.className="kt-chip kt-add";add.textContent="＋ add";
   add.onclick=()=>openKtInput(); box.appendChild(add);
+}
+// Text swaps ("percent" → "%") — same tablet UX as keep-together, saved into the live rules file.
+// They apply right after transcription, so both Whisper and Scribe give caption-ready text.
+function trMap(){
+  CAPTION_RULES=CAPTION_RULES||{};
+  CAPTION_RULES.text_rules=CAPTION_RULES.text_rules||{};
+  CAPTION_RULES.text_rules.en=CAPTION_RULES.text_rules.en||{};
+  CAPTION_RULES.text_rules.en.replace=CAPTION_RULES.text_rules.en.replace||{};
+  return CAPTION_RULES.text_rules.en.replace;
+}
+function renderTrChips(){
+  const box=$("trChips"); if(!box)return; box.innerHTML="";
+  const m=trMap();
+  Object.keys(m).forEach(k=>{
+    const c=document.createElement("span");c.className="kt-chip";c.textContent=k+" → "+m[k];
+    const x=document.createElement("button");x.type="button";x.title="Remove";x.textContent="✕";
+    x.onclick=()=>{ delete trMap()[k]; ktSave(); renderTrChips(); };
+    c.appendChild(x); box.appendChild(c);
+  });
+  const add=document.createElement("span");add.className="kt-chip kt-add";add.textContent="＋ add";
+  add.onclick=()=>openTrInput(); box.appendChild(add);
+}
+function openTrInput(){
+  const box=$("trChips"); if(!box)return;
+  const old=$("trInputRow"); if(old)old.remove();
+  const row=document.createElement("span");row.id="trInputRow";row.className="kt-chip";
+  const from=document.createElement("input");from.type="text";from.className="kt-input";from.placeholder="percent";from.style.width="90px";
+  const arrow=document.createElement("span");arrow.textContent="→";arrow.style.cssText="opacity:.6;padding:0 4px";
+  const to=document.createElement("input");to.type="text";to.className="kt-input";to.placeholder="%";to.style.width="70px";
+  const ok=document.createElement("button");ok.type="button";ok.textContent="↵";ok.title="Add";
+  const commit=()=>{ const f=from.value.trim().toLowerCase(), t=to.value.trim();
+    if(f&&t){ trMap()[f]=t; ktSave(); }
+    renderTrChips(); };
+  [from,to].forEach(i=>i.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault(); if(i===from&&!to.value){to.focus();return;} commit();}
+    else if(e.key==="Escape"){renderTrChips();}}));
+  ok.onclick=commit;
+  row.appendChild(from);row.appendChild(arrow);row.appendChild(to);row.appendChild(ok);
+  box.appendChild(row); from.focus();
 }
 function openKtInput(){
   const box=$("ktChips"); if(!box)return;
@@ -1081,7 +1171,9 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
   for(let i=0;i<events.length-1;i++){const nxt=events[i+1].start,ne=events[i].end,gap=nxt-ne;
     events[i].end=(gap<=HOLD_MAX)?nxt:Math.min(nxt,ne+TAIL);
     if(events[i].end<=events[i].start)events[i].end=events[i].start+0.1;}
-  if(events.length){var _L=events[events.length-1];_L.end=Math.min(_L.end,_L.start+HOLD_MAX);if(_L.end<=_L.start)_L.end=_L.start+0.4;} // don't hang the last caption over trailing footage/packshot — readable tail only (a cut below trims further)
+  if(events.length){var _L=events[events.length-1];
+    if($("holdLast")&&$("holdLast").checked&&dur){_L.end=Math.max(_L.end,dur+0.2);}   // "hold last caption to end" (+slack so it can't blink off on the final frames)
+    else{_L.end=Math.min(_L.end,_L.start+HOLD_MAX);if(_L.end<=_L.start)_L.end=_L.start+0.4;}} // otherwise a readable tail only (a cut below trims further)
   if(cutList.length){for(const e of events){for(const c of cutList){if(e.start<c&&c<e.end){e.end=c;break;}}}}  // clamp end at next cut → no linger over the next shot
   return events;
 }
@@ -1562,7 +1654,8 @@ async function fetchLayout(){
   const cuts=(variants[activeVar]&&variants[activeVar].cuts)||null;
   const seq=++_layoutSeq;
   try{const r=await fetch(API+"/api/layout",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({words,regions:regions||null,base_style:baseEng,cuts,lang:capLang()})});
+      body:JSON.stringify({words,regions:regions||null,base_style:baseEng,cuts,lang:capLang(),
+        duration:((video&&video.duration)||0)})});
     if(!r.ok)return; const d=await r.json(); if(seq!==_layoutSeq)return;   // superseded by a newer request
     serverLayout=(d&&d.events)?d.events:null;
   }catch(e){/* network hiccup → keep last layout (or JS fallback) */}
@@ -1638,6 +1731,19 @@ function renderHlLangs(){
       "<input data-hll='"+l+"' value=\""+String(hlTexts[l]||"").replace(/"/g,"&quot;").replace(/\n/g," / ")+"\" placeholder='same as EN' style='flex:1;font-size:12px'></div>").join("");
   box.querySelectorAll("[data-hll]").forEach(inp=>inp.oninput=()=>{hlTexts[inp.dataset.hll]=inp.value;});
 }
+// Make it obvious that only Typewriter survives the render: warn right under the picker when a
+// preview-only animation is selected, so nobody ships a creative expecting Pop/Rise to be there.
+function updateAnimWarn(){
+  const sel=$("animType");if(!sel)return;
+  let w=$("animWarn");
+  if(!w){w=document.createElement("div");w.id="animWarn";w.className="hint";
+    w.style.cssText="margin-top:6px;color:var(--accent);font-weight:600";
+    sel.closest(".row").insertAdjacentElement("afterend",w);}
+  const v=sel.value;
+  w.style.display=(v==="pop"||v==="rise")?"block":"none";
+  w.textContent="⚠ Прев'ю-онлі: у фінальний рендер ця анімація НЕ потрапить (слова просто зʼявляться). Робоча — Typewriter.";
+}
+if($("animType"))$("animType").addEventListener("change",updateAnimWarn);
 (function wireHeadline(){
   const t=$("hlText");if(!t)return;
   t.addEventListener("input",()=>{hlTexts[activeVar||"en"]=t.value;});
@@ -1787,7 +1893,7 @@ function fromEngineStyle(e){
     karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
     gradC0:hx((gr.colors&&gr.colors[0])||[255,90,44,255]),gradC1:hx((gr.colors&&gr.colors[1])||[255,212,0,255]),gradDir:gr.direction||"vertical",gradText:!!gr.on_text,gradActive:!!gr.on_active,gradPlate:!!gr.on_plate,
     scrimOn:!!(e.scrim&&e.scrim.enabled),scrimColor:hx((e.scrim&&e.scrim.color)||[0,0,0,150]),scrimAlpha:(e.scrim&&e.scrim.color&&e.scrim.color[3]!=null)?e.scrim.color[3]:150,scrimFeather:+g(e.scrim||{},"feather",70),scrimFade:+g(e.scrim||{},"fade",0.25),
-    animType:(e.animation&&e.animation.type)||"none",animSpeed:+g(e.animation||{},"speed",0.25)};
+    animType:(e.animation&&e.animation.type)||"none",animSpeed:+g(e.animation||{},"speed",0.25),holdLast:!!e.hold_last};
 }
 // mini "Aa" sample CSS derived from an engine style
 function styleSampleCSS(e){
@@ -2536,6 +2642,7 @@ $("batchAssembleBtn").onclick=async()=>{
     renderBatchStage();
     // keep the speed numbers on screen (they're the capacity-planning standard, also in ~/.assembler/timings.csv)
     const _s=d.stats;
+    if(_s&&_s.ops&&typeof renderOpBreakdown==="function")renderOpBreakdown(_s);   // where the time went (updates each run)
     $("batchResults").innerHTML=d.results.length+" video(s) ready — download them on the board →"+
       (_s?("<div style='margin-top:6px;font-size:12px;color:var(--ok)'>⏱ "+_s.wall_seconds+"s total · "
         +_s.seconds_per_creative+"s per creative · "+(_s.creatives_per_min||"?")+" creatives/min"
@@ -2547,7 +2654,7 @@ $("batchAssembleBtn").onclick=async()=>{
           +(_s.fallback_reason?(" — "+_s.fallback_reason):"")+"</span>"):"")
         +"</div>"):"");
     const errs=d.errors&&Object.keys(d.errors).length?(" Errors: "+Object.entries(d.errors).map(([k,v])=>k+": "+v).join("; ")):"";
-    setStatus("Built "+d.results.length+" video(s)."+errs,errs?"err":"ok");
+    setStatus("Built "+d.results.length+" video(s)"+(_s?(" за "+_s.wall_seconds+"s · "+_s.seconds_per_creative+"s кожен"):"")+"."+errs,errs?"err":"ok");
     if(d.results.length){chime("render");busyDone("Зібрано "+d.results.length+" відео");}else busyStop();
   }catch(e){setStatus("Build error: "+e.message,"err");busyStop();}
   updateBuildBtn();
@@ -3116,6 +3223,35 @@ function openPicker(kind,anchor,slot){
 }
 document.addEventListener("click",e=>{const p=$("pickPop");if(p&&!p.contains(e.target)&&!e.target.closest("[data-pick]"))closePicker();});
 
+// Board time board: where the last run's time went, per operation. Survives board re-renders and
+// is replaced by each new run (the live timer during a run stays as it is).
+let lastRunStats=null;
+function renderOpBreakdown(s){lastRunStats=s;renderBatchStage();}
+function opBreakdownHTML(){
+  const s=lastRunStats;if(!s||!s.ops)return "";
+  const o=s.ops, fmt=v=>(v>=60?(Math.floor(v/60)+"m "+Math.round(v%60)+"s"):(Math.round(v*10)/10+"s"));
+  // one card per operation, each with its own colour — easier to read than a merged bar
+  const cards=[
+    {t:"Captions bake",v:o.captions_bake,c:"#ff6b3d",n:"рендер пікселів"},
+    {t:"Normalize",v:o.normalize,c:"#7c5cff",n:"підготовка кліпів · кеш "+(o.cache_hits||0)+"×"},
+    {t:"Join · copy",v:o.join_copy,c:"#22c55e",n:(s.fast_joins||0)+" без перекоду"},
+    {t:"Join · re-encode",v:o.join_reencode,c:"#ef4444",n:(s.reencoded_joins||0)+" з перекодом"},
+    {t:"Other",v:s.other_seconds,c:"#64748b",n:"аудіо, пекшот, службове"},
+  ].filter(x=>(+x.v||0)>0.05);
+  const card=x=>{const pct=Math.round((+x.v/Math.max(s.wall_seconds,0.1))*100);
+    return "<div style='flex:1 1 150px;min-width:140px;padding:10px 12px;border-radius:10px;background:var(--panel2);border-left:4px solid "+x.c+"' title='"+x.n+"'>"
+      +"<div style='font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>"+x.t+"</div>"
+      +"<div style='font-size:19px;font-weight:700;color:"+x.c+";font-variant-numeric:tabular-nums;margin-top:2px'>"+fmt(+x.v)+"</div>"
+      +"<div style='font-size:10.5px;color:var(--muted)'>"+pct+"% · "+x.n+"</div></div>";};
+  return "<div style='max-width:1000px;margin:18px auto 0;padding-top:14px;border-top:1px solid var(--line)'>"
+    +"<div style='display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:9px'>"
+    +"<b style='color:var(--txt)'>⏱ Останній прогін</b>"
+    +"<span style='color:var(--ok)'>"+fmt(s.wall_seconds)+" · "+s.creatives+" креатив(и) · "
+    +fmt(s.seconds_per_creative)+" кожен"+(s.creatives_per_min?(" · "+s.creatives_per_min+"/хв"):"")+"</span></div>"
+    +"<div style='display:flex;flex-wrap:wrap;gap:8px'>"+cards.map(card).join("")+"</div>"
+    +(s.fallback_reason?("<div style='margin-top:7px;font-size:11px;color:var(--accent)'>fallback: "+s.fallback_reason+"</div>"):"")
+    +"</div>";
+}
 function renderBatchStage(){
   const el=$("batchStage");if(!el)return;
   updateBuildBtn();
@@ -3156,6 +3292,7 @@ function renderBatchStage(){
     html+="<div style='max-width:620px;margin:16px auto 0'>"
       +"<div style='font-size:12px;color:var(--muted);margin-bottom:5px'>📝 Назви креативів — по рядку на відео (застосуються до відео і PNG в архіві):</div>"
       +"<textarea id='nameBox' rows='"+Math.min(Math.max(finals.length,2),8)+"' style='width:100%;font-size:12px;font-family:monospace'>"+finals.map(f=>creativeName(f.file)).join("\n").replace(/</g,"&lt;")+"</textarea></div>";}
+  html+=opBreakdownHTML();   // ⏱ time board — at the BOTTOM of the board, one card per operation
   el.innerHTML=html;
   if($("nameBox")){const finals=shown.map(h=>batchFinals[clipKey(h)]).filter(Boolean);
     $("nameBox").oninput=()=>{const ls=$("nameBox").value.split("\n");finals.forEach((f,i)=>{const v=(ls[i]||"").trim();if(v)creativeNames[f.file]=v;else delete creativeNames[f.file];});};}

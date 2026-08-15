@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 # allow "python -m server.app" and direct execution
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles  # noqa: E402
+from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(ROOT, "web")
@@ -119,12 +119,43 @@ def _apply_caption_rules_path():
     from the shipped defaults so built-in rules aren't lost."""
     base = os.path.dirname(_custom_styles_dir())            # <library> or ~/.assembler
     dst = os.path.join(base, "caption_rules.json")
+    shipped = os.path.join(ROOT, "caption_rules.json")
     try:
         os.makedirs(base, exist_ok=True)
         if not os.path.exists(dst):
-            shipped = os.path.join(ROOT, "caption_rules.json")
             if os.path.exists(shipped):
                 shutil.copy(shipped, dst)
+        elif os.path.exists(shipped):
+            # MERGE, don't just seed: rules shipped with the code (team-wide, edited on GitHub)
+            # must reach everyone on update, while each machine keeps its own additions.
+            # Local values win per key; new keys/entries from the code are added in.
+            try:
+                import json as _j
+                ship = _j.load(open(shipped, encoding="utf-8"))
+                local = _j.load(open(dst, encoding="utf-8"))
+
+                def _merge(s, l):
+                    if isinstance(s, dict) and isinstance(l, dict):
+                        out = dict(s)
+                        for k, v in l.items():
+                            out[k] = _merge(s.get(k), v) if k in s else v
+                        return out
+                    if isinstance(s, list) and isinstance(l, list):
+                        seen, out = set(), []
+                        for x in s + l:                       # shipped first, then local extras
+                            key = str(x).lower()
+                            if key not in seen:
+                                seen.add(key)
+                                out.append(x)
+                        return out
+                    return l if l is not None else s
+
+                merged = _merge(ship, local)
+                if merged != local:
+                    _j.dump(merged, open(dst, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+                    print("[rules] merged shipped caption rules into the local file", flush=True)
+            except Exception as e:
+                print(f"[rules] merge skipped ({type(e).__name__}: {e})", flush=True)
         os.environ["CS_CAPTION_RULES"] = dst
     except OSError:
         pass  # fall back to the shipped path (subtitles._rules_path default)
@@ -231,6 +262,10 @@ if os.path.exists(_CFG):
 
 # Library folder is now final → point styles next to it (or the local fallback) + recover.
 _apply_styles_dirs()
+try:      # keep the normalized-clip cache from growing forever (entries are rebuilt on demand)
+    compose.prune_cache()
+except Exception:
+    pass
 
 
 # --- delivery: drop finished creatives into the team "Finished Work" Drive folder ----
@@ -582,6 +617,8 @@ async def api_transcribe(
     except Exception as e:  # surface a clean message to the UI
         raise HTTPException(500, f"Transcription failed: {e}")
 
+    result["words"] = _clean_transcript(result["words"], result.get("language"))
+
     import json
     with open(os.path.join(sdir, "words.json"), "w", encoding="utf-8") as wf:
         json.dump(result["words"], wf)
@@ -592,6 +629,19 @@ async def api_transcribe(
         "language": result["language"],
         "words": result["words"],
     }
+
+
+def _clean_transcript(words, lang=None):
+    """Caption-ready clean-up of raw ASR words (numbers -> digits, unit/word swaps).
+
+    Applied to BOTH engines right after transcription, so Whisper and Scribe give the same
+    caption-ready text and the transcript box shows exactly what will be burned in.
+    """
+    try:
+        return textrules.clean_words(words or [], lang or "en", subtitles.load_rules())
+    except Exception as e:
+        print(f"[textrules] skipped ({type(e).__name__}: {e})", flush=True)
+        return words
 
 
 class TranscribeClipReq(BaseModel):
@@ -619,7 +669,8 @@ def api_transcribe_clip(req: TranscribeClipReq):
         )
     except Exception as e:
         raise HTTPException(500, f"Transcription failed: {e}")
-    return {"language": result["language"], "words": result["words"]}
+    return {"language": result["language"],
+            "words": _clean_transcript(result["words"], result.get("language"))}
 
 
 class PreviewFrameReq(BaseModel):
@@ -655,9 +706,13 @@ def api_preview_frame(req: PreviewFrameReq):
     tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}],
                                     lang=(req.lang or "en"), cuts=req.cuts)
     events = [e for e, _ in tagged]
-    # NOTE: do NOT extend the last caption to the clip end — build_events already gives it a
-    # readable tail (and trims at a scene cut). Extending here made 'exact' hang the last
-    # caption over trailing footage / the packshot.
+    # By default do NOT extend the last caption to the clip end — build_events already gives it a
+    # readable tail (and trims at a scene cut); extending unconditionally made 'exact' hang the
+    # last caption over trailing footage / the packshot. The style switch opts back in.
+    if events and req.dur and style.get("hold_last"):
+        # +0.2s of slack: the browser's duration can be a hair short of the real file length,
+        # so without it the caption could blink off on the very last frames of the preview.
+        events[-1]["end"] = max(float(events[-1]["end"]), float(req.dur) + 0.2)
     ev = next((e for e in events if req.time >= e["start"] and req.time < e["end"]), None)
     if ev is None:
         return Response(status_code=204)  # nothing on screen at this moment
@@ -677,6 +732,7 @@ class LayoutReq(BaseModel):
     base_style: Optional[dict] = None
     cuts: Optional[List[float]] = None
     lang: str = "en"
+    duration: float = 0.0                         # clip length — needed for "hold last caption to end"
 
 
 @app.post("/api/layout")
@@ -692,6 +748,9 @@ def api_layout(req: LayoutReq):
     else:
         regions = [{"start": 0, "end": None, "style": base}]
     tagged = compose.build_timeline(req.words or [], regions, lang=(req.lang or "en"), cuts=req.cuts)
+    # mirror the render's "hold last caption to end" so the preview shows the same thing
+    if tagged and req.duration and base.get("hold_last"):
+        tagged[-1][0]["end"] = max(float(tagged[-1][0]["end"]), float(req.duration) + 0.2)
     events = []
     for e, _s in tagged:
         events.append({
@@ -786,6 +845,86 @@ def api_render(req: RenderReq):
          "name": os.path.basename(p)}
         for i, p in enumerate(outputs)
     ]}
+
+
+@app.get("/api/stats")
+def api_stats():
+    """Aggregate of ~/.assembler/timings.csv — today / last 7 days / all time.
+
+    Per operation: how many times it ran and how long it took (total + median), plus the
+    assembly cache hit rate and an estimate of the encoding time the cache avoided.
+    """
+    import csv as _csv
+    import datetime as _dt
+    import re as _re
+    p = os.path.join(_ASSEMBLER_HOME, "timings.csv")
+    empty = {"today": {}, "week": {}, "all": {}, "rows": 0, "file": p}
+    if not os.path.exists(p):
+        return empty
+    now = _dt.datetime.now()
+    today0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week0 = now - _dt.timedelta(days=7)
+    buckets = {"today": {}, "week": {}, "all": {}}
+    joined_seconds = 0.0
+    fast = reenc = 0
+    bake_rt = []          # measured encode cost (seconds of compute per second of video)
+    rows = 0
+    try:
+        with open(p, newline="", encoding="utf-8") as fh:
+            for r in _csv.DictReader(fh):
+                try:
+                    when = _dt.datetime.fromisoformat(r.get("timestamp", ""))
+                except Exception:
+                    continue
+                op = (r.get("op") or "?").strip()
+                try:
+                    secs = float(r.get("seconds") or 0)
+                except Exception:
+                    continue
+                rows += 1
+                notes = r.get("notes") or ""
+                kv = dict(_re.findall(r"([a-z_]+)=([^\s]+)", notes))
+                if op == "batch":
+                    fast += int(float(kv.get("fast_joins", 0) or 0)) if "fast_joins" in kv else 0
+                    reenc += int(float(kv.get("reencoded_joins", 0) or 0)) if "reencoded_joins" in kv else 0
+                    try:
+                        joined_seconds += float(kv.get("out_s_total", 0) or 0)
+                    except Exception:
+                        pass
+                if op == "render":
+                    try:
+                        rt = float(kv.get("realtime_x", 0) or 0)
+                        if rt > 0:
+                            bake_rt.append(rt)
+                    except Exception:
+                        pass
+                for name, since in (("today", today0), ("week", week0), ("all", None)):
+                    if since is None or when >= since:
+                        b = buckets[name].setdefault(op, {"count": 0, "total": 0.0, "samples": []})
+                        b["count"] += 1
+                        b["total"] += secs
+                        b["samples"].append(secs)
+    except Exception:
+        return empty
+
+    def finish(b):
+        out = {}
+        for op, v in b.items():
+            s = sorted(v["samples"])
+            out[op] = {"count": v["count"], "total_seconds": round(v["total"], 1),
+                       "median_seconds": round(s[len(s) // 2], 2) if s else 0}
+        return out
+
+    med_rt = sorted(bake_rt)[len(bake_rt) // 2] if bake_rt else 0
+    total_joins = fast + reenc
+    return {"today": finish(buckets["today"]), "week": finish(buckets["week"]),
+            "all": finish(buckets["all"]), "rows": rows, "file": p,
+            "cache": {"fast_joins": fast, "reencoded_joins": reenc,
+                      "hit_rate_pct": round(100.0 * fast / total_joins, 1) if total_joins else None,
+                      # estimate: those joined seconds would have been re-encoded at this machine's
+                      # own measured encode speed (median realtime factor from real renders)
+                      "encoding_avoided_seconds": round(joined_seconds * med_rt, 1) if med_rt else None,
+                      "encode_realtime_factor": round(med_rt, 3) if med_rt else None}}
 
 
 @app.get("/api/cache")
@@ -1356,6 +1495,11 @@ def api_batch_assemble(req: BatchReq):
             _stats["fast_joins"] = _cs.get("copy", 0)
             _stats["reencoded_joins"] = _cs.get("reencode", 0)
             _stats["fallback_reason"] = _cs.get("why", "")
+            # per-operation breakdown: where the time actually went this run
+            _ot = dict(getattr(compose, "OP_TIMES", {}))
+            _stats["ops"] = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in _ot.items()}
+            _stats["other_seconds"] = round(max(0.0, _wall - sum(
+                float(_ot.get(k, 0) or 0) for k in ("captions_bake", "normalize", "join_copy", "join_reencode"))), 2)
         except Exception:
             pass
         _log_timing("batch", _wall,

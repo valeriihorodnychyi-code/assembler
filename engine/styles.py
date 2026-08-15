@@ -34,6 +34,7 @@ DEFAULT_STYLE = {
     "box_offset_y": 0,                 # nudge plate/highlight box up(+)/down(-), text stays
     "force_single_line": False,
     "punctuation": False,              # False = clean look (abbreviation dots kept); True = keep punctuation as transcribed
+    "hold_last": False,                # False = last caption gets a short tail (never sits on a packshot); True = it stays to the clip end
     "stroke_on": True,                 # master on/off for the whole outline (inner + outer = double stroke)
     "stroke": {"width": 0, "color": [0, 0, 0, 255]},
     "stroke_outer": {"width": 0, "color": [0, 0, 0, 255]},
