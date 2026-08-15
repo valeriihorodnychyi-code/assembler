@@ -230,6 +230,11 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
 
     cmd += ["-filter_complex", fc.strip().strip(";"), "-map", last_v, "-map", "0:a?"]
     cmd += ff.encoder_quality_args(hook_bitrate)
+    # Force the AUDIO to the concat target too (44.1k stereo AAC). Video was already conformant,
+    # but audio kept the source's rate/channels — so a 48 kHz or mono hook came out of the bake
+    # "not concat-ready" and then got a SECOND full encode by normalize_clip before joining
+    # (slower + one extra generation). With this, a freshly baked hook joins by stream copy.
+    cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2"]
     cmd += [temp_hook, "-y"]
     ff.run(cmd)
     if os.path.exists(temp_shadow):
