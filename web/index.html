@@ -806,16 +806,18 @@ function chime(kind){
 
 // ---------- busy bar (capybara progress + live timer) ----------
 let _busyT0=0,_busyTick=null;
-function fmtDur(ms){const s=Math.round(ms/1000);const m=Math.floor(s/60),r=s%60;return m>0?(m+":"+String(r).padStart(2,"0")):(r+"s");}  // round to whole seconds; hh-free mm:ss — not F1 telemetry 🏎️
+// NOTE: takes MILLISECONDS. Named apart from fmtDur(seconds) below on purpose — one
+// function name for two units silently turned 21s into "6h 1m" on the busy bar.
+function fmtElapsed(ms){const s=Math.round(ms/1000);const m=Math.floor(s/60),r=s%60;return m>0?(m+":"+String(r).padStart(2,"0")):(r+"s");}  // whole seconds; hh-free mm:ss — not F1 telemetry 🏎️
 function busyStart(label){
   _busyT0=performance.now();
   $("bbLabel").textContent=label||"Working…";$("bbTimer").textContent="0s";
   $("busyBar").classList.add("show");
-  clearInterval(_busyTick);_busyTick=setInterval(()=>{$("bbTimer").textContent=fmtDur(performance.now()-_busyT0);},500);
+  clearInterval(_busyTick);_busyTick=setInterval(()=>{$("bbTimer").textContent=fmtElapsed(performance.now()-_busyT0);},500);
 }
 function busyDone(label){
   clearInterval(_busyTick);
-  $("bbLabel").innerHTML=(label||"Done")+" <b>· "+fmtDur(performance.now()-_busyT0)+"</b>";$("bbTimer").textContent="";
+  $("bbLabel").innerHTML=(label||"Done")+" <b>· "+fmtElapsed(performance.now()-_busyT0)+"</b>";$("bbTimer").textContent="";
   setTimeout(()=>$("busyBar").classList.remove("show"),3000);
 }
 function busyStop(){clearInterval(_busyTick);$("busyBar").classList.remove("show");}
@@ -1505,13 +1507,14 @@ function saveActiveHook(){
   try{const rw=parseBreaksToWords($("transcript").value,h.words);if(rw)h.words=rw;}catch(e){}
   h.ctrl=readControls();h.style=toEngineStyle(h.ctrl);   // h is a board hook → board stays current
   h.titles=cloneTitles();h.titlesOn=titlesOn();          // titles belong to THIS clip
+  h.trim=(variants.en&&variants.en.trim)||h.trim||null;   // and so does the trim
 }
 function selectHook(i){
   if(i<0||i>=editPack.length)return;
   editingHook=null;
   saveActiveHook();
   const h=editPack[i];activeHook=i;
-  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,style:h.ctrl,language:h.lang,cuts:h.cuts||null}};activeVar="en";
+  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,style:h.ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null}};activeVar="en";
   if(typeof updateCutsLabel==="function")updateCutsLabel();
   videoFile=null;                                  // in-session clip — re-transcribe targets it, no session fork
   if($("language"))$("language").value=h.lang||""; // force the hook's language on re-transcribe
@@ -1524,6 +1527,7 @@ function selectHook(i){
   if(typeof setLangSticker==="function")setLangSticker(h.lang);
   $("transcribeBtn").disabled=false;$("renderBtn").disabled=false;
   renderHookStrip();renderGroupBar();updateEditButtons();
+  if(typeof syncTrim==="function")syncTrim();                   // this clip's own trim back on the bar
   if(typeof invalidateLayout==="function")invalidateLayout();   // drop the previous clip's caption layout at once
   if(typeof exactOn!=="undefined"&&exactOn)scheduleExact();
 }
@@ -1615,9 +1619,16 @@ function syncTrim(){
   $("trimRow").style.display=(dur&&$("batchStage").style.display!=="block")?"flex":"none";
   drawTrimBar();
 }
+// the clip currently open in the editor (a pack hook or a single hook opened with ✎)
+function openHookRef(){
+  if(typeof activeHook!=="undefined"&&activeHook>=0&&editPack[activeHook])return editPack[activeHook];
+  return (typeof editingHook!=="undefined"&&editingHook)?editingHook:null;
+}
 function writeTrim(){
   const dur=video.duration||0,i=pf($("trimIn").value,0),o=pf($("trimOut").value,dur)||dur;
-  if(variants[activeVar])variants[activeVar].trim=(i>0.05||o<dur-0.05)?[i,o]:null;
+  const t=(i>0.05||o<dur-0.05)?[i,o]:null;
+  if(variants[activeVar])variants[activeVar].trim=t;
+  const h=openHookRef();if(h)h.trim=t;      // stick the trim to the CLIP → survives switching clips + goes to the board
 }
 function drawTrimBar(){
   const dur=video.duration||0;if(!dur||!$("trimBar"))return;
@@ -1644,7 +1655,9 @@ function trimDrag(which){return e=>{
 };}
 $("trimHIn").addEventListener("pointerdown",trimDrag("in"));
 $("trimHOut").addEventListener("pointerdown",trimDrag("out"));
-$("trimReset").onclick=()=>{if(variants[activeVar])variants[activeVar].trim=null;syncTrim();};
+$("trimReset").onclick=()=>{if(variants[activeVar])variants[activeVar].trim=null;
+  {const h=openHookRef();if(h)h.trim=null;}
+  syncTrim();};
 video.addEventListener("loadedmetadata",syncTrim);
 
 // ---------- exact preview: engine-rendered frame, OPTIONAL toggle (default off) ----------
@@ -2949,16 +2962,23 @@ $("batchAssembleBtn").onclick=async()=>{
   if(!hooks.length){setStatus("Add hooks first.","err");return;}
   if(!fileId){setStatus("No session.","err");return;}
   const packBase=$("packAsset").value,fmt=ratio;   // project format (9:16 / 1:1 / 16:9)
-  const recipes=hooks.map(h=>{const hookSeg={type:"session",ref:h.clip||h.name};
-    if(h.words&&h.style){hookSeg.words=h.words;hookSeg.style=h.style;if(h.regions)hookSeg.regions=h.regions;}  // live hook → bake captions now (+ per-phrase overrides)
-    {const _hl=hookHeadline(h,h.lang);if(_hl)hookSeg.headline=_hl;}   // THIS clip's own titles, in THIS hook's language (localized copy)
-    if(h.cap_in!=null)hookSeg.cap_in=h.cap_in;if(h.cap_out!=null)hookSeg.cap_out=h.cap_out;  // caption in/out window
-    if(h.cuts&&h.cuts.length)hookSeg.cuts=h.cuts;   // scene cuts → captions clipped at cuts
-    if(h.trim)hookSeg.trim=h.trim;                                     // cut clip at assemble
-    if(h.overlays&&h.overlays.length)hookSeg.overlays=h.overlays;       // PNG/.mov stickers baked on the hook
-    const segs=[hookSeg];
+  // one place that turns a board clip into a segment — used for the Hook column AND for a hook
+  // reused as a Body part, so a reused hook keeps its captions/titles/trim instead of going in raw
+  const segFromHook=(h,ref)=>{const s={type:"session",ref:ref||h.clip||h.name};
+    if(h.words&&h.style){s.words=h.words;s.style=h.style;if(h.regions)s.regions=h.regions;}  // live clip → bake captions now (+ per-phrase overrides)
+    {const _hl=hookHeadline(h,h.lang);if(_hl)s.headline=_hl;}   // THIS clip's own titles, in THIS clip's language
+    if(h.cap_in!=null)s.cap_in=h.cap_in;if(h.cap_out!=null)s.cap_out=h.cap_out;  // caption in/out window
+    if(h.cuts&&h.cuts.length)s.cuts=h.cuts;   // scene cuts → captions clipped at cuts
+    if(h.trim)s.trim=h.trim;                                     // cut clip at assemble
+    if(h.overlays&&h.overlays.length)s.overlays=h.overlays;       // PNG/.mov stickers baked on the clip
+    return s;};
+  const recipes=hooks.map(h=>{
+    const segs=[segFromHook(h)];
     bodyParts.forEach(bp=>{if(!bp)return;
-      if(isSessionRef(bp)){segs.push({type:"session",ref:sessionRefName(bp)});return;}   // a hook reused as a body part (hook + hook + hook)
+      if(isSessionRef(bp)){                                       // a hook reused as a body part (hook + hook + hook)
+        const nm=sessionRefName(bp);
+        const src=hooks.find(x=>(x.clip||x.name)===nm);
+        segs.push(src?segFromHook(src,nm):{type:"session",ref:nm});return;}
       const b=libItemFor(bp,h.lang,"body");if(b)segs.push({type:"library",ref:b.id});});  // each body part, in order, per-language
     if(packBase){const p=libItemFor(packBase,h.lang,"packshot");if(p){const ps={type:"library",ref:p.id};if($("packFade")&&$("packFade").checked)ps.fade_in=0.5;segs.push(ps);}}
     return {name:(h.name||h.clip).replace(/\.[^.]+$/,""),format:fmt,segments:segs};});
@@ -3271,7 +3291,7 @@ function editLocHook(h){
   const url=API+"/clip/"+fileId+"/"+h.clip;
   const ctrl=h.ctrl||sharedCtrl||readControls();
   enVideoUrl=url;realWords=h.words||[];
-  variants={en:{clip:h.clip,videoUrl:url,words:h.words,style:ctrl,language:h.lang,cuts:h.cuts||null}};activeVar="en";
+  variants={en:{clip:h.clip,videoUrl:url,words:h.words,style:ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null}};activeVar="en";
   if(typeof updateCutsLabel==="function")updateCutsLabel();
   videoFile=null;                                  // edit the in-session clip — never re-upload (no session fork)
   if($("language"))$("language").value=h.lang||""; // force re-transcribe to the localized language (not auto-detect → EN)
@@ -3283,6 +3303,7 @@ function editLocHook(h){
   if(typeof loadCapWin==="function"){loadCapWin(h);variants.en.capIn=(h.cap_in!=null?h.cap_in:null);variants.en.capOut=(h.cap_out!=null?h.cap_out:null);}
   if(typeof setLangSticker==="function")setLangSticker(h.lang);
   updateEditButtons();
+  if(typeof syncTrim==="function")syncTrim();
   if(typeof invalidateLayout==="function")invalidateLayout();
   setMode("edit");autoGrow();
   setStatus("Правиш локалізований хук «"+(h.name||h.clip)+"» ("+(h.lang||"").toUpperCase()+"). Натисни 💾 Save back → повернешся в LOC.","");
@@ -3292,6 +3313,7 @@ function saveEditingHook(){
   try{const rw=parseBreaksToWords($("transcript").value,editingHook.words);if(rw)editingHook.words=rw;}catch(e){}
   const ctrl=readControls();editingHook.ctrl=ctrl;editingHook.style=toEngineStyle(ctrl);
   editingHook.titles=cloneTitles();editingHook.titlesOn=titlesOn();   // its own titles (incl. this language's copy)
+  editingHook.trim=(variants.en&&variants.en.trim)||editingHook.trim||null;
   editingHook=null;_titleLang=null;updateEditButtons();
   renderHookTiles();setMode("loc");
   setStatus("Збережено — локалізований хук оновлено.","ok");
@@ -3523,7 +3545,9 @@ function updateBuildBtn(){
 // ---------- board pickers (choose body/packshot by clicking the tile) ----------
 function libThumbURL(base,type){const it=libItemFor(base,"en",type)||libItemFor(base,"",type);return it?(API+"/library_thumb/"+encodeURIComponent(it.id)):null;}
 function fmtBox(w){const d=DIMS[ratio]||[1080,1920];return "width:"+w+"px;aspect-ratio:"+d[0]+"/"+d[1]+";object-fit:cover;border-radius:7px;display:block;margin:0 auto;background:#0e1119";}
-function addTile(kind){return "<div data-add='"+kind+"' style='cursor:pointer;padding:11px;border-radius:10px;border:1px dashed var(--line);text-align:center;font-size:12px;color:var(--muted)'>＋ "+(kind==='hook'?'add hook':'add body part')+"</div>";}
+function addTile(kind,compact){
+  if(compact)return "<div data-add='"+kind+"' title='Додати частину боді (час іде вправо)' style='cursor:pointer;height:100%;min-height:96px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px dashed var(--line);font-size:18px;color:var(--muted)'>＋</div>";
+  return "<div data-add='"+kind+"' style='cursor:pointer;padding:11px;border-radius:10px;border:1px dashed var(--line);text-align:center;font-size:12px;color:var(--muted)'>＋ "+(kind==='hook'?'add hook':'add body part')+"</div>";}
 function pickTile(kind,base,slot,removable){
   const sess=isSessionRef(base);
   const label=sess?sessionRefName(base):base;
@@ -3590,7 +3614,7 @@ function opBreakdownHTML(){
 function renderBatchStage(){
   const el=$("batchStage");if(!el)return;
   updateBuildBtn();
-  const col=(title,inner,id)=>"<div "+(id?"id='"+id+"' ":"")+"style='flex:1;min-width:0'><div style='font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px'>"+title+"</div><div style='display:flex;flex-direction:column;gap:8px'>"+inner+"</div></div>";
+  const col=(title,inner,id,grow)=>"<div "+(id?"id='"+id+"' ":"")+"style='flex:"+(grow||1)+";min-width:0'><div style='font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px'>"+title+"</div><div style='display:flex;flex-direction:column;gap:8px'>"+inner+"</div></div>";
   const arrow="<div style='display:flex;align-items:center;color:var(--muted);font-size:22px;padding:0 4px'>→</div>";
   const tile=(name,lang,suffix)=>"<div style='display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;background:var(--panel2);border-left:4px solid "+langColor(lang)+";font-size:12px'><span style='background:"+langColor(lang)+";color:#0d0e12;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(lang||"?").toUpperCase()+"</span><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+name+"</span>"+(suffix||"")+"</div>";
   if(!hooks.length){
@@ -3602,10 +3626,18 @@ function renderBatchStage(){
   // hook tile with a × to remove it right on the board
   const hookTile=(h,i)=>"<div title='"+(h.src==="edit"?"з Edit":"додано вручну")+"' style='display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;background:var(--panel2);border-left:4px solid "+srcColor(h.src)+";font-size:12px'><span style='background:"+langColor(h.lang)+";color:#0d0e12;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(h.lang||"?").toUpperCase()+"</span><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+h.name+"</span><span data-tobody='"+i+"' title='Use as a Body part → (lets you build hook + hook + hook)' style='cursor:pointer;color:var(--accent2);padding:0 3px;font-size:15px;font-weight:700'>▸</span><span data-rm='"+i+"' title='remove' style='cursor:pointer;color:var(--muted);padding:0 2px;font-size:13px'>✕</span></div>";
   const hookLegend="<div style='font-size:10px;margin-top:3px'><span style='color:var(--ok)'>●</span> Edit&nbsp;&nbsp;<span style='color:var(--accent2)'>●</span> додані</div>";
-  const hookCol=col("Hooks ("+shown.length+")"+hookLegend,shown.map((h,i)=>hookTile(h,i)).join("")+addTile("hook"));
+  const hookCol=col("Hooks ("+shown.length+")"+hookLegend,shown.map((h,i)=>hookTile(h,i)).join("")+addTile("hook"),null,1.5);
   const packName=$("packAsset").value;
-  const bodyInner=bodyParts.map((bp,i)=>pickTile("body",bp,i,bodyParts.length>1)).join("")+addTile("body");
-  const cols=[hookCol,arrow,col(bodyParts.length>1?"Body parts":"Body",bodyInner),arrow,col("Packshot",pickTile("packshot",packName,null,false))];
+  // TIME goes RIGHT: body parts lay out in a row (Body 1 ▸ Body 2 ▸ …), so the board reads as a
+  // timeline. The vertical axis stays what it always was — the list of creatives/variants.
+  const colH=(title,inner,grow)=>"<div style='flex:"+(grow||1)+";min-width:0'><div style='font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px'>"+title+"</div><div style='display:flex;flex-direction:row;align-items:stretch;gap:5px'>"+inner+"</div></div>";
+  const sep="<div style='display:flex;align-items:center;color:var(--muted);font-size:14px;flex:0 0 auto'>▸</div>";
+  const bodyInner=bodyParts.map((bp,i)=>"<div style='flex:1;min-width:0'>"+pickTile("body",bp,i,bodyParts.length>1)+"</div>").join(sep)
+    +sep+"<div style='flex:0 0 46px'>"+addTile("body",true)+"</div>";
+  const nParts=bodyParts.filter(Boolean).length;
+  const cols=[hookCol,arrow,
+    colH(nParts>1?("Body parts · час →"):"Body",bodyInner,Math.max(1,nParts*0.85+0.5)),
+    arrow,col("Packshot",pickTile("packshot",packName,null,false))];
   if(hasFinals){
     const fin=shown.map(h=>{const f=batchFinals[clipKey(h)];
       if(!f)return tile(h.name,h.lang,"<span style='color:var(--muted)'>…</span>");
@@ -3616,7 +3648,8 @@ function renderBatchStage(){
         +"<button class='posterOne' data-file='"+f.file+"' data-t='"+t+"' title='Прев’ю-картинка (PNG)' style='border:0;border-radius:6px;background:rgba(255,255,255,.08);color:var(--txt);cursor:pointer;font-size:13px;padding:3px 7px'>🖼</button></div>";}).join("");
     cols.push(arrow,col("✓ Final videos",fin,"finCol"));
   }
-  let html="<div style='display:flex;gap:8px;align-items:flex-start;justify-content:center;max-width:1000px;margin:0 auto'>"+cols.join("")+"</div>";
+  const boardW=Math.min(1520,1000+Math.max(0,bodyParts.length-1)*175);   // more body parts → wider board, not taller
+  let html="<div style='display:flex;gap:8px;align-items:flex-start;justify-content:center;max-width:"+boardW+"px;margin:0 auto'>"+cols.join("")+"</div>";
   if(musicTracks.length)html+="<div style='margin:16px auto 0;max-width:620px;padding:9px 12px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--accent);font-size:12px;text-align:center;color:var(--muted)'>🎵 "+musicTracks.length+" музичн"+(musicTracks.length>1?"і доріжки":"а доріжка")+" · налаштування в панелі <b>Audio</b> ліворуч</div>";
   const n=shown.length;
   html+="<div style='display:flex;gap:12px;justify-content:center;align-items:center;margin-top:22px'><button id='boardBuild' class='primary' style='padding:15px 44px;font-size:17px;font-weight:700;letter-spacing:.3px'>🎬 Render "+n+" video"+(n>1?"s":"")+"</button>"
