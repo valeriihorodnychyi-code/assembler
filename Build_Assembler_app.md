@@ -1,0 +1,1 @@
+cd "/Users/valerii/WELLTECH/TODAY/Claude/captions_studio" && bash packaging/build_app.sh

@@ -987,10 +987,29 @@ def api_cache_clear():
     return {"removed": n, "freed_mb": round(freed / 1e6, 1), "dir": d}
 
 
+@app.get("/api/clip_info")
+def api_clip_info(file_id: str, clip: str = "source.mp4"):
+    """Real stream params of a session clip — the UI needs the TRUE fps to snap the trim
+    handles to whole frames (a 24 fps source on a 30 fps grid is off by up to a frame)."""
+    sdir = _session_dir(file_id)
+    src = os.path.join(sdir, os.path.basename(clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip '{clip}' not found in session")
+    p = compose._stream_params(src) or (None,) * 8
+    try:
+        dur = ffmpeg_utils.get_video_duration(src) or 0.0
+    except Exception:
+        dur = 0.0
+    return {"width": p[0], "height": p[1], "fps": p[2] or 30.0, "vcodec": p[3],
+            "acodec": p[5], "sample_rate": p[6], "channels": p[7],
+            "duration": round(float(dur), 3)}
+
+
 class NormalizeReq(BaseModel):
     file_id: str
     clip: str = "source.mp4"
     format: str = "9:16"
+    trim: Optional[List[float]] = None    # [in, out] seconds — cut FIRST, then conform
 
 
 @app.post("/api/normalize")
@@ -1010,18 +1029,34 @@ def api_normalize(req: NormalizeReq):
     out_dir = os.path.join(sdir, "output")
     os.makedirs(out_dir, exist_ok=True)
     t0 = _t.time()
+    stem = os.path.splitext(os.path.basename(src))[0]
+    cut = None
+    # Trim FIRST when asked, so "Normalize" delivers the actual body part you cut on the bar
+    # (before this, trim was only applied during the final assemble, and a trimmed body could
+    # not be handed over as a ready clip / library item). The cut file gets a deterministic
+    # name so normalize_clip's content cache still works on repeat runs.
+    if req.trim and len(req.trim) == 2:
+        t_in, t_out = float(req.trim[0]), float(req.trim[1])
+        if t_out - t_in > 0.05:
+            cut = os.path.join(out_dir, f"{stem}_cut_{int(t_in * 1000)}_{int(t_out * 1000)}.mp4")
+            if not (os.path.exists(cut) and os.path.getsize(cut) > 1000):
+                try:
+                    compose.trim_clip(src, t_in, t_out, cut)
+                except Exception as e:
+                    raise HTTPException(500, f"Trim failed: {e}")
+            stem = f"{stem}_cut"
     try:
-        norm = compose.normalize_clip(src, req.format)
+        norm = compose.normalize_clip(cut or src, req.format)
     except Exception as e:
         raise HTTPException(500, f"Normalize failed: {e}")
-    stem = os.path.splitext(os.path.basename(src))[0]
     name = f"{stem}_norm.mp4"
     dst = os.path.join(out_dir, name)
     if os.path.abspath(norm) != os.path.abspath(dst):
         shutil.copyfile(norm, dst)
     el = _t.time() - t0
-    already = (os.path.abspath(norm) == os.path.abspath(src))   # source already matched the target
-    _log_timing("normalize", el, f"clip={os.path.basename(src)} fmt={req.format} already_ok={already}")
+    already = (os.path.abspath(norm) == os.path.abspath(cut or src))   # already matched the target
+    _log_timing("normalize", el,
+                f"clip={os.path.basename(src)} fmt={req.format} already_ok={already} trimmed={bool(cut)}")
     return {"name": name, "url": f"/download/{req.file_id}/{name}",
             "seconds": round(el, 2), "already_conformed": already,
             "size_mb": round(os.path.getsize(dst) / 1e6, 2) if os.path.exists(dst) else 0}
