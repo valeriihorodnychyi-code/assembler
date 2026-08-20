@@ -80,6 +80,17 @@ def _scan_folder(sub, typ, exts=VIDEO_EXT):
     return items
 
 
+def _with_size(it):
+    """Attach the file size (free — no ffprobe). Lets the UI show WHY one language version of a
+    creative comes out heavier: a body that already matches the render params is stream-copied
+    untouched, so its own bitrate carries straight into the final file."""
+    try:
+        it["size_mb"] = round(os.path.getsize(os.path.join(LIBRARY_DIR, it["file"])) / 1e6, 1)
+    except OSError:
+        it["size_mb"] = 0
+    return it
+
+
 def list_items(fmt=None, lang=None, type=None):
     data = _load()
     items = [it for it in data["items"] if os.path.exists(os.path.join(LIBRARY_DIR, it["file"]))]
@@ -98,7 +109,7 @@ def list_items(fmt=None, lang=None, type=None):
         items = [it for it in items if it.get("lang") == lang]
     if type:
         items = [it for it in items if it.get("type") == type]
-    return items
+    return [_with_size(it) for it in items]
 
 
 def add_item(src_path, name, lang, fmt, kind="body"):

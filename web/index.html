@@ -2817,7 +2817,8 @@ function renderLib(){
   if(!libItems.length){list.innerHTML="<div style='color:var(--muted)'>Library is empty.</div>";}
   else{list.innerHTML="";libItems.forEach(it=>{const row=document.createElement("div");
     row.style.cssText="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:3px 0;background:var(--panel2);border-radius:6px";
-    row.innerHTML="<span>"+(it.type==="packshot"?"🏷 ":"🎬 ")+it.name+" · <b>"+(it.lang||"?").toUpperCase()+"</b> · "+it.format+"</span>";
+    row.innerHTML="<span>"+(it.type==="packshot"?"🏷 ":"🎬 ")+it.name+" · <b>"+(it.lang||"?").toUpperCase()+"</b> · "+it.format
+      +(it.size_mb?(" · <span style='color:var(--muted)' title='Розмір файлу. Боді, що вже в наших параметрах, іде в склейку БЕЗ перекоду — тому його вага прямо додається до фінального відео.'>"+it.size_mb+" MB</span>"):"")+"</span>";
     const del=document.createElement("button");del.textContent="✕";del.style.cssText="padding:2px 8px;font-size:11px";
     del.onclick=async()=>{await fetch(API+"/api/library/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:it.id})});loadLibrary();};
     row.appendChild(del);list.appendChild(row);});}
