@@ -3213,6 +3213,9 @@ const LOC_LANGS={
 function TL(ua,en){return (typeof tutLang!=="undefined"&&tutLang==="en")?en:ua;}
 const TARGET_LANGS=["es","fr","de","it","pt"];   // current localization pool
 let locExcluded=new Set();                        // source clips the user toggled off (✕) before localizing
+// The LOC stage is re-rendered on every change (and after a run). Language + provider choices
+// must SURVIVE that — otherwise a failed run looked like "the settings just reset themselves".
+let locSel=new Set(), locProviderSel="elevenlabs";
 function localizedFor(srcClip){
   const stem=(srcClip||"").replace(/\.[^.]+$/,"");
   return hooks.filter(h=>h.src==="loc"&&(h.clip.indexOf("dub_"+stem+"_")===0||(srcClip==="source.mp4"&&/^dub_[a-z]{2}\.mp4$/i.test(h.clip))));
@@ -3237,8 +3240,12 @@ function renderLocStage(){
     +'</div>';
   const LC=$("locLangs");
   TARGET_LANGS.forEach(l=>{const c=LOC_LANGS[l];if(!c)return;
-    const chip=document.createElement("div");chip.className="chip";chip.dataset.l=l;chip.style.cssText="flex:0 0 auto;font-size:14px;padding:9px 15px";chip.textContent=c.flag+" "+l.toUpperCase();
-    chip.onclick=()=>{chip.classList.toggle("on");if(typeof renderLocTitles==="function")renderLocTitles();};LC.appendChild(chip);});
+    const chip=document.createElement("div");chip.className="chip"+(locSel.has(l)?" on":"");chip.dataset.l=l;chip.style.cssText="flex:0 0 auto;font-size:14px;padding:9px 15px";chip.textContent=c.flag+" "+l.toUpperCase();
+    chip.onclick=()=>{chip.classList.toggle("on");
+      if(chip.classList.contains("on"))locSel.add(l);else locSel.delete(l);   // remember across re-renders
+      if(typeof renderLocTitles==="function")renderLocTitles();};LC.appendChild(chip);});
+  if($("locProvider2")){$("locProvider2").value=locProviderSel;
+    $("locProvider2").onchange=()=>{locProviderSel=$("locProvider2").value;};}
   $("locGoBtn").onclick=localizePack;
   if(typeof renderLocTitles==="function")renderLocTitles();   // titles × languages translation grid
   if($("locBackupBtn"))$("locBackupBtn").onclick=downloadLocs;
@@ -3379,31 +3386,41 @@ function downloadLocs(){
   setTimeout(()=>setStatus("Архів локалізацій завантажується ⬇","ok"),800);
 }
 async function localizePack(){
-  const langs=Array.from(document.querySelectorAll('#locLangs .chip.on')).map(c=>c.dataset.l);
+  let langs=Array.from(document.querySelectorAll('#locLangs .chip.on')).map(c=>c.dataset.l);
+  if(!langs.length&&locSel.size)langs=Array.from(locSel);   // stage may have re-rendered
   if(!langs.length){setStatus("Обери хоч одну мову.","err");return;}
+  locSel=new Set(langs);
   const srcs=locSources().filter(s=>!locExcluded.has(s.clip));
   if(!srcs.length){setStatus("Немає хуків для локалізації (усі виключені або порожньо).","err");return;}
   if(!fileId){setStatus("Немає сесії — спершу зроби хуки в EDIT.","err");return;}
-  const provider=$("locProvider2")?$("locProvider2").value:"elevenlabs";
+  const provider=($("locProvider2")&&$("locProvider2").value)||locProviderSel||"elevenlabs";
+  locProviderSel=provider;
   // make sure the ORIGINALS are on the board too (so EN versions assemble alongside the localized ones)
   srcs.forEach(s=>{if(!hooks.some(h=>h.clip===s.clip))hooks.push({name:s.clip,clip:s.clip,lang:s.lang||"en",words:s.words,style:s.style,ctrl:s.ctrl,src:"edit"});});
   busyStart("Локалізація: "+srcs.length+"×"+langs.length+"…");startQuiz(langs);let added=0;
+  const failed=[];   // per-language failures come back with HTTP 200 in `errors` — they used to be swallowed
   for(const s of srcs){
     try{
       const r=await fetch(API+"/api/dub",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({file_id:fileId,clip:s.clip,target_langs:langs,provider:provider,model_size:$("modelSize").value})});
       const d=await r.json();if(!r.ok)throw new Error(d.detail||"dub failed");
+      const errs=d.errors||{};
+      Object.keys(errs).forEach(k=>failed.push((s.name||s.clip)+" · "+String(k).toUpperCase()+": "+errs[k]));
       (d.results||[]).forEach(res=>{if(hooks.some(h=>h.clip===res.clip))return;
         const hook={name:res.clip,clip:res.clip,lang:res.lang,words:res.words,src:"loc",
                     videoUrl:API+"/clip/"+fileId+"/"+res.clip};
         if(s.style)hook.style=s.style;            // localized inherits the original's caption style
         if(s.ctrl)hook.ctrl=JSON.parse(JSON.stringify(s.ctrl));  // own controls copy for thumbnail + ✎ edit
         hooks.push(hook);added++;});
-    }catch(e){setStatus("Лок "+(s.name||s.clip)+": "+e.message,"err");}
+    }catch(e){failed.push((s.name||s.clip)+": "+e.message);}
   }
-  stopQuiz();renderHookTiles();renderLocStage();
-  if(added){if(typeof chime==="function")chime("localize");busyDone(added+" локалізованих хуків");setStatus(added+" локалізованих хуків → на дошці Assemble.","ok");}
-  else busyStop();
+  stopQuiz();renderHookTiles();renderLocStage();   // language + provider choices survive this now
+  if(added){if(typeof chime==="function")chime("localize");busyDone(added+" локалізованих хуків");
+    setStatus(added+" локалізованих хуків → на дошці Assemble."+(failed.length?(" ⚠ "+failed.length+" не вдалось: "+failed[0]):""),failed.length?"err":"ok");}
+  else{busyStop();
+    // never fail silently: without this, a provider error looked like "nothing happened"
+    setStatus(failed.length?("Локалізація не вдалась — "+failed.join(" | ")):"Локалізація нічого не повернула (перевір ключ провайдера в ⚙ Settings).","err");}
+  if(failed.length)console.warn("[loc] failures:",failed);
 }
 function renderLocResults(){
   const box=$("locResults");if(!box)return;

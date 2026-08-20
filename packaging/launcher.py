@@ -154,6 +154,12 @@ def library_dir():
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, encoding="utf-8") as f:
                 ld = json.load(f).get("library_dir")
+                # A drive.google.com LINK is not a folder. Accepting one used to kill the app:
+                # makedirs() then tried to create that path relative to the launch cwd ("/"),
+                # raised, and main() died before the server ever started.
+                if ld and "://" in str(ld):
+                    log(f"library: config holds a URL, ignoring it -> {ld}")
+                    ld = None
                 if ld:
                     log(f"library: from config -> {ld}")
                     return os.path.expanduser(ld)
@@ -223,9 +229,20 @@ def main():
     inject_ffmpeg_path()
     preconfig_keys()
 
-    os.environ["CS_LIBRARY_DIR"] = library_dir()
-    os.makedirs(os.environ["CS_LIBRARY_DIR"], exist_ok=True)
-    log(f"library: {os.environ['CS_LIBRARY_DIR']}")
+    # NEVER let the library folder stop the app from starting: a bad path (or a read-only
+    # location) must degrade to the local fallback, not raise out of main().
+    _lib = library_dir()
+    try:
+        os.makedirs(_lib, exist_ok=True)
+    except Exception as e:
+        log(f"library folder unusable ({type(e).__name__}: {e}) — falling back to {DEFAULT_LIBRARY}")
+        _lib = DEFAULT_LIBRARY
+        try:
+            os.makedirs(_lib, exist_ok=True)
+        except Exception as e2:
+            log(f"fallback library folder failed too ({e2}) — continuing without one")
+    os.environ["CS_LIBRARY_DIR"] = _lib
+    log(f"library: {_lib}")
 
     # Make the updater importable (it sits next to this file in the bundle).
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

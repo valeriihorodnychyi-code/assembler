@@ -163,6 +163,8 @@ def _apply_caption_rules_path():
 # Library lives in a configurable folder (point CS_LIBRARY_DIR / config.json
 # "library_dir" at a shared Drive/Dropbox folder to share it across the team).
 os.environ.setdefault("CS_LIBRARY_DIR", os.path.join(ROOT, "library"))
+if "://" in os.environ.get("CS_LIBRARY_DIR", ""):   # a web link can never be a library folder
+    os.environ["CS_LIBRARY_DIR"] = os.path.join(ROOT, "library")
 library.LIBRARY_DIR = os.environ["CS_LIBRARY_DIR"]
 
 import json as _json
