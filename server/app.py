@@ -179,8 +179,11 @@ if os.path.exists(_PCFG):
             os.environ.setdefault("ELEVENLABS_API_KEY", _pc["elevenlabs_api_key"])
         if _pc.get("heygen_api_key"):
             os.environ.setdefault("HEYGEN_API_KEY", _pc["heygen_api_key"])
-        if _pc.get("library_dir"):   # persist the chosen library folder across restarts (dev mode)
-            os.environ["CS_LIBRARY_DIR"] = os.path.expanduser(_pc["library_dir"])
+        # persist the chosen library folder across restarts — but ignore a stored web link
+        # (an older build accepted URLs and pointed the whole library at a bogus folder)
+        _lib = (_pc.get("library_dir") or "").strip()
+        if _lib and "://" not in _lib:
+            os.environ["CS_LIBRARY_DIR"] = os.path.expanduser(_lib)
             library.LIBRARY_DIR = os.environ["CS_LIBRARY_DIR"]
     except Exception:
         pass
@@ -255,7 +258,7 @@ if os.path.exists(_CFG):
             os.environ["ELEVENLABS_API_KEY"] = _cfg["elevenlabs_api_key"]
         if _cfg.get("heygen_api_key") and not os.environ.get("HEYGEN_API_KEY"):
             os.environ["HEYGEN_API_KEY"] = _cfg["heygen_api_key"]
-        if _cfg.get("library_dir") and not os.environ.get("CS_LIBRARY_DIR"):
+        if _cfg.get("library_dir") and "://" not in _cfg["library_dir"] and not os.environ.get("CS_LIBRARY_DIR"):
             os.environ["CS_LIBRARY_DIR"] = os.path.expanduser(_cfg["library_dir"])
     except Exception:
         pass
@@ -405,12 +408,60 @@ def info():
     }
 
 
+def _looks_like_url(p):
+    import re as _re
+    return bool(_re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", (p or "").strip()))
+
+
+def valid_lib_dir(p):
+    """A usable library folder = a real LOCAL directory. A drive.google.com link is not one."""
+    p = (p or "").strip()
+    return bool(p) and not _looks_like_url(p) and os.path.isdir(os.path.expanduser(p))
+
+
+@app.get("/api/drive_roots")
+def drive_roots():
+    """Candidate LOCAL paths of synced cloud folders on this Mac, so the user can pick one
+    instead of pasting a web link (Google Drive for desktop mounts under ~/Library/CloudStorage)."""
+    home = os.path.expanduser("~")
+    out, seen = [], set()
+
+    def add(p):
+        if os.path.isdir(p) and p not in seen:
+            seen.add(p)
+            out.append(p)
+    cs = os.path.join(home, "Library", "CloudStorage")
+    if os.path.isdir(cs):
+        for e in sorted(os.listdir(cs)):
+            p = os.path.join(cs, e)
+            add(p)
+            for sub in ("My Drive", "Мій диск", "Shared drives", "Спільні диски"):
+                add(os.path.join(p, sub))
+    for e in sorted(os.listdir(home)) if os.path.isdir(home) else []:
+        low = e.lower()
+        if low.startswith("google drive") or low.startswith("dropbox"):
+            add(os.path.join(home, e))
+    return {"roots": out[:40], "current": os.environ.get("CS_LIBRARY_DIR", "")}
+
+
 def save_library_dir(path):
     """Persist the shared library folder to the per-machine config and apply it live."""
-    path = os.path.expanduser((path or "").strip())
+    path = os.path.expanduser((path or "").strip().strip('"').strip("'"))
     if not path:
         return
-    os.makedirs(path, exist_ok=True)
+    # A web link (https://drive.google.com/…) can't be read by ffmpeg or Python. It used to be
+    # accepted and os.makedirs() then CREATED a folder literally named after the URL — the
+    # library looked "✓ set" and was permanently empty. Refuse it with a usable hint instead.
+    if _looks_like_url(path):
+        raise HTTPException(400,
+                            "Це веб-посилання, а не папка на цьому Mac. Відкрий папку в Finder "
+                            "(Google Drive), правий клік → «Copy as Pathname» (⌥⌘C) і вставь ШЛЯХ, "
+                            "напр. /Users/…/Library/CloudStorage/GoogleDrive-…/My Drive/Assembler_Library")
+    if not os.path.isdir(path):
+        parent = os.path.dirname(path.rstrip(os.sep))
+        if not (parent and os.path.isdir(parent)):
+            raise HTTPException(400, f"Папки не існує і батьківської теки теж немає: {path}")
+        os.makedirs(path, exist_ok=True)   # only one new level, inside a folder that really exists
     os.environ["CS_LIBRARY_DIR"] = path
     library.LIBRARY_DIR = path
     _apply_styles_dirs()   # styles follow the shared library folder (or fall back locally)

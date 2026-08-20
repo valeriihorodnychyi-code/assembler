@@ -726,6 +726,8 @@
     <input type="password" id="keyHeygen" placeholder="sk_…  (порожнє = лишити поточний)">
     <div class="mlbl">Shared library folder (Google Drive)</div>
     <input type="text" id="libDir" placeholder="/Users/…/Assembler Library  (порожнє = лишити поточний)">
+    <div class="hint" style="margin-top:5px">Це <b>шлях до синхронізованої папки на цьому Mac</b>, не посилання drive.google.com. У Finder: правий клік на папці → ⌥⌘C («Copy as Pathname»). Або тицьни варіант нижче:</div>
+    <div id="libRoots" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px"></div>
     <div class="hint" id="libStatus" style="margin-top:6px"></div>
     <div class="hint" id="keysStatus" style="margin-top:9px"></div>
     <div class="mlbl" style="margin-top:14px">Render speed test</div>
@@ -840,8 +842,30 @@ async function loadSettings(){
     $("machineId").textContent=d.machine_id;$("lockMid").textContent=d.machine_id;
     $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set");
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
-      $("libStatus").innerHTML="Current: <b>"+(d.library_dir||"—")+"</b> "+(d.library_exists?"✓":"⚠ folder not found");}
+      $("libStatus").innerHTML=libStatusHTML(d.library_dir,d.library_exists);}
     if(d.allowed===false)$("lockScreen").classList.add("show");
+    loadDriveRoots();
+  }catch(e){}
+}
+// A web link in this field used to be accepted (and a folder literally named after the URL got
+// created) — the library then looked "set" and was forever empty. Call it out loudly.
+function libStatusHTML(dir,exists){
+  const isUrl=/^[a-z]+:\/\//i.test(String(dir||""));
+  if(isUrl)return "<span style='color:var(--accent);font-weight:600'>⚠ Тут веб-посилання, а не папка на цьому Mac — бібліотека тому порожня.</span>"
+    +"<br>Вставь локальний шлях (⌥⌘C у Finder) і збережи.<br><span style='opacity:.7'>Зараз: "+dir+"</span>";
+  return "Current: <b>"+(dir||"—")+"</b> "+(exists?"✓":"⚠ folder not found");
+}
+// Detected local paths of synced cloud folders → one click instead of typing a path
+async function loadDriveRoots(){
+  const box=$("libRoots");if(!box)return;box.innerHTML="";
+  try{const d=await(await fetch(API+"/api/drive_roots")).json();
+    (d.roots||[]).forEach(p=>{
+      const b=document.createElement("button");
+      b.textContent="📁 "+p.replace(/^.*\/CloudStorage\//,"").replace(/^.*\/Users\/[^/]+\//,"~/");
+      b.title=p;b.style.cssText="font-size:11px;padding:4px 8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+      b.onclick=()=>{$("libDir").value=p+"/Assembler_Library";$("libDir").focus();};
+      box.appendChild(b);});
+    if(!(d.roots||[]).length)box.innerHTML="<span class='hint'>Синхронізованих папок не знайдено — вставь шлях руками.</span>";
   }catch(e){}
 }
 $("settingsBtn").onclick=()=>{$("settingsModal").classList.add("show");loadSettings();refreshCacheInfo();refreshStats();};
@@ -918,12 +942,17 @@ $("settingsClose").onclick=()=>$("settingsModal").classList.remove("show");
 $("settingsModal").onclick=e=>{if(e.target===$("settingsModal"))$("settingsModal").classList.remove("show");};
 $("copyMid").onclick=()=>{try{navigator.clipboard.writeText($("machineId").textContent);setStatus("Machine ID copied.","ok");}catch(e){}};
 $("settingsSave").onclick=async()=>{
+  const _ld=$("libDir")?$("libDir").value.trim():"";
+  if(/^[a-z]+:\/\//i.test(_ld)){   // stop the URL before it ever reaches the server
+    setStatus("Це веб-посилання. Потрібен ШЛЯХ до синхронізованої папки на цьому Mac: у Finder правий клік на папці → ⌥⌘C.","err");return;}
   try{const r=await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({elevenlabs_api_key:$("keyEleven").value,heygen_api_key:$("keyHeygen").value,library_dir:($("libDir")?$("libDir").value:"")})});
-    const d=await r.json();$("keyEleven").value="";$("keyHeygen").value="";
+      body:JSON.stringify({elevenlabs_api_key:$("keyEleven").value,heygen_api_key:$("keyHeygen").value,library_dir:_ld})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||"failed");
+    $("keyEleven").value="";$("keyHeygen").value="";
     $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set");
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
-      $("libStatus").innerHTML="Current: <b>"+(d.library_dir||"—")+"</b> "+(d.library_exists?"✓":"⚠ folder not found");}
+      $("libStatus").innerHTML=libStatusHTML(d.library_dir,d.library_exists);}
     if(typeof loadLibrary==="function")loadLibrary();
     setStatus("Settings saved on this Mac.","ok");
   }catch(e){setStatus("Save failed: "+e.message,"err");}
