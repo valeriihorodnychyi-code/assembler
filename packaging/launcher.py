@@ -189,20 +189,51 @@ def prefetch_whisper():
         log(f"model prefetch deferred ({type(e).__name__}: {e}) — will retry next launch")
 
 
+def _server_alive(port=None):
+    """Is a server actually listening? Used to tell a REAL running instance from a
+    stale lock left behind by a crashed one."""
+    import socket
+    port = int(port or os.environ.get("CS_PORT", "8765"))
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.7):
+            return True
+    except OSError:
+        return False
+
+
 def acquire_single_instance():
-    """Hard cap: only ONE Assembler may run. If the lock is already held (another
-    instance, or a stray relaunch), we don't start a second server — we just open
-    the browser to the existing one and exit. This makes a relaunch-storm impossible.
+    """Hard cap: only ONE Assembler may run. If the lock is already held we normally
+    just open the browser to the existing instance and exit — that makes a relaunch
+    storm impossible.
+
+    BUT a crashed instance could leave the lock held by a zombie process, and then every
+    future launch exited silently: no window, no error, nothing. So if the lock is busy
+    and NOTHING is listening on the port, treat the lock as stale and take it over.
     """
     global _LOCK_FH
     import fcntl
-    try:
-        os.makedirs(ASSEMBLER_HOME, exist_ok=True)
-        _LOCK_FH = open(os.path.join(ASSEMBLER_HOME, "app.lock"), "w")
-        fcntl.flock(_LOCK_FH, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return True
-    except OSError:
-        return False
+    lock_path = os.path.join(ASSEMBLER_HOME, "app.lock")
+    for attempt in (1, 2):
+        try:
+            os.makedirs(ASSEMBLER_HOME, exist_ok=True)
+            _LOCK_FH = open(lock_path, "w")
+            fcntl.flock(_LOCK_FH, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except OSError:
+            if attempt == 2:
+                return False
+            if _server_alive():
+                return False        # a real instance is up → hand over to it
+            log("lock is held but nothing answers on the port — stale lock, taking over")
+            try:
+                _LOCK_FH.close()
+            except Exception:
+                pass
+            try:
+                os.remove(lock_path)
+            except OSError:
+                return False
+    return False
 
 
 def run_server(code_home):
@@ -217,13 +248,20 @@ def run_server(code_home):
 def main():
     _setup_logging()
     if not acquire_single_instance():
-        log("another Assembler instance is already running — opening browser and exiting")
+        log("another Assembler instance is already running — bringing it to the front")
+        port = int(os.environ.get("CS_PORT", "8765"))
+        url = f"http://127.0.0.1:{port}"
+        # `open` ACTIVATES the browser (raises the window); webbrowser.open often just loads a
+        # tab in the background, which looked exactly like "the app doesn't react at all".
         try:
-            import webbrowser
-            port = int(os.environ.get("CS_PORT", "8765"))
-            webbrowser.open(f"http://127.0.0.1:{port}")
+            import subprocess
+            subprocess.run(["open", url], capture_output=True, timeout=10)
         except Exception:
-            pass
+            try:
+                import webbrowser
+                webbrowser.open(url)
+            except Exception:
+                pass
         return
     log(f"resources: {RES}")
     inject_ffmpeg_path()
@@ -268,10 +306,31 @@ def main():
             raise
 
 
+def _fatal_dialog(msg):
+    """Never die silently. Without this, any launch failure looked like 'the app just
+    doesn't open' — no window, no error, nothing to report."""
+    try:
+        import subprocess
+        text = (msg or "")[:400].replace('"', "'").replace("\n", " ")
+        subprocess.run(["osascript", "-e",
+                        f'display dialog "Assembler не змiг запуститись.\n\n{text}\n\n'
+                        f'Деталi: ~/.assembler/launch.log" with title "Assembler" buttons {{"OK"}} '
+                        f'default button "OK" with icon caution'],
+                       capture_output=True, timeout=30)
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
     # Must be the very first thing: in a frozen app, multiprocessing 'spawn'
     # re-execs this binary. freeze_support() makes those children behave as
     # workers instead of re-running main() (which would relaunch the whole app).
     import multiprocessing
     multiprocessing.freeze_support()
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        log("FATAL: " + traceback.format_exc())
+        _fatal_dialog(f"{type(e).__name__}: {e}")
+        raise
