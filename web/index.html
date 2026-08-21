@@ -2807,14 +2807,18 @@ function loadVariant(key){
 }
 
 // ---------- library + assemble ----------
-let libItems=[];
+let libItems=[], libDirOk=true, libDirPath="";
 async function loadLibrary(){
-  try{const r=await fetch(API+"/api/library");const d=await r.json();libItems=d.items||[];renderLib();if(typeof populateMusicLib==="function")populateMusicLib();}
+  try{const r=await fetch(API+"/api/library");const d=await r.json();libItems=d.items||[];libDirOk=(d.dir_ok!==false);libDirPath=d.dir||"";
+    renderLib();if(typeof populateMusicLib==="function")populateMusicLib();
+    if(!libDirOk)setStatus("Папка бібліотеки недоступна ("+libDirPath+") — Google Drive не змонтований або папку перейменували. Бібліотека тимчасово порожня.","err");}
   catch(e){/* backend offline */}
 }
 function renderLib(){
   const list=$("libList");
-  if(!libItems.length){list.innerHTML="<div style='color:var(--muted)'>Library is empty.</div>";}
+  if(!libDirOk){list.innerHTML="<div style='color:var(--accent);font-weight:600'>⚠ Папка бібліотеки недоступна</div>"
+    +"<div style='color:var(--muted);font-size:11.5px;margin-top:4px'>"+(libDirPath||"—")+"<br>Перевір, чи запущений Google Drive і чи видно цю папку у Finder. Ассемблер працює далі — просто без бібліотеки.</div>";}
+  else if(!libItems.length){list.innerHTML="<div style='color:var(--muted)'>Library is empty.</div>";}
   else{list.innerHTML="";libItems.forEach(it=>{const row=document.createElement("div");
     row.style.cssText="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:3px 0;background:var(--panel2);border-radius:6px";
     row.innerHTML="<span>"+(it.type==="packshot"?"🏷 ":"🎬 ")+it.name+" · <b>"+(it.lang||"?").toUpperCase()+"</b> · "+it.format

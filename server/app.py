@@ -1240,8 +1240,9 @@ def api_dub(req: DubReq):
 # ----- Library (reusable body parts) -----
 @app.get("/api/library")
 def api_library(format: str = "", lang: str = ""):
+    ok = library.dir_ok()
     return {"items": library.list_items(fmt=format or None, lang=lang or None),
-            "dir": library.LIBRARY_DIR}
+            "dir": library.LIBRARY_DIR, "dir_ok": ok}
 
 
 class AddLibraryReq(BaseModel):

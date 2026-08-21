@@ -18,8 +18,16 @@ AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac")
 
 
 def _derive_lang(filename):
-    """Pull a language tag from a name_LANG.ext filename (the naming convention)."""
+    """Pull a language tag from the filename.
+
+    Two conventions are understood:
+      our own : name_LANG.ext                    (serum_body_es.mp4)
+      ADAM    : Kind_id_LANG_(n)Sub_WxH.ext      (Body_12_EN_Sub_1080x1080.mp4)
+    """
     import re
+    m = re.search(r"_([a-zA-Z]{2})_n?Sub_", filename, re.IGNORECASE)   # ADAM parts
+    if m:
+        return m.group(1).lower()
     m = re.search(r"_([a-zA-Z]{2})\.[^.]+$", filename)
     if m:
         return m.group(1).lower()
@@ -28,17 +36,77 @@ def _derive_lang(filename):
     return ""
 
 
-def _derive_format(path):
-    """Guess aspect-ratio bucket from a video file (for files dropped in directly)."""
+def _bucket(w, h):
+    if not w or not h:
+        return ""
+    return "16:9" if w > h else ("1:1" if w == h else "9:16")
+
+
+# Probe results are cached LOCALLY (never in the shared folder): probing every loose file on
+# every library listing meant one ffprobe subprocess per file, and on a Google Drive stream
+# mount each of those pulls data over the network — that's what made the app crawl when Drive
+# was slow or offline.
+_PROBE_CACHE = None
+_PROBE_DIRTY = False
+
+
+def _probe_cache_path():
+    return os.path.join(os.path.expanduser("~"), ".assembler", "library_probe.json")
+
+
+def _probe_cache():
+    global _PROBE_CACHE
+    if _PROBE_CACHE is None:
+        try:
+            with open(_probe_cache_path(), encoding="utf-8") as f:
+                _PROBE_CACHE = json.load(f)
+        except Exception:
+            _PROBE_CACHE = {}
+    return _PROBE_CACHE
+
+
+def flush_probe_cache():
+    global _PROBE_DIRTY
+    if not _PROBE_DIRTY:
+        return
+    try:
+        p = _probe_cache_path()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(_PROBE_CACHE or {}, f)
+        _PROBE_DIRTY = False
+    except Exception:
+        pass
+
+
+def _derive_format(path, stat=None):
+    """Aspect-ratio bucket for a file. Order matters — cheapest first:
+       1) the size baked into the NAME (…_1080x1920.mp4 — ADAM assets and our exports have it)
+       2) a cached probe (keyed by size+mtime)
+       3) ffprobe, then cache it
+    """
+    global _PROBE_DIRTY
+    import re
+    m = re.search(r"(\d{3,4})\s*[xX]\s*(\d{3,4})", os.path.basename(path))
+    if m:
+        return _bucket(int(m.group(1)), int(m.group(2)))
+    try:
+        stt = stat or os.stat(path)
+        key = os.path.abspath(path)
+        sig = f"{stt.st_size}|{int(stt.st_mtime)}"
+        hit = _probe_cache().get(key)
+        if hit and hit.get("sig") == sig:
+            return hit.get("format", "")
+    except OSError:
+        return ""
     try:
         w, h = ff.get_video_size(path)
-        if w > h:
-            return "16:9"
-        if w == h:
-            return "1:1"
-        return "9:16"
+        fmt = _bucket(w, h)
     except Exception:
-        return ""
+        fmt = ""
+    _probe_cache()[key] = {"sig": sig, "format": fmt}
+    _PROBE_DIRTY = True
+    return fmt
 
 
 def _manifest_path():
@@ -46,8 +114,8 @@ def _manifest_path():
 
 
 def _load():
-    os.makedirs(LIBRARY_DIR, exist_ok=True)
-    p = _manifest_path()
+    p = _manifest_path()   # read-only: never create the folder here (a missing Drive mount
+                           # would get a local shadow folder that Drive then fights over)
     if os.path.exists(p):
         try:
             with open(p, encoding="utf-8") as f:
@@ -71,12 +139,23 @@ def _scan_folder(sub, typ, exts=VIDEO_EXT):
     items = []
     d = os.path.join(LIBRARY_DIR, sub) if sub else LIBRARY_DIR
     if os.path.isdir(d):
-        for f in sorted(os.listdir(d)):
-            if f.lower().endswith(exts):
-                rel = (sub + "/" + f) if sub else f
-                items.append({"id": rel, "name": os.path.splitext(f)[0], "lang": _derive_lang(f),
-                              "format": _derive_format(os.path.join(d, f)),
-                              "file": rel, "type": typ, "added": "(in folder)"})
+        try:
+            entries = sorted(os.scandir(d), key=lambda e: e.name)   # one syscall for name+stat
+        except OSError:
+            return items
+        for e in entries:
+            f = e.name
+            if not f.lower().endswith(exts):
+                continue
+            try:
+                stt = e.stat()
+            except OSError:
+                stt = None
+            rel = (sub + "/" + f) if sub else f
+            items.append({"id": rel, "name": os.path.splitext(f)[0], "lang": _derive_lang(f),
+                          "format": _derive_format(os.path.join(d, f), stat=stt),
+                          "size_mb": round((stt.st_size / 1e6), 1) if stt else 0,
+                          "file": rel, "type": typ, "added": "(in folder)"})
     return items
 
 
@@ -84,6 +163,8 @@ def _with_size(it):
     """Attach the file size (free — no ffprobe). Lets the UI show WHY one language version of a
     creative comes out heavier: a body that already matches the render params is stream-copied
     untouched, so its own bitrate carries straight into the final file."""
+    if it.get("size_mb"):
+        return it
     try:
         it["size_mb"] = round(os.path.getsize(os.path.join(LIBRARY_DIR, it["file"])) / 1e6, 1)
     except OSError:
@@ -91,7 +172,18 @@ def _with_size(it):
     return it
 
 
+def dir_ok():
+    """Is the library folder actually reachable right now? (Google Drive not mounted / signed
+    out / renamed folder → False, and the app must say so instead of showing an empty list.)"""
+    try:
+        return os.path.isdir(LIBRARY_DIR)
+    except OSError:
+        return False
+
+
 def list_items(fmt=None, lang=None, type=None):
+    if not dir_ok():
+        return []          # folder gone → return fast, don't stat/probe anything
     data = _load()
     items = [it for it in data["items"] if os.path.exists(os.path.join(LIBRARY_DIR, it["file"]))]
     for it in items:
@@ -109,7 +201,9 @@ def list_items(fmt=None, lang=None, type=None):
         items = [it for it in items if it.get("lang") == lang]
     if type:
         items = [it for it in items if it.get("type") == type]
-    return [_with_size(it) for it in items]
+    out = [_with_size(it) for it in items]
+    flush_probe_cache()   # persist any new probes so the next listing is instant
+    return out
 
 
 def add_item(src_path, name, lang, fmt, kind="body"):
