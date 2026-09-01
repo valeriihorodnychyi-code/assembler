@@ -530,8 +530,15 @@ def render_headline_png(text, filename, width, height, font_path, cfg):
 
 
 def render_subtitle_png(event, filename, width, height, font_path, style_cfg, scale_factor=1.0,
-                        draw_scrim=True, scrim_only=False):
-    """Render a single karaoke event to a transparent PNG (pixel-faithful to preview)."""
+                        draw_scrim=True, scrim_only=False, word_filter=None, text_only=False):
+    """Render a single karaoke event to a transparent PNG (pixel-faithful to preview).
+
+    `word_filter(idx, is_active) -> bool` picks WHICH words are drawn (positions are always
+    computed from the full caption, so the layout never shifts). `text_only=True` skips the
+    scrim / plate / word-plate and draws just the glyphs. Together they let the animated
+    render split one caption into "everything except the new word" + "the new word alone",
+    which is what makes Pop / Rise possible without re-implementing the whole layout.
+    """
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     final_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -576,7 +583,7 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     # faded overlay layer, so text PNGs pass draw_scrim=False; scrim_only=True renders just
     # the band (for that shared overlay). Legacy/exact single-frame calls keep draw_scrim=True.
     scrim = style_cfg.get("scrim", {})
-    if (scrim.get("enabled", False) and draw_scrim) or scrim_only:
+    if ((scrim.get("enabled", False) and draw_scrim) or scrim_only) and not text_only:
         sc_pad = int(int(scrim.get("pad", 40)) * scale_factor)
         sc_feather = max(1, int(int(scrim.get("feather", 70)) * scale_factor))
         sc_color = tuple(scrim.get("color", [0, 0, 0, 150]))
@@ -597,8 +604,13 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     for i, line in enumerate(lines):
         current_x = cx - (line_widths[i] / 2)
         for w in line:
-            if not (typewriter and word_counter > active_idx):
-                word_positions.append((current_x, current_y, w["text"], word_counter == active_idx))
+            _is_act = (word_counter == active_idx)
+            if word_filter is not None:
+                _keep = bool(word_filter(word_counter, _is_act))
+            else:
+                _keep = not (typewriter and word_counter > active_idx)
+            if _keep:
+                word_positions.append((current_x, current_y, w["text"], _is_act))
             current_x += font.getlength(w["text"]) + space_width
             word_counter += 1
         current_y += line_height + line_spacing
@@ -635,7 +647,7 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         lay.paste(_linear_gradient(width, height, g_colors[0], g_colors[1], g_dir), (0, 0), mask)
         return lay
 
-    if plate_on:
+    if plate_on and not text_only:
         plate = style_cfg["plate"]
         pad_x = int(int(plate.get("pad_x", 30)) * scale_factor)
         pad_y = int(int(plate.get("pad_y", 15)) * scale_factor)
@@ -687,7 +699,7 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
             final_img.alpha_composite(plate_img)
 
     kp = style_cfg.get("karaoke_plate", {})
-    if kp.get("enabled", False):
+    if kp.get("enabled", False) and not text_only:
         kp_c = tuple(kp.get("color", [255, 128, 0, 255]))
         kp_px = int(int(kp.get("pad_x", 15)) * scale_factor)
         kp_py = int(int(kp.get("pad_y", 5)) * scale_factor)
@@ -772,6 +784,62 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         text_img.alpha_composite(_grad_layer(gmask))
     final_img.alpha_composite(text_img)
     final_img.save(filename)
+
+
+def _ease_out_cubic(x):
+    return 1 - (1 - x) ** 3
+
+
+def _ease_out_back(x):
+    c1 = 1.70158
+    c3 = c1 + 1
+    return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2
+
+
+def anim_word_state(kind, prog, scale_factor=1.0):
+    """(alpha, scale, dy) for an animating word — the SAME curves the live preview uses,
+    so what you watch is what gets rendered. Mirrors animAt() in web/index.html."""
+    p = max(0.0, min(1.0, float(prog)))
+    if kind == "rise":
+        return p, 1.0, (1 - _ease_out_cubic(p)) * 22.0 * scale_factor
+    if kind == "pop":
+        return p, 0.55 + 0.45 * _ease_out_back(p), 0.0
+    return 1.0, 1.0, 0.0
+
+
+def compose_anim_frame(base_png, word_png, out_png, kind="pop", prog=1.0, scale_factor=1.0):
+    """One animation frame: the settled part of the caption + the new word transformed.
+
+    `base_png` is the caption WITHOUT the new word (plate, scrim and already-spoken words),
+    `word_png` is that one word alone on a transparent frame. The word is scaled around its
+    own centre / offset vertically and faded, then composited back — so the plate never moves.
+    """
+    base = Image.open(base_png).convert("RGBA")
+    layer = Image.open(word_png).convert("RGBA")
+    a, sc, dy = anim_word_state(kind, prog, scale_factor)
+    box = layer.getbbox()
+    if box is None or a <= 0:
+        base.save(out_png)
+        return out_png
+    if abs(sc - 1.0) > 0.002:
+        crop = layer.crop(box)
+        cw, ch = crop.size
+        nw, nh = max(1, int(round(cw * sc))), max(1, int(round(ch * sc)))
+        crop = crop.resize((nw, nh), Image.LANCZOS)
+        cx = (box[0] + box[2]) / 2.0
+        cy = (box[1] + box[3]) / 2.0
+        moved = Image.new("RGBA", layer.size, (0, 0, 0, 0))
+        moved.paste(crop, (int(round(cx - nw / 2)), int(round(cy - nh / 2 + dy))), crop)
+        layer = moved
+    elif abs(dy) > 0.5:
+        moved = Image.new("RGBA", layer.size, (0, 0, 0, 0))
+        moved.paste(layer, (0, int(round(dy))), layer)
+        layer = moved
+    if a < 1.0:
+        layer.putalpha(layer.getchannel("A").point(lambda v, _a=a: int(v * _a)))
+    base.alpha_composite(layer)
+    base.save(out_png)
+    return out_png
 
 
 def generate_shadow_asset(video_w, video_h, target_w, target_h, filename):

@@ -14,6 +14,7 @@ from PIL import Image
 from . import ffmpeg_utils as ff
 from . import styles as st
 from .subtitles import build_events, render_subtitle_png, generate_shadow_asset, render_headline_png
+from . import subtitles as subtitles_mod   # compose_anim_frame (Pop / Rise in the render)
 
 
 def _region_for(t, regions):
@@ -183,6 +184,45 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
                     f.write(f"duration {event['start'] - current:.3f}\n")
                 png = f"sub_{i}.png"
                 font = st.resolve_font(style.get("font_name"))
+                _an = style.get("animation") or {}
+                _atype = _an.get("type")
+                _ev_len = float(event["end"]) - float(event["start"])
+                # Pop / Rise: the caption track is a concat of PNGs, so an animation is just a
+                # few EXTRA short PNGs at the start of the event — the new word scaled/offset
+                # step by step (same easing as the preview), then the settled caption for the
+                # rest. One 0.25s animation at 30fps is ~7 frames, so it stays cheap.
+                if _atype in ("pop", "rise") and _ev_len > 0.04:
+                    _d = min(max(0.05, float(_an.get("speed", 0.25) or 0.25)), _ev_len)
+                    _steps = max(1, min(9, int(round(_d * 30))))
+                    _step_d = _d / _steps
+                    # Parity with the preview: words already spoken are settled, the new word
+                    # animates, and words NOT yet spoken are invisible (their own progress is 0).
+                    _ai = int(event.get("active_word_index", 0) or 0)
+                    _base = os.path.join(sub_dir, f"sub_{i}_base.png")
+                    render_subtitle_png(event, _base, TARGET_W, TARGET_H, font, style, scale,
+                                        draw_scrim=not use_scrim,
+                                        word_filter=lambda idx, act, _a=_ai: idx < _a)   # settled words only
+                    _wp = os.path.join(sub_dir, f"sub_{i}_w.png")
+                    render_subtitle_png(event, _wp, TARGET_W, TARGET_H, font, style, scale,
+                                        draw_scrim=False, text_only=True,
+                                        word_filter=lambda idx, act: act)       # the new word alone
+                    for _k in range(_steps):
+                        _fr = f"sub_{i}_{_k}.png"
+                        subtitles_mod.compose_anim_frame(_base, _wp, os.path.join(sub_dir, _fr),
+                                                         kind=_atype, prog=(_k + 1) / _steps,
+                                                         scale_factor=scale)
+                        f.write(f"file '{_fr}'\n")
+                        f.write(f"duration {_step_d:.3f}\n")
+                    _rest = _ev_len - _d
+                    if _rest > 0.02:
+                        render_subtitle_png(event, os.path.join(sub_dir, png),
+                                            TARGET_W, TARGET_H, font, style, scale,
+                                            draw_scrim=not use_scrim,
+                                            word_filter=lambda idx, act, _a=_ai: idx <= _a)
+                        f.write(f"file '{png}'\n")
+                        f.write(f"duration {_rest:.3f}\n")
+                    current = event["end"]
+                    continue
                 render_subtitle_png(event, os.path.join(sub_dir, png),
                                     TARGET_W, TARGET_H, font, style, scale,
                                     draw_scrim=not use_scrim)
@@ -215,13 +255,27 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
                             st.resolve_font(_t.get("font_name")), _t)
         cmd += ["-loop", "1", "-t", f"{render_duration}", "-i", hl_png]
         hi_, ho_ = _t.get("in"), _t.get("out")
+        lo = float(hi_) if hi_ is not None else 0.0
+        hi = float(ho_) if ho_ is not None else float(render_duration)
         en = ""
         if hi_ is not None or ho_ is not None:
-            lo = float(hi_) if hi_ is not None else 0.0
-            hi = float(ho_) if ho_ is not None else 1e9
-            en = f":enable='between(t,{lo},{hi})'"
+            _hi_en = float(ho_) if ho_ is not None else 1e9
+            en = f":enable='between(t,{lo},{_hi_en})'"
         _sep = "" if (not fc.strip() or fc.strip().endswith(";")) else "; "
-        fc += f"{_sep}{last_v}[{sub_idx}:v]overlay=0:0:format=auto{en}[hl{_ti}]"
+        # Optional fade in/out on the title itself (alpha fade — the title appears/leaves softly
+        # instead of popping on a single frame). Same filter pair the scrim uses, so preview,
+        # 'exact' and the final render all agree.
+        _fade = float(_t.get("fade", 0) or 0)
+        _src = f"[{sub_idx}:v]"
+        if _fade > 0.01:
+            _d = min(_fade, max(0.05, (hi - lo) / 2.0))
+            _out_st = max(lo, hi - _d)
+            fc += (f"{_sep}[{sub_idx}:v]format=yuva420p,"
+                   f"fade=t=in:st={lo:.3f}:d={_d:.3f}:alpha=1,"
+                   f"fade=t=out:st={_out_st:.3f}:d={_d:.3f}:alpha=1[hlf{_ti}]; ")
+            _src = f"[hlf{_ti}]"
+            _sep = ""
+        fc += f"{_sep}{last_v}{_src}overlay=0:0:format=auto{en}[hl{_ti}]"
         last_v = f"[hl{_ti}]"
         sub_idx += 1
 

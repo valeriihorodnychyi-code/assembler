@@ -221,7 +221,8 @@
   .loc-mini{position:relative}
   .loc-excluded{opacity:.32;filter:grayscale(.6)}
   .loc-x{position:absolute;top:4px;left:4px;border:0;border-radius:7px;background:rgba(0,0,0,.62);color:#fff;cursor:pointer;font-size:12px;padding:2px 7px;z-index:2}
-  .lang-sticker{position:absolute;top:-9px;right:-4px;z-index:3;font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#06210f;background:#22c55e;border-radius:8px;padding:1px 11px;transform:rotate(3deg);box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;letter-spacing:.5px}
+  /* top-LEFT: the Text/Words toggle sits at the top right, and the sticker used to cover the Words button */
+  .lang-sticker{position:absolute;top:-9px;left:-2px;z-index:3;font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#06210f;background:#22c55e;border-radius:8px;padding:1px 11px;transform:rotate(-3deg);box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;letter-spacing:.5px}
   .loc-provider{padding:12px 14px;font-size:15px;border-radius:10px;background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
   @keyframes thoughtIn{from{opacity:0;filter:blur(11px);transform:translateY(16px) rotate(-1.5deg) scale(.94)}to{opacity:1;filter:blur(0);transform:translateY(0) rotate(-1.5deg) scale(1)}}
   /* ---- busy bar: capybara progress + live timer ---- */
@@ -580,13 +581,13 @@
       <span class="beta-tag">beta</span>
       <summary><span>Animation</span> <span class="chev">›</span></summary>
       <div class="body">
-        <div class="hint">Words animate in around when they're spoken. <b style="color:var(--ok)">Typewriter is the only one that also renders</b> — Pop and Rise are preview-only for now (they need per-frame rendering), so don't ship with them yet.</div>
+        <div class="hint">Words animate in as they're spoken. <b style="color:var(--ok)">All three now render</b> — the render uses the same easing curves as this preview, so what you watch is what you get.</div>
         <div class="row"><label>Type</label>
           <select id="animType" style="flex:1">
             <option value="none">None</option>
-            <option value="type">✓ Typewriter (word-by-word) — works in render</option>
-            <option value="pop">Pop (scale-in) — preview only</option>
-            <option value="rise">Rise (slide-up) — preview only</option>
+            <option value="type">✓ Typewriter (word-by-word)</option>
+            <option value="pop">✓ Pop (scale-in)</option>
+            <option value="rise">✓ Rise (slide-up)</option>
           </select></div>
         <div class="row"><label>Speed (s)</label><input type="range" id="animSpeed" min="0.08" max="0.8" step="0.02" value="0.25"><span class="val" id="animSpeedV">0.25</span></div>
       </div>
@@ -1617,10 +1618,17 @@ function updateEditButtons(){
   show("exportBtn",showExp); if(eb)eb.classList.toggle("pulse-cta",showExp);
   show("normalizeBtn",showExp);   // same situations as Export: one loaded clip in Edit
   const ap=$("sendPackAsmBtn"); if(ap)ap.classList.toggle("pulse-cta",pack&&!editing&&!locpack);
-  const tb=$("transcribeBtn");if(tb)tb.textContent="① Transcribe";   // single = active hook only
+  // Transcribe is the FIRST step, so it has to look like it: filled + pulsing while the loaded
+  // clip still has no words, quiet once there's a transcript.
+  const tb=$("transcribeBtn");
+  if(tb){tb.textContent="① Transcribe";                               // single = active hook only
+    const need=videoLoaded&&!(realWords&&realWords.length);
+    tb.classList.toggle("primary",need);tb.classList.toggle("pulse-cta",need);}
   const ptb=$("packTranscribeBtn");                                   // pack = all pending, shown only when there's a pack to do
   if(ptb){const pend=editPack.filter(h=>!h.words||!h.words.length).length;
-    ptb.style.display=(pack&&!editing&&pend>0)?"inline-block":"none";
+    const showPtb=(pack&&!editing&&pend>0);
+    ptb.style.display=showPtb?"inline-block":"none";
+    ptb.classList.toggle("primary",showPtb);ptb.classList.toggle("pulse-cta",showPtb);
     ptb.textContent="① Transcribe pack ("+pend+")";}
 }
 const dz=$("dropzone");
@@ -1710,13 +1718,10 @@ function armTrim(which){
   paint($("trimHIn"),which==="in");paint($("trimHOut"),which==="out");
 }
 function trimCuts(){const v=variants[activeVar];return (v&&v.cuts&&v.cuts.length)?v.cuts:[];}
-// magnet: a scene cut within a few frames wins — that's where a body part almost always starts
-function magnet(t){
-  const cs=trimCuts();if(!cs.length)return t;
-  const tol=4/fps();let best=t,bd=tol;
-  cs.forEach(c=>{const d=Math.abs(c-t);if(d<bd){bd=d;best=c;}});
-  return best;
-}
+// Magnet to scene cuts is OFF: it fought the user — once a handle stuck to a cut you could no
+// longer nudge it one or two frames off it. The cut markers stay drawn on the bar (they're the
+// useful part — you aim by eye and land exactly where you want).
+function magnet(t){return t;}
 function drawTrimBar(){
   const dur=video.duration||0;if(!dur||!$("trimBar"))return;
   const i=pf($("trimIn").value,0),o=pf($("trimOut").value,dur)||dur;
@@ -1861,7 +1866,7 @@ function newTitle(){
           stroke:6, strokeColor:"#000000", plate:false, plateColor:"#000000", plateAlpha:150,
           platePadX:26, platePadY:14, plateRadius:14,
           shadow:false, shX:0, shY:8, shBlur:0, shColor:"#000000",
-          in:"", out:"", align:"center", caseMode:"uppercase", lineSpacing:8, maxWidth:0.86, angle:0, x:0.5};
+          in:"", out:"", align:"center", caseMode:"uppercase", lineSpacing:8, maxWidth:0.86, angle:0, x:0.5, fade:0};
 }
 function titleText(t,lang){const L=lang||activeVar||"en";
   return (t.texts[L]!=null&&String(t.texts[L]).trim())?t.texts[L]:(t.texts.en||"");}
@@ -1878,6 +1883,7 @@ function titleCfgOf(t,lang,on){
     out:(t.out===""||t.out==null)?null:parseFloat(t.out),
     case:t.caseMode||"uppercase",line_spacing:(t.lineSpacing!=null?+t.lineSpacing:8),
     max_width:(t.maxWidth!=null?+t.maxWidth:0.86),align:t.align||"center",angle:+(t.angle||0),x:(t.x!=null?+t.x:0.5),
+    fade:+(t.fade||0),
     font_name:font,
     stroke:{width:+t.stroke||0,color:[sRGB[0],sRGB[1],sRGB[2],255]},
     shadow:{enabled:!!t.shadow,offset_x:+(t.shX||0),offset_y:+(t.shY!=null?t.shY:8),
@@ -1950,7 +1956,17 @@ function drawTitles(t){
   _titleBoxes=[];
   titlesCfg(tLang()).forEach((c,i)=>{
     if((c.in!=null&&t<c.in)||(c.out!=null&&t>c.out))return;
-    drawOneTitle(c,i);
+    // mirror the engine's alpha fade so the preview shows the same soft in/out
+    let a=1;
+    const f=+(c.fade||0);
+    if(f>0.01){
+      const lo=(c.in!=null?+c.in:0), hi=(c.out!=null?+c.out:(video.duration||0)||1e9);
+      const d=Math.min(f,Math.max(0.05,(hi-lo)/2));
+      if(t<lo+d)a=Math.max(0,(t-lo)/d);
+      else if(hi<1e8&&t>hi-d)a=Math.max(0,(hi-t)/d);
+    }
+    if(a<=0)return;
+    ctx.save();ctx.globalAlpha=a;drawOneTitle(c,i);ctx.restore();
   });
 }
 function drawOneTitle(c,idx){
@@ -2073,6 +2089,7 @@ function renderTitles(){
     +"<div class='row'><label>Color</label><input type='color' data-tcolor='"+i+"' value='"+(t.color||"#ffffff")+"'>"
     +"<label style='flex:0 0 auto;margin-left:10px'>Plate</label><label class='switch'><input type='checkbox' data-tplate='"+i+"'"+(t.plate?" checked":"")+"><span class='slider'></span></label></div>"
     +"<div class='row'><label>Outline</label><input type='range' data-tstroke='"+i+"' min='0' max='24' value='"+(t.stroke||0)+"'><span class='val'>"+(t.stroke||0)+"</span></div>"
+    +"<div class='row'><label title='Плавна поява/зникання тайтла (0 = різко, як було)'>Fade in/out (s)</label><input type='range' data-tfade='"+i+"' min='0' max='1.5' step='0.05' value='"+(t.fade||0)+"'><span class='val'>"+(t.fade||0)+"</span></div>"
     +"<div class='row'><label>Show from / to (s)</label>"
     +"<input type='number' step='0.1' data-tin='"+i+"' value='"+(t.in!==""&&t.in!=null?t.in:"")+"' placeholder='0' style='flex:1'>"
     +"<input type='number' step='0.1' data-tout='"+i+"' value='"+(t.out!==""&&t.out!=null?t.out:"")+"' placeholder='end' style='flex:1;margin-left:6px'></div>"
@@ -2109,7 +2126,7 @@ function renderTitles(){
     if(typeof renderLocTitles==="function")renderLocTitles();});
   upd("data-tfont","font"); upd("data-tsize","size",Number); upd("data-ty","y",Number);
   upd("data-tcolor","color"); upd("data-tstroke","stroke",Number); upd("data-tang","angle",Number); upd("data-tx","x",Number);
-  upd("data-tplate","plate",Boolean); upd("data-tin","in"); upd("data-tout","out");
+  upd("data-tplate","plate",Boolean); upd("data-tin","in"); upd("data-tout","out"); upd("data-tfade","fade",Number);
   // ⚙ More styling
   upd("data-tcase","caseMode"); upd("data-talign","align");
   upd("data-tls","lineSpacing",Number); upd("data-tmw","maxWidth",Number);
@@ -2140,7 +2157,8 @@ function updateAnimWarn(){
     sel.closest(".row").insertAdjacentElement("afterend",w);}
   const v=sel.value;
   w.style.display=(v==="pop"||v==="rise")?"block":"none";
-  w.textContent="⚠ Прев'ю-онлі: у фінальний рендер ця анімація НЕ потрапить (слова просто зʼявляться). Робоча — Typewriter.";
+  w.style.color="var(--muted)";w.style.fontWeight="500";
+  w.textContent="Анімація друкує кілька додаткових кадрів на кожен титр — рендер стає трохи довшим (приблизно +1–2 с на хук).";
 }
 if($("animType"))$("animType").addEventListener("change",updateAnimWarn);
 // LOC tab: translate every title into every language in one grid (titles × languages)
@@ -2572,6 +2590,7 @@ $("transcribeBtn").onclick=async()=>{
     $("renderBtn").disabled=false;if($("renderBtn2"))$("renderBtn2").disabled=false;if($("localizeBtn"))$("localizeBtn").disabled=false;
   }catch(e){setStatus("Transcription error: "+e.message,"err");busyStop();}
   $("transcribeBtn").disabled=false;
+  updateEditButtons();   // words exist now → the Transcribe CTA stops pulsing
 };
 
 // ---------- render ----------
@@ -3815,6 +3834,9 @@ function renderBatchStage(){
   if(musicTracks.length)html+="<div style='margin:16px auto 0;max-width:620px;padding:9px 12px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--accent);font-size:12px;text-align:center;color:var(--muted)'>🎵 "+musicTracks.length+" музичн"+(musicTracks.length>1?"і доріжки":"а доріжка")+" · налаштування в панелі <b>Audio</b> ліворуч</div>";
   const n=shown.length;
   html+="<div style='display:flex;gap:12px;justify-content:center;align-items:center;margin-top:22px'><button id='boardBuild' class='primary' style='padding:15px 44px;font-size:17px;font-weight:700;letter-spacing:.3px'>🎬 Render "+n+" video"+(n>1?"s":"")+"</button>"
+    // Re-run the SAME session after tweaking something upstream: clearing the results unlocks
+    // the board (hooks/bodies/titles stay put) instead of forcing a fresh session.
+    +(hasFinals?"<button id='clearFinals' title='Прибрати результати останнього рендеру — хуки, боді й налаштування лишаються. Можеш піти поправити титри/трім і зібрати знову.' style='padding:14px 20px;font-size:14px'>↺ Новий прогін</button>":"")
     +(hasFinals?"<button id='dlAllBtn' class='primary' style='padding:14px 24px;font-size:15px'>⬇ Завантажити все</button>":"")
     +(hasFinals?"<button id='deliverBtn' style='padding:14px 24px;font-size:15px;background:var(--ok);color:#0d0e12;border:none;font-weight:600' title='Скопіювати готові відео у спільну папку Finished Work на Google Drive'>🚀 Send to Finished Work</button>":"")+"</div>"
     +(hasFinals?"<div style='text-align:center;font-size:11px;color:var(--muted);margin-top:6px'>відео + PNG-прев'ю одним архівом · або 🖼 поряд із кожним відео для одиночної картинки</div>":"");
@@ -3873,6 +3895,12 @@ function renderBatchStage(){
   el.querySelectorAll("[data-pick]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();openPicker(t.dataset.pick,t,t.dataset.slot===''?null:+t.dataset.slot);});
   el.querySelectorAll("[data-add]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();if(t.dataset.add==='hook'){$("batchFiles").click();}else{bodyParts.push("");renderBatchStage();}});
   const bb=el.querySelector("#boardBuild");if(bb)bb.onclick=()=>$("batchAssembleBtn").click();
+  const cf=el.querySelector("#clearFinals");
+  if(cf)cf.onclick=()=>{
+    if(!confirm("Прибрати результати останнього прогону?\n\nГотові файли лишаються на диску (і в папці сесії), просто зникають з дошки. Хуки, боді, титри й тайтли не змінюються."))return;
+    batchFinals={};lastRunStats=null;creativeNames={};
+    renderBatchStage();
+    setStatus("Дошка готова до нового прогону — можеш повернутись у EDIT, поправити і зібрати знову.","ok");};
   if(typeof renderTrackList==="function")renderTrackList();   // keep per-track "Start at" options in sync with segments
 }
 

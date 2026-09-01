@@ -798,7 +798,22 @@ def api_preview_frame(req: PreviewFrameReq):
         for _i, t in enumerate(act_titles):
             tp = tempfile.mktemp(suffix=".png")
             subtitles.render_headline_png(t["text"], tp, TW, TH, st.resolve_font(t.get("font_name")), t)
-            base.alpha_composite(_Img.open(tp).convert("RGBA"))
+            layer = _Img.open(tp).convert("RGBA")
+            # same alpha fade the render applies, so 'exact' agrees during the fade too
+            fade = float(t.get("fade", 0) or 0)
+            if fade > 0.01:
+                lo = float(t["in"]) if t.get("in") is not None else 0.0
+                hi = float(t["out"]) if t.get("out") is not None else (float(req.dur) or 1e9)
+                d = min(fade, max(0.05, (hi - lo) / 2.0))
+                a = 1.0
+                if req.time < lo + d:
+                    a = max(0.0, (req.time - lo) / d)
+                elif hi < 1e8 and req.time > hi - d:
+                    a = max(0.0, (hi - req.time) / d)
+                if a < 1.0:
+                    alpha = layer.getchannel("A").point(lambda v, _a=a: int(v * _a))
+                    layer.putalpha(alpha)
+            base.alpha_composite(layer)
             os.remove(tp)
         base.save(tmp)
     with open(tmp, "rb") as f:
