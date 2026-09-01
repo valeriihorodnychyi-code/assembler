@@ -221,8 +221,9 @@
   .loc-mini{position:relative}
   .loc-excluded{opacity:.32;filter:grayscale(.6)}
   .loc-x{position:absolute;top:4px;left:4px;border:0;border-radius:7px;background:rgba(0,0,0,.62);color:#fff;cursor:pointer;font-size:12px;padding:2px 7px;z-index:2}
-  /* top-LEFT: the Text/Words toggle sits at the top right, and the sticker used to cover the Words button */
-  .lang-sticker{position:absolute;top:-9px;left:-2px;z-index:3;font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#06210f;background:#22c55e;border-radius:8px;padding:1px 11px;transform:rotate(-3deg);box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;letter-spacing:.5px}
+  /* back to the top RIGHT corner of the transcript box; the Text/Words toggle above it is
+     shifted left by roughly the sticker's width so the two never overlap */
+  .lang-sticker{position:absolute;top:-9px;right:-4px;z-index:3;font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#06210f;background:#22c55e;border-radius:8px;padding:1px 11px;transform:rotate(3deg);box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;letter-spacing:.5px}
   .loc-provider{padding:12px 14px;font-size:15px;border-radius:10px;background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
   @keyframes thoughtIn{from{opacity:0;filter:blur(11px);transform:translateY(16px) rotate(-1.5deg) scale(.94)}to{opacity:1;filter:blur(0);transform:translateY(0) rotate(-1.5deg) scale(1)}}
   /* ---- busy bar: capybara progress + live timer ---- */
@@ -385,7 +386,8 @@
             <button type="button" data-v="large-v3">large-v3</button>
           </div></div>
         <input type="hidden" id="language" value="">
-        <div style="display:flex;justify-content:flex-end;margin:4px 0 7px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
+        <!-- padding-right keeps the toggle clear of the language sticker pinned to the box's top-right corner -->
+        <div style="display:flex;justify-content:flex-end;margin:4px 0 7px;padding-right:78px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
           <div class="seg" id="txtViewSeg">
             <button type="button" data-v="text" class="active">Text</button>
             <button type="button" data-v="words">Words</button>
