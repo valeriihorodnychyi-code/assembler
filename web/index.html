@@ -287,6 +287,7 @@
       <button id="packTranscribeBtn" style="display:none" title="Транскрибувати всі не-транскрибовані хуки паку обраною моделлю (мова — авто)">① Transcribe pack</button>
       <button id="normalizeBtn" style="display:none" title="Prepare this clip for assembly — no captions, just conform it to the project format (so the board can join it fast, without re-encoding)">⚙ Normalize</button>
       <button id="exportBtn" style="display:none" title="Export the current video with its captions baked in">⬇ Export</button>
+      <button id="srtBtn" style="display:none" title="Завантажити .srt для цього кліпа — той самий розбив і ті самі таймінги, що й у запечених титрах">⬇ SRT</button>
       <button class="primary" id="renderBtn" data-i18n="sendAsm" disabled>Send to Assemble →</button>
       <button id="sLocBtn" data-i18n="toLoc" style="display:none">→ LOC</button>
       <button id="copyAllBtn" data-i18n="styleAll" style="display:none" title="Скопіювати стиль активного хука на всі">⧉ Style→all</button>
@@ -1633,6 +1634,7 @@ function updateEditButtons(){
   const eb=$("exportBtn"), showExp=(!pack&&!editing&&videoLoaded);
   show("exportBtn",showExp); if(eb)eb.classList.toggle("pulse-cta",showExp);
   show("normalizeBtn",showExp);   // same situations as Export: one loaded clip in Edit
+  show("srtBtn",showExp&&!!(realWords&&realWords.length));   // needs a transcript to write cues from
   const ap=$("sendPackAsmBtn"); if(ap)ap.classList.toggle("pulse-cta",pack&&!editing&&!locpack);
   // Transcribe is the FIRST step, so it has to look like it: filled + pulsing while the loaded
   // clip still has no words, quiet once there's a transcript.
@@ -2609,6 +2611,37 @@ $("transcribeBtn").onclick=async()=>{
   updateEditButtons();   // words exist now → the Transcribe CTA stops pulsing
 };
 
+// ---------- .srt export: same layout engine as the burned-in captions ----------
+// Built server-side from build_timeline, so the cues, the line breaks and the timings are
+// exactly what the render bakes — no second subtitle implementation to drift apart.
+function srtBaseName(){
+  const v=variants[activeVar]||{};
+  const src=((videoFile&&videoFile.name)||v.clip||"creative.mp4").replace(/\.[^.]+$/,"");
+  return src.replace(/_nSub$/i,"");           // same naming rule as the video export
+}
+async function downloadSrt(){
+  const v=variants[activeVar]||{};
+  const words=(v.words&&v.words.length)?v.words:realWords;
+  if(!words||!words.length){setStatus("Спершу зроби транскрайб — з чого писати титри.","err");return;}
+  const b=$("srtBtn");if(b)b.disabled=true;
+  try{
+    const baseEng=toEngineStyle(readControls());
+    const regions=buildStyleRegions(baseEng,(v.phraseStyles||[]))||[{start:0,end:null,style:baseEng}];
+    const r=await fetch(API+"/api/srt",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({words,regions,base_style:baseEng,cuts:v.cuts||null,lang:capLang(),
+        duration:(video&&video.duration)||0,trim:v.trim||null,
+        cap_in:capWin().in,cap_out:capWin().out,match_case:false})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+    const blob=new Blob([d.srt||""],{type:"application/x-subrip;charset=utf-8"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+    a.download=srtBaseName()+".srt";document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    setStatus("SRT завантажено: "+d.cues+" титр(ів) — розбив як у відео.","ok");
+  }catch(e){setStatus("SRT помилка: "+e.message,"err");}
+  if(b)b.disabled=false;
+}
+if($("srtBtn"))$("srtBtn").onclick=downloadSrt;
+
 // ---------- ✨ Polish captions (Gemini): fix misheard words + choose the line breaks ----------
 // The pass returns DATA only (per-word fixes + brk markers) — the SAME data your own Enter
 // produces — so it flows through the one layout engine and preview/render stay identical.
@@ -3320,7 +3353,12 @@ function renderLocStage(){
     +'<h2 style="margin:0 0 4px;letter-spacing:.5px">LOC</h2>'
     +'<div style="color:var(--muted);margin-bottom:16px">Локалізація хуків: '+(srcs.length?('<b>'+srcs.length+'</b> вихідних — ✕ виключає хук перед локалізацією'):'<b style="color:var(--accent)">немає хуків</b> — зроби пак в EDIT і натисни «Send pack → LOC»')+'.</div>'
     +'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Мови локалізації:</div>'
-    +'<div id="locLangs" style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:16px"></div>'
+    // languages on the left, the language-independent LipSync action on the right
+    +'<div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">'
+      +'<div id="locLangs" style="display:flex;flex-wrap:wrap;gap:9px;flex:1"></div>'
+      +'<button id="lipsyncBtn" style="flex:0 0 auto;min-width:210px;padding:11px 18px;font-size:15px;font-weight:600;background:var(--panel2);border:1px solid var(--accent2);color:var(--accent2);border-radius:10px" '
+      +'title="Поправити ліпсинк на ОРИГІНАЛЬНОМУ відео, без перекладу: той самий голос, та сама довжина — тільки рот синхронний. Для генерацій, які вийшли круті, але з поганими губами.">🎙 LipSync (без перекладу)</button>'
+    +'</div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">'
       +'<select id="locProvider2" class="loc-provider"><option value="elevenlabs">Voice dub (ElevenLabs)</option><option value="synclab">Lip-sync (Sync Lab)</option><option value="heygen">Lip-sync (HeyGen)</option></select>'
       +'<button class="primary big-go" id="locGoBtn">🌍 Localize</button>'
@@ -3341,6 +3379,7 @@ function renderLocStage(){
   if($("locProvider2")){$("locProvider2").value=locProviderSel;
     $("locProvider2").onchange=()=>{locProviderSel=$("locProvider2").value;};}
   $("locGoBtn").onclick=localizePack;
+  if($("lipsyncBtn"))$("lipsyncBtn").onclick=lipsyncPack;
   if(typeof renderLocTitles==="function")renderLocTitles();   // titles × languages translation grid
   if($("locBackupBtn"))$("locBackupBtn").onclick=downloadLocs;
   const rows=$("locRows");
@@ -3478,6 +3517,41 @@ function downloadLocs(){
   setStatus("Готую архів локалізацій…","",true);
   window.location.href=API+"/api/download_locs/"+fileId;   // FileResponse → browser saves the zip
   setTimeout(()=>setStatus("Архів локалізацій завантажується ⬇","ok"),800);
+}
+// 🎙 LipSync — no translation, no new voice: re-sync the mouth of the ORIGINAL clip to its own
+// audio. For generations that look great but whose lips are off. The result goes on the board
+// as a normal clip, so you can caption it, localize it, or assemble it like anything else.
+async function lipsyncPack(){
+  if(!fileId){setStatus("Немає сесії — спершу зроби хуки в EDIT.","err");return;}
+  const srcs=(typeof locSources==="function"?locSources():[]).filter(s=>!locExcluded.has(s.clip));
+  if(!srcs.length){setStatus("Немає кліпів (усі виключені ✕ або дошка порожня).","err");return;}
+  const b=$("lipsyncBtn");if(b)b.disabled=true;
+  busyStart("LipSync: "+srcs.length+" кліп(ів)…");
+  let ok=0;const failed=[];
+  for(const s of srcs){
+    try{
+      setStatus("LipSync «"+(s.name||s.clip)+"»… (Sync Lab, кілька хвилин)","",true);
+      const r=await fetch(API+"/api/lipsync",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:s.clip,provider:"synclab"})});
+      const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+      if(!hooks.some(h=>h.clip===d.clip)){
+        hooks.push({name:"🎙 "+(s.name||s.clip).replace(/\.[^.]+$/,""),clip:d.clip,
+                    lang:s.lang||"en",src:"edit",videoUrl:API+d.url,
+                    words:(s.words?JSON.parse(JSON.stringify(s.words)):null),
+                    ctrl:(s.ctrl?JSON.parse(JSON.stringify(s.ctrl)):null),
+                    style:s.style||null,titles:(s.titles!=null?s.titles:null)});
+      }
+      locExcluded.add(s.clip);   // the fixed clip replaces the original for further work
+      ok++;
+    }catch(e){failed.push((s.name||s.clip)+": "+e.message);}
+  }
+  renderHookTiles();renderLocStage();
+  if(b)$("lipsyncBtn")&&($("lipsyncBtn").disabled=false);
+  if(ok){if(typeof chime==="function")chime("localize");busyDone(ok+" кліп(ів) з виправленим ліпсинком");
+    setStatus(ok+" кліп(ів) готові — оригінали виключені ✕, далі працюй з версіями 🎙."
+      +(failed.length?(" ⚠ не вдалось: "+failed[0]):""),failed.length?"err":"ok");}
+  else{busyStop();setStatus("LipSync не вдався — "+(failed[0]||"перевір ключ Sync Lab у ⚙ Settings."),"err");}
+  if(failed.length)console.warn("[lipsync] failures:",failed);
 }
 async function localizePack(){
   let langs=Array.from(document.querySelectorAll('#locLangs .chip.on')).map(c=>c.dataset.l);
@@ -3910,7 +3984,7 @@ function renderBatchStage(){
     +(hasFinals?"<button id='clearFinals' title='Прибрати результати останнього рендеру — хуки, боді й налаштування лишаються. Можеш піти поправити титри/трім і зібрати знову.' style='padding:14px 20px;font-size:14px'>↺ Новий прогін</button>":"")
     +(hasFinals?"<button id='dlAllBtn' class='primary' style='padding:14px 24px;font-size:15px'>⬇ Завантажити все</button>":"")
     +(hasFinals?"<button id='deliverBtn' style='padding:14px 24px;font-size:15px;background:var(--ok);color:#0d0e12;border:none;font-weight:600' title='Скопіювати готові відео у спільну папку Finished Work на Google Drive'>🚀 Send to Finished Work</button>":"")+"</div>"
-    +(hasFinals?"<div style='text-align:center;font-size:11px;color:var(--muted);margin-top:6px'>відео + PNG-прев'ю одним архівом · або 🖼 поряд із кожним відео для одиночної картинки</div>":"");
+    +(hasFinals?"<div style='text-align:center;font-size:11px;color:var(--muted);margin-top:6px'>відео + PNG-прев'ю + .srt одним архівом · або 🖼 поряд із кожним відео для одиночної картинки</div>":"");
   if(hasFinals){const finals=shown.map(h=>batchFinals[clipKey(h)]).filter(Boolean);
     html+="<div style='max-width:620px;margin:16px auto 0'>"
       +"<div style='font-size:12px;color:var(--muted);margin-bottom:5px'>📝 Назви креативів — по рядку на відео (застосуються до відео і PNG в архіві):</div>"
@@ -3931,13 +4005,28 @@ function renderBatchStage(){
   // download everything: videos + auto-generated posters, one archive
   if($("dlAllBtn"))$("dlAllBtn").onclick=async()=>{
     if(!fileId){setStatus("Спершу зроби рендер.","err");return;}
-    const shots=shown.map(h=>{const f=batchFinals[clipKey(h)];if(!f)return null;
+    setStatus("Готую .srt до архіву…","",true);busyStart("Експорт…");
+    // one .srt per creative, built from the SAME layout engine as the burned-in captions
+    const shots=[];
+    for(const h of shown){
+      const f=batchFinals[clipKey(h)];if(!f)continue;
       const t=(h.words&&h.words.length&&h.words[0].start!=null)?Math.max(0.1,+h.words[0].start+0.2):1.0;
-      return {file:f.file,t,name:creativeName(f.file)};}).filter(Boolean);
-    setStatus("Пакую відео + прев'ю…","",true);busyStart("Експорт…");
+      const shot={file:f.file,t,name:creativeName(f.file)};
+      if(h.words&&h.words.length&&h.style){
+        try{const r=await fetch(API+"/api/srt",{method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({words:h.words,regions:h.regions||null,base_style:h.style,
+              cuts:h.cuts||null,lang:h.lang||"en",trim:h.trim||null,
+              cap_in:(h.cap_in!=null?h.cap_in:null),cap_out:(h.cap_out!=null?h.cap_out:null),
+              match_case:false})});
+          if(r.ok){const d=await r.json();if(d.srt)shot.srt=d.srt;}
+        }catch(e){/* no subtitles for this one → the video still goes in */}
+      }
+      shots.push(shot);
+    }
+    setStatus("Пакую відео + прев'ю + .srt…","",true);
     try{const r=await fetch(API+"/api/export_all",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,shots})});
       if(!r.ok)throw new Error((await r.json()).detail||"failed");
-      dlBlob(await r.blob(),"Assembler_export.zip");busyDone("Готово");setStatus("Завантажено: відео + PNG-прев'ю.","ok");
+      dlBlob(await r.blob(),"Assembler_export.zip");busyDone("Готово");setStatus("Завантажено: відео + PNG-прев'ю + .srt.","ok");
     }catch(e){setStatus("Експорт помилка: "+e.message,"err");busyStop();}
   };
   // deliver finished videos straight into the shared "Finished Work" Drive folder

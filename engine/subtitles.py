@@ -786,6 +786,87 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     final_img.save(filename)
 
 
+def _srt_time(t):
+    t = max(0.0, float(t or 0))
+    h = int(t // 3600)
+    m = int((t % 3600) // 60)
+    s = int(t % 60)
+    ms = int(round((t - int(t)) * 1000))
+    if ms == 1000:            # rounding can spill into the next second
+        s += 1
+        ms = 0
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def to_srt(tagged_events, case=None, min_dur=0.4, orig_words=None):
+    """Build an .srt from the SAME events the render burns in.
+
+    The engine emits one event PER WORD (that's how karaoke highlighting works), all sharing
+    the caption they belong to — so consecutive events with identical text are merged back
+    into one cue. The result therefore matches the burned-in captions exactly: same chunking,
+    same line breaks, same timings. No second implementation to drift apart.
+
+    `case` mirrors the style's text case ("uppercase"/"lowercase") when you want the file to
+    read like the picture; leave it None to keep the transcript's natural case (better for
+    platform captions and for translators).
+    """
+    # build_events already applied the style's case to the event text, so "natural case" has
+    # to come back from the original transcript — matched by the word's start time (unique).
+    orig = []
+    for w in (orig_words or []):
+        try:
+            orig.append((float(w.get("start", 0) or 0),
+                         str(w.get("text") or w.get("word") or "")))
+        except Exception:
+            pass
+    orig.sort()
+
+    def _wtext(w):
+        cur = str(w.get("text") or w.get("word") or "")
+        if not orig:
+            return cur
+        try:
+            t = float(w.get("start", 0) or 0)
+        except Exception:
+            return cur
+        # nearest original word by start time (a trim/shift can move it by a millisecond),
+        # accepted only when it's the SAME word — so we restore case, never swap words
+        best, bd = None, 0.08
+        for s, txt in orig:
+            d = abs(s - t)
+            if d <= bd:
+                bd, best = d, txt
+        return best if (best and best.lower() == cur.lower()) else cur
+
+    cues = []
+    for item in (tagged_events or []):
+        e = item[0] if isinstance(item, (list, tuple)) else item
+        lines = []
+        for line in e.get("lines", []) or []:
+            txt = " ".join(_wtext(w) for w in line).strip()
+            if txt:
+                lines.append(txt)
+        if not lines:
+            continue
+        text = "\n".join(lines)
+        if case == "uppercase":
+            text = text.upper()
+        elif case == "lowercase":
+            text = text.lower()
+        st_, en_ = float(e.get("start", 0)), float(e.get("end", 0))
+        if cues and cues[-1]["text"] == text:      # same caption, next word → extend the cue
+            cues[-1]["end"] = max(cues[-1]["end"], en_)
+            continue
+        cues.append({"start": st_, "end": en_, "text": text})
+    out = []
+    for i, c in enumerate(cues, 1):
+        end = max(c["end"], c["start"] + min_dur)   # a cue shorter than ~0.4s is unreadable
+        if i < len(cues):
+            end = min(end, cues[i]["start"])        # never overlap the next cue
+        out.append(f"{i}\n{_srt_time(c['start'])} --> {_srt_time(end)}\n{c['text']}\n")
+    return "\n".join(out)
+
+
 def _ease_out_cubic(x):
     return 1 - (1 - x) ** 3
 

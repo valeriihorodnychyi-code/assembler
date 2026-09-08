@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 # allow "python -m server.app" and direct execution
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, polish  # noqa: E402
+from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, polish, synclab  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(ROOT, "web")
@@ -655,6 +655,51 @@ def api_detect_cuts(req: DetectCutsReq):
     return {"cuts": cuts}
 
 
+class LipsyncReq(BaseModel):
+    file_id: str
+    clip: str = "source.mp4"
+    provider: str = "synclab"
+
+
+@app.post("/api/lipsync")
+def api_lipsync(req: LipsyncReq):
+    """Fix the lips on a clip WITHOUT translating it — the clip's own audio drives the mouth.
+
+    For AI-generated footage that looks great but whose lipsync is off. No new voice, no new
+    language: same audio, same length, just a corrected mouth. The result lands in the session
+    as lipsync_<name>.mp4 and can then be captioned / localized like any other clip.
+    """
+    import time as _t
+    sdir = _session_dir(req.file_id)
+    clip = os.path.basename(req.clip)
+    src = os.path.join(sdir, clip)
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip '{clip}' missing in session")
+    if req.provider != "synclab":
+        # HeyGen's endpoint we integrate is video TRANSLATION — it would replace the voice,
+        # which is the opposite of what this feature is for.
+        raise HTTPException(400, "Lipsync-only is available via Sync Lab (HeyGen's endpoint "
+                                 "re-voices the clip). Pick Sync Lab as the provider.")
+    t0 = _t.time()
+    try:
+        fixed = synclab.lipsync_clip(src, api_key=os.environ.get("SYNCLAB_API_KEY"),
+                                     work_dir=os.path.join(sdir, "_ls"))
+    except Exception as e:
+        raise HTTPException(500, f"{e}")
+    stem = os.path.splitext(clip)[0]
+    name = f"lipsync_{stem}.mp4"
+    dst = os.path.join(sdir, name)
+    shutil.copyfile(fixed, dst)
+    el = _t.time() - t0
+    _log_timing("lipsync", el, f"clip={clip} provider={req.provider}")
+    try:
+        dur = ffmpeg_utils.get_video_duration(dst)
+    except Exception:
+        dur = 0
+    return {"name": name, "clip": name, "url": f"/clip/{req.file_id}/{name}",
+            "seconds": round(el, 1), "duration": round(float(dur or 0), 3)}
+
+
 class PolishReq(BaseModel):
     words: List[dict] = []
     lang: str = "en"
@@ -907,6 +952,48 @@ def api_layout(req: LayoutReq):
                        for w in line] for line in e.get("lines", [])],
         })
     return {"events": events}
+
+
+class SrtReq(LayoutReq):
+    trim: Optional[List[float]] = None      # same [in,out] the render applies, so timings match
+    cap_in: Optional[float] = None
+    cap_out: Optional[float] = None
+    match_case: bool = False                # True = write it in the style's case (as on screen)
+
+
+@app.post("/api/srt")
+def api_srt(req: SrtReq):
+    """An .srt built from the SAME layout the render burns in.
+
+    It goes through build_timeline (one layout engine) and applies the same trim / caption
+    window, so the file's chunking, line breaks and timings match the picture exactly.
+    """
+    if not req.words:
+        raise HTTPException(400, "No words — transcribe first.")
+    base = st.normalize(req.base_style or {})
+    words = req.words
+    trim = req.trim
+    if trim and len(trim) == 2:                     # re-base onto the trimmed clip, like the render
+        words = compose.shift_words(words, float(trim[0]), float(trim[1]))
+    if req.regions:
+        regions = [{"start": float(r.get("start", 0)), "end": r.get("end"),
+                    "style": st.normalize(r.get("style") or (req.base_style or {}))} for r in req.regions]
+    else:
+        regions = [{"start": 0, "end": None, "style": base}]
+    cuts = req.cuts
+    if cuts and trim and len(trim) == 2:
+        lo, hi = float(trim[0]), float(trim[1])
+        cuts = [c - lo for c in cuts if lo < c < hi]
+    tagged = compose.build_timeline(words or [], regions, lang=(req.lang or "en"), cuts=cuts)
+    tagged = compose.clip_caption_window(tagged, req.cap_in, req.cap_out)
+    if tagged and req.duration and base.get("hold_last"):
+        tagged[-1][0]["end"] = max(float(tagged[-1][0]["end"]), float(req.duration))
+    # match_case=True → exactly as on screen (usually ALL CAPS); default → the transcript's
+    # natural case, which is what platforms and translators actually want in a .srt
+    srt = subtitles.to_srt(tagged,
+                           case=(base.get("text_case") if req.match_case else None),
+                           orig_words=(None if req.match_case else words))
+    return {"srt": srt, "cues": srt.count("-->")}
 
 
 class RenderReq(BaseModel):
@@ -1531,6 +1618,10 @@ def export_all(req: PosterReq):
                 p = _render_poster(out, s.get("file", ""), s.get("t", 1.0))
                 if p:
                     z.write(p, f"posters/{nm}.png")
+                # the .srt the UI generated for this creative (same layout engine as the
+                # burned-in captions) rides along in /subtitles with the SAME name
+                if s.get("srt"):
+                    z.writestr(f"subtitles/{nm}.srt", str(s["srt"]))
         else:  # no naming info — just zip whatever finals exist
             for v in (sorted(_glob.glob(os.path.join(out, "batch_*.mp4"))) or sorted(_glob.glob(os.path.join(out, "*.mp4")))):
                 z.write(v, "videos/" + os.path.basename(v)); n += 1

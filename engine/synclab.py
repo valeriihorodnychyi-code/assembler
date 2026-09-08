@@ -75,6 +75,67 @@ def submit(video_path, target_lang, source_lang="en", api_key=None, model=None):
     return gen_id
 
 
+def submit_lipsync(video_path, audio_path, api_key=None, model=None):
+    """Start a SAME-LANGUAGE lipsync: the clip's own audio drives the lips.
+
+    This is the 'fix a bad generation' case — no translation, no new voice. We pass the
+    original audio as the audio input and omit dubParams, so the model only re-syncs the
+    mouth to the speech that's already there.
+    """
+    import requests  # lazy
+    api_key = _key(api_key)
+    for p in (video_path, audio_path):
+        size = os.path.getsize(p)
+        if size > MAX_UPLOAD:
+            raise RuntimeError(f"Sync Lab accepts uploads up to 20MB; {os.path.basename(p)} "
+                               f"is {size / 1e6:.1f}MB. Trim the clip first.")
+    vname, aname = os.path.basename(video_path), os.path.basename(audio_path)
+    vct = _CT.get(os.path.splitext(vname)[1].lower(), "video/mp4")
+    with open(video_path, "rb") as vf, open(audio_path, "rb") as af:
+        r = requests.post(
+            GENERATE_URL,
+            headers={"x-api-key": api_key},
+            files={"video": (vname, vf, vct), "audio": (aname, af, "audio/wav")},
+            data={"model": (model or MODEL)},
+            timeout=600,
+        )
+    if r.status_code >= 300:
+        raise RuntimeError(f"Sync Lab lipsync submit failed ({r.status_code}): {r.text[:300]}")
+    gen_id = (r.json() or {}).get("id")
+    if not gen_id:
+        raise RuntimeError(f"Sync Lab lipsync: no id in response: {r.text[:300]}")
+    return gen_id
+
+
+def lipsync_clip(video_path, api_key=None, work_dir=None, progress=None, model=None):
+    """Re-sync the lips of a clip to ITS OWN audio. Returns the path to the fixed clip."""
+    import requests
+    from . import ffmpeg_utils as ff
+    api_key = _key(api_key)
+    work_dir = work_dir or tempfile.mkdtemp(prefix="cs_synclab_ls_")
+    os.makedirs(work_dir, exist_ok=True)
+    if not ff.has_audio_stream(video_path):
+        raise RuntimeError("This clip has no audio track — there's nothing to sync the lips to.")
+    wav = os.path.join(work_dir, "voice.wav")
+    ff.run([ff.FFMPEG, "-i", video_path, "-vn", "-ac", "1", "-ar", "16000",
+            "-c:a", "pcm_s16le", wav, "-y"])   # small mono wav keeps us well under the limit
+    if progress:
+        progress("Uploading to Sync Lab (lipsync)…")
+    gen_id = submit_lipsync(video_path, wav, api_key=api_key, model=model)
+    url = wait(gen_id, api_key=api_key, progress=progress)
+    out = os.path.join(work_dir, f"lipsync_{gen_id[:8]}.mp4")
+    with requests.get(url, stream=True, timeout=600) as r:
+        if r.status_code >= 300:
+            raise RuntimeError(f"Sync Lab download failed ({r.status_code}).")
+        with open(out, "wb") as f:
+            for chunk in r.iter_content(1 << 20):
+                if chunk:
+                    f.write(chunk)
+    if not os.path.exists(out) or os.path.getsize(out) < 1000:
+        raise RuntimeError("Sync Lab lipsync download produced an empty file.")
+    return out
+
+
 def wait(gen_id, api_key=None, poll_secs=10, timeout_secs=1800, progress=None):
     """Poll until the generation finishes. Returns the output media URL."""
     import requests
