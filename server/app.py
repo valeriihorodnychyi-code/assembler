@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 # allow "python -m server.app" and direct execution
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules  # noqa: E402
+from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, polish  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(ROOT, "web")
@@ -181,6 +181,10 @@ if os.path.exists(_PCFG):
             os.environ.setdefault("ELEVENLABS_API_KEY", _pc["elevenlabs_api_key"])
         if _pc.get("heygen_api_key"):
             os.environ.setdefault("HEYGEN_API_KEY", _pc["heygen_api_key"])
+        if _pc.get("synclab_api_key"):
+            os.environ.setdefault("SYNCLAB_API_KEY", _pc["synclab_api_key"])
+        if _pc.get("gemini_api_key"):
+            os.environ.setdefault("GEMINI_API_KEY", _pc["gemini_api_key"])
         # persist the chosen library folder across restarts — but ignore a stored web link
         # (an older build accepted URLs and pointed the whole library at a bogus folder)
         _lib = (_pc.get("library_dir") or "").strip()
@@ -232,7 +236,7 @@ def license_ok():
         return True
 
 
-def save_keys(eleven, heygen):
+def save_keys(eleven, heygen, synclab="", gemini=""):
     os.makedirs(os.path.dirname(_PCFG), exist_ok=True)
     cur = {}
     if os.path.exists(_PCFG):
@@ -246,6 +250,12 @@ def save_keys(eleven, heygen):
     if heygen:
         cur["heygen_api_key"] = heygen
         os.environ["HEYGEN_API_KEY"] = heygen
+    if synclab:
+        cur["synclab_api_key"] = synclab
+        os.environ["SYNCLAB_API_KEY"] = synclab
+    if gemini:
+        cur["gemini_api_key"] = gemini
+        os.environ["GEMINI_API_KEY"] = gemini
     _json.dump(cur, open(_PCFG, "w", encoding="utf-8"), indent=2)
 
 
@@ -260,6 +270,10 @@ if os.path.exists(_CFG):
             os.environ["ELEVENLABS_API_KEY"] = _cfg["elevenlabs_api_key"]
         if _cfg.get("heygen_api_key") and not os.environ.get("HEYGEN_API_KEY"):
             os.environ["HEYGEN_API_KEY"] = _cfg["heygen_api_key"]
+        if _cfg.get("synclab_api_key") and not os.environ.get("SYNCLAB_API_KEY"):
+            os.environ["SYNCLAB_API_KEY"] = _cfg["synclab_api_key"]
+        if _cfg.get("gemini_api_key") and not os.environ.get("GEMINI_API_KEY"):
+            os.environ["GEMINI_API_KEY"] = _cfg["gemini_api_key"]
         if _cfg.get("library_dir") and "://" not in _cfg["library_dir"] and not os.environ.get("CS_LIBRARY_DIR"):
             os.environ["CS_LIBRARY_DIR"] = os.path.expanduser(_cfg["library_dir"])
     except Exception:
@@ -511,6 +525,8 @@ def deliver_finished(req: DeliverReq):
 class KeysReq(BaseModel):
     elevenlabs_api_key: Optional[str] = None
     heygen_api_key: Optional[str] = None
+    synclab_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
     library_dir: Optional[str] = None
     finished_dir: Optional[str] = None
 
@@ -520,6 +536,8 @@ def get_settings():
     return {"machine_id": machine_id(), "allowed": license_ok(),
             "scribe_key_present": bool(os.environ.get("ELEVENLABS_API_KEY")),
             "heygen_key_present": bool(os.environ.get("HEYGEN_API_KEY")),
+            "synclab_key_present": bool(os.environ.get("SYNCLAB_API_KEY")),
+            "gemini_key_present": bool(os.environ.get("GEMINI_API_KEY")),
             "library_dir": os.environ.get("CS_LIBRARY_DIR", ""),
             "library_exists": os.path.isdir(os.environ.get("CS_LIBRARY_DIR", "")),
             "finished_dir": os.environ.get("CS_FINISHED_DIR", ""),
@@ -529,7 +547,8 @@ def get_settings():
 
 @app.post("/api/settings")
 def post_settings(body: KeysReq):
-    save_keys((body.elevenlabs_api_key or "").strip(), (body.heygen_api_key or "").strip())
+    save_keys((body.elevenlabs_api_key or "").strip(), (body.heygen_api_key or "").strip(),
+              (body.synclab_api_key or "").strip(), (body.gemini_api_key or "").strip())
     if body.library_dir is not None and body.library_dir.strip():
         save_library_dir(body.library_dir)
     if body.finished_dir is not None:
@@ -537,6 +556,8 @@ def post_settings(body: KeysReq):
     return {"saved": True,
             "scribe_key_present": bool(os.environ.get("ELEVENLABS_API_KEY")),
             "heygen_key_present": bool(os.environ.get("HEYGEN_API_KEY")),
+            "synclab_key_present": bool(os.environ.get("SYNCLAB_API_KEY")),
+            "gemini_key_present": bool(os.environ.get("GEMINI_API_KEY")),
             "library_dir": os.environ.get("CS_LIBRARY_DIR", ""),
             "library_exists": os.path.isdir(os.environ.get("CS_LIBRARY_DIR", ""))}
 
@@ -632,6 +653,36 @@ def api_detect_cuts(req: DetectCutsReq):
     except Exception as e:
         raise HTTPException(500, f"Cut detection failed: {e}")
     return {"cuts": cuts}
+
+
+class PolishReq(BaseModel):
+    words: List[dict] = []
+    lang: str = "en"
+    max_chars: int = 15
+    max_lines: int = 2
+
+
+@app.post("/api/polish_captions")
+def api_polish_captions(req: PolishReq):
+    """✨ Polish: ask Gemini to fix misheard words and choose the line breaks.
+
+    Returns the SAME word list (same count, same timings) with corrections applied and
+    `brk="soft"` markers set — i.e. plain data that flows through the one and only layout
+    engine, so preview and render stay identical. Also returns a diff so the UI can show
+    exactly what changed before the user accepts it.
+    """
+    if not req.words:
+        raise HTTPException(400, "No words to polish — transcribe first.")
+    import time as _t
+    t0 = _t.time()
+    try:
+        res = polish.polish(req.words, lang=req.lang, max_chars=req.max_chars,
+                            max_lines=req.max_lines, rules=subtitles.load_rules())
+    except Exception as e:
+        raise HTTPException(500, f"{e}")
+    _log_timing("polish", _t.time() - t0,
+                f"words={len(req.words)} lang={req.lang} changes={len(res.get('changes', []))} model={res.get('model')}")
+    return res
 
 
 @app.get("/api/caption_rules")
@@ -1237,8 +1288,9 @@ def api_dub(req: DubReq):
             source_lang=req.source_lang, api_key=os.environ.get("ELEVENLABS_API_KEY"),
             transcribe_engine=req.transcribe_engine, model_size=req.model_size,
             provider=req.provider,
-            provider_key=os.environ.get("HEYGEN_API_KEY") if req.provider == "heygen"
-            else os.environ.get("ELEVENLABS_API_KEY"),
+            provider_key=({"heygen": os.environ.get("HEYGEN_API_KEY"),
+                           "synclab": os.environ.get("SYNCLAB_API_KEY")}
+                          .get(req.provider) or os.environ.get("ELEVENLABS_API_KEY")),
             name_prefix=prefix,
         )
     except Exception as e:

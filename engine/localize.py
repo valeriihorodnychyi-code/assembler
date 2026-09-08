@@ -10,7 +10,10 @@ import os
 import shutil
 import tempfile
 
-from . import dub, heygen, transcribe, compose, styles as st
+from . import dub, heygen, synclab, transcribe, compose, styles as st
+
+# provider id (as sent by the UI) -> module exposing dub_clip(video, lang, ...)
+PROVIDERS = {"elevenlabs": dub, "heygen": heygen, "synclab": synclab}
 
 
 def dub_and_transcribe(video_path, target_langs, dest_dir, source_lang="en",
@@ -26,7 +29,7 @@ def dub_and_transcribe(video_path, target_langs, dest_dir, source_lang="en",
     """
     os.makedirs(dest_dir, exist_ok=True)
     work_dir = work_dir or tempfile.mkdtemp(prefix="cs_dub_")
-    provider_mod = heygen if provider == "heygen" else dub  # provider-agnostic localized media
+    provider_mod = PROVIDERS.get(provider, dub)   # provider-agnostic localized media
     results, errors = [], {}
     for lang in target_langs:
         try:

@@ -397,6 +397,14 @@
           <textarea id="transcript" rows="3" style="min-height:210px;max-height:360px;overflow-y:auto;resize:vertical;font-size:15px" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
           <div id="transcriptWords" class="twords" contenteditable="true" spellcheck="false" style="display:none"></div>
         </div>
+        <!-- ✨ Polish: one Gemini pass that fixes misheard words and picks the line breaks.
+             It returns DATA (per-word fixes + break markers) that goes through the same layout
+             engine as everything else, so preview and render can't drift apart. -->
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          <button id="polishBtn" style="font-size:12px;padding:6px 10px" title="Gemini перевіряє транскрипт на неправильно почуті слова і розставляє розриви титрів. Показує, що саме змінив — можна відкотити.">✨ Полірувати</button>
+          <button id="polishUndo" style="display:none;font-size:12px;padding:6px 10px">↩ Відкотити</button>
+        </div>
+        <div id="polishOut" style="display:none;margin-top:6px;font-size:11.5px"></div>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
         <div class="row" style="margin-top:8px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків; крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label><label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
         <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
@@ -630,7 +638,7 @@
       <summary><span data-i18n="secLocalize">Localize</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Method</label>
-          <select id="locProvider"><option value="elevenlabs">Voice dub (ElevenLabs)</option><option value="heygen">Lip-sync (HeyGen)</option></select></div>
+          <select id="locProvider"><option value="elevenlabs">Voice dub (ElevenLabs)</option><option value="synclab">Lip-sync (Sync Lab)</option><option value="heygen">Lip-sync (HeyGen)</option></select></div>
         <div class="hint" id="locProviderHint">Voice dub: new voice on the original video. Fast & cheap.</div>
         <div class="row"><label>Target languages</label>
           <div class="chips" id="langChips" style="flex-wrap:wrap">
@@ -727,6 +735,10 @@
     <input type="password" id="keyEleven" placeholder="sk_…  (порожнє = лишити поточний)">
     <div class="mlbl">HeyGen API key (lip-sync)</div>
     <input type="password" id="keyHeygen" placeholder="sk_…  (порожнє = лишити поточний)">
+    <div class="mlbl">Sync Lab API key (sync.so — dub + lip-sync)</div>
+    <input type="password" id="keySynclab" placeholder="sk-…  (порожнє = лишити поточний)">
+    <div class="mlbl">Gemini API key (✨ Полірувати титри)</div>
+    <input type="password" id="keyGemini" placeholder="AIza…  (порожнє = лишити поточний)">
     <div class="mlbl">Shared library folder (Google Drive)</div>
     <input type="text" id="libDir" placeholder="/Users/…/Assembler Library  (порожнє = лишити поточний)">
     <div class="hint" style="margin-top:5px">Це <b>шлях до синхронізованої папки на цьому Mac</b>, не посилання drive.google.com. У Finder: правий клік на папці → ⌥⌘C («Copy as Pathname»). Або тицьни варіант нижче:</div>
@@ -843,7 +855,7 @@ function busyStop(){clearInterval(_busyTick);$("busyBar").classList.remove("show
 async function loadSettings(){
   try{const d=await(await fetch(API+"/api/settings")).json();
     $("machineId").textContent=d.machine_id;$("lockMid").textContent=d.machine_id;
-    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set");
+    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Gemini: "+(d.gemini_key_present?"✓ set":"— not set");
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
       $("libStatus").innerHTML=libStatusHTML(d.library_dir,d.library_exists);}
     if(d.allowed===false)$("lockScreen").classList.add("show");
@@ -949,11 +961,13 @@ $("settingsSave").onclick=async()=>{
   if(/^[a-z]+:\/\//i.test(_ld)){   // stop the URL before it ever reaches the server
     setStatus("Це веб-посилання. Потрібен ШЛЯХ до синхронізованої папки на цьому Mac: у Finder правий клік на папці → ⌥⌘C.","err");return;}
   try{const r=await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({elevenlabs_api_key:$("keyEleven").value,heygen_api_key:$("keyHeygen").value,library_dir:_ld})});
+      body:JSON.stringify({elevenlabs_api_key:$("keyEleven").value,heygen_api_key:$("keyHeygen").value,
+        synclab_api_key:($("keySynclab")?$("keySynclab").value:""),
+        gemini_api_key:($("keyGemini")?$("keyGemini").value:""),library_dir:_ld})});
     const d=await r.json();
     if(!r.ok)throw new Error(d.detail||"failed");
-    $("keyEleven").value="";$("keyHeygen").value="";
-    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set");
+    $("keyEleven").value="";$("keyHeygen").value="";if($("keySynclab"))$("keySynclab").value="";if($("keyGemini"))$("keyGemini").value="";
+    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Gemini: "+(d.gemini_key_present?"✓ set":"— not set");
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
       $("libStatus").innerHTML=libStatusHTML(d.library_dir,d.library_exists);}
     if(typeof loadLibrary==="function")loadLibrary();
@@ -2595,6 +2609,61 @@ $("transcribeBtn").onclick=async()=>{
   updateEditButtons();   // words exist now → the Transcribe CTA stops pulsing
 };
 
+// ---------- ✨ Polish captions (Gemini): fix misheard words + choose the line breaks ----------
+// The pass returns DATA only (per-word fixes + brk markers) — the SAME data your own Enter
+// produces — so it flows through the one layout engine and preview/render stay identical.
+let _polishBackup=null;
+function applyPolishedWords(ws){
+  realWords=ws;
+  if(variants[activeVar])variants[activeVar].words=ws;
+  const h=(typeof openHookRef==="function")?openHookRef():null; if(h)h.words=ws;
+  $("transcript").value=wordsToText(ws);autoGrow();
+  if(txtView==="words"&&typeof renderWordsView==="function")renderWordsView();
+  if(typeof invalidateLayout==="function")invalidateLayout();
+  if(typeof scheduleExact==="function")scheduleExact();
+}
+if($("polishBtn"))$("polishBtn").onclick=async()=>{
+  if(!realWords||!realWords.length){setStatus("Спершу зроби транскрайб.","err");return;}
+  const b=$("polishBtn");b.disabled=true;const old=b.textContent;b.textContent="✨ …";
+  setStatus("Полірую титри (Gemini)…","",true);
+  try{
+    const s=readControls();
+    const r=await fetch(API+"/api/polish_captions",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({words:realWords,lang:capLang(),max_chars:+s.maxChars||15,max_lines:+s.maxLines||2})});
+    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
+    _polishBackup=JSON.parse(JSON.stringify(realWords));   // one-click undo
+    applyPolishedWords(d.words||realWords);
+    renderPolishOut(d);
+    $("polishUndo").style.display=(d.changes||[]).length?"inline-block":"none";
+    setStatus((d.changes||[]).length?("Пороблено "+d.changes.length+" правок ("+(d.model||"gemini")+"). Перевір і відкоти, якщо не те."):"Gemini не знайшов, що поправити 👌",(d.changes||[]).length?"ok":"");
+  }catch(e){setStatus("Полірування не вдалось: "+e.message,"err");}
+  b.disabled=false;b.textContent=old;
+};
+if($("polishUndo"))$("polishUndo").onclick=()=>{
+  if(!_polishBackup)return;
+  applyPolishedWords(JSON.parse(JSON.stringify(_polishBackup)));
+  _polishBackup=null;$("polishUndo").style.display="none";
+  $("polishOut").style.display="none";$("polishOut").innerHTML="";
+  setStatus("Правки відкочено — транскрипт як був.","ok");
+};
+// show WHAT changed: silent AI edits kill trust faster than a bad transcript
+function renderPolishOut(d){
+  const box=$("polishOut");if(!box)return;
+  const ch=d.changes||[], rules=d.rules||[], dropped=d.dropped||[];
+  if(!ch.length&&!rules.length){box.style.display="none";box.innerHTML="";return;}
+  const fixes=ch.filter(c=>c.type==="fix"), brks=ch.filter(c=>c.type==="break");
+  let h="<div style='padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)'>";
+  if(fixes.length)h+="<div style='color:var(--accent2);font-weight:600;margin-bottom:3px'>Слова ("+fixes.length+")</div>"
+    +fixes.map(c=>"<div style='color:var(--muted)'><s>"+String(c.from).replace(/</g,"&lt;")+"</s> → <b style='color:var(--txt)'>"+String(c.to).replace(/</g,"&lt;")+"</b>"+(c.why?(" <span style='opacity:.7'>— "+String(c.why).replace(/</g,"&lt;")+"</span>"):"")+"</div>").join("");
+  if(brks.length)h+="<div style='color:var(--accent2);font-weight:600;margin:6px 0 3px'>Розриви ("+brks.length+")</div>"
+    +"<div style='color:var(--muted)'>після: "+brks.map(c=>String(c.after).replace(/</g,"&lt;")).join(" · ")+"</div>";
+  if(rules.length)h+="<div style='color:var(--ok);font-weight:600;margin:6px 0 3px'>Пропонує правила ("+rules.length+")</div>"
+    +rules.map(x=>"<div style='color:var(--muted)'>"+[x.kind,x.from,x.to].filter(Boolean).map(v=>String(v).replace(/</g,"&lt;")).join(" · ")+(x.why?(" <span style='opacity:.7'>— "+String(x.why).replace(/</g,"&lt;")+"</span>"):"")+"</div>").join("")
+    +"<div style='color:var(--muted);margin-top:3px;font-size:11px'>Скинь мені ці рядки — занесу в caption_rules.json, і наступного разу спрацює без моделі.</div>";
+  if(dropped.length)h+="<div style='color:var(--muted);margin-top:6px;font-size:11px'>Відкинуто небезпечних правок: "+dropped.length+" (могли зламати тайминги)</div>";
+  box.innerHTML=h+"</div>";box.style.display="block";
+}
+
 // ---------- render ----------
 // "Send to Compose" — the single forward action for EN and every localized variant.
 // Pushes live hooks (clip + words + style + trim) onto the board. Baking happens once,
@@ -3253,7 +3322,7 @@ function renderLocStage(){
     +'<div style="font-size:12px;color:var(--muted);margin-bottom:6px">Мови локалізації:</div>'
     +'<div id="locLangs" style="display:flex;flex-wrap:wrap;gap:9px;margin-bottom:16px"></div>'
     +'<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">'
-      +'<select id="locProvider2" class="loc-provider"><option value="elevenlabs">Voice dub (ElevenLabs)</option><option value="heygen">Lip-sync (HeyGen)</option></select>'
+      +'<select id="locProvider2" class="loc-provider"><option value="elevenlabs">Voice dub (ElevenLabs)</option><option value="synclab">Lip-sync (Sync Lab)</option><option value="heygen">Lip-sync (HeyGen)</option></select>'
       +'<button class="primary big-go" id="locGoBtn">🌍 Localize</button>'
       +(haveLoc?'<button class="ghost" id="locBackupBtn" title="Завантажити всі локалізовані кліпи + транскрипти одним архівом — резерв на випадок краху сесії">⬇ Backup .zip</button>':'')+'</div>'
     +'<div style="display:flex;gap:20px;align-items:flex-start">'
