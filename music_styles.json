@@ -1,0 +1,37 @@
+{
+  "_readme": "MUSIC tab presets. Two different things, kept separate on purpose: 'recipes' are COMPLETE briefs — one click replaces the description field with editable text; 'tablets' are short modifiers that APPEND to whatever is already in the field. Both are visible in the field, so nothing happens invisibly. Edit freely: this shipped file is merged into ~/.assembler/music_styles.json on launch (local edits win), so a recipe added here reaches the whole team with the next update.",
+  "recipes": [
+    {"label": "Фітнес-хук 30с",
+     "text": "High-energy pop-dance track at 128 BPM in A minor, driving four-on-the-floor kick, bright supersaw synths and claps, instant hook in the first second and one clear peak; confident female alto, punchy and motivating. Structured for a 30-second ad with a clean ending."},
+    {"label": "Велнес під голос",
+     "text": "Soft wellness underscore at 88 BPM in F major, warm felt piano, gentle shaker and airy pads, no busy melodies in the mid frequencies so a voice-over stays clear. Calm, healthy-lifestyle warmth, slow gentle build, clean ending."},
+    {"label": "K-pop реклама",
+     "text": "Bright K-pop track at 124 BPM in B major, glossy synth stabs, slap bass, crisp trap-influenced drums, pre-chorus lift into a big group-vocal chorus; lead female vocal with playful energy plus layered backing chants."},
+    {"label": "Lo-fi фон",
+     "text": "Lo-fi hip hop at 84 BPM in D minor, dusty vinyl crackle, mellow Rhodes chords, soft boom-bap drums and upright bass, sparse and unobtrusive. Instrumental only, no vocals."},
+    {"label": "Епічний трейлер",
+     "text": "Cinematic orchestral build at 100 BPM in D minor, solo piano intro, strings swelling with braams and taiko hits, climaxing in a wall of sound at the end. Instrumental only, no vocals."},
+    {"label": "UGC-органіка",
+     "text": "Casual acoustic pop at 104 BPM in G major, fingerpicked guitar, handclaps and light tambourine, feels homemade rather than produced; friendly male tenor singing close to the mic."},
+    {"label": "Дерзкий хіп-хоп",
+     "text": "Confident hip hop at 92 BPM in F minor, heavy 808 bass, sharp hi-hats and a simple ominous synth motif; bold rap delivery with attitude, gang-vocal hook."},
+    {"label": "Ретро-синтвейв",
+     "text": "80s synthwave at 112 BPM in A minor, gated drum machine, shimmering analog pads and an arpeggiated bassline, retro-futuristic; smoky female alto with a nostalgic delivery."}
+  ],
+  "tablets": [
+    {"label": "швидше", "text": "faster tempo, around 130 BPM"},
+    {"label": "повільніше", "text": "slower tempo, around 80 BPM"},
+    {"label": "радісніше", "text": "brighter and more uplifting"},
+    {"label": "серйозніше", "text": "more serious and restrained"},
+    {"label": "жін. вокал", "text": "female lead vocal"},
+    {"label": "чол. вокал", "text": "male lead vocal"},
+    {"label": "хор на припіві", "text": "layered group vocals on the chorus"},
+    {"label": "дроп на 12с", "text": "build tension and land the drop at 12 seconds"},
+    {"label": "хук з 1-ї сек", "text": "start on the hook immediately, no long intro"},
+    {"label": "під голос", "text": "keep the mid frequencies clear so a voice-over sits on top"},
+    {"label": "мінімум", "text": "sparse arrangement, few elements, lots of space"},
+    {"label": "стіна звуку", "text": "dense layered arrangement, wall of sound"},
+    {"label": "живий запис", "text": "live-room feel, natural drums, minimal processing"},
+    {"label": "лоу-фай", "text": "lo-fi texture, tape saturation, gentle noise floor"}
+  ]
+}

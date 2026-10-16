@@ -581,6 +581,143 @@ def trim_clip(clip_path, start, end, output_path):
     return output_path
 
 
+def cut_spans(clip_path, spans, output_path, fps=None):
+    """Remove one or more time ranges from the MIDDLE of a clip (video AND audio together).
+
+    trim_clip can only take the head or the tail; this is what a compliance fix needs when the
+    offending phrase sits at 0:34 of a 0:58 creative. Boundaries are snapped to whole frames of
+    the SOURCE's real fps, so a join lands on a frame and not between two.
+
+    Built from trim/atrim + concat rather than select/aselect on purpose: aselect can only keep
+    WHOLE audio frames (~23ms each), so every seam kept a few samples too many and the audio
+    ended up longer than the picture — drift you can hear. atrim cuts on the sample, so video
+    and audio come out the same length. Returns (output_path, removed_seconds).
+    """
+    spans = _merge_spans(spans)
+    if not spans:
+        return clip_path, 0.0
+    p = _stream_params(clip_path) or (None,) * 8
+    r = float(fps or p[2] or 30.0)
+    snapped = [(round(a * r) / r, round(b * r) / r) for a, b in spans]
+    removed = sum(b - a for a, b in snapped)
+    has_audio = bool(p[5])
+
+    keeps = []
+    cur = 0.0
+    for a, b in snapped:
+        if a > cur + 1e-6:
+            keeps.append((cur, a))
+        cur = b
+    keeps.append((cur, None))          # tail: open-ended, to the end of the clip
+    if not keeps:
+        return clip_path, 0.0
+
+    fc, vlabels, alabels = [], [], []
+    for i, (a, b) in enumerate(keeps):
+        rng = f"start={a:.6f}" + (f":end={b:.6f}" if b is not None else "")
+        fc.append(f"[0:v]trim={rng},setpts=PTS-STARTPTS[v{i}]")
+        vlabels.append(f"[v{i}]")
+        if has_audio:
+            fc.append(f"[0:a]atrim={rng},asetpts=PTS-STARTPTS[a{i}]")
+            alabels.append(f"[a{i}]")
+    n = len(keeps)
+    fc.append("".join(vlabels) + f"concat=n={n}:v=1:a=0[vout]")
+    if has_audio:
+        fc.append("".join(alabels) + f"concat=n={n}:v=0:a=1[aout]")
+
+    cmd = ["ffmpeg", "-i", clip_path, "-filter_complex", "; ".join(fc), "-map", "[vout]"]
+    if has_audio:
+        cmd += ["-map", "[aout]"]
+    cmd += ff.encoder_quality_args("12M")
+    if has_audio:
+        cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2"]
+    cmd += [output_path, "-y"]
+    ff.run(cmd)
+    return output_path, round(removed, 3)
+
+
+def mute_spans(clip_path, spans, output_path, fade=0.08):
+    """Silence time ranges WITHOUT changing the length, video untouched (stream-copied).
+
+    This is the guide's fix for an overpromise in an on-screen-text hook: "we remove the song's
+    audio at the beginning and change the text". Cutting would shorten the hook and break its
+    edit; muting keeps every frame where it was, so the text overlay and the caption timings
+    stay valid.
+
+    One `volume` filter per span, each carrying its own gain envelope: 0 inside the span and a
+    short linear ramp on either side, so there is no click. Deliberately NOT afade — afade is a
+    one-shot ramp, not a local window: `afade=t=out` at the head of a clip takes the volume to
+    zero and leaves it there, which silences the entire track.
+    """
+    spans = _merge_spans(spans)
+    if not spans:
+        return clip_path
+    f = max(0.0, float(fade or 0))
+    chain = []
+    for a, b in spans:
+        if f > 0.005:
+            lo = max(0.0, a - f)
+            e = (f"if(between(t,{a:.6f},{b:.6f}),0,"
+                 f"if(between(t,{lo:.6f},{a:.6f}),({a:.6f}-t)/{f:.3f},"
+                 f"if(between(t,{b:.6f},{b + f:.6f}),(t-{b:.6f})/{f:.3f},1)))")
+        else:
+            e = f"if(between(t,{a:.6f},{b:.6f}),0,1)"
+        chain.append(f"volume=volume='{e}':eval=frame")
+    ff.run(["ffmpeg", "-i", clip_path, "-af", ",".join(chain), "-c:v", "copy",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", output_path, "-y"])
+    return output_path
+
+
+def _merge_spans(spans):
+    """Sorted, non-overlapping, non-empty [(a,b)] — overlapping cuts would double-count."""
+    out = []
+    for sp in sorted([(float(a), float(b)) for a, b in (spans or []) if float(b) > float(a)]):
+        if out and sp[0] <= out[-1][1] + 1e-6:
+            out[-1] = (out[-1][0], max(out[-1][1], sp[1]))
+        else:
+            out.append(sp)
+    return out
+
+
+def shift_words_cut(words, spans, fps=None):
+    """Re-time words for a clip that had spans cut out of its middle.
+
+    A word inside a cut is GONE (its audio left with it). A word that only clips the edge of a
+    cut keeps the part that survives. Everything after a cut moves earlier by the removed time,
+    which is what keeps captions, titles and the caption window valid after the edit.
+    """
+    spans = _merge_spans(spans)
+    if not spans:
+        return list(words or [])
+    r = float(fps or 30.0)
+    spans = [(round(a * r) / r, round(b * r) / r) for a, b in spans]
+
+    def remap(t):
+        """Source time -> output time, minus every cut that ends before it."""
+        off = 0.0
+        for a, b in spans:
+            if t >= b:
+                off += (b - a)
+            elif t > a:
+                return max(0.0, a - off)   # inside a cut: collapse onto the seam
+        return max(0.0, t - off)
+
+    out = []
+    for w in (words or []):
+        ws, we = float(w["start"]), float(w["end"])
+        # drop a word whose MIDDLE was cut away — half a spoken word is worse than none
+        mid = (ws + we) / 2.0
+        if any(a <= mid < b for a, b in spans):
+            continue
+        ns, ne = remap(ws), remap(we)
+        if ne - ns < 0.04:                 # nothing audible left of it
+            continue
+        d = dict(w)
+        d["start"], d["end"] = round(ns, 3), round(ne, 3)
+        out.append(d)
+    return out
+
+
 def shift_words(words, start, end):
     """Re-base word timecodes to a trimmed clip: drop words outside [start,end],
     shift the rest so the clip starts at 0."""

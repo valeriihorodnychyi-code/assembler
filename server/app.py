@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 # allow "python -m server.app" and direct execution
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, polish, synclab  # noqa: E402
+from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, polish, synclab, lyria, compliance, jira  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(ROOT, "web")
@@ -527,6 +527,9 @@ class KeysReq(BaseModel):
     heygen_api_key: Optional[str] = None
     synclab_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    jira_email: Optional[str] = None
+    jira_api_token: Optional[str] = None
+    jira_site: Optional[str] = None
     library_dir: Optional[str] = None
     finished_dir: Optional[str] = None
 
@@ -538,6 +541,8 @@ def get_settings():
             "heygen_key_present": bool(os.environ.get("HEYGEN_API_KEY")),
             "synclab_key_present": bool(os.environ.get("SYNCLAB_API_KEY")),
             "gemini_key_present": bool(os.environ.get("GEMINI_API_KEY")),
+            "jira_configured": jira.configured(),
+            "jira_email": jira.load_creds()[1],
             "library_dir": os.environ.get("CS_LIBRARY_DIR", ""),
             "library_exists": os.path.isdir(os.environ.get("CS_LIBRARY_DIR", "")),
             "finished_dir": os.environ.get("CS_FINISHED_DIR", ""),
@@ -545,8 +550,30 @@ def get_settings():
             "keys_location": _PCFG}
 
 
+def save_jira(email="", token="", site=""):
+    """Each designer's OWN Jira token, per machine — never shared, never in the repo. Tasks
+    carry a security level, so a shared token would show people tasks Jira hides from them."""
+    if not (email or token or site):
+        return
+    os.makedirs(os.path.dirname(_PCFG), exist_ok=True)
+    cur = {}
+    if os.path.exists(_PCFG):
+        try:
+            cur = _json.load(open(_PCFG, encoding="utf-8"))
+        except Exception:
+            cur = {}
+    if email:
+        cur["jira_email"] = email.strip()
+    if token:
+        cur["jira_api_token"] = token.strip()
+    if site:
+        cur["jira_site"] = site.strip().replace("https://", "").replace("http://", "").strip("/")
+    _json.dump(cur, open(_PCFG, "w", encoding="utf-8"), indent=2)
+
+
 @app.post("/api/settings")
 def post_settings(body: KeysReq):
+    save_jira(body.jira_email or "", body.jira_api_token or "", body.jira_site or "")
     save_keys((body.elevenlabs_api_key or "").strip(), (body.heygen_api_key or "").strip(),
               (body.synclab_api_key or "").strip(), (body.gemini_api_key or "").strip())
     if body.library_dir is not None and body.library_dir.strip():
@@ -558,6 +585,8 @@ def post_settings(body: KeysReq):
             "heygen_key_present": bool(os.environ.get("HEYGEN_API_KEY")),
             "synclab_key_present": bool(os.environ.get("SYNCLAB_API_KEY")),
             "gemini_key_present": bool(os.environ.get("GEMINI_API_KEY")),
+            "jira_configured": jira.configured(),
+            "jira_email": jira.load_creds()[1],
             "library_dir": os.environ.get("CS_LIBRARY_DIR", ""),
             "library_exists": os.path.isdir(os.environ.get("CS_LIBRARY_DIR", ""))}
 
@@ -653,6 +682,430 @@ def api_detect_cuts(req: DetectCutsReq):
     except Exception as e:
         raise HTTPException(500, f"Cut detection failed: {e}")
     return {"cuts": cuts}
+
+
+# ---------- MUSIC: generate with Lyria, audition, keep the good ones in the library ----------
+def _music_styles_path():
+    """Style tablets live per-machine (editable) and are seeded/merged from the shipped file,
+    exactly like caption_rules — so a tablet added in the repo reaches everyone on update,
+    while a local edit is never overwritten."""
+    dst = os.path.join(_ASSEMBLER_HOME, "music_styles.json")
+    src = os.path.join(ROOT, "music_styles.json")
+    try:
+        os.makedirs(_ASSEMBLER_HOME, exist_ok=True)
+        shipped = {}
+        if os.path.exists(src):
+            with open(src, encoding="utf-8") as f:
+                shipped = _json.load(f) or {}
+        if not os.path.exists(dst):
+            if shipped:
+                with open(dst, "w", encoding="utf-8") as f:
+                    _json.dump(shipped, f, ensure_ascii=False, indent=2)
+        elif shipped.get("groups"):
+            with open(dst, encoding="utf-8") as f:
+                local = _json.load(f) or {}
+            have = {g.get("name") for g in (local.get("groups") or [])}
+            added = [g for g in shipped["groups"] if g.get("name") not in have]
+            if added:
+                local.setdefault("groups", []).extend(added)
+                with open(dst, "w", encoding="utf-8") as f:
+                    _json.dump(local, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[music] styles merge skipped ({type(e).__name__}: {e})", flush=True)
+    return dst if os.path.exists(dst) else src
+
+
+@app.get("/api/music/styles")
+def api_music_styles():
+    try:
+        with open(_music_styles_path(), encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return {"groups": []}
+
+
+@app.post("/api/music/styles")
+def api_music_styles_save(body: dict):
+    if not isinstance(body, dict) or "groups" not in body:
+        raise HTTPException(400, "Expected {groups:[...]}")
+    p = _music_styles_path()
+    tmp = p + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(body, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, p)
+    return {"saved": True, "path": p}
+
+
+class AutoPromptReq(BaseModel):
+    lyrics: str = ""
+    brief: str = ""
+    chips: List[str] = []
+    kind: str = "clip"
+    instrumental: bool = False
+
+
+@app.post("/api/music/autoprompt")
+def api_music_autoprompt(req: AutoPromptReq):
+    """Lyrics + a few words + style tablets -> three finished Lyria briefs to choose from."""
+    import time as _t
+    t0 = _t.time()
+    try:
+        res = lyria.autoprompt(lyrics=req.lyrics, brief=req.brief, chips=req.chips,
+                               kind=req.kind, instrumental=req.instrumental)
+    except Exception as e:
+        raise HTTPException(500, f"{e}")
+    _log_timing("music_autoprompt", _t.time() - t0,
+                f"chips={len(req.chips)} kind={req.kind} model={res.get('model')}")
+    return res
+
+
+class MusicGenReq(BaseModel):
+    file_id: str = ""
+    prompt: str = ""
+    kind: str = "clip"                    # clip = 30s | song = full length
+    instrumental: bool = False
+    lyrics: str = ""                      # YOUR OWN lyrics ([Verse]/[Chorus] tags); empty = model writes them
+    takes: int = 1                        # results vary between calls → generate a few, pick one
+    images: Optional[List[dict]] = None   # [{"mime_type","data"(base64)}] — e.g. a frame of the creative
+    wav: bool = False
+
+
+def _music_dir(file_id):
+    """Where generated takes live. Music must work with NO video session at all (someone can
+    open Assembler just to make a track), so an unknown/absent id falls back to a scratch dir
+    instead of failing session validation."""
+    base = None
+    if file_id and file_id != "scratch":
+        try:
+            base = _session_dir(file_id)
+        except Exception:
+            base = None
+    if not base:
+        base = os.path.join(WORK_ROOT, "music_scratch")
+    d = os.path.join(base, "music")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+@app.post("/api/music/generate")
+def api_music_generate(req: MusicGenReq):
+    """Generate 1–3 takes and drop them in the session so they can be auditioned in the app.
+
+    Nothing is saved to the shared library yet — that's a separate, deliberate step.
+    """
+    import time as _t
+    fid = req.file_id or "scratch"
+    d = _music_dir(fid)
+    takes = max(1, min(3, int(req.takes or 1)))
+    out, errors = [], []
+    for i in range(takes):
+        t0 = _t.time()
+        try:
+            res = lyria.generate(req.prompt, kind=req.kind, instrumental=req.instrumental,
+                                 images=req.images, wav=req.wav, lyrics=req.lyrics)
+        except Exception as e:
+            errors.append(str(e))
+            continue
+        stamp = _t.strftime("%H%M%S") + f"_{i+1}"
+        name = f"lyria_{req.kind}_{stamp}{res['ext']}"
+        with open(os.path.join(d, name), "wb") as f:
+            f.write(res["audio"])
+        el = _t.time() - t0
+        _log_timing("music", el, f"model={res['model']} kind={req.kind} instrumental={req.instrumental}")
+        out.append({"name": name, "url": f"/api/music/file/{fid}/{name}",
+                    "lyrics": res["lyrics"], "model": res["model"],
+                    "seconds": round(el, 1),
+                    "size_mb": round(len(res["audio"]) / 1e6, 2)})
+    if not out:
+        raise HTTPException(500, "; ".join(errors) or "Lyria returned nothing")
+    return {"tracks": out, "errors": errors, "file_id": fid}
+
+
+@app.get("/api/music/file/{file_id}/{name}")
+def api_music_file(file_id: str, name: str):
+    p = os.path.join(_music_dir(file_id), os.path.basename(name))
+    if not os.path.exists(p):
+        raise HTTPException(404, "Track not found")
+    mt = "audio/wav" if p.lower().endswith(".wav") else "audio/mpeg"
+    return FileResponse(p, media_type=mt, filename=os.path.basename(p))
+
+
+@app.get("/api/music/library")
+def api_music_library():
+    """Saved tracks + their RECIPE (the sidecar JSON written when the take was kept).
+
+    This is what makes "remix the winner" possible: the winning track lives in the shared
+    library, and its prompt travels with it, so it can be reloaded and re-generated with
+    edited lyrics instead of being described from memory.
+    """
+    items = []
+    for it in library.list_items(type="music"):
+        meta = {}
+        try:
+            side = os.path.join(library.LIBRARY_DIR,
+                                os.path.splitext(it["file"])[0] + ".json")
+            if os.path.exists(side):
+                with open(side, encoding="utf-8") as f:
+                    meta = _json.load(f) or {}
+        except Exception:
+            meta = {}
+        items.append({**it,
+                      "prompt": meta.get("prompt", ""),
+                      "kind": meta.get("kind", ""),
+                      "instrumental": bool(meta.get("instrumental", False)),
+                      "model": meta.get("model", ""),
+                      "lyrics": meta.get("lyrics", ""),
+                      "lyrics_in": meta.get("lyrics_in", ""),
+                      "created": meta.get("created", it.get("added", "")),
+                      "url": f"/api/music/lib_file/{it['file']}"})
+    items.sort(key=lambda x: x.get("created", ""), reverse=True)
+    return {"items": items, "dir": library.LIBRARY_DIR, "dir_ok": library.dir_ok()}
+
+
+@app.get("/api/music/lib_file/{sub}/{name}")
+def api_music_lib_file(sub: str, name: str):
+    p = os.path.join(library.LIBRARY_DIR, os.path.basename(sub), os.path.basename(name))
+    if not os.path.exists(p):
+        raise HTTPException(404, "Track not found")
+    mt = "audio/wav" if p.lower().endswith(".wav") else "audio/mpeg"
+    return FileResponse(p, media_type=mt, filename=os.path.basename(p))
+
+
+class MusicSaveReq(BaseModel):
+    file_id: str = ""
+    name: str                     # the generated file in the session
+    save_as: str = ""             # library name (without extension)
+    prompt: str = ""
+    kind: str = "clip"
+    instrumental: bool = False
+    model: str = ""
+    lyrics: str = ""          # what the model produced
+    lyrics_in: str = ""       # what the user wrote (the part that belongs to the recipe)
+
+
+@app.post("/api/music/save")
+def api_music_save(req: MusicSaveReq):
+    """Keep a take: copy it into the shared library's music/ folder with a sidecar JSON.
+
+    The sidecar stores the prompt/model/date, so a track can be found later and regenerated
+    (Lyria isn't deterministic, but the prompt is the recipe).
+    """
+    src = os.path.join(_music_dir(req.file_id or "scratch"), os.path.basename(req.name))
+    if not os.path.exists(src):
+        raise HTTPException(404, "That take is gone — generate it again.")
+    if not library.dir_ok():
+        raise HTTPException(400, f"Library folder unavailable: {library.LIBRARY_DIR}")
+    dest_dir = os.path.join(library.LIBRARY_DIR, library.SUBDIRS.get("music", "music"))
+    os.makedirs(dest_dir, exist_ok=True)
+    ext = os.path.splitext(src)[1] or ".mp3"
+    # underscores, not spaces — the library is a shared Drive folder that other tools read
+    stem = _safe_name(req.save_as, os.path.splitext(os.path.basename(src))[0]).replace(" ", "_")
+    name = stem + ext
+    k = 2
+    while os.path.exists(os.path.join(dest_dir, name)):     # never overwrite a colleague's track
+        name = f"{stem}_{k}{ext}"
+        k += 1
+    shutil.copyfile(src, os.path.join(dest_dir, name))
+    meta = {"file": name, "prompt": req.prompt, "kind": req.kind, "model": req.model,
+            "instrumental": bool(req.instrumental), "lyrics": req.lyrics,
+            "lyrics_in": req.lyrics_in,
+            "created": __import__("time").strftime("%Y-%m-%d %H:%M")}
+    try:
+        with open(os.path.join(dest_dir, os.path.splitext(name)[0] + ".json"), "w",
+                  encoding="utf-8") as f:
+            _json.dump(meta, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+    return {"saved": name, "dir": dest_dir}
+
+
+# ---------- compliance: turn a META creative into a network-safe edit (AppLovin) ----------
+class ComplianceReq(BaseModel):
+    words: List[dict] = []
+    profile: str = "applovin"
+    duration: float = 0.0          # clip length, so the length rule can be checked too
+    has_disclaimer: bool = False
+
+
+@app.post("/api/compliance/scan")
+def api_compliance_scan(req: ComplianceReq):
+    """Every compliance hit WITH ITS TIMECODE, plus the profile's pre-flight checks.
+
+    Timecodes matter because the spoken line is what a reviewer hears: a caption edit alone
+    does not fix "lose 45 pounds" if the narrator says it. Each hit says whether it needs a
+    re-voice/cut or just a human decision.
+    """
+    if not req.words:
+        raise HTTPException(400, "No transcript — transcribe the clip first.")
+    res = compliance.scan(req.words, profile=req.profile)
+    prof = res.get("profile") or {}
+    checks = []
+    mx = float(prof.get("max_seconds") or 0)
+    if mx and req.duration:
+        ok = req.duration <= mx + 0.05
+        checks.append({"id": "length", "ok": ok,
+                       "text": f"Довжина {req.duration:.1f}с / ліміт {mx:.0f}с"
+                               + ("" if ok else f" — прибрати {req.duration - mx:.1f}с")})
+    if prof.get("require_disclaimer"):
+        checks.append({"id": "disclaimer", "ok": bool(req.has_disclaimer),
+                       "text": "Дисклеймер «" + str(prof.get("disclaimer_text", "")) + "»"
+                               + (" на місці" if req.has_disclaimer else " ВІДСУТНІЙ (додай оверлеєм)")})
+    blocking = sum(1 for h in res["hits"] if h["action"] in ("revoice", "replace"))
+    checks.append({"id": "text", "ok": blocking == 0,
+                   "text": (f"Текст: {blocking} місць(ь) потребують правки"
+                            if blocking else "Текст: заборонених формулювань не знайдено")})
+    return {**res, "checks": checks, "ready": all(c["ok"] for c in checks)}
+
+
+@app.get("/api/compliance/rules")
+def api_compliance_rules():
+    return compliance.load_rules()
+
+
+@app.get("/api/compliance/profiles")
+def api_compliance_profiles():
+    """Which networks this install can check. There is no 'all creatives' profile on purpose —
+    a delivery rule belongs to the network that asked for it, never to Assembler in general."""
+    return {"profiles": compliance.profiles()}
+
+
+class ComplianceFixReq(BaseModel):
+    words: List[dict] = []
+    fixes: List[dict] = []         # [{"word_from":i,"word_to":j,"text":"lose extra weight"}]
+
+
+@app.post("/api/compliance/fix_captions")
+def api_compliance_fix(req: ComplianceFixReq):
+    """Rewrite the CAPTIONS of the given spans. Word count and timings are preserved, so the
+    caption layout is untouched — and the audio is deliberately NOT changed here."""
+    if not req.words or not req.fixes:
+        raise HTTPException(400, "Nothing to fix")
+    words, changes = compliance.apply_captions(req.words, req.fixes)
+    return {"words": words, "changes": changes}
+
+
+# ---------- Jira → session: paste task keys / links / asset names, get the videos ----------
+class JiraReq(BaseModel):
+    text: str
+    file_id: str = ""
+
+
+@app.get("/api/jira/status")
+def api_jira_status():
+    site, email, _ = jira.load_creds()
+    return {"configured": jira.configured(), "site": site, "email": email}
+
+
+@app.post("/api/jira/resolve")
+def api_jira_resolve(req: JiraReq):
+    """Metadata only — nothing downloaded. Fast enough to run on 50 tasks, and what a
+    compliance pre-scan over the voice-over texts needs."""
+    try:
+        return jira.resolve(req.text)
+    except jira.JiraError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/jira/import")
+def api_jira_import(req: JiraReq):
+    """Resolve the pasted tasks and pull each clean master straight into the session.
+
+    The server downloads directly from ADAM into the session folder — the browser never
+    carries the file, so 5 x 200 MB arrive in the time of the slowest one, not their sum.
+    Each item comes back in the SAME shape an uploaded clip has, so everything downstream
+    (transcribe, captions, titles, the board) treats it exactly like a dropped file.
+    """
+    try:
+        res = jira.resolve(req.text)
+    except jira.JiraError as e:
+        raise HTTPException(400, str(e))
+    fid = req.file_id if (req.file_id and os.path.isdir(os.path.join(WORK_ROOT, req.file_id))) \
+        else uuid.uuid4().hex[:12]
+    sdir = os.path.join(WORK_ROOT, fid)
+    os.makedirs(os.path.join(sdir, "output"), exist_ok=True)
+
+    from concurrent.futures import ThreadPoolExecutor
+    todo = [r for r in res["items"] if r.get("video")]
+    for r in res["items"]:
+        if not r.get("video"):
+            res["errors"].append({"input": r["key"], "error": r["warn"] or "немає відео"})
+
+    def pull(rec):
+        try:
+            rec["clip"] = jira.download(rec["video"], sdir)
+            rec["url"] = f"/clip/{fid}/{rec['clip']}"
+            return rec, None
+        except Exception as e:
+            return rec, str(e)
+
+    import time as _t
+    t0 = _t.time()
+    done = []
+    with ThreadPoolExecutor(max_workers=3) as ex:     # 3 at a time: fast, and kind to ADAM
+        for rec, err in ex.map(pull, todo):
+            if err:
+                res["errors"].append({"input": rec["key"], "error": err})
+            else:
+                done.append(rec)
+    _log_timing("jira_import", _t.time() - t0, f"{len(done)} clips")
+    return {"file_id": fid, "items": done, "errors": res["errors"],
+            "unrecognized": res["unrecognized"]}
+
+
+class LengthReq(BaseModel):
+    file_id: str
+    recipes: List[dict] = []
+    profile: str = "applovin"
+
+
+@app.post("/api/compliance/length")
+def api_compliance_length(req: LengthReq):
+    """How long each creative on the board will actually be, against the profile's limit.
+
+    Measured the same way the board builds it — the SAME segment list, with each segment's
+    trim applied — so the number is the real output length, not an estimate. Cheap: the
+    per-file probes are cached, and bodies/packshots repeat across languages.
+    """
+    prof = (compliance.load_rules().get("profiles") or {}).get(req.profile, {})
+    limit = float(prof.get("max_seconds") or 0)
+    sdir = _session_dir(req.file_id)
+    out_dir = os.path.join(sdir, "output")
+
+    def seg_len(seg):
+        if seg.get("type") == "library":
+            p = library.item_path(seg.get("ref", ""))
+        else:
+            ref = os.path.basename(seg.get("ref", ""))
+            p = next((c for c in (os.path.join(out_dir, ref), os.path.join(sdir, ref))
+                      if os.path.exists(c)), None)
+        if not p or not os.path.exists(p):
+            return 0.0, False
+        d = library.duration_of(p)
+        tr = seg.get("trim")
+        if tr and len(tr) == 2:                      # a trimmed segment contributes only its kept part
+            a, b = float(tr[0] or 0), float(tr[1] or 0)
+            if b > a:
+                d = min(d, b - a) if d else (b - a)
+        return round(d, 3), True
+
+    items = []
+    for rec in (req.recipes or []):
+        parts, total, missing = [], 0.0, 0
+        for seg in (rec.get("segments") or []):
+            d, found = seg_len(seg)
+            if not found:
+                missing += 1
+            total += d
+            parts.append({"ref": os.path.basename(str(seg.get("ref", ""))),
+                          "type": seg.get("type", ""), "seconds": d, "found": found})
+        total = round(total, 2)
+        over = round(total - limit, 2) if limit else 0.0
+        items.append({"name": rec.get("name", ""), "seconds": total, "parts": parts,
+                      "missing": missing, "over": max(0.0, over),
+                      "ok": (not limit) or total <= limit + 0.05})
+    return {"limit": limit, "items": items,
+            "worst": max([i["seconds"] for i in items], default=0.0),
+            "ready": all(i["ok"] for i in items) if items else False}
 
 
 class LipsyncReq(BaseModel):
@@ -808,6 +1261,7 @@ class TranscribeClipReq(BaseModel):
     engine: str = "whisper"
     model_size: str = "small"
     language: str = ""
+    script: str = ""     # voice-over text from the Jira task, when the clip came from Jira
 
 
 @app.post("/api/transcribe_clip")
@@ -827,8 +1281,15 @@ def api_transcribe_clip(req: TranscribeClipReq):
         )
     except Exception as e:
         raise HTTPException(500, f"Transcription failed: {e}")
+    words, fixes = result["words"], []
+    if req.script:
+        # The recogniser knows WHEN, the task text knows WHAT. Fix only one-for-one
+        # mishearings and keep every timing; a localized clip or a re-dubbed line is
+        # left untouched by the alignment's own guards.
+        words, fixes = jira.align_to_script(words, req.script)
     return {"language": result["language"],
-            "words": _clean_transcript(result["words"], result.get("language"))}
+            "words": _clean_transcript(words, result.get("language")),
+            "script_fixes": fixes}
 
 
 class PreviewFrameReq(BaseModel):

@@ -109,6 +109,34 @@ def _derive_format(path, stat=None):
     return fmt
 
 
+def duration_of(path):
+    """Length in seconds, cached alongside the format probe.
+
+    Deliberately NOT called from list_items: a library listing must stay ffprobe-free (a
+    Google Drive stream turns one probe per file into a ten-second freeze). This is for the
+    few files a compliance length check actually needs.
+    """
+    global _PROBE_DIRTY
+    try:
+        stt = os.stat(path)
+        key = os.path.abspath(path)
+        sig = f"{stt.st_size}|{int(stt.st_mtime)}"
+    except OSError:
+        return 0.0
+    hit = _probe_cache().get(key)
+    if hit and hit.get("sig") == sig and hit.get("dur") is not None:
+        return float(hit["dur"])
+    try:
+        dur = float(ff.get_video_duration(path) or 0.0)
+    except Exception:
+        dur = 0.0
+    ent = hit if (hit and hit.get("sig") == sig) else {"sig": sig}
+    ent["dur"] = round(dur, 3)
+    _probe_cache()[key] = ent
+    _PROBE_DIRTY = True
+    return dur
+
+
 def _manifest_path():
     return os.path.join(LIBRARY_DIR, "library.json")
 

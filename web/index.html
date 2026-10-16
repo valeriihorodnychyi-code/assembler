@@ -92,12 +92,17 @@
   .seg button{flex:1;font-size:12px;color:var(--muted);background:transparent;border:0;border-radius:0;padding:6px}
   .seg button.active{background:var(--accent);color:#fff;font-weight:600}
   .grp{background:var(--bg);border:0.5px solid var(--line);border-radius:12px;margin:12px 12px 0;overflow:hidden;position:relative}
-  .hdrsw{position:absolute;top:50%;right:34px;transform:translateY(-50%);z-index:3;margin:0;width:38px;height:22px;flex:0 0 38px}   /* section Enable toggle in the header — visible open or closed, left of the chevron */
+  /* Higher specificity than the generic .switch rule ON PURPOSE: that rule sets
+     position:relative and lives later in the sheet, so a plain .hdrsw would lose its
+     absolute placement to it and drop into the flow on top of the section title. */
+  .switch.hdrsw{position:absolute;top:50%;right:34px;transform:translateY(-50%);z-index:3;margin:0;width:38px;height:22px;flex:0 0 38px}   /* section Enable toggle in the header — visible open or closed, left of the chevron */
   .grp>summary{padding:13px 14px;font-weight:600;font-size:13px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:9px;user-select:none;position:relative}
   .grp>summary:hover{background:#1b1e27}
   .grp[open]>summary{color:#fff}
   .grp>summary::-webkit-details-marker{display:none}
-  .grp>summary .ic{color:var(--accent);font-size:16px;width:18px;text-align:center;flex:none}
+  /* font-variant-emoji:text keeps a dual-purpose glyph (⚖ ♪ ★ …) as monochrome TEXT, so it
+     takes var(--accent) like the rest instead of the OS drawing its own colour emoji. */
+  .grp>summary .ic{color:var(--accent);font-size:16px;width:18px;text-align:center;flex:none;font-variant-emoji:text}
   .grp>summary .chev{margin-left:auto;color:var(--muted);transition:.2s}.grp[open]>summary .chev{transform:rotate(90deg)}
   .grp .body{padding:4px 14px 14px}
   @keyframes grpIn{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
@@ -140,7 +145,11 @@
   #txtViewSeg{flex:0 0 auto;background:#0f1014;border:1px solid var(--line);border-radius:10px;gap:0;overflow:hidden;padding:3px}
   #txtViewSeg button{flex:0 0 auto;padding:6px 20px;font-size:12.5px;font-weight:600;border:0;border-radius:7px;color:var(--muted);background:transparent}
   #txtViewSeg button.active{background:var(--accent);color:#fff}
-  .row .switch{position:relative;width:38px;height:22px;flex:0 0 38px}
+  /* The toggle must size itself ANYWHERE, not only inside a .row. When this rule was
+     .row .switch, a switch placed elsewhere lost its size and position:relative — its
+     absolutely-positioned .slider then latched onto the page and covered the whole screen
+     (dark track, white knob in the corner, and bright accent once clicked). */
+  .switch{position:relative;display:inline-block;width:38px;height:22px;flex:0 0 38px;vertical-align:middle}
   .switch input{opacity:0;width:0;height:0}
   .slider{position:absolute;inset:0;background:var(--line);border-radius:22px;transition:.2s;cursor:pointer}
   .slider:before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
@@ -271,11 +280,13 @@
       </div>
     </div>
     <button class="primary" id="loadBtn" data-i18n="loadVideo" style="margin-left:4px">LOAD VIDEO</button>
+    <button id="jiraBtn" title="Вставити таски з Джири (ключі, лінки або імена файлів) — відео підтягнуться з ADAM прямо в сесію" style="margin-left:4px;font-weight:700">⇩ JIRA</button>
     <div class="badge" id="encBadge">encoder: …</div>
     <div class="modeswitch">
       <button id="mEdit" class="active" data-i18n="mEdit" onclick="setMode('edit')">✎ Edit clip</button>
       <button id="mLoc" data-i18n="mLoc" onclick="setMode('loc')">🌍 Loc</button>
       <button id="mAsm" data-i18n="mAsm" onclick="setMode('asm')">▦ Assemble</button>
+      <button id="mMus" onclick="setMode('mus')" title="Згенерувати музику (Lyria) і покласти в спільну бібліотеку">♪ Music</button>
     </div>
     <div class="tactions" id="actEdit">
       <div class="ratio-tabs" id="ratioTabs" style="display:none">
@@ -305,6 +316,7 @@
   <div class="stage">
     <div id="batchStage" style="display:none;width:100%;height:100%;overflow:auto;padding:24px"></div>
     <div id="locStage" style="display:none;width:100%;height:100%;overflow:auto;padding:24px"></div>
+    <div id="musStage" style="display:none;width:100%;height:100%;overflow:auto;padding:24px"></div>
     <div id="editStage" class="editstage">
       <div class="editzone"><div class="railhead">Presets</div><div id="presetRail" class="presetrail"></div></div>
       <div class="groupcol" id="groupCol"><div class="railhead">Projects</div></div>
@@ -317,6 +329,7 @@
         <div class="dropzone" id="dropzone">
           <div class="big">🎬</div>
           <div><b>Drop a video here</b><br>or click “Load video”</div>
+          <div style="margin-top:8px;font-size:12px">або <b id="dzJira" style="cursor:pointer;color:var(--accent2)">⇩ встав таски з Джири</b> — YCP-8482, лінки або імена файлів</div>
           <div class="hint">Design the style live, then Transcribe → Send to Compose → Render.</div>
         </div>
         <video id="video" playsinline hidden></video>
@@ -401,7 +414,10 @@
         <!-- ✨ Polish: one Gemini pass that fixes misheard words and picks the line breaks.
              It returns DATA (per-word fixes + break markers) that goes through the same layout
              engine as everything else, so preview and render can't drift apart. -->
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+        <!-- ✨ Полірувати is PARKED (hidden) on purpose: the Gemini pass works, but the plan is
+             to do line breaks deterministically first, so the button isn't shown to the team
+             yet. Flip this display back to flex to bring it out of hiding. -->
+        <div style="display:none;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
           <button id="polishBtn" style="font-size:12px;padding:6px 10px" title="Gemini перевіряє транскрипт на неправильно почуті слова і розставляє розриви титрів. Показує, що саме змінив — можна відкотити.">✨ Полірувати</button>
           <button id="polishUndo" style="display:none;font-size:12px;padding:6px 10px">↩ Відкотити</button>
         </div>
@@ -409,6 +425,26 @@
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
         <div class="row" style="margin-top:8px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків; крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label><label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
         <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
+      </div>
+    </details>
+
+    <!-- ⚖ Compliance. The whole design rests on one fact: a compliance problem lives in the
+         SPOKEN line, not in the subtitle. Swapping a caption to "lose extra weight" while the
+         narrator still says "lose 45 pounds" only hides the problem from whoever proofreads the
+         captions. So every hit carries its TIMECODE and says what it actually needs:
+         ✂ cut the span out, 🎙 re-voice it, or ✎ caption-only (safe when the words are on screen
+         but not in the audio). Rules live in compliance_rules.json — the team extends them
+         without touching code. -->
+    <details class="grp" id="grpCompliance">
+      <summary><span>Compliance (AppLovin)</span> <span class="chev">›</span></summary>
+      <div class="body">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button id="compScan" class="primary" style="font-size:12px;padding:7px 12px" title="Пройтись по транскрипту правилами мережі: числа про вагу, TPC-дати, red-комунікації. Кожна знахідка — з таймкодом.">§ Перевірити</button>
+          <button id="compDisc" style="font-size:12px;padding:7px 12px" title="Додати дисклеймер «Result may vary to personal features» дрібним текстом внизу кадру на всю довжину кліпу — як звичайний тайтл, тому він іде в рендер разом з усім.">＋ Дисклеймер</button>
+          <span id="compBadge" style="margin-left:auto;font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div id="compOut" style="margin-top:9px;font-size:11.5px"></div>
+        <div class="hint">Перевірка йде по <b>транскрипту цього кліпу</b>. Довжину всього креатива (хук + боді + пекшот) проти ліміту 58с показує кнопка <b>§ 58с</b> на дошці в <b>Assemble</b>.</div>
       </div>
     </details>
     </section>
@@ -469,7 +505,7 @@
     </details>
 
     <details class="grp" id="grpSmart" style="border-color:#34c759">
-      <summary style="color:#34c759"><span>✨ Smart captions</span> <span class="chev">›</span></summary>
+      <summary style="color:#34c759"><span>Smart captions</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row" style="align-items:center"><label title="Фрази, які НІКОЛИ не розриваються між рядками/титрами. Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label></div>
         <div id="ktChips" class="kt-chips"></div>
@@ -681,7 +717,7 @@
     <div id="batchResults" style="display:none"></div>
 
     <details class="grp" open>
-      <summary>🎵 Audio <span class="chev">›</span></summary>
+      <summary><span>Audio</span> <span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Saved</label><select id="musicLib" style="flex:1.3;font-size:11px"><option value="">— pick a saved track —</option></select></div>
         <div class="row"><label>Upload</label><input type="file" id="musicFile" accept="audio/*" style="flex:1.3;font-size:11px"></div>
@@ -740,6 +776,10 @@
     <input type="password" id="keySynclab" placeholder="sk-…  (порожнє = лишити поточний)">
     <div class="mlbl">Gemini API key (✨ Полірувати титри)</div>
     <input type="password" id="keyGemini" placeholder="AIza…  (порожнє = лишити поточний)">
+    <div class="mlbl">Jira — твій email і API token (⇩ JIRA)</div>
+    <div style="display:flex;gap:6px"><input type="text" id="jiraEmail" placeholder="name@welltech.com" style="flex:1">
+      <input type="password" id="jiraToken" placeholder="API token  (порожнє = лишити поточний)" style="flex:1.3"></div>
+    <div class="hint" style="margin-top:4px">Токен — <b>особистий</b>: id.atlassian.com → Security → API tokens. Він бачить рівно ті таски, які бачиш ти в Джирі, тому спільний токен на команду не підходить. Зберігається лише на цьому Mac.</div>
     <div class="mlbl">Shared library folder (Google Drive)</div>
     <input type="text" id="libDir" placeholder="/Users/…/Assembler Library  (порожнє = лишити поточний)">
     <div class="hint" style="margin-top:5px">Це <b>шлях до синхронізованої папки на цьому Mac</b>, не посилання drive.google.com. У Finder: правий клік на папці → ⌥⌘C («Copy as Pathname»). Або тицьни варіант нижче:</div>
@@ -856,7 +896,8 @@ function busyStop(){clearInterval(_busyTick);$("busyBar").classList.remove("show
 async function loadSettings(){
   try{const d=await(await fetch(API+"/api/settings")).json();
     $("machineId").textContent=d.machine_id;$("lockMid").textContent=d.machine_id;
-    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Gemini: "+(d.gemini_key_present?"✓ set":"— not set");
+    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Gemini: "+(d.gemini_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");
+    jiraReady=!!d.jira_configured;if($("jiraEmail")&&d.jira_email)$("jiraEmail").placeholder=d.jira_email;
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
       $("libStatus").innerHTML=libStatusHTML(d.library_dir,d.library_exists);}
     if(d.allowed===false)$("lockScreen").classList.add("show");
@@ -964,11 +1005,15 @@ $("settingsSave").onclick=async()=>{
   try{const r=await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({elevenlabs_api_key:$("keyEleven").value,heygen_api_key:$("keyHeygen").value,
         synclab_api_key:($("keySynclab")?$("keySynclab").value:""),
-        gemini_api_key:($("keyGemini")?$("keyGemini").value:""),library_dir:_ld})});
+        gemini_api_key:($("keyGemini")?$("keyGemini").value:""),
+        jira_email:($("jiraEmail")?$("jiraEmail").value.trim():""),jira_api_token:($("jiraToken")?$("jiraToken").value.trim():""),
+        library_dir:_ld})});
     const d=await r.json();
     if(!r.ok)throw new Error(d.detail||"failed");
     $("keyEleven").value="";$("keyHeygen").value="";if($("keySynclab"))$("keySynclab").value="";if($("keyGemini"))$("keyGemini").value="";
-    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Gemini: "+(d.gemini_key_present?"✓ set":"— not set");
+    if($("jiraEmail"))$("jiraEmail").value="";if($("jiraToken"))$("jiraToken").value="";
+    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Gemini: "+(d.gemini_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");
+    jiraReady=!!d.jira_configured;if($("jiraEmail")&&d.jira_email)$("jiraEmail").placeholder=d.jira_email;
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
       $("libStatus").innerHTML=libStatusHTML(d.library_dir,d.library_exists);}
     if(typeof loadLibrary==="function")loadLibrary();
@@ -1513,36 +1558,114 @@ async function batchOriginals(files){
       let r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});let d=await r.json();
       if(!r.ok)throw new Error(d.detail||"upload failed");
       fileId=d.file_id;const clip=d.name;
-      const hk={name:clip,clip:clip,lang:((typeof langFromName==="function"&&langFromName(f.name))||""),  // tile colour only, best-effort
-                videoUrl:URL.createObjectURL(f),words:null,ctrl:JSON.parse(JSON.stringify(sharedCtrl)),
-                style:toEngineStyle(sharedCtrl),src:"edit",
-                titles:(titles.length?cloneTitles():null),titlesOn:titlesOn()};   // whatever titles were set up carry into every clip of the pack; edit each clip separately after
+      const hk=makePackHook(clip,URL.createObjectURL(f),((typeof langFromName==="function"&&langFromName(f.name))||""));
       if(!hooks.some(h=>h.clip===clip))hooks.push(hk);
       editPack.push(hk);ok++;
     }catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
   }
   batchHintHide();
+  finishPack(ok,0);
+}
+// ONE hook shape for every way a clip enters the pack (dropped files, Jira). Everything
+// downstream — transcribe, captions, titles, trim, the board — sees no difference.
+function makePackHook(clip,videoUrl,lang){
+  return {name:clip,clip:clip,lang:lang||"",                 // tile colour only, best-effort
+          videoUrl:videoUrl,words:null,ctrl:JSON.parse(JSON.stringify(sharedCtrl||readControls())),
+          style:toEngineStyle(sharedCtrl||readControls()),src:"edit",
+          titles:(titles.length?cloneTitles():null),titlesOn:titlesOn()};   // titles set up now carry into every clip; edit per clip after
+}
+function finishPack(ok,focus){
   if(ok){busyDone(ok+" хуків завантажено");
     $("dropzone").style.display="none";video.hidden=false;canvas.hidden=false;videoLoaded=true;
-    activeHook=-1;renderHookTiles();selectHook(0);updateEditButtons();
+    activeHook=-1;renderHookTiles();selectHook(Math.max(0,Math.min(focus||0,editPack.length-1)));updateEditButtons();
     setStatus(ok+" хуків завантажено. Обери модель (small / medium) і тисни «① Transcribe pack».","ok");
   } else busyStop();
 }
+
+// ---------- ⇩ JIRA: paste tasks → the clean _nSub masters land in the pack ----------
+// The server pulls each file from ADAM straight into the session (3 at a time), so the
+// browser never carries 200 MB per clip. Accepts keys, task links and asset names, mixed.
+let jiraReady=false;
+function openJiraPop(){
+  let p=$("jiraPop");
+  if(p){p.remove();return;}
+  p=document.createElement("div");p.id="jiraPop";
+  p.style.cssText="position:fixed;z-index:210;top:64px;left:50%;transform:translateX(-50%);width:min(560px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)";
+  p.innerHTML="<div style='display:flex;align-items:center;margin-bottom:8px'><b style='font-size:14px'>⇩ Таски з Джири</b>"
+    +"<span id='jiraClose' style='margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px'>✕</span></div>"
+    +(jiraReady?"":"<div class='hint' style='color:var(--accent);margin-bottom:8px'>Спершу додай свій Jira email і API token у <b id='jiraToSettings' style='cursor:pointer;text-decoration:underline'>⚙ Settings</b>.</div>")
+    +"<textarea id='jiraText' rows='6' spellcheck='false' style='width:100%;font-family:monospace;font-size:12px' placeholder='YCP-8482\nYCP-8483\nhttps://welltech.atlassian.net/browse/WCP-12016\nYG_104973_99257_WO_EN_tch_YDV_Vid_Var_1080x1920\n\n…по рядку, через кому — як скопіюєш'></textarea>"
+    +"<div class='hint' style='margin:6px 0 10px'>Береться чистий <b>_nSub</b>-мастер. Якщо в таски його ще нема — фінал із вшитими титрами, і кліп буде позначено ⚠. Уже відкриті кліпи паку лишаються — нові додаються в кінець.</div>"
+    +"<div style='display:flex;gap:8px;align-items:center'><button id='jiraGo' class='primary' style='padding:8px 18px'>Імпортувати</button>"
+    +"<span id='jiraNote' style='font-size:12px;color:var(--muted)'></span></div>"
+    +"<div id='jiraOut' style='margin-top:10px;max-height:240px;overflow:auto;font-size:12px'></div>";
+  document.body.appendChild(p);
+  $("jiraClose").onclick=()=>p.remove();
+  if($("jiraToSettings"))$("jiraToSettings").onclick=()=>{p.remove();if($("settingsBtn"))$("settingsBtn").click();};
+  $("jiraGo").onclick=jiraImport;
+  $("jiraText").focus();
+}
+async function jiraImport(){
+  const text=($("jiraText")||{}).value||"";
+  if(!text.trim()){setStatus("Встав хоч одну таску.","err");return;}
+  const b=$("jiraGo");b.disabled=true;b.textContent="Тягну з ADAM…";
+  $("jiraNote").textContent="";$("jiraOut").innerHTML="";
+  busyStart("Jira → ADAM…");
+  try{
+    const r=await fetch(API+"/api/jira/import",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({text,file_id:fileId||""})});
+    const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"import failed"));
+    fileId=d.file_id;
+    // APPEND to the pack that's open: re-importing to add one forgotten task must not wipe
+    // the transcripts of the five already done. A fresh pack only when none is open.
+    const appending=editPack.length&&packMode==="orig";
+    if(!appending){editingHook=null;packMode="orig";_packFormats=new Set();editPack=[];}
+    sharedCtrl=readControls();
+    const first=editPack.length;let ok=0,burned=0;
+    (d.items||[]).forEach(it=>{
+      if(editPack.some(h=>h.clip===it.clip))return;          // already in this pack
+      const hk=makePackHook(it.clip,API+it.url,it.lang||"en");
+      hk.jira={key:it.key,link:it.link,asset:it.asset,script:it.script||"",burned_in:!!it.burned_in,
+               has_nsub:!!it.has_nsub,langs:it.langs||[],cid:it.cid,baseid:it.baseid,warn:it.warn||""};
+      if(it.burned_in)burned++;
+      if(!hooks.some(h=>h.clip===hk.clip))hooks.push(hk);
+      editPack.push(hk);ok++;
+    });
+    const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/'/g,"&#39;");
+    let h=(d.items||[]).map(it=>"<div style='padding:4px 0;border-bottom:1px solid var(--line)'>"
+      +(it.burned_in?"⚠ ":"✓ ")+"<a href='"+esc(it.link)+"' target='_blank' style='color:var(--accent2)'>"+esc(it.key)+"</a> "
+      +"<span style='color:var(--muted)'>"+esc(it.asset)+"</span>"
+      +(it.warn?"<div style='color:var(--accent);font-size:11px'>"+esc(it.warn)+"</div>":"")+"</div>").join("");
+    h+=(d.errors||[]).map(e=>"<div style='padding:4px 0;color:var(--accent)'>✗ "+esc(e.input)+" — "+esc(e.error)+"</div>").join("");
+    if((d.unrecognized||[]).length)h+="<div style='padding:4px 0;color:var(--muted)'>не схоже на таску: "+d.unrecognized.map(esc).join(", ")+"</div>";
+    $("jiraOut").innerHTML=h;
+    $("jiraNote").textContent=ok?("+"+ok+" у пак"+(burned?(" · "+burned+" з вшитими титрами"):"")):"нічого нового";
+    if(ok){finishPack(editPack.length,first);
+      setStatus("З Джири: +"+ok+" кліп(ів)"+(burned?(" — у "+burned+" титри вже вшиті, позначено ⚠"):"")+". Далі «① Transcribe pack» — текст із тасок виправить недочуті слова.","ok");}
+    else busyStop();
+  }catch(e){busyStop();$("jiraOut").innerHTML="<div style='color:var(--accent)'>✗ "+String(e.message).replace(/</g,"&lt;")+"</div>";
+    setStatus("Jira: "+e.message,"err");}
+  b.disabled=false;b.textContent="Імпортувати";
+}
+if($("jiraBtn"))$("jiraBtn").onclick=openJiraPop;
+if($("dzJira"))$("dzJira").onclick=e=>{e.stopPropagation();openJiraPop();};
 // Phase 2: transcribe every not-yet-transcribed hook, on demand, with the chosen
 // model. Language is AUTO-DETECTED per clip (reliable on Medium) — no filename guessing.
 async function transcribePack(){
   const eng=$("engine").value, ms=$("modelSize").value;
   const todo=editPack.filter(h=>!h.words||!h.words.length);
   if(!todo.length){setStatus("Усі хуки вже транскрибовані.","");return;}
-  busyStart("Транскрайб паку: "+todo.length+" ("+ms+")…");let ok=0;
+  busyStart("Транскрайб паку: "+todo.length+" ("+ms+")…");let ok=0,fixedTotal=0;
   for(let i=0;i<todo.length;i++){const h=todo[i];
     try{
       setStatus("Транскрайб "+(i+1)+"/"+todo.length+"…","",true);
       batchHint("Хук "+(i+1)+" / "+todo.length+" 🎬<br>"+TL("розпізнаю текст…","recognizing text…"));
       const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:h.clip,engine:eng,model_size:ms,language:""})});  // "" = auto-detect
+        body:JSON.stringify({file_id:fileId,clip:h.clip,engine:eng,model_size:ms,language:"",   // "" = auto-detect
+                             script:(h.jira&&h.jira.script)||""})});   // Jira text fixes misheard words, timings untouched
       const d=await r.json();if(!r.ok)throw new Error(d.detail||"transcribe failed");
       h.words=d.words; if(d.language)h.lang=d.language;
+      h.scriptFixes=(d.script_fixes||[]);fixedTotal+=h.scriptFixes.length;
     ok++;}catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
   }
   batchHintHide();
@@ -1556,7 +1679,7 @@ async function transcribePack(){
     if(typeof scheduleExact==="function")scheduleExact();}
   updateEditButtons();
   if(ok){busyDone(ok+" транскрибовано");if(typeof chime==="function")chime("localize");
-    setStatus(ok+" хуків транскрибовано ("+ms+"). Клікай по стрічці, щоб поправити.","ok");}
+    setStatus(ok+" хуків транскрибовано ("+ms+")"+(fixedTotal?(" · "+fixedTotal+" недочутих слів виправлено за текстом із Джири"):"")+". Клікай по стрічці, щоб поправити.","ok");}
   else busyStop();
 }
 // --- EDIT pack: per-hook fine-tuning (mirrors the old per-language filmstrip) ---
@@ -1573,6 +1696,7 @@ function selectHook(i){
   editingHook=null;
   saveActiveHook();
   const h=editPack[i];activeHook=i;
+  if(h.jira&&h.jira.burned_in)setTimeout(()=>setStatus("⚠ "+h.jira.key+": у файлі вже вшиті титри (чистого _nSub у таски нема). Свої титри зверху дадуть подвійні.","err"),0);
   variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,style:h.ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null}};activeVar="en";
   if(typeof updateCutsLabel==="function")updateCutsLabel();
   videoFile=null;                                  // in-session clip — re-transcribe targets it, no session fork
@@ -1602,6 +1726,12 @@ function renderHookStrip(){
       tb.textContent="T"+(h.titles.length>1?h.titles.length:"");tb.title=h.titles.length+" тайтл(и) на цьому кліпі";
       tb.style.cssText="position:absolute;top:4px;right:4px;font:700 9px/1 system-ui;padding:3px 4px;border-radius:5px;background:var(--accent2);color:#08120c";
       card.appendChild(tb);}
+    if(h.jira){const jb=document.createElement("div");
+      jb.textContent=(h.jira.burned_in?"⚠ ":"")+h.jira.key;
+      jb.title=h.jira.key+" · "+(h.jira.asset||"")+(h.jira.warn?("\n"+h.jira.warn):"");
+      jb.style.cssText="position:absolute;left:3px;right:3px;bottom:3px;font:700 8px/1.2 system-ui;padding:2px 3px;border-radius:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+        +(h.jira.burned_in?"background:var(--accent);color:#fff":"background:rgba(0,0,0,.7);color:#cfe3ff");
+      card.appendChild(jb);card.title=jb.title;}
     card.onclick=()=>selectHook(i);
     fs.appendChild(card);
     drawThumb(cv,{videoUrl:h.videoUrl,words:h.words,style:h.ctrl},"hook"+i);
@@ -2596,7 +2726,8 @@ $("transcribeBtn").onclick=async()=>{
       if($("language"))$("language").value=d.language||"";
     }else{           // re-transcribe a clip already in the session (a pack hook / localized hook)
       const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:curClip,engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value})});
+        body:JSON.stringify({file_id:fileId,clip:curClip,engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value,
+                             script:((activeHook>=0&&editPack[activeHook]&&editPack[activeHook].jira&&editPack[activeHook].jira.script)||"")})});
       d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
       if(variants.en)variants.en.words=d.words;
       if(activeHook>=0&&editPack[activeHook])editPack[activeHook].words=d.words;
@@ -2696,6 +2827,130 @@ function renderPolishOut(d){
   if(dropped.length)h+="<div style='color:var(--muted);margin-top:6px;font-size:11px'>Відкинуто небезпечних правок: "+dropped.length+" (могли зламати тайминги)</div>";
   box.innerHTML=h+"</div>";box.style.display="block";
 }
+
+// ---------- ⚖ compliance (AppLovin) ----------
+// A network rejection is about what the viewer HEARS, so the scan runs on the transcript and
+// every hit keeps its timecode. Three honest actions per hit, and they are not equivalent:
+//   ✂ In/Out — the span leaves the creative entirely (only possible at the head or the tail)
+//   ✎ титри  — the CAPTION changes, the audio does not. Safe only when the phrase is on screen.
+//   ▶        — park the playhead there and judge it yourself
+let compHits=[],compLastScan=0;
+let compProfile={max_seconds:58,require_disclaimer:true,disclaimer_text:"Result may vary to personal features"};
+const compEsc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+function compClipDur(){
+  // the length that matters is the TRIMMED length — that's what goes into the creative
+  const ti=parseFloat($("trimIn").value||0),to=parseFloat($("trimOut").value||0);
+  if(to>ti+0.05)return to-ti;
+  return (video&&videoLoaded)?(video.duration||0):0;
+}
+function compHasDisclaimer(){
+  const txt=(compProfile.disclaimer_text||"result may vary").toLowerCase().slice(0,18);
+  return titlesOn()&&titles.some(t=>Object.values(t.texts||{}).some(v=>String(v||"").toLowerCase().includes(txt)));
+}
+async function complianceScan(){
+  if(!realWords||!realWords.length){setStatus("Спершу зроби транскрайб — перевірка йде по словах, не по картинці.","err");return;}
+  const b=$("compScan");b.disabled=true;const old=b.textContent;b.textContent="§ …";
+  try{
+    const r=await fetch(API+"/api/compliance/scan",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({words:realWords,profile:"applovin",duration:compClipDur(),has_disclaimer:compHasDisclaimer()})});
+    const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"scan failed"));
+    if(d.profile)compProfile=Object.assign(compProfile,d.profile);
+    compHits=d.hits||[];compLastScan=Date.now();
+    renderCompliance(d);
+    const bad=(d.counts.revoice||0)+(d.counts.replace||0);
+    setStatus(bad?("Знайшов "+compHits.length+" місць(ь), "+bad+" потребують правки звуку або кату."):
+      (compHits.length?("Знайшов "+compHits.length+" на перегляд — заборонених формулювань немає."):"Чисто 👌"),bad?"err":"ok");
+  }catch(e){setStatus("Перевірка не вдалась: "+e.message,"err");}
+  b.disabled=false;b.textContent=old;
+}
+function renderCompliance(d){
+  const box=$("compOut");if(!box)return;
+  const hits=d.hits||[],checks=d.checks||[];
+  const AC={revoice:{c:"#ef4444",l:"переозвучити / вирізати"},replace:{c:"#f59e0b",l:"замінити"},review:{c:"#7c5cff",l:"на розгляд"}};
+  const bdg=$("compBadge");
+  if(bdg){const bad=(d.counts&&((d.counts.revoice||0)+(d.counts.replace||0)))||0;
+    bdg.innerHTML=d.ready?"<span style='color:var(--ok)'>✓ готовий</span>"
+      :("<span style='color:var(--accent)'>"+(bad?(bad+" на правку"):"перевір пункти")+"</span>");}
+  let h="";
+  h+="<div style='display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:9px;background:var(--panel2);border:1px solid var(--line)'>";
+  checks.forEach(c=>{h+="<div style='color:"+(c.ok?"var(--ok)":"var(--accent)")+"'>"+(c.ok?"✓":"✗")+" "+compEsc(c.text)+"</div>";});
+  h+="</div>";
+  if(!hits.length){box.innerHTML=h;box.style.display="block";return;}
+  h+="<div style='margin:8px 0 4px;color:var(--muted)'>Знахідки — клік на таймкод перемотує:</div>";
+  hits.forEach((x,i)=>{
+    const a=AC[x.action]||AC.review;
+    const dur=compClipDur()||1;
+    const head=x.end<=dur*0.34, tail=x.start>=dur*0.66;   // ✂ only works from an edge
+    h+="<div style='padding:7px 9px;margin-bottom:5px;border-radius:8px;background:var(--panel2);border-left:3px solid "+a.c+"'>"
+      +"<div style='display:flex;gap:6px;align-items:baseline'>"
+      +"<span data-cjump='"+i+"' title='Перемотати на це місце' style='cursor:pointer;color:var(--accent2);font-variant-numeric:tabular-nums;font-weight:600'>"+x.start.toFixed(2)+"s</span>"
+      +"<span style='flex:1;color:var(--txt)'>«"+compEsc(x.match)+"»</span>"
+      +"<span style='color:"+a.c+";font-size:10px;white-space:nowrap'>"+a.l+"</span></div>"
+      +"<div style='color:var(--muted);margin-top:2px'>"+compEsc(x.title)+(x.why?(" — "+compEsc(x.why)):"")+"</div>"
+      +"<div style='display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;align-items:center'>"
+      +(x.suggest&&x.suggest.length?("<select data-csug='"+i+"' style='font-size:11px;padding:3px 5px;max-width:190px'>"
+          +x.suggest.map(s=>"<option>"+compEsc(s)+"</option>").join("")+"</select>"):"")
+      +"<button data-cfix='"+i+"' title='Замінити ТІЛЬКИ титри на цьому відрізку. Звук лишається як є — тому годиться, коли фраза є в кадрі, але не в озвучці.' style='font-size:11px;padding:3px 8px'>✎ титри</button>"
+      +(head?("<button data-ccut='in:"+i+"' title='Поставити Trim In після цієї фрази — вона зникне з креатива разом зі звуком' style='font-size:11px;padding:3px 8px'>✂ In після</button>"):"")
+      +(tail?("<button data-ccut='out:"+i+"' title='Поставити Trim Out перед цією фразою — хвіст з нею відрізається' style='font-size:11px;padding:3px 8px'>✂ Out перед</button>"):"")
+      +((!head&&!tail)?"<span style='color:var(--muted);font-size:10.5px'>у середині кліпу — тільки переозвучка (LOC) або новий дубль</span>":"")
+      +"</div></div>";
+  });
+  box.innerHTML=h;box.style.display="block";
+  box.querySelectorAll("[data-cjump]").forEach(el=>el.onclick=()=>{
+    const x=compHits[+el.dataset.cjump];if(!x)return;
+    if(video&&videoLoaded){try{video.currentTime=Math.max(0,x.start-0.15);}catch(_){}
+      if(video.paused){try{render(video.currentTime,video.duration||0);}catch(_){}}
+      if(typeof scheduleExact==="function")scheduleExact();}
+  });
+  box.querySelectorAll("[data-cfix]").forEach(el=>el.onclick=()=>compFixCaption(+el.dataset.cfix));
+  box.querySelectorAll("[data-ccut]").forEach(el=>el.onclick=()=>{
+    const [side,idx]=el.dataset.ccut.split(":");const x=compHits[+idx];if(!x)return;
+    const t=(side==="in")?(x.end+0.04):(x.start-0.04);
+    setTrimEdge(side,Math.max(0,t),{noMagnet:true});
+    setStatus("Trim "+side.toUpperCase()+" → "+t.toFixed(2)+"s. Перевір стик кнопкою ▶ і перескануй.","ok");
+  });
+}
+async function compFixCaption(i){
+  const x=compHits[i];if(!x)return;
+  const sel=$("compOut").querySelector("[data-csug='"+i+"']");
+  const txt=(sel&&sel.value)||(x.suggest&&x.suggest[0])||"";
+  if(!txt){setStatus("Немає на що замінити — допиши варіант у compliance_rules.json.","err");return;}
+  try{
+    const r=await fetch(API+"/api/compliance/fix_captions",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({words:realWords,fixes:[{word_from:x.word_from,word_to:x.word_to,text:txt}]})});
+    const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"fix failed"));
+    _polishBackup=JSON.parse(JSON.stringify(realWords));   // same one-click undo as ✨
+    applyPolishedWords(d.words||realWords);
+    setStatus("Титри: «"+x.match+"» → «"+txt+"». ⚠️ Звук НЕ змінився — якщо фраза звучить, потрібна переозвучка.","ok");
+    complianceScan();
+  }catch(e){setStatus("Не вдалось замінити: "+e.message,"err");}
+}
+// The disclaimer is just a title: small, bottom, whole clip. That way it travels through the
+// same layout engine and the same render as everything else — nothing bespoke to maintain.
+function addDisclaimer(){
+  if(compHasDisclaimer()){setStatus("Дисклеймер вже є на цьому кліпі.","");return;}
+  const t=newTitle();
+  t.texts.en=compProfile.disclaimer_text||"Result may vary to personal features";
+  // Montserrat, no plate — a plate behind a legal line reads as part of the ad. A thin outline
+  // instead, so the line stays readable over a bright frame without becoming a design element.
+  t.font="Montserrat/Montserrat-Regular.ttf";
+  t.size=34;t.y=0.945;t.caseMode="none";t.maxWidth=0.9;t.lineSpacing=4;
+  // Hairline outline + a soft shadow, not a 3px stroke: at 34px a heavy outline reads as a
+  // cartoon caption. The shadow is what keeps it legible over a bright frame.
+  t.stroke=1;t.strokeColor="#000000";
+  t.shadow=true;t.shX=0;t.shY=2;t.shBlur=6;t.shColor="#000000";
+  t.plate=false;
+  titles.push(t);
+  if($("hlOn"))$("hlOn").checked=true;
+  syncTitlesToClip();
+  if(typeof renderTitles==="function")renderTitles();
+  if(typeof renderLocTitles==="function")renderLocTitles();
+  if(typeof scheduleExact==="function")scheduleExact();
+  setStatus("Дисклеймер додано дрібним текстом внизу на всю довжину. Правиться як звичайний тайтл; ⧉ на всі — щоб розкинути по всіх кліпах.","ok");
+}
+if($("compScan"))$("compScan").onclick=complianceScan;
+if($("compDisc"))$("compDisc").onclick=addDisclaimer;
 
 // ---------- render ----------
 // "Send to Compose" — the single forward action for EN and every localized variant.
@@ -3226,9 +3481,9 @@ function populateCompose(){
 }
 $("bodyAsset").onchange=renderBatchStage;
 $("packAsset").onchange=renderBatchStage;
-$("batchAssembleBtn").onclick=async()=>{
-  if(!hooks.length){setStatus("Add hooks first.","err");return;}
-  if(!fileId){setStatus("No session.","err");return;}
+// ONE recipe builder, used by Build AND by the compliance length pre-flight — so the number the
+// pre-flight shows is measured on exactly the segment list that will be rendered, not on a guess.
+function buildRecipes(){
   const packBase=$("packAsset").value,fmt=ratio;   // project format (9:16 / 1:1 / 16:9)
   // one place that turns a board clip into a segment — used for the Hook column AND for a hook
   // reused as a Body part, so a reused hook keeps its captions/titles/trim instead of going in raw
@@ -3250,6 +3505,12 @@ $("batchAssembleBtn").onclick=async()=>{
       const b=libItemFor(bp,h.lang,"body");if(b)segs.push({type:"library",ref:b.id});});  // each body part, in order, per-language
     if(packBase){const p=libItemFor(packBase,h.lang,"packshot");if(p){const ps={type:"library",ref:p.id};if($("packFade")&&$("packFade").checked)ps.fade_in=0.5;segs.push(ps);}}
     return {name:(h.name||h.clip).replace(/\.[^.]+$/,""),format:fmt,segments:segs};});
+  return recipes;
+}
+$("batchAssembleBtn").onclick=async()=>{
+  if(!hooks.length){setStatus("Add hooks first.","err");return;}
+  if(!fileId){setStatus("No session.","err");return;}
+  const recipes=buildRecipes();
   const music=musicTracks.length?{tracks:musicTracks.map(t=>({name:t.name,startSeg:t.startSeg,in:t.inSec,out:(t.dur&&t.outSec<t.dur-0.05)?t.outSec:1e6,volume:t.vol,duck:t.duck}))}:null;
   setStatus("Rendering "+recipes.length+" video(s)… keep this tab open.","",true);busyStart("Рендерю "+recipes.length+" відео…");$("batchAssembleBtn").disabled=true;
   try{const r=await fetch(API+"/api/batch_assemble",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -3281,9 +3542,9 @@ $("batchAssembleBtn").onclick=async()=>{
 // Three modes: edit (single-clip studio), loc (localizations only), asm (the board).
 let currentMode="edit";
 function setMode(m){
-  if(m!=="edit"&&m!=="loc"&&m!=="asm")m="edit";
+  if(m!=="edit"&&m!=="loc"&&m!=="asm"&&m!=="mus")m="edit";
   currentMode=m;
-  const asm=(m==="asm"), loc=(m==="loc"), edit=(m==="edit");
+  const asm=(m==="asm"), loc=(m==="loc"), mus=(m==="mus"), edit=(m==="edit");
   // Left sidebar sections: compose only in asm; the rest only in edit; loc UI is self-contained.
   document.querySelectorAll(".sec").forEach(s=>{
     if(s.dataset.sec==="localize"){s.style.display="none";return;}   // Localize removed from the left bar — LOC has its own screen
@@ -3296,18 +3557,294 @@ function setMode(m){
   $("mEdit").classList.toggle("active",edit);
   $("mLoc").classList.toggle("active",loc);
   $("mAsm").classList.toggle("active",asm);
+  if($("mMus"))$("mMus").classList.toggle("active",mus);
   $("actEdit").style.display=edit?"flex":"none";
   $("actAsm").style.display=asm?"flex":"none";
   $("panelContent").scrollTop=0;
   $("batchStage").style.display=asm?"block":"none";
   $("locStage").style.display=loc?"block":"none";
+  if($("musStage"))$("musStage").style.display=mus?"block":"none";
   $("editStage").style.display=edit?"grid":"none";
   $("trimRow").style.display=(!edit||!videoLoaded)?"none":"flex";
-  if(asm){$("varTabs").style.display="none";pullSessionHooks(true);renderBatchStage();}
+  if(mus){$("varTabs").style.display="none";if(typeof renderMusicStage==="function")renderMusicStage();}
+  else if(asm){$("varTabs").style.display="none";pullSessionHooks(true);renderBatchStage();}
   else if(loc){$("varTabs").style.display="none";if(typeof ensureOriginalsOnBoard==="function")ensureOriginalsOnBoard();if(typeof renderLocStage==="function")renderLocStage();}
   else{autoGrow();buildVarTabs();buildFilmstrip();if(typeof renderGroupBar==="function")renderGroupBar();if(typeof renderOverlays==="function"){renderOverlays();renderOverlayList();}}
-  if(typeof tutOn!=="undefined"&&tutOn){tutIdx=0;showTut();}
+  // tutorial follows the mode; a mode without its own script closes it instead of dimming the app
+  if(typeof tutOn!=="undefined"&&tutOn){
+    if(typeof tutHasSteps==="function"&&!tutHasSteps(m)){closeTut();}
+    else{tutIdx=0;showTut();}
+  }
 }
+// A stale server (run.command not restarted after a Python change) has no new routes, so a
+// POST falls through to the static mount and comes back as 405 — a message nobody can act on.
+// Translate that class of failure into the one instruction that actually fixes it.
+function apiErr(r,d,fallback){
+  if(r&&(r.status===405||r.status===404))
+    return "сервер працює на старому коді — перезапусти run.command (Python-зміни підхоплюються тільки при рестарті)";
+  return (d&&d.detail)||fallback||("HTTP "+(r&&r.status));
+}
+// ---------- MUSIC: generate tracks with Lyria, audition, keep the good ones ----------
+// Replaces the Suno round-trip: the file arrives in the response, so there are no download
+// limits, and "Keep" writes it straight into the shared library's music/ folder — where the
+// Assemble board already looks for tracks. Uses the SAME Gemini key as everything else.
+let musTracks=[], musPlaying=null, musUseFrame=false;
+// Style tablets are loaded from the shared music_styles.json (editable per machine, seeded
+// from the repo) — same idea as the caption exception lists.
+let MUS_STYLES=null, musPicked=new Set();
+function renderMusicStage(){
+  const el=$("musStage");if(!el)return;
+  el.innerHTML='<div style="max-width:980px;margin:0 auto">'
+    +'<h2 style="margin:0 0 4px;letter-spacing:.5px">MUSIC</h2>'
+    +'<div style="color:var(--muted);margin-bottom:16px;font-size:13px">Генератор треків (Lyria). Збережений трек одразу зʼявляється в бібліотеці й на дошці Assemble.</div>'
+    // ── 1. THE BRIEF ─────────────────────────────────────────────────────────────
+    +'<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Опис треку</div>'
+    +'<textarea id="musPrompt" rows="4" placeholder="Напр.: весела швидка пісня в стилі k-pop про Tai Chi walking, для 30-секундного ролика" style="width:100%;font-size:14px;padding:10px;border-radius:10px"></textarea>'
+    // Recipes REPLACE the description with a complete brief; tablets APPEND a modifier.
+    // Both write into the field you can see — nothing happens invisibly.
+    +'<div id="musChips" style="margin:8px 0 0"></div>'
+    // ✨ sits right under the brief zone it works on, not down by Generate.
+    +'<div style="display:flex;gap:10px;align-items:center;margin:10px 0 18px">'
+      +'<button id="musAuto" style="padding:10px 18px;font-size:13.5px;font-weight:600;border:1px solid var(--accent2);color:var(--accent2)" title="Gemini дочистить опис до повного музичного брифу (жанр, BPM, тональність, інструменти, структура, вокал) і дасть три варіанти">✨ Скласти промпт</button>'
+      +'<span class="hint" style="margin:0">Gemini перепише опис у повний бриф і запропонує 3 варіанти. Слова пісні він не чіпає.</span>'
+    +'</div>'
+    // ── 2. THE LYRICS — always open: this is the product (the ad copy, sung) ─────
+    +'<div id="musLyrWrap">'
+      +'<div style="font-size:12px;margin-bottom:5px"><b style="color:var(--accent2)">Слова пісні</b> <span id="musLyrReq" style="color:var(--accent)">— обовʼязково</span></div>'
+      +'<textarea id="musLyrics" rows="8" placeholder="[Verse 1]&#10;Tai Chi Walking,&#10;the kind of movement you don&#39;t mind doing.&#10;&#10;[Chorus]&#10;Ten minutes of Tai Chi Walking (walking)&#10;let&#39;s get moving!" style="width:100%;font-size:13px;padding:10px;border-radius:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace"></textarea>'
+      +'<div class="hint">Теги секцій: <b>[Intro]</b> <b>[Verse 1]</b> <b>[Pre-chorus]</b> <b>[Chorus]</b> <b>[Bridge]</b> <b>[Outro]</b>. Слово в дужках — підпівка або ехо: «Let’s go (go)». Хочеш, щоб текст написала Lyria — лиши порожнім і опиши в описі, про що він.</div>'
+    +'</div>'
+    // ── 3. FORMAT + GENERATE ────────────────────────────────────────────────────
+    +'<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:16px 0 14px">'
+      +'<div class="seg" id="musKind"><button type="button" data-v="clip" class="active">Clip · 30 c</button><button type="button" data-v="song">Song · 2–3 хв</button></div>'
+      // NOTE: never nest <label> in <label> — the parser closes the outer one and the markup
+      // falls apart. Text stays a <span>; the switch keeps its own label.
+      +'<span style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)" title="Фонова музика без вокалу — під голос диктора">Без слів (фонова)'
+        +'<label class="switch"><input type="checkbox" id="musInstr"><span class="slider"></span></label></span>'
+      +'<span style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)">Варіантів'
+        +'<select id="musTakes" style="font-size:13px"><option>1</option><option selected>2</option><option>3</option></select></span>'
+      +'<button id="musFrameBtn" style="font-size:12px;padding:7px 11px" title="Додати поточний кадр з Edit як референс — Lyria складе музику під його настрій">🖼 Кадр як референс: вимк</button>'
+      +'<span style="flex:1"></span>'
+      +'<button id="musGo" class="primary" style="padding:12px 26px;font-size:15px;font-weight:700">♪ Згенерувати</button>'
+    +'</div>'
+    +'<div id="musOut"></div>'
+    +'<div id="musLib" style="margin-top:22px;padding-top:16px;border-top:1px solid var(--line)"></div></div>';
+  renderMusChips();
+  $("musKind").querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    $("musKind").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));});
+  if($("musInstr"))$("musInstr").addEventListener("change",musSyncVocals);
+  musSyncVocals();
+  $("musFrameBtn").onclick=()=>{musUseFrame=!musUseFrame;
+    $("musFrameBtn").textContent="🖼 Кадр як референс: "+(musUseFrame?"увімк":"вимк");
+    $("musFrameBtn").style.color=musUseFrame?"var(--accent2)":"";};
+  $("musGo").onclick=musGenerate;
+  if($("musAuto"))$("musAuto").onclick=musAutoPrompt;
+  renderMusicTracks();
+  loadMusicLibrary();
+}
+// Style tablets — grouped, multi-select, loaded from the shared music_styles.json so the team
+// can extend them the same way the caption exception lists are extended.
+async function renderMusChips(){
+  const box=$("musChips");if(!box)return;
+  if(!MUS_STYLES){
+    box.innerHTML="<div class='hint'>Завантажую пресети…</div>";
+    try{const r=await fetch(API+"/api/music/styles");
+      MUS_STYLES=r.ok?await r.json():{recipes:[],tablets:[],_stale:(r.status===404||r.status===405)};}
+    catch(e){MUS_STYLES={recipes:[],tablets:[],_stale:true};}
+  }
+  const rec=(MUS_STYLES&&MUS_STYLES.recipes)||[], tab=(MUS_STYLES&&MUS_STYLES.tablets)||[];
+  if(!rec.length&&!tab.length){
+    box.innerHTML=(MUS_STYLES&&MUS_STYLES._stale)
+      ? "<div class='hint' style='color:var(--accent);font-weight:600'>⚠ Сервер працює на старому коді — перезапусти <b>run.command</b>, і пресети зʼявляться.</div>"
+      : "<div class='hint'>Пресетів немає — перевір music_styles.json.</div>";
+    return;}
+  const chip=(label,title,attr)=>"<span class='chip' "+attr+" title=\""+String(title).replace(/"/g,"&quot;")+"\" style='flex:0 0 auto;font-size:11.5px;padding:5px 9px;cursor:pointer'>"+String(label).replace(/</g,"&lt;")+"</span>";
+  box.innerHTML=
+    (rec.length?("<div style='display:flex;gap:7px;align-items:baseline;flex-wrap:wrap;margin-bottom:5px'>"
+      +"<span style='flex:0 0 96px;font-size:11px;color:var(--muted);text-align:right'>рецепти</span>"
+      +"<span style='display:flex;flex-wrap:wrap;gap:5px;flex:1'>"
+      +rec.map((r,i)=>chip(r.label,"Підставити готовий бриф (замінить опис):\n\n"+r.text,"data-mrec='"+i+"'")).join("")
+      +"</span></div>"):"")
+    +(tab.length?("<div style='display:flex;gap:7px;align-items:baseline;flex-wrap:wrap'>"
+      +"<span style='flex:0 0 96px;font-size:11px;color:var(--muted);text-align:right'>+ до опису</span>"
+      +"<span style='display:flex;flex-wrap:wrap;gap:5px;flex:1'>"
+      +tab.map((t,i)=>chip(t.label,"Дописати в опис: "+t.text,"data-mtab='"+i+"'")).join("")
+      +"</span></div>"):"")
+    +"<div class='hint'><b>Рецепт</b> підставляє готовий бриф у поле опису, <b>+ до опису</b> дописує модифікатор. Усе видно в полі — можеш правити руками. Свої пресети: <b>~/.assembler/music_styles.json</b>.</div>";
+  const ta=()=>$("musPrompt");
+  box.querySelectorAll("[data-mrec]").forEach(c=>c.onclick=()=>{
+    const r=rec[+c.dataset.mrec];if(!r)return;
+    const cur=ta().value.trim();
+    if(cur&&!confirm("Замінити поточний опис рецептом «"+r.label+"»?"))return;
+    ta().value=r.text;ta().focus();
+    setStatus("Рецепт «"+r.label+"» у полі опису — правь як треба.","ok");});
+  box.querySelectorAll("[data-mtab]").forEach(c=>c.onclick=()=>{
+    const t=tab[+c.dataset.mtab];if(!t)return;
+    const cur=ta().value.trim();
+    ta().value=(cur?cur.replace(/[.,;\s]+$/,"")+", ":"")+t.text;
+    ta().focus();try{ta().setSelectionRange(ta().value.length,ta().value.length);}catch(e){}});
+}
+// "Без слів" means there is nothing to sing — so the lyrics box (and its "обовʼязково"
+// marker) steps aside instead of sitting there contradicting the switch.
+function musSyncVocals(){
+  const instr=$("musInstr")&&$("musInstr").checked;
+  const wrap=$("musLyrWrap");if(wrap)wrap.style.display=instr?"none":"block";
+  const req=$("musLyrReq");if(req)req.style.display=instr?"none":"inline";
+}
+// ✨ Auto-prompt: lyrics + a few words + tablets → three finished briefs to choose from.
+// It writes the musical DIRECTION only; the lyrics stay yours and are sent separately.
+async function musAutoPrompt(){
+  const b=$("musAuto");if(!b)return;
+  const kind=($("musKind").querySelector("button.active")||{}).dataset?.v||"clip";
+  const payload={lyrics:($("musLyrics")?$("musLyrics").value.trim():""),
+                 brief:$("musPrompt").value.trim(),chips:[...musPicked],
+                 kind,instrumental:$("musInstr").checked};
+  if(!payload.lyrics&&!payload.brief&&!payload.chips.length){
+    setStatus("Дай хоч щось: текст пісні, кілька слів у промпті або таблетки стилю.","err");return;}
+  b.disabled=true;const old=b.textContent;b.textContent="✨ …";
+  setStatus("Складаю музичний бриф…","",true);
+  try{
+    const r=await fetch(API+"/api/music/autoprompt",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)});
+    const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(apiErr(r,d,"failed"));
+    showAutoPrompts(d.options||[],d.model);
+    setStatus((d.options||[]).length+" варіант(и) брифу — вибери, підставлю в промпт.","ok");
+  }catch(e){setStatus("Не склалось: "+e.message,"err");}
+  b.disabled=false;b.textContent=old;
+}
+function showAutoPrompts(opts,model){
+  let box=$("musAutoOut");
+  if(!box){box=document.createElement("div");box.id="musAutoOut";box.style.margin="0 0 14px";
+    const anchor=$("musChips");if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(box,anchor.nextSibling);}
+  if(!opts.length){box.innerHTML="";return;}
+  box.innerHTML="<div style='font-size:12px;color:var(--muted);margin-bottom:6px'>✨ Варіанти брифу"+(model?(" <span style='opacity:.6'>("+model+")</span>"):"")+" — клік підставить у промпт:</div>"
+    +opts.map((o,i)=>"<div data-apick='"+i+"' style='cursor:pointer;padding:9px 11px;margin-bottom:6px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)'>"
+      +"<div style='font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:3px'>"+String(o.title).replace(/</g,"&lt;")+"</div>"
+      +"<div style='font-size:12px;line-height:1.5'>"+String(o.prompt).replace(/</g,"&lt;")+"</div>"
+      +(o.notes?("<div style='font-size:11px;color:var(--muted);margin-top:4px'>"+String(o.notes).replace(/</g,"&lt;")+"</div>"):"")
+      +"</div>").join("");
+  box.querySelectorAll("[data-apick]").forEach(el=>el.onclick=()=>{
+    const o=opts[+el.dataset.apick];if(!o)return;
+    $("musPrompt").value=o.prompt;
+    box.querySelectorAll("[data-apick]").forEach(x=>x.style.borderColor="var(--line)");
+    el.style.borderColor="var(--accent2)";
+    setStatus("Бриф «"+o.title+"» у промпті. Можеш правити — і ♪ Згенерувати.","ok");});
+}
+// Load a track's RECIPE back into the prompt box. Lyria can't edit an existing track (single
+// pass, non-deterministic), so a "remix" is an honest re-generation from the same brief with
+// the lyrics you changed — siblings of the winner, not the winner with a new intro.
+function musRemix(rec){
+  const ta=$("musPrompt");if(!ta)return;
+  ta.value=rec.prompt||"";
+  if(rec.kind)$("musKind").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===rec.kind));
+  if($("musInstr"))$("musInstr").checked=!!rec.instrumental;
+  if($("musLyrics")){$("musLyrics").value=rec.lyrics_in||"";
+    if(rec.lyrics_in&&$("musLyrWrap"))$("musLyrWrap").open=true;}   // open the box so the lines are right there
+  ta.scrollIntoView({behavior:"smooth",block:"center"});ta.focus();
+  try{ta.setSelectionRange(ta.value.length,ta.value.length);}catch(e){}
+  setStatus("Рецепт завантажено. Поправ рядки або структуру і тисни ♪ Згенерувати — вийдуть варіації того ж брифу.","ok");
+}
+async function loadMusicLibrary(){
+  const box=$("musLib");if(!box)return;
+  box.innerHTML="<div style='font-size:12px;color:var(--muted)'>Завантажую бібліотеку…</div>";
+  try{
+    const d=await(await fetch(API+"/api/music/library")).json();
+    const items=d.items||[];
+    if(!d.dir_ok){box.innerHTML="<div style='font-size:12px;color:var(--accent)'>⚠ Папка бібліотеки недоступна — збережені треки не видно.</div>";return;}
+    if(!items.length){box.innerHTML="<div style='font-size:12px;color:var(--muted)'>У бібліотеці ще немає треків. Збережи згенерований — і зможеш реміксувати його потім.</div>";return;}
+    box.innerHTML="<div style='font-size:12px;color:var(--muted);margin-bottom:8px'>🎵 <b style='color:var(--txt)'>У бібліотеці</b> ("+items.length+") — тут лежать переможці. ⟳ підніме рецепт треку в промпт:</div>"
+      +items.map((t,i)=>
+        "<div style='padding:10px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)'>"
+        +"<div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap'>"
+        +"<span style='flex:0 0 auto;font-size:12px;font-weight:600'>"+String(t.name).replace(/</g,"&lt;")+"</span>"
+        +(t.instrumental?"<span style='font-size:9.5px;font-weight:700;background:var(--accent2);color:#08120c;padding:2px 6px;border-radius:4px'>INSTR</span>":"")
+        +"<audio controls preload='none' src='"+API+t.url+"' style='flex:1;min-width:240px;height:32px'></audio>"
+        +"<span style='font-size:11px;color:var(--muted)'>"+(t.size_mb||0)+" MB"+(t.created?(" · "+t.created):"")+"</span>"
+        +(t.prompt?("<button data-mremix='"+i+"' style='font-size:12px;padding:6px 11px' title='Підняти рецепт цього треку в промпт'>⟳ Remix</button>"):"<span style='font-size:11px;color:var(--muted)' title='Цей файл додали в папку руками — рецепту немає'>без рецепту</span>")
+        +"</div>"
+        +(t.prompt?("<div style='font-size:11.5px;color:var(--muted);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' title='"+String(t.prompt).replace(/"/g,"&quot;")+"'>"+String(t.prompt).replace(/</g,"&lt;")+"</div>"):"")
+        +"</div>").join("");
+    box.querySelectorAll("[data-mremix]").forEach(b=>b.onclick=()=>musRemix(items[+b.dataset.mremix]));
+  }catch(e){box.innerHTML="<div style='font-size:12px;color:var(--muted)'>Бібліотека недоступна.</div>";}
+}
+// a frame of the creative as a music reference (Lyria takes up to 10 images)
+function currentFrameB64(){
+  try{
+    if(!videoLoaded||!video||!video.videoWidth)return null;
+    const c=document.createElement("canvas");
+    const s=Math.min(1,720/Math.max(video.videoWidth,video.videoHeight));
+    c.width=Math.round(video.videoWidth*s);c.height=Math.round(video.videoHeight*s);
+    c.getContext("2d").drawImage(video,0,0,c.width,c.height);
+    return c.toDataURL("image/jpeg",0.85).split(",")[1];
+  }catch(e){return null;}
+}
+async function musGenerate(){
+  const prompt=$("musPrompt").value.trim();
+  const kind=($("musKind").querySelector("button.active")||{}).dataset?.v||"clip";
+  const instrumental=$("musInstr").checked;
+  const lyrics=($("musLyrics")?$("musLyrics").value.trim():"");
+  const takes=+$("musTakes").value||1;
+  let images=null;
+  if(musUseFrame){const b=currentFrameB64();
+    if(b)images=[{mime_type:"image/jpeg",data:b}];
+    else setStatus("Кадр не взявся — у Edit не завантажене відео. Генерую без референсу.","");}
+  if(!instrumental&&!lyrics){
+    setStatus("Впиши слова пісні — це головне в наших треках. Або увімкни «Без слів (фонова)».","err");
+    if($("musLyrics"))$("musLyrics").focus();return;}
+  if(!prompt&&!images){setStatus("Опиши трек кількома словами або візьми рецепт.","err");return;}
+  const g=$("musGo");g.disabled=true;const old=g.textContent;g.textContent="♪ …";
+  busyStart("Генерую музику: "+takes+" варіант(ів)…");
+  try{
+    const r=await fetch(API+"/api/music/generate",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId||"",prompt,kind,instrumental,lyrics,takes,images})});
+    const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(apiErr(r,d,"failed"));
+    (d.tracks||[]).forEach(t=>musTracks.unshift({...t,file_id:d.file_id,prompt,kind,instrumental,lyrics_in:lyrics}));
+    renderMusicTracks();
+    if(typeof chime==="function")chime("render");
+    busyDone((d.tracks||[]).length+" трек(ів) готові");
+    setStatus((d.tracks||[]).length+" трек(ів) — послухай і збережи потрібний."
+      +((d.errors||[]).length?(" ⚠ "+d.errors[0]):""),"ok");
+  }catch(e){setStatus("Музика не вдалась: "+e.message,"err");busyStop();}
+  g.disabled=false;g.textContent=old;
+}
+function renderMusicTracks(){
+  const box=$("musOut");if(!box)return;
+  if(!musTracks.length){box.innerHTML="<div style='color:var(--muted);font-size:13px'>Ще нічого не згенеровано.</div>";return;}
+  box.innerHTML="<div style='font-size:12px;color:var(--muted);margin-bottom:8px'>Ця сесія ("+musTracks.length+"):</div>"
+    +musTracks.map((t,i)=>
+      "<div style='padding:11px 13px;margin-bottom:9px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)'>"
+      +"<div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap'>"
+      +"<span style='background:"+(t.instrumental?"var(--accent2)":"var(--accent)")+";color:#0d0e12;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px'>"
+      +(t.instrumental?"INSTR":"VOCAL")+" · "+(t.kind==="song"?"2–3 хв":"30 с")+"</span>"
+      +"<audio controls preload='none' src='"+API+t.url+"' style='flex:1;min-width:260px;height:34px'></audio>"
+      +"<span style='font-size:11px;color:var(--muted)'>"+t.size_mb+" MB · "+t.seconds+"s</span>"
+      +"<input data-msave='"+i+"' placeholder='назва для бібліотеки' style='flex:0 0 190px;font-size:12px'>"
+      +"<button data-mkeep='"+i+"' style='font-size:12px;padding:6px 11px'>♥ Зберегти</button>"
+      +"<button data-mrx='"+i+"' style='font-size:12px;padding:6px 9px' title='Підняти рецепт цього варіанта в промпт'>⟳</button>"
+      +"<a href='"+API+t.url+"' download style='font-size:12px;color:var(--accent2);text-decoration:none'>⬇</a>"
+      +"</div>"
+      +"<div style='font-size:11.5px;color:var(--muted);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' title='"+String(t.prompt||"").replace(/"/g,"&quot;")+"'>"+String(t.prompt||"").replace(/</g,"&lt;")+"</div>"
+      +(t.lyrics?("<details style='margin-top:5px'><summary style='cursor:pointer;font-size:11.5px;color:var(--muted)'>Текст / структура</summary><pre style='white-space:pre-wrap;font-size:11.5px;color:var(--txt);margin:5px 0 0'>"+String(t.lyrics).replace(/</g,"&lt;")+"</pre></details>"):"")
+      +"</div>").join("");
+  box.querySelectorAll("[data-mrx]").forEach(b=>b.onclick=()=>musRemix(musTracks[+b.dataset.mrx]||{}));
+  box.querySelectorAll("[data-mkeep]").forEach(b=>b.onclick=async()=>{
+    const i=+b.dataset.mkeep,t=musTracks[i];if(!t)return;
+    const nameEl=box.querySelector("[data-msave='"+i+"']");
+    const nm=(nameEl&&nameEl.value.trim())||"";
+    if(!nm){setStatus("Дай треку назву — під нею він ляже в бібліотеку.","err");if(nameEl)nameEl.focus();return;}
+    b.disabled=true;
+    try{const r=await fetch(API+"/api/music/save",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:t.file_id||"",name:t.name,save_as:nm,prompt:t.prompt,
+          kind:t.kind,instrumental:t.instrumental,model:t.model,lyrics:t.lyrics||"",
+          lyrics_in:t.lyrics_in||""})});
+      const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(apiErr(r,d,"failed"));
+      setStatus("Збережено в бібліотеку: "+d.saved+" — вже доступний у панелі Audio.","ok");
+      if(typeof loadLibrary==="function")loadLibrary();
+      if(typeof loadMusicLibrary==="function")loadMusicLibrary();
+    }catch(e){setStatus("Не зберіглось: "+e.message,"err");}
+    b.disabled=false;});
+}
+
 // LOC workspace shell — localizations only (built out in the next increments).
 // Country/language data — powers both the language chips and the waiting-quiz.
 const LOC_LANGS={
@@ -3534,21 +4071,31 @@ async function lipsyncPack(){
       const r=await fetch(API+"/api/lipsync",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({file_id:fileId,clip:s.clip,provider:"synclab"})});
       const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
-      if(!hooks.some(h=>h.clip===d.clip)){
-        hooks.push({name:"🎙 "+(s.name||s.clip).replace(/\.[^.]+$/,""),clip:d.clip,
-                    lang:s.lang||"en",src:"edit",videoUrl:API+d.url,
-                    words:(s.words?JSON.parse(JSON.stringify(s.words)):null),
-                    ctrl:(s.ctrl?JSON.parse(JSON.stringify(s.ctrl)):null),
-                    style:s.style||null,titles:(s.titles!=null?s.titles:null)});
+      // REPLACE the clip in place — don't add a second tile. Because the board hook object is
+      // the SAME object the EDIT pack and LOC hold, mutating it means every screen (Edit,
+      // LOC, Assemble) immediately works with the fixed version. Words, caption style, titles
+      // and trim stay valid: the lipsync keeps the length and the audio untouched.
+      const ref=hooks.find(h=>h.clip===s.clip);
+      if(ref){
+        if(!ref._lsFrom)ref._lsFrom={clip:ref.clip,name:ref.name,videoUrl:ref.videoUrl||null};
+        ref.clip=d.clip;ref.videoUrl=API+d.url;
+        ref.name="🎙 "+String(ref.name||"").replace(/^🎙\s*/,"");
+        exportedNames.add(d.clip);   // it's ours — don't let the board re-add it as a new hook
       }
-      locExcluded.add(s.clip);   // the fixed clip replaces the original for further work
+      // if that clip is open in EDIT right now, point the editor at the fixed file too
+      if(variants[activeVar]&&variants[activeVar].clip===s.clip&&ref){
+        variants[activeVar].clip=ref.clip;variants[activeVar].videoUrl=ref.videoUrl;
+        if(video){video.src=ref.videoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};}
+        if(typeof invalidateLayout==="function")invalidateLayout();
+      }
       ok++;
     }catch(e){failed.push((s.name||s.clip)+": "+e.message);}
   }
   renderHookTiles();renderLocStage();
   if(b)$("lipsyncBtn")&&($("lipsyncBtn").disabled=false);
   if(ok){if(typeof chime==="function")chime("localize");busyDone(ok+" кліп(ів) з виправленим ліпсинком");
-    setStatus(ok+" кліп(ів) готові — оригінали виключені ✕, далі працюй з версіями 🎙."
+    setStatus(ok+" кліп(ів) 🎙 замінили оригінали на дошці — Edit, LOC і Assemble вже працюють з ними. "
+      +"Оригінали лишились у сесії, на тайлі є ↩ щоб повернути."
       +(failed.length?(" ⚠ не вдалось: "+failed[0]):""),failed.length?"err":"ok");}
   else{busyStop();setStatus("LipSync не вдався — "+(failed[0]||"перевір ключ Sync Lab у ⚙ Settings."),"err");}
   if(failed.length)console.warn("[lipsync] failures:",failed);
@@ -3727,7 +4274,9 @@ function buildStudioLayout(){
   if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all — same compact pill shape as Save preset
   if(ez&&$("saveStyleBtn2")){$("saveStyleBtn2").textContent="＋ Save preset";$("saveStyleBtn2").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("saveStyleBtn2"),ez.children[1]||null);}  // #9 Save preset — compact green pill by the presets
   const qp=$("quickPanel");
-  [$("grpTranscribe"),$("grpBaseText"),$("grpSmart")].forEach(el=>{if(el)qp.appendChild(el);});
+  // ⚖ Compliance rides along with Transcription: it checks that very transcript, so it has to
+  // live next to it in the quick panel — not orphaned in the sidebar section the studio empties.
+  [$("grpTranscribe"),$("grpBaseText"),$("grpSmart"),$("grpCompliance")].forEach(el=>{if(el)qp.appendChild(el);});
   const tb=$("transcribeBtn"),mr=$("modelRow");
   if(tb&&mr){tb.style.width="100%";tb.style.margin="6px 0 0";tb.className="primary";mr.insertAdjacentElement("afterend",tb);}   // Transcribe sits with the settings (above the text field)
   const ptb=$("packTranscribeBtn");
@@ -3756,6 +4305,14 @@ function showSection(sec){setMode(sec==="compose"?"asm":"edit");}
 
 // ---------- tutorial mode (step-by-step hand-drawn coach) ----------
 const TUT={
+  mus:[
+    {sel:"#musPrompt",  ua:"1. Опиши трек: жанр, настрій, BPM, інструменти. Або тицьни чипс нижче", en:"1. Describe the track: genre, mood, BPM, instruments — or tap a chip below"},
+    {sel:"#musKind",    ua:"2. Clip — рівно 30 с (швидко перебирати). Song — 2–3 хв з куплетами", en:"2. Clip — exactly 30s (fast to audition). Song — 2–3 min with verses"},
+    {sel:"#musInstr",   ua:"3. Instrumental — для беду під голос. Вимкнений = пісня з вокалом", en:"3. Instrumental — for a bed under a voice-over. Off = a sung track"},
+    {sel:"#musTakes",   ua:"4. Результат щоразу інший, тому бери 2–3 варіанти й вибирай", en:"4. Results vary every call, so take 2–3 and pick"},
+    {sel:"#musGo",      ua:"5. Генеруй, послухай — і ♥ Зберегти покладе трек у спільну бібліотеку", en:"5. Generate, listen — ♥ Save puts the track into the shared library"},
+    {sel:"#musLib", fallback:"#musOut", ua:"6. Тут переможці з бібліотеки. ⟳ підніме рецепт треку назад у промпт", en:"6. Winners from the library live here. ⟳ loads a track's recipe back into the prompt"},
+  ],
   edit:[
     {sel:"#loadBtn",     ua:"1. Завантаж відео. Кілька файлів = пак хуків одразу", en:"1. Load a video. Pick several = a whole hook pack"},
     {sel:"#transcribeBtn", ua:"2. Транскрибуй — слова й тайминги (мову визначить авто)", en:"2. Transcribe — words & timings (language auto-detected)"},
@@ -3782,7 +4339,11 @@ const TUT={
 const TUTL={ua:{step:"Крок",next:"далі →",done:"готово ✓",skip:"пропустити",btn:"✎ як це працює?"},
             en:{step:"Step",next:"next →",done:"done ✓",skip:"skip",btn:"✎ how it works?"}};
 let tutOn=false, tutIdx=0, tutLang="ua", tutRAF=null, tutLastKey="";
-function curMode(){return (typeof currentMode!=="undefined"&&TUT[currentMode])?currentMode:"edit";}
+// A mode with NO tutorial must NOT silently fall back to the Edit script: the blur panels
+// would dim the whole screen while the ring hunts an element that isn't on this tab (a hidden
+// element's rect is all zeros → a lonely ring in the top-left corner and a black page).
+function curMode(){return (typeof currentMode!=="undefined")?currentMode:"edit";}
+function tutHasSteps(m){return !!(TUT[m]&&TUT[m].length);}
 function curStep(){const s=TUT[curMode()];return s&&s[tutIdx];}
 function tutBlurEls(){let c=$("tutBlur");if(!c){c=document.createElement("div");c.id="tutBlur";for(let i=0;i<4;i++){const d=document.createElement("div");d.className="tut-blur";c.appendChild(d);}document.body.appendChild(c);}return c.children;}
 function setRect(d,x,y,w,h){d.style.left=x+"px";d.style.top=y+"px";d.style.width=Math.max(0,w)+"px";d.style.height=Math.max(0,h)+"px";}
@@ -3847,9 +4408,13 @@ function tutNext(){   // fade everything out, then reappear at the next spot (no
 }
 function showTut(){
   const L=TUTL[tutLang], steps=TUT[curMode()];
-  if(!steps||tutIdx>=steps.length){closeTut();return;}
+  if(!steps||!steps.length||tutIdx>=steps.length){closeTut();return;}
   const st=steps[tutIdx];
   const target=tutFindTarget(st);
+  // a target that isn't on screen (missing or hidden → zero rect) would blur the whole app and
+  // ring the corner; skip to the next step instead
+  if(target){const _r=target.getBoundingClientRect();
+    if(!_r.width&&!_r.height){tutIdx++;showTut();return;}}
   if(target&&target.scrollIntoView)target.scrollIntoView({block:"center",inline:"nearest"});
   let spot=$("tutSpot");if(!spot){spot=document.createElement("div");spot.id="tutSpot";spot.className="tut-spot";document.body.appendChild(spot);}
   let hint=$("tutHint");if(!hint){hint=document.createElement("div");hint.id="tutHint";hint.className="tut-hint";document.body.appendChild(hint);}
@@ -3950,7 +4515,7 @@ function renderBatchStage(){
   const shown=hooks;
   const hasFinals=shown.some(h=>batchFinals[clipKey(h)]);
   // hook tile with a × to remove it right on the board
-  const hookTile=(h,i)=>"<div title='"+(h.src==="edit"?"з Edit":"додано вручну")+"' style='display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;background:var(--panel2);border-left:4px solid "+srcColor(h.src)+";font-size:12px'><span style='background:"+langColor(h.lang)+";color:#0d0e12;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(h.lang||"?").toUpperCase()+"</span><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+h.name+"</span><span data-tobody='"+i+"' title='Use as a Body part → (lets you build hook + hook + hook)' style='cursor:pointer;color:var(--accent2);padding:0 3px;font-size:15px;font-weight:700'>▸</span><span data-rm='"+i+"' title='remove' style='cursor:pointer;color:var(--muted);padding:0 2px;font-size:13px'>✕</span></div>";
+  const hookTile=(h,i)=>"<div title='"+(h.src==="edit"?"з Edit":"додано вручну")+"' style='display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;background:var(--panel2);border-left:4px solid "+srcColor(h.src)+";font-size:12px'><span style='background:"+langColor(h.lang)+";color:#0d0e12;font-weight:700;font-size:10px;padding:2px 6px;border-radius:4px'>"+(h.lang||"?").toUpperCase()+"</span><span style='flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+h.name+"</span>"+(h._lsFrom?("<span data-lsundo='"+i+"' title='Повернути оригінал (до LipSync)' style='cursor:pointer;color:var(--muted);padding:0 3px;font-size:13px'>↩</span>"):"")+"<span data-tobody='"+i+"' title='Use as a Body part → (lets you build hook + hook + hook)' style='cursor:pointer;color:var(--accent2);padding:0 3px;font-size:15px;font-weight:700'>▸</span><span data-rm='"+i+"' title='remove' style='cursor:pointer;color:var(--muted);padding:0 2px;font-size:13px'>✕</span></div>";
   const hookLegend="<div style='font-size:10px;margin-top:3px'><span style='color:var(--ok)'>●</span> Edit&nbsp;&nbsp;<span style='color:var(--accent2)'>●</span> додані</div>";
   const hookCol=col("Hooks ("+shown.length+")"+hookLegend,shown.map((h,i)=>hookTile(h,i)).join("")+addTile("hook"),null,1.5);
   const packName=$("packAsset").value;
@@ -3979,6 +4544,9 @@ function renderBatchStage(){
   if(musicTracks.length)html+="<div style='margin:16px auto 0;max-width:620px;padding:9px 12px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--accent);font-size:12px;text-align:center;color:var(--muted)'>🎵 "+musicTracks.length+" музичн"+(musicTracks.length>1?"і доріжки":"а доріжка")+" · налаштування в панелі <b>Audio</b> ліворуч</div>";
   const n=shown.length;
   html+="<div style='display:flex;gap:12px;justify-content:center;align-items:center;margin-top:22px'><button id='boardBuild' class='primary' style='padding:15px 44px;font-size:17px;font-weight:700;letter-spacing:.3px'>🎬 Render "+n+" video"+(n>1?"s":"")+"</button>"
+    // pre-flight: measure the real output length (hook+bodies+packshot, trims applied) against
+    // the network's 58s cap BEFORE spending a render on something that will be rejected
+    +"<button id='boardLen' title='Порахувати довжину кожного креатива (хук + боді + пекшот, з трімами) і порівняти з лімітом AppLovin 58с' style='padding:14px 18px;font-size:14px'>§ 58с</button>"
     // Re-run the SAME session after tweaking something upstream: clearing the results unlocks
     // the board (hooks/bodies/titles stay put) instead of forcing a fresh session.
     +(hasFinals?"<button id='clearFinals' title='Прибрати результати останнього рендеру — хуки, боді й налаштування лишаються. Можеш піти поправити титри/трім і зібрати знову.' style='padding:14px 20px;font-size:14px'>↺ Новий прогін</button>":"")
@@ -4043,6 +4611,12 @@ function renderBatchStage(){
     }catch(e){setStatus("Доставка не вдалась: "+e.message+" — перевір, чи синхронізується папка Finished Work у Google Drive (або вкажи її в ⚙ налаштуваннях).","err");busyStop();}
   };
   el.querySelectorAll("[data-rm]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();hooks.splice(+x.dataset.rm,1);renderHookTiles();});
+  // ↩ undo LipSync: put the original clip back on this tile (the file was never deleted)
+  el.querySelectorAll("[data-lsundo]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();
+    const h=hooks[+x.dataset.lsundo];if(!h||!h._lsFrom)return;
+    const was=h._lsFrom;h.clip=was.clip;h.name=was.name;h.videoUrl=was.videoUrl;delete h._lsFrom;
+    if(variants[activeVar]&&variants[activeVar].clip!==h.clip&&typeof invalidateLayout==="function"){}
+    renderHookTiles();setStatus("Повернуто оригінал «"+(h.name||h.clip)+"» — версія з ліпсинком лишилась у сесії.","ok");});
   el.querySelectorAll("[data-rmbody]").forEach(x=>x.onclick=ev=>{ev.stopPropagation();bodyParts.splice(+x.dataset.rmbody,1);if(!bodyParts.length)bodyParts=[""];renderBatchStage();});
   // ▸ on a hook tile: reuse that clip as a BODY part, so a creative can be hook + hook + hook
   // (not only hook + a library body). Session clips are stored with a "session:" marker.
@@ -4055,6 +4629,7 @@ function renderBatchStage(){
   el.querySelectorAll("[data-pick]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();openPicker(t.dataset.pick,t,t.dataset.slot===''?null:+t.dataset.slot);});
   el.querySelectorAll("[data-add]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();if(t.dataset.add==='hook'){$("batchFiles").click();}else{bodyParts.push("");renderBatchStage();}});
   const bb=el.querySelector("#boardBuild");if(bb)bb.onclick=()=>$("batchAssembleBtn").click();
+  const bl=el.querySelector("#boardLen");if(bl)bl.onclick=checkBoardLength;
   const cf=el.querySelector("#clearFinals");
   if(cf)cf.onclick=()=>{
     if(!confirm("Прибрати результати останнього прогону?\n\nГотові файли лишаються на диску (і в папці сесії), просто зникають з дошки. Хуки, боді, титри й тайтли не змінюються."))return;
@@ -4062,6 +4637,46 @@ function renderBatchStage(){
     renderBatchStage();
     setStatus("Дошка готова до нового прогону — можеш повернутись у EDIT, поправити і зібрати знову.","ok");};
   if(typeof renderTrackList==="function")renderTrackList();   // keep per-track "Start at" options in sync with segments
+  if(lastLenCheck)renderLenCheck(lastLenCheck);               // survive board re-renders
+}
+
+// 58-second pre-flight for the WHOLE creative. Measured on the same recipes Build sends, with
+// each segment's trim applied — so "62.4s" is the file you would have got, not an estimate.
+// Shown per creative, because a body part that fits in EN can overrun in DE.
+let lastLenCheck=null;
+async function checkBoardLength(){
+  if(!hooks.length){setStatus("Спершу додай хуки.","err");return;}
+  if(!fileId){setStatus("Немає сесії.","err");return;}
+  const btn=$("boardLen");if(btn){btn.disabled=true;btn.textContent="§ …";}
+  try{
+    const recipes=buildRecipes();
+    const r=await fetch(API+"/api/compliance/length",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,recipes,profile:"applovin"})});
+    const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"length check failed"));
+    lastLenCheck=d;renderBatchStage();
+    const bad=(d.items||[]).filter(i=>!i.ok);
+    setStatus(bad.length?(bad.length+" креатив(и) довші за "+d.limit+"с — на скільки різати, видно на дошці."):
+      "Усі креативи вкладаються в "+d.limit+"с 👌",bad.length?"err":"ok");
+  }catch(e){setStatus("Не порахував довжину: "+e.message,"err");}
+  if(btn){btn.disabled=false;btn.textContent="§ 58с";}
+}
+function renderLenCheck(d){
+  const el=$("batchStage");if(!el)return;
+  const items=d.items||[];if(!items.length)return;
+  const row=i=>"<div style='display:flex;gap:8px;align-items:baseline;padding:5px 9px;border-radius:7px;background:var(--panel2);border-left:3px solid "+(i.ok?"var(--ok)":"var(--accent)")+";font-size:12px'>"
+    +"<span style='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+String(i.name).replace(/</g,"&lt;")+"</span>"
+    +"<span style='font-variant-numeric:tabular-nums;color:"+(i.ok?"var(--ok)":"var(--accent)")+";font-weight:600'>"+i.seconds.toFixed(1)+"s</span>"
+    +(i.ok?"":"<span style='color:var(--accent);font-size:11px'>−"+i.over.toFixed(1)+"s</span>")
+    +(i.missing?"<span style='color:var(--muted);font-size:10.5px'>"+i.missing+" файл(и) не знайдено</span>":"")
+    +"<span style='color:var(--muted);font-size:10.5px'>"+i.parts.filter(p=>p.seconds>0).map(p=>p.seconds.toFixed(1)).join(" + ")+"</span></div>";
+  const box=document.createElement("div");
+  box.style.cssText="max-width:620px;margin:16px auto 0";
+  box.innerHTML="<div style='display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:6px'>"
+    +"<b style='color:var(--txt)'>§ Довжина проти ліміту "+d.limit+"с</b>"
+    +"<span style='color:var(--muted);font-size:11px'>хук + боді + пекшот, з трімами</span></div>"
+    +"<div style='display:flex;flex-direction:column;gap:4px'>"+items.map(row).join("")+"</div>"
+    +"<div style='margin-top:6px;font-size:11px;color:var(--muted)'>Довше за ліміт → вертайся в EDIT і ріж трімом, або прибери боді-частину. Знахідки по тексту — панель <b>§ Compliance</b> в EDIT.</div>";
+  el.appendChild(box);
 }
 
 // ---------- init ----------
@@ -4122,7 +4737,15 @@ function renderOverlays(){
 $("overlayFile").onchange=e=>{const f=e.target.files[0];if(f)addOverlay(f);e.target.value="";};
 
 function decorateGroupIcons(){
-  const MAP=[["transcription","✦"],["base text","T"],["style regions","◫"],["stroke","A"],["shadow","☼"],["plate","▭"],["karaoke","★"],["export","↧"],["localize","⊕"],["hooks","☰"],["music","♪"],["library","▤"]];
+  // Flat, monochrome glyphs only. ⚖ / ✨ / 🎵 default to EMOJI presentation on macOS, so the
+  // system draws them in colour at its own size and they clash with the rest of the set —
+  // that's what made the Compliance header look broken. Every group is listed here on
+  // purpose: a title that falls through to "•" looks like a bug, not like a default.
+  const MAP=[["transcription","✦"],["base text","T"],["smart captions","✧"],["compliance","§"],
+             ["style regions","◫"],["stroke","A"],["shadow","☼"],["scrim","▚"],["plate","▭"],
+             ["gradients","▨"],["karaoke","★"],["animation","∿"],["titles","¶"],["overlays","▣"],
+             ["export","↧"],["localize","⊕"],["hooks","☰"],["audio","♪"],["music","♪"],
+             ["library","▤"]];
   document.querySelectorAll(".grp>summary").forEach(s=>{
     if(s.querySelector(".ic"))return;
     const t=s.textContent.toLowerCase();const hit=MAP.find(([k])=>t.includes(k));
