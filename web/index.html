@@ -9,13 +9,23 @@
   :root{--bg:#0d0e12;--panel:#16181f;--panel2:#1d2029;--line:#2a2e3a;--txt:#e8eaf0;--muted:#8a90a0;--accent:#ff3a22;--accent2:#3b82f6;--ok:#22c55e;}
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;height:100vh;overflow:hidden}
-  .app{display:grid;grid-template-columns:372px 1fr;grid-template-rows:58px 1fr;height:100vh}
+  .app{display:grid;grid-template-columns:clamp(300px,25vw,372px) 1fr;grid-template-rows:58px 1fr;height:100vh}
   header{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--panel);position:relative}
   .stage{grid-column:2;grid-row:2}
   .panel{grid-column:1;grid-row:2}
   header .logo{font-weight:800;letter-spacing:.5px;font-size:16px}
   header .logo span{color:var(--accent)}
-  header .badge{font-size:11px;color:var(--muted);padding:3px 8px;border:1px solid var(--line);border-radius:20px}
+  header .badge{font-size:11px;color:var(--muted);padding:3px 8px;border:1px solid var(--line);border-radius:20px;min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  header .hzone{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:12px}
+  header .hright{justify-content:flex-end;gap:10px;min-width:max-content}
+  header .hzone>button,header .logo{flex-shrink:0}
+  /* narrow windows: a loaded clip with a transcript puts 7 buttons on the right, so tighten the
+     whole bar rather than let the left group slide under the mode switch */
+  @media (max-width:1366px){
+    header{gap:8px;padding:0 12px}
+    header .hzone{gap:8px} header .hright{gap:6px} header .tactions{gap:6px}
+    header button{padding:7px 10px;font-size:12px}
+    header .modeswitch button{padding:7px 12px}}
   header .badge b{color:var(--ok)}
   header .spacer{flex:1}
   button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;font-size:13px;padding:8px 14px;color:var(--txt);background:var(--panel2);transition:.15s}
@@ -30,9 +40,16 @@
   .pulse-cta{animation:ctaPulse 1.5s ease-out infinite}
   button.go{background:var(--ok);color:#06210f;font-weight:700}
   button.ghost{background:transparent;border:1px solid var(--line)}
-  .stage{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;gap:12px;overflow:auto;background-color:var(--bg);background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px);background-size:24px 24px;background-position:-1px -1px}
+  .stage{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:18px;gap:12px;overflow:auto;background-color:var(--bg);background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px);background-size:24px 24px;background-position:-1px -1px}
   .viewport{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);background:#000;max-width:100%}
-  .viewport video{display:block;max-height:72vh;max-width:100%}  /* bounded to its grid column — can never overlap the side panels */
+  /* a loaded clip also shows the trim bar under it, so it budgets for header + transport + trim
+     + status (≈ 300 px); the empty drop zone has no trim bar and keeps the 248 px budget below */
+  .viewport video{display:block;max-height:min(72vh,calc(100vh - 300px));max-width:100%}
+  .viewport video[hidden]{display:none}   /* author display:block beats the hidden attribute — the "hidden" video sat as a 300×150 black box under the drop zone */
+  /* 9:16 / 1:1: the preview's HEIGHT follows its width (canvas aspect-ratio), so cap the width by
+     what the window can show under it (header + transport + status ≈ 248 px) — the centre
+     column then fits a 13" screen at 100 % without scrolling */
+  .editstage:not(.wide) .viewport{max-width:min(100%,calc((100vh - 256px) * 0.5625))}  /* bounded to its grid column — can never overlap the side panels */
   .viewport canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   /* #3 — drag the caption up/down right on the preview (vertical only → Bottom margin) */
   #capDrag{position:absolute;left:0;width:100%;display:none;cursor:ns-resize;z-index:5;touch-action:none}
@@ -47,11 +64,12 @@
   .statTab.active{background:var(--accent2);color:#fff}
   /* skewed green 'beta' tag, like the language sticker */
   .beta-tag{position:absolute;top:-7px;right:8px;z-index:3;font-family:'Caveat',cursive;font-size:15px;font-weight:700;color:#06210f;background:#22c55e;border-radius:7px;padding:0 9px;transform:rotate(3deg);box-shadow:0 3px 10px rgba(0,0,0,.35);letter-spacing:.5px;pointer-events:none}
-  .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:340px;height:470px;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;padding:20px}
+  .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:340px;max-width:100%;height:470px;max-height:72vh;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;padding:20px}
   .dropzone.drag{border-color:var(--accent);color:var(--txt)}
   .dropzone .big{font-size:42px}
-  .transport{display:flex;align-items:center;gap:12px;width:100%;max-width:520px}
-  .transport input[type=range]{flex:1}
+  .transport{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;width:100%;max-width:520px}
+  .transport input[type=range]{flex:1 1 90px;min-width:80px}
+  .transport #timeLbl{min-width:44px!important}
   .status{font-size:12px;color:var(--muted);min-height:16px;text-align:center}
   .status.err{color:#ff7a6b}.status.ok{color:var(--ok)}
   #exactToggle.on{background:var(--ok);color:#06210f;border-color:var(--ok);font-weight:700}
@@ -103,12 +121,17 @@
   /* font-variant-emoji:text keeps a dual-purpose glyph (⚖ ♪ ★ …) as monochrome TEXT, so it
      takes var(--accent) like the rest instead of the OS drawing its own colour emoji. */
   .grp>summary .ic{color:var(--accent);font-size:16px;width:18px;text-align:center;flex:none;font-variant-emoji:text}
+  .grp>summary>span:not(.ic):not(.chev){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .grp>summary:has(.hdrsw)>span:not(.ic):not(.chev){margin-right:52px}   /* room for the absolutely-placed toggle */
   .grp>summary .chev{margin-left:auto;color:var(--muted);transition:.2s}.grp[open]>summary .chev{transform:rotate(90deg)}
   .grp .body{padding:4px 14px 14px}
   @keyframes grpIn{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
   .grp[open]>.body{animation:grpIn .22s ease}
   .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:9px 0}
   .row label{font-size:12px;color:var(--muted);flex:1}
+  /* a toggle IS a <label class="switch">: without this, `.row label{flex:1}` above out-ranks
+     `.switch` and stretches every in-row toggle across the panel (regressed in 1.9.57) */
+  .row label.switch{flex:0 0 38px;width:38px}
   .row input[type=range]{flex:1.3}
   .row input[type=number]{width:62px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 6px;font-size:12px}
   .row input[type=text]{flex:1.3;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 8px;font-size:12px}
@@ -168,7 +191,7 @@
   ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:#2a2e3a;border-radius:6px}
   /* new shell: topbar + mode switch */
   .logo .wm{font-weight:800;font-size:17px;letter-spacing:1.4px;color:var(--txt)}
-  .modeswitch{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+  .modeswitch{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;flex-shrink:0}
   .tactions{margin-left:auto}
   #modelSeg button{font-size:11px;padding:5px 4px}
   .modeswitch button{background:transparent;border:0;color:var(--muted);font-weight:600;font-size:13px;padding:8px 18px;border-radius:7px;display:flex;align-items:center;gap:7px}
@@ -176,16 +199,24 @@
   .modeswitch button:not(.active):hover{background:#262a36;color:var(--txt)}
   .tactions{display:flex;align-items:center;gap:10px}
   /* studio edit layout: presets | preview | quick controls */
-  .editstage{display:grid;grid-template-columns:138px 96px auto 440px;gap:20px;align-items:start;justify-content:center;width:100%}        /* 9:16 / 1:1 — preview hugs the video, wider tools column on the right */
+  .editstage{display:grid;grid-template-columns:138px auto auto 440px;gap:20px;align-items:start;justify-content:center;width:100%}        /* 9:16 / 1:1 — preview hugs the video, wider tools column on the right */
+  .stage>.editstage{margin-top:auto;margin-bottom:auto}   /* centred when it fits, top-aligned (below the stickers) when it doesn't */
   .previewcol{align-self:center}        /* keep the video vertically centred while panels start from the top */
-  .editstage.wide{grid-template-columns:138px 96px minmax(0,1fr) 440px;justify-content:stretch}                                            /* 16:9 — preview fills the centre (bounded) */
+  .editstage.wide{grid-template-columns:138px auto minmax(0,1fr) 440px;justify-content:stretch}
+  @media (max-width:1499px){
+    .editstage{grid-template-columns:118px auto auto 380px;gap:16px}
+    .editstage.wide{grid-template-columns:118px auto minmax(0,1fr) 380px}}
+  @media (max-width:1299px){
+    .editstage{grid-template-columns:108px auto auto 330px;gap:14px}
+    .editstage.wide{grid-template-columns:108px auto minmax(0,1fr) 330px}}                                            /* 16:9 — preview fills the centre (bounded) */
   .editzone{display:flex;flex-direction:column}
   .groupcol{display:flex;flex-direction:column;gap:8px;max-height:74vh;overflow-y:auto;align-items:stretch}
   .railhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;text-align:center;margin-bottom:8px}
   .presetrail{display:flex;flex-direction:column;gap:6px;max-height:64vh;overflow-y:auto;padding:2px}
   #presetRail .presets{grid-template-columns:1fr;gap:6px;margin-top:0}
   .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0}
-  .qpanel{display:flex;flex-direction:column;gap:8px;max-height:74vh;overflow-y:auto;padding:0 2px}
+  /* only the right tools column sits under the fixed tutorial stickers, so only it steps down */
+  .qpanel{display:flex;flex-direction:column;gap:8px;margin-top:46px;max-height:calc(100vh - 168px);overflow-y:auto;padding:0 2px}   /* header 58 + stage padding 36 + sticker strip 46 + status line 28 */
   #quickPanel .grp{background:transparent;border:0;margin:0 0 4px}
   #quickPanel .grp>summary{background:transparent;border-left:0;padding:8px 4px;font-size:12px;color:var(--muted)}
   #quickPanel .grp>summary:hover{background:transparent}
@@ -249,7 +280,15 @@
   /* ---- settings modal + license lock ---- */
   .modal-bg{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
   .modal-bg.show{display:flex}
-  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;width:430px;max-width:92vw}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;width:430px;max-width:92vw;max-height:calc(100vh - 32px);overflow:auto}
+  .modal.msettings{width:540px;padding:0;display:flex;flex-direction:column;overflow:hidden}
+  .msettings .mhead{padding:18px 22px 10px;border-bottom:1px solid var(--line)}
+  .msettings .mbody{padding:2px 22px 16px;overflow-y:auto;flex:1;min-height:0}
+  .msettings .mfoot{padding:12px 22px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;align-items:center}
+  .msettings .mfoot .hint{margin:0 auto 0 0}
+  .msettings details.mdiag{margin-top:16px;border-top:1px solid var(--line);padding-top:10px}
+  .msettings details.mdiag>summary{cursor:pointer;font-size:12px;color:var(--muted);list-style:none}
+  .msettings details.mdiag>summary::before{content:"▸ "}.msettings details.mdiag[open]>summary::before{content:"▾ "}
   .modal h3{font-size:16px;margin-bottom:2px}
   .modal .mlbl{font-size:12px;color:var(--muted);margin:13px 0 5px}
   .modal input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px;font-size:13px}
@@ -269,6 +308,7 @@
 <body>
 <div class="app">
   <header>
+    <div class="hzone hleft">
     <div class="logo">
       <div style="display:flex;flex-direction:column;gap:4px;line-height:1">
         <span class="wm">ASSEMBLER</span>
@@ -282,12 +322,13 @@
     <button class="primary" id="loadBtn" data-i18n="loadVideo" style="margin-left:4px">LOAD VIDEO</button>
     <button id="jiraBtn" title="Вставити таски з Джири (ключі, лінки або імена файлів) — відео підтягнуться з ADAM прямо в сесію" style="margin-left:4px;font-weight:700">⇩ JIRA</button>
     <div class="badge" id="encBadge">encoder: …</div>
+    </div>
     <div class="modeswitch">
       <button id="mEdit" class="active" data-i18n="mEdit" onclick="setMode('edit')">✎ Edit clip</button>
       <button id="mLoc" data-i18n="mLoc" onclick="setMode('loc')">🌍 Loc</button>
       <button id="mAsm" data-i18n="mAsm" onclick="setMode('asm')">▦ Assemble</button>
-      <button id="mMus" onclick="setMode('mus')" title="Згенерувати музику (Lyria) і покласти в спільну бібліотеку">♪ Music</button>
     </div>
+    <div class="hzone hright">
     <div class="tactions" id="actEdit">
       <div class="ratio-tabs" id="ratioTabs" style="display:none">
         <button data-r="9:16" class="active">9:16</button>
@@ -311,12 +352,12 @@
     <button class="ghost" id="settingsBtn" title="Settings (keys, machine ID)" style="margin-left:6px">⚙</button>
     <button class="ghost" id="quitBtn" data-i18n="quit" title="Stop the app">Quit</button>
     <input type="file" id="videoInput" accept="video/*" multiple hidden>
+    </div>
   </header>
 
   <div class="stage">
     <div id="batchStage" style="display:none;width:100%;height:100%;overflow:auto;padding:24px"></div>
     <div id="locStage" style="display:none;width:100%;height:100%;overflow:auto;padding:24px"></div>
-    <div id="musStage" style="display:none;width:100%;height:100%;overflow:auto;padding:24px"></div>
     <div id="editStage" class="editstage">
       <div class="editzone"><div class="railhead">Presets</div><div id="presetRail" class="presetrail"></div></div>
       <div class="groupcol" id="groupCol"><div class="railhead">Projects</div></div>
@@ -329,7 +370,7 @@
         <div class="dropzone" id="dropzone">
           <div class="big">🎬</div>
           <div><b>Drop a video here</b><br>or click “Load video”</div>
-          <div style="margin-top:8px;font-size:12px">або <b id="dzJira" style="cursor:pointer;color:var(--accent2)">⇩ встав таски з Джири</b> — YCP-8482, лінки або імена файлів</div>
+          <div style="margin-top:6px;font-size:12px">або <b id="dzJira" style="cursor:pointer;color:var(--accent2)">⇩ таски з Джири</b></div>
           <div class="hint">Design the style live, then Transcribe → Send to Compose → Render.</div>
         </div>
         <video id="video" playsinline hidden></video>
@@ -348,8 +389,8 @@
       <button id="frameFwd" title="+1 кадр (→)" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 12px">⟩</button>
       <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
       <span class="val" id="timeLbl" style="display:inline-block;min-width:56px;text-align:left;font-variant-numeric:tabular-nums">0.0s</span>
-      <button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
-      <button id="safeToggle" title="Safe zones for social (TikTok / Reels / Shorts) — keeps captions clear of the platform UI. Guide only, not exported." style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">⧉ Safe</button>
+      <span class="vtools" style="display:inline-flex;gap:8px;flex:0 0 auto"><button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
+      <button id="safeToggle" title="Safe zones for social (TikTok / Reels / Shorts) — keeps captions clear of the platform UI. Guide only, not exported." style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">⧉ Safe</button></span>
     </div>
     <div id="trimRow" style="display:none;max-width:520px;margin:8px auto 0;flex-direction:column;gap:6px">
       <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)">
@@ -411,42 +452,12 @@
           <textarea id="transcript" rows="3" style="min-height:210px;max-height:360px;overflow-y:auto;resize:vertical;font-size:15px" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
           <div id="transcriptWords" class="twords" contenteditable="true" spellcheck="false" style="display:none"></div>
         </div>
-        <!-- ✨ Polish: one Gemini pass that fixes misheard words and picks the line breaks.
-             It returns DATA (per-word fixes + break markers) that goes through the same layout
-             engine as everything else, so preview and render can't drift apart. -->
-        <!-- ✨ Полірувати is PARKED (hidden) on purpose: the Gemini pass works, but the plan is
-             to do line breaks deterministically first, so the button isn't shown to the team
-             yet. Flip this display back to flex to bring it out of hiding. -->
-        <div style="display:none;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
-          <button id="polishBtn" style="font-size:12px;padding:6px 10px" title="Gemini перевіряє транскрипт на неправильно почуті слова і розставляє розриви титрів. Показує, що саме змінив — можна відкотити.">✨ Полірувати</button>
-          <button id="polishUndo" style="display:none;font-size:12px;padding:6px 10px">↩ Відкотити</button>
-        </div>
-        <div id="polishOut" style="display:none;margin-top:6px;font-size:11.5px"></div>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
         <div class="row" style="margin-top:8px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків; крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label><label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
         <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
       </div>
     </details>
 
-    <!-- ⚖ Compliance. The whole design rests on one fact: a compliance problem lives in the
-         SPOKEN line, not in the subtitle. Swapping a caption to "lose extra weight" while the
-         narrator still says "lose 45 pounds" only hides the problem from whoever proofreads the
-         captions. So every hit carries its TIMECODE and says what it actually needs:
-         ✂ cut the span out, 🎙 re-voice it, or ✎ caption-only (safe when the words are on screen
-         but not in the audio). Rules live in compliance_rules.json — the team extends them
-         without touching code. -->
-    <details class="grp" id="grpCompliance">
-      <summary><span>Compliance (AppLovin)</span> <span class="chev">›</span></summary>
-      <div class="body">
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <button id="compScan" class="primary" style="font-size:12px;padding:7px 12px" title="Пройтись по транскрипту правилами мережі: числа про вагу, TPC-дати, red-комунікації. Кожна знахідка — з таймкодом.">§ Перевірити</button>
-          <button id="compDisc" style="font-size:12px;padding:7px 12px" title="Додати дисклеймер «Result may vary to personal features» дрібним текстом внизу кадру на всю довжину кліпу — як звичайний тайтл, тому він іде в рендер разом з усім.">＋ Дисклеймер</button>
-          <span id="compBadge" style="margin-left:auto;font-size:11px;color:var(--muted)"></span>
-        </div>
-        <div id="compOut" style="margin-top:9px;font-size:11.5px"></div>
-        <div class="hint">Перевірка йде по <b>транскрипту цього кліпу</b>. Довжину всього креатива (хук + боді + пекшот) проти ліміту 58с показує кнопка <b>§ 58с</b> на дошці в <b>Assemble</b>.</div>
-      </div>
-    </details>
     </section>
 
     <section class="sec" data-sec="style">
@@ -763,9 +774,10 @@
   <div class="bb-meta" style="font-size:14px"><span id="bbLabel">Working…</span> · <span id="bbTimer" style="font-weight:700">0s</span></div>
 </div>
 <div class="modal-bg" id="settingsModal">
-  <div class="modal">
-    <h3>Settings</h3>
-    <div class="hint">Keys live locally on this Mac (<b>~/.assembler/</b>), not in the shared folder.</div>
+  <div class="modal msettings">
+    <div class="mhead"><h3>Settings</h3>
+    <div class="hint">Keys live locally on this Mac (<b>~/.assembler/</b>), not in the shared folder.</div></div>
+    <div class="mbody">
     <div class="mlbl">This machine ID</div>
     <div class="midrow"><span id="machineId" style="font-family:monospace;flex:1">…</span><button id="copyMid" class="ghost" style="font-size:11px;padding:4px 9px">copy</button></div>
     <div class="mlbl">ElevenLabs API key (voice dub + Scribe)</div>
@@ -774,8 +786,6 @@
     <input type="password" id="keyHeygen" placeholder="sk_…  (порожнє = лишити поточний)">
     <div class="mlbl">Sync Lab API key (sync.so — dub + lip-sync)</div>
     <input type="password" id="keySynclab" placeholder="sk-…  (порожнє = лишити поточний)">
-    <div class="mlbl">Gemini API key (✨ Полірувати титри)</div>
-    <input type="password" id="keyGemini" placeholder="AIza…  (порожнє = лишити поточний)">
     <div class="mlbl">Jira — твій email і API token (⇩ JIRA)</div>
     <div style="display:flex;gap:6px"><input type="text" id="jiraEmail" placeholder="name@welltech.com" style="flex:1">
       <input type="password" id="jiraToken" placeholder="API token  (порожнє = лишити поточний)" style="flex:1.3"></div>
@@ -786,7 +796,8 @@
     <div id="libRoots" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px"></div>
     <div class="hint" id="libStatus" style="margin-top:6px"></div>
     <div class="hint" id="keysStatus" style="margin-top:9px"></div>
-    <div class="mlbl" style="margin-top:14px">Render speed test</div>
+    <details class="mdiag"><summary>Діагностика — швидкість цього Mac, час роботи, кеш</summary>
+    <div class="mlbl" style="margin-top:12px">Render speed test</div>
     <div class="hint">Renders the loaded clip a few times and reports how fast this Mac is. Numbers also land in <b>~/.assembler/timings.csv</b>. The machine is busy while it runs.</div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
       <label style="font-size:12px;color:var(--muted)">at once</label>
@@ -808,7 +819,9 @@
       <span id="cacheInfo" style="flex:1;font-size:12px;color:var(--muted)">…</span>
       <button id="cacheClear" class="ghost" style="font-size:12px;padding:6px 12px">🧹 Clear cache</button>
     </div>
-    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+    </details>
+    </div>
+    <div class="mfoot">
       <button class="ghost" id="settingsClose">Close</button>
       <button class="primary" id="settingsSave">Save keys</button>
     </div>
@@ -896,8 +909,9 @@ function busyStop(){clearInterval(_busyTick);$("busyBar").classList.remove("show
 async function loadSettings(){
   try{const d=await(await fetch(API+"/api/settings")).json();
     $("machineId").textContent=d.machine_id;$("lockMid").textContent=d.machine_id;
-    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Gemini: "+(d.gemini_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");
+    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");
     jiraReady=!!d.jira_configured;if($("jiraEmail")&&d.jira_email)$("jiraEmail").placeholder=d.jira_email;
+    if($("jiraWarn"))$("jiraWarn").style.display=jiraReady?"none":"block";
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
       $("libStatus").innerHTML=libStatusHTML(d.library_dir,d.library_exists);}
     if(d.allowed===false)$("lockScreen").classList.add("show");
@@ -1005,15 +1019,15 @@ $("settingsSave").onclick=async()=>{
   try{const r=await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({elevenlabs_api_key:$("keyEleven").value,heygen_api_key:$("keyHeygen").value,
         synclab_api_key:($("keySynclab")?$("keySynclab").value:""),
-        gemini_api_key:($("keyGemini")?$("keyGemini").value:""),
         jira_email:($("jiraEmail")?$("jiraEmail").value.trim():""),jira_api_token:($("jiraToken")?$("jiraToken").value.trim():""),
         library_dir:_ld})});
     const d=await r.json();
     if(!r.ok)throw new Error(d.detail||"failed");
-    $("keyEleven").value="";$("keyHeygen").value="";if($("keySynclab"))$("keySynclab").value="";if($("keyGemini"))$("keyGemini").value="";
+    $("keyEleven").value="";$("keyHeygen").value="";if($("keySynclab"))$("keySynclab").value="";
     if($("jiraEmail"))$("jiraEmail").value="";if($("jiraToken"))$("jiraToken").value="";
-    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Gemini: "+(d.gemini_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");
+    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");
     jiraReady=!!d.jira_configured;if($("jiraEmail")&&d.jira_email)$("jiraEmail").placeholder=d.jira_email;
+    if($("jiraWarn"))$("jiraWarn").style.display=jiraReady?"none":"block";
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
       $("libStatus").innerHTML=libStatusHTML(d.library_dir,d.library_exists);}
     if(typeof loadLibrary==="function")loadLibrary();
@@ -1593,7 +1607,9 @@ function openJiraPop(){
   p.style.cssText="position:fixed;z-index:210;top:64px;left:50%;transform:translateX(-50%);width:min(560px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)";
   p.innerHTML="<div style='display:flex;align-items:center;margin-bottom:8px'><b style='font-size:14px'>⇩ Таски з Джири</b>"
     +"<span id='jiraClose' style='margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px'>✕</span></div>"
-    +(jiraReady?"":"<div class='hint' style='color:var(--accent);margin-bottom:8px'>Спершу додай свій Jira email і API token у <b id='jiraToSettings' style='cursor:pointer;text-decoration:underline'>⚙ Settings</b>.</div>")
+    // always rendered, shown/hidden live: saving the key in Settings while this window is open
+    // must clear the warning, not leave a stale "add your token" over a working setup
+    +"<div id='jiraWarn' class='hint' style='color:var(--accent);margin-bottom:8px;display:"+(jiraReady?"none":"block")+"'>Спершу додай свій Jira email і API token у <b id='jiraToSettings' style='cursor:pointer;text-decoration:underline'>⚙ Settings</b>.</div>"
     +"<textarea id='jiraText' rows='6' spellcheck='false' style='width:100%;font-family:monospace;font-size:12px' placeholder='YCP-8482\nYCP-8483\nhttps://welltech.atlassian.net/browse/WCP-12016\nYG_104973_99257_WO_EN_tch_YDV_Vid_Var_1080x1920\n\n…по рядку, через кому — як скопіюєш'></textarea>"
     +"<div class='hint' style='margin:6px 0 10px'>Береться чистий <b>_nSub</b>-мастер. Якщо в таски його ще нема — фінал із вшитими титрами, і кліп буде позначено ⚠. Уже відкриті кліпи паку лишаються — нові додаються в кінець.</div>"
     +"<div style='display:flex;gap:8px;align-items:center'><button id='jiraGo' class='primary' style='padding:8px 18px'>Імпортувати</button>"
@@ -1716,6 +1732,8 @@ function selectHook(i){
 }
 function renderHookStrip(){
   const fs=$("filmstrip");if(!fs)return;
+  const gh=$("groupCol")&&$("groupCol").querySelector(".railhead");
+  if(gh)gh.style.display=editPack.length?"":"none";        // an empty "Projects" column costs no width
   if(!editPack.length){fs.style.display="none";fs.innerHTML="";return;}
   fs.style.display="flex";fs.innerHTML="";
   editPack.forEach((h,i)=>{
@@ -2576,7 +2594,10 @@ function renderPresetRail(){
     "<button id='railExport' style='flex:1;font-size:11px;padding:6px 4px' title='Вивантажити поточний стиль у .json — щоб надіслати колезі'>⤓ Export</button>"+
     // 'Save as app default' only makes sense in the maintainer's repo clone — hidden everywhere else
     (IS_MAINTAINER?"<button id='railBase' style='flex:1 1 100%;font-size:11px;padding:6px 4px' title='Зберегти поточний вигляд як БАЗОВИЙ пресет (у styles/): їде з кожним апдейтом і в кожну збірку .app. Далі Commit + Push у GitHub Desktop.'>⭳ Save as app default (base)</button>":"");
-  pw.appendChild(act);
+  // outside the scrolling rail: inside it, Save/Import/Export were the first thing clipped
+  const rail=$("presetRail");let holder=$("railActs");
+  if(rail&&!holder){holder=document.createElement("div");holder.id="railActs";rail.after(holder);}
+  if(holder){holder.innerHTML="";holder.appendChild(act);}else pw.appendChild(act);
   $("railSave").onclick=saveCurrentStyle;$("railImport").onclick=()=>$("styleFileInput").click();
   $("railExport").onclick=exportCurrentStyle;
   if($("railBase"))$("railBase").onclick=saveAsDefault;
@@ -2772,185 +2793,6 @@ async function downloadSrt(){
   if(b)b.disabled=false;
 }
 if($("srtBtn"))$("srtBtn").onclick=downloadSrt;
-
-// ---------- ✨ Polish captions (Gemini): fix misheard words + choose the line breaks ----------
-// The pass returns DATA only (per-word fixes + brk markers) — the SAME data your own Enter
-// produces — so it flows through the one layout engine and preview/render stay identical.
-let _polishBackup=null;
-function applyPolishedWords(ws){
-  realWords=ws;
-  if(variants[activeVar])variants[activeVar].words=ws;
-  const h=(typeof openHookRef==="function")?openHookRef():null; if(h)h.words=ws;
-  $("transcript").value=wordsToText(ws);autoGrow();
-  if(txtView==="words"&&typeof renderWordsView==="function")renderWordsView();
-  if(typeof invalidateLayout==="function")invalidateLayout();
-  if(typeof scheduleExact==="function")scheduleExact();
-}
-if($("polishBtn"))$("polishBtn").onclick=async()=>{
-  if(!realWords||!realWords.length){setStatus("Спершу зроби транскрайб.","err");return;}
-  const b=$("polishBtn");b.disabled=true;const old=b.textContent;b.textContent="✨ …";
-  setStatus("Полірую титри (Gemini)…","",true);
-  try{
-    const s=readControls();
-    const r=await fetch(API+"/api/polish_captions",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({words:realWords,lang:capLang(),max_chars:+s.maxChars||15,max_lines:+s.maxLines||2})});
-    const d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
-    _polishBackup=JSON.parse(JSON.stringify(realWords));   // one-click undo
-    applyPolishedWords(d.words||realWords);
-    renderPolishOut(d);
-    $("polishUndo").style.display=(d.changes||[]).length?"inline-block":"none";
-    setStatus((d.changes||[]).length?("Пороблено "+d.changes.length+" правок ("+(d.model||"gemini")+"). Перевір і відкоти, якщо не те."):"Gemini не знайшов, що поправити 👌",(d.changes||[]).length?"ok":"");
-  }catch(e){setStatus("Полірування не вдалось: "+e.message,"err");}
-  b.disabled=false;b.textContent=old;
-};
-if($("polishUndo"))$("polishUndo").onclick=()=>{
-  if(!_polishBackup)return;
-  applyPolishedWords(JSON.parse(JSON.stringify(_polishBackup)));
-  _polishBackup=null;$("polishUndo").style.display="none";
-  $("polishOut").style.display="none";$("polishOut").innerHTML="";
-  setStatus("Правки відкочено — транскрипт як був.","ok");
-};
-// show WHAT changed: silent AI edits kill trust faster than a bad transcript
-function renderPolishOut(d){
-  const box=$("polishOut");if(!box)return;
-  const ch=d.changes||[], rules=d.rules||[], dropped=d.dropped||[];
-  if(!ch.length&&!rules.length){box.style.display="none";box.innerHTML="";return;}
-  const fixes=ch.filter(c=>c.type==="fix"), brks=ch.filter(c=>c.type==="break");
-  let h="<div style='padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)'>";
-  if(fixes.length)h+="<div style='color:var(--accent2);font-weight:600;margin-bottom:3px'>Слова ("+fixes.length+")</div>"
-    +fixes.map(c=>"<div style='color:var(--muted)'><s>"+String(c.from).replace(/</g,"&lt;")+"</s> → <b style='color:var(--txt)'>"+String(c.to).replace(/</g,"&lt;")+"</b>"+(c.why?(" <span style='opacity:.7'>— "+String(c.why).replace(/</g,"&lt;")+"</span>"):"")+"</div>").join("");
-  if(brks.length)h+="<div style='color:var(--accent2);font-weight:600;margin:6px 0 3px'>Розриви ("+brks.length+")</div>"
-    +"<div style='color:var(--muted)'>після: "+brks.map(c=>String(c.after).replace(/</g,"&lt;")).join(" · ")+"</div>";
-  if(rules.length)h+="<div style='color:var(--ok);font-weight:600;margin:6px 0 3px'>Пропонує правила ("+rules.length+")</div>"
-    +rules.map(x=>"<div style='color:var(--muted)'>"+[x.kind,x.from,x.to].filter(Boolean).map(v=>String(v).replace(/</g,"&lt;")).join(" · ")+(x.why?(" <span style='opacity:.7'>— "+String(x.why).replace(/</g,"&lt;")+"</span>"):"")+"</div>").join("")
-    +"<div style='color:var(--muted);margin-top:3px;font-size:11px'>Скинь мені ці рядки — занесу в caption_rules.json, і наступного разу спрацює без моделі.</div>";
-  if(dropped.length)h+="<div style='color:var(--muted);margin-top:6px;font-size:11px'>Відкинуто небезпечних правок: "+dropped.length+" (могли зламати тайминги)</div>";
-  box.innerHTML=h+"</div>";box.style.display="block";
-}
-
-// ---------- ⚖ compliance (AppLovin) ----------
-// A network rejection is about what the viewer HEARS, so the scan runs on the transcript and
-// every hit keeps its timecode. Three honest actions per hit, and they are not equivalent:
-//   ✂ In/Out — the span leaves the creative entirely (only possible at the head or the tail)
-//   ✎ титри  — the CAPTION changes, the audio does not. Safe only when the phrase is on screen.
-//   ▶        — park the playhead there and judge it yourself
-let compHits=[],compLastScan=0;
-let compProfile={max_seconds:58,require_disclaimer:true,disclaimer_text:"Result may vary to personal features"};
-const compEsc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;");
-function compClipDur(){
-  // the length that matters is the TRIMMED length — that's what goes into the creative
-  const ti=parseFloat($("trimIn").value||0),to=parseFloat($("trimOut").value||0);
-  if(to>ti+0.05)return to-ti;
-  return (video&&videoLoaded)?(video.duration||0):0;
-}
-function compHasDisclaimer(){
-  const txt=(compProfile.disclaimer_text||"result may vary").toLowerCase().slice(0,18);
-  return titlesOn()&&titles.some(t=>Object.values(t.texts||{}).some(v=>String(v||"").toLowerCase().includes(txt)));
-}
-async function complianceScan(){
-  if(!realWords||!realWords.length){setStatus("Спершу зроби транскрайб — перевірка йде по словах, не по картинці.","err");return;}
-  const b=$("compScan");b.disabled=true;const old=b.textContent;b.textContent="§ …";
-  try{
-    const r=await fetch(API+"/api/compliance/scan",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({words:realWords,profile:"applovin",duration:compClipDur(),has_disclaimer:compHasDisclaimer()})});
-    const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"scan failed"));
-    if(d.profile)compProfile=Object.assign(compProfile,d.profile);
-    compHits=d.hits||[];compLastScan=Date.now();
-    renderCompliance(d);
-    const bad=(d.counts.revoice||0)+(d.counts.replace||0);
-    setStatus(bad?("Знайшов "+compHits.length+" місць(ь), "+bad+" потребують правки звуку або кату."):
-      (compHits.length?("Знайшов "+compHits.length+" на перегляд — заборонених формулювань немає."):"Чисто 👌"),bad?"err":"ok");
-  }catch(e){setStatus("Перевірка не вдалась: "+e.message,"err");}
-  b.disabled=false;b.textContent=old;
-}
-function renderCompliance(d){
-  const box=$("compOut");if(!box)return;
-  const hits=d.hits||[],checks=d.checks||[];
-  const AC={revoice:{c:"#ef4444",l:"переозвучити / вирізати"},replace:{c:"#f59e0b",l:"замінити"},review:{c:"#7c5cff",l:"на розгляд"}};
-  const bdg=$("compBadge");
-  if(bdg){const bad=(d.counts&&((d.counts.revoice||0)+(d.counts.replace||0)))||0;
-    bdg.innerHTML=d.ready?"<span style='color:var(--ok)'>✓ готовий</span>"
-      :("<span style='color:var(--accent)'>"+(bad?(bad+" на правку"):"перевір пункти")+"</span>");}
-  let h="";
-  h+="<div style='display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:9px;background:var(--panel2);border:1px solid var(--line)'>";
-  checks.forEach(c=>{h+="<div style='color:"+(c.ok?"var(--ok)":"var(--accent)")+"'>"+(c.ok?"✓":"✗")+" "+compEsc(c.text)+"</div>";});
-  h+="</div>";
-  if(!hits.length){box.innerHTML=h;box.style.display="block";return;}
-  h+="<div style='margin:8px 0 4px;color:var(--muted)'>Знахідки — клік на таймкод перемотує:</div>";
-  hits.forEach((x,i)=>{
-    const a=AC[x.action]||AC.review;
-    const dur=compClipDur()||1;
-    const head=x.end<=dur*0.34, tail=x.start>=dur*0.66;   // ✂ only works from an edge
-    h+="<div style='padding:7px 9px;margin-bottom:5px;border-radius:8px;background:var(--panel2);border-left:3px solid "+a.c+"'>"
-      +"<div style='display:flex;gap:6px;align-items:baseline'>"
-      +"<span data-cjump='"+i+"' title='Перемотати на це місце' style='cursor:pointer;color:var(--accent2);font-variant-numeric:tabular-nums;font-weight:600'>"+x.start.toFixed(2)+"s</span>"
-      +"<span style='flex:1;color:var(--txt)'>«"+compEsc(x.match)+"»</span>"
-      +"<span style='color:"+a.c+";font-size:10px;white-space:nowrap'>"+a.l+"</span></div>"
-      +"<div style='color:var(--muted);margin-top:2px'>"+compEsc(x.title)+(x.why?(" — "+compEsc(x.why)):"")+"</div>"
-      +"<div style='display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;align-items:center'>"
-      +(x.suggest&&x.suggest.length?("<select data-csug='"+i+"' style='font-size:11px;padding:3px 5px;max-width:190px'>"
-          +x.suggest.map(s=>"<option>"+compEsc(s)+"</option>").join("")+"</select>"):"")
-      +"<button data-cfix='"+i+"' title='Замінити ТІЛЬКИ титри на цьому відрізку. Звук лишається як є — тому годиться, коли фраза є в кадрі, але не в озвучці.' style='font-size:11px;padding:3px 8px'>✎ титри</button>"
-      +(head?("<button data-ccut='in:"+i+"' title='Поставити Trim In після цієї фрази — вона зникне з креатива разом зі звуком' style='font-size:11px;padding:3px 8px'>✂ In після</button>"):"")
-      +(tail?("<button data-ccut='out:"+i+"' title='Поставити Trim Out перед цією фразою — хвіст з нею відрізається' style='font-size:11px;padding:3px 8px'>✂ Out перед</button>"):"")
-      +((!head&&!tail)?"<span style='color:var(--muted);font-size:10.5px'>у середині кліпу — тільки переозвучка (LOC) або новий дубль</span>":"")
-      +"</div></div>";
-  });
-  box.innerHTML=h;box.style.display="block";
-  box.querySelectorAll("[data-cjump]").forEach(el=>el.onclick=()=>{
-    const x=compHits[+el.dataset.cjump];if(!x)return;
-    if(video&&videoLoaded){try{video.currentTime=Math.max(0,x.start-0.15);}catch(_){}
-      if(video.paused){try{render(video.currentTime,video.duration||0);}catch(_){}}
-      if(typeof scheduleExact==="function")scheduleExact();}
-  });
-  box.querySelectorAll("[data-cfix]").forEach(el=>el.onclick=()=>compFixCaption(+el.dataset.cfix));
-  box.querySelectorAll("[data-ccut]").forEach(el=>el.onclick=()=>{
-    const [side,idx]=el.dataset.ccut.split(":");const x=compHits[+idx];if(!x)return;
-    const t=(side==="in")?(x.end+0.04):(x.start-0.04);
-    setTrimEdge(side,Math.max(0,t),{noMagnet:true});
-    setStatus("Trim "+side.toUpperCase()+" → "+t.toFixed(2)+"s. Перевір стик кнопкою ▶ і перескануй.","ok");
-  });
-}
-async function compFixCaption(i){
-  const x=compHits[i];if(!x)return;
-  const sel=$("compOut").querySelector("[data-csug='"+i+"']");
-  const txt=(sel&&sel.value)||(x.suggest&&x.suggest[0])||"";
-  if(!txt){setStatus("Немає на що замінити — допиши варіант у compliance_rules.json.","err");return;}
-  try{
-    const r=await fetch(API+"/api/compliance/fix_captions",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({words:realWords,fixes:[{word_from:x.word_from,word_to:x.word_to,text:txt}]})});
-    const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"fix failed"));
-    _polishBackup=JSON.parse(JSON.stringify(realWords));   // same one-click undo as ✨
-    applyPolishedWords(d.words||realWords);
-    setStatus("Титри: «"+x.match+"» → «"+txt+"». ⚠️ Звук НЕ змінився — якщо фраза звучить, потрібна переозвучка.","ok");
-    complianceScan();
-  }catch(e){setStatus("Не вдалось замінити: "+e.message,"err");}
-}
-// The disclaimer is just a title: small, bottom, whole clip. That way it travels through the
-// same layout engine and the same render as everything else — nothing bespoke to maintain.
-function addDisclaimer(){
-  if(compHasDisclaimer()){setStatus("Дисклеймер вже є на цьому кліпі.","");return;}
-  const t=newTitle();
-  t.texts.en=compProfile.disclaimer_text||"Result may vary to personal features";
-  // Montserrat, no plate — a plate behind a legal line reads as part of the ad. A thin outline
-  // instead, so the line stays readable over a bright frame without becoming a design element.
-  t.font="Montserrat/Montserrat-Regular.ttf";
-  t.size=34;t.y=0.945;t.caseMode="none";t.maxWidth=0.9;t.lineSpacing=4;
-  // Hairline outline + a soft shadow, not a 3px stroke: at 34px a heavy outline reads as a
-  // cartoon caption. The shadow is what keeps it legible over a bright frame.
-  t.stroke=1;t.strokeColor="#000000";
-  t.shadow=true;t.shX=0;t.shY=2;t.shBlur=6;t.shColor="#000000";
-  t.plate=false;
-  titles.push(t);
-  if($("hlOn"))$("hlOn").checked=true;
-  syncTitlesToClip();
-  if(typeof renderTitles==="function")renderTitles();
-  if(typeof renderLocTitles==="function")renderLocTitles();
-  if(typeof scheduleExact==="function")scheduleExact();
-  setStatus("Дисклеймер додано дрібним текстом внизу на всю довжину. Правиться як звичайний тайтл; ⧉ на всі — щоб розкинути по всіх кліпах.","ok");
-}
-if($("compScan"))$("compScan").onclick=complianceScan;
-if($("compDisc"))$("compDisc").onclick=addDisclaimer;
 
 // ---------- render ----------
 // "Send to Compose" — the single forward action for EN and every localized variant.
@@ -3481,8 +3323,8 @@ function populateCompose(){
 }
 $("bodyAsset").onchange=renderBatchStage;
 $("packAsset").onchange=renderBatchStage;
-// ONE recipe builder, used by Build AND by the compliance length pre-flight — so the number the
-// pre-flight shows is measured on exactly the segment list that will be rendered, not on a guess.
+// ONE recipe builder for Build — kept separate so anything that needs "the exact segment list that
+// will be rendered" (a length check, a preview of the board) reads it from here, not from a guess.
 function buildRecipes(){
   const packBase=$("packAsset").value,fmt=ratio;   // project format (9:16 / 1:1 / 16:9)
   // one place that turns a board clip into a segment — used for the Hook column AND for a hook
@@ -3542,32 +3384,29 @@ $("batchAssembleBtn").onclick=async()=>{
 // Three modes: edit (single-clip studio), loc (localizations only), asm (the board).
 let currentMode="edit";
 function setMode(m){
-  if(m!=="edit"&&m!=="loc"&&m!=="asm"&&m!=="mus")m="edit";
+  if(m!=="edit"&&m!=="loc"&&m!=="asm")m="edit";
   currentMode=m;
-  const asm=(m==="asm"), loc=(m==="loc"), mus=(m==="mus"), edit=(m==="edit");
+  const asm=(m==="asm"), loc=(m==="loc"), edit=(m==="edit");
   // Left sidebar sections: compose only in asm; the rest only in edit; loc UI is self-contained.
   document.querySelectorAll(".sec").forEach(s=>{
     if(s.dataset.sec==="localize"){s.style.display="none";return;}   // Localize removed from the left bar — LOC has its own screen
     const isCompose=s.dataset.sec==="compose";
     s.style.display=((asm?isCompose:(edit&&!isCompose)))?"block":"none";
   });
-  // In LOC, move Quit + settings next to the version badge (the top-right is empty there).
-  const _sb=$("settingsBtn"),_qb=$("quitBtn"),_eb=$("encBadge"),_vi=$("videoInput");
-  if(_sb&&_qb&&_eb&&_vi){ if(loc){_eb.after(_sb,_qb);} else {_vi.before(_sb,_qb);} }
+  // ⚙ and Quit stay top-right in every mode. (LOC used to move them next to the version badge
+  // to fill an empty corner; with the mode switch now in the header's flow that only pushed
+  // the switch off-centre.)
   $("mEdit").classList.toggle("active",edit);
   $("mLoc").classList.toggle("active",loc);
   $("mAsm").classList.toggle("active",asm);
-  if($("mMus"))$("mMus").classList.toggle("active",mus);
   $("actEdit").style.display=edit?"flex":"none";
   $("actAsm").style.display=asm?"flex":"none";
   $("panelContent").scrollTop=0;
   $("batchStage").style.display=asm?"block":"none";
   $("locStage").style.display=loc?"block":"none";
-  if($("musStage"))$("musStage").style.display=mus?"block":"none";
   $("editStage").style.display=edit?"grid":"none";
   $("trimRow").style.display=(!edit||!videoLoaded)?"none":"flex";
-  if(mus){$("varTabs").style.display="none";if(typeof renderMusicStage==="function")renderMusicStage();}
-  else if(asm){$("varTabs").style.display="none";pullSessionHooks(true);renderBatchStage();}
+  if(asm){$("varTabs").style.display="none";pullSessionHooks(true);renderBatchStage();}
   else if(loc){$("varTabs").style.display="none";if(typeof ensureOriginalsOnBoard==="function")ensureOriginalsOnBoard();if(typeof renderLocStage==="function")renderLocStage();}
   else{autoGrow();buildVarTabs();buildFilmstrip();if(typeof renderGroupBar==="function")renderGroupBar();if(typeof renderOverlays==="function"){renderOverlays();renderOverlayList();}}
   // tutorial follows the mode; a mode without its own script closes it instead of dimming the app
@@ -3584,267 +3423,6 @@ function apiErr(r,d,fallback){
     return "сервер працює на старому коді — перезапусти run.command (Python-зміни підхоплюються тільки при рестарті)";
   return (d&&d.detail)||fallback||("HTTP "+(r&&r.status));
 }
-// ---------- MUSIC: generate tracks with Lyria, audition, keep the good ones ----------
-// Replaces the Suno round-trip: the file arrives in the response, so there are no download
-// limits, and "Keep" writes it straight into the shared library's music/ folder — where the
-// Assemble board already looks for tracks. Uses the SAME Gemini key as everything else.
-let musTracks=[], musPlaying=null, musUseFrame=false;
-// Style tablets are loaded from the shared music_styles.json (editable per machine, seeded
-// from the repo) — same idea as the caption exception lists.
-let MUS_STYLES=null, musPicked=new Set();
-function renderMusicStage(){
-  const el=$("musStage");if(!el)return;
-  el.innerHTML='<div style="max-width:980px;margin:0 auto">'
-    +'<h2 style="margin:0 0 4px;letter-spacing:.5px">MUSIC</h2>'
-    +'<div style="color:var(--muted);margin-bottom:16px;font-size:13px">Генератор треків (Lyria). Збережений трек одразу зʼявляється в бібліотеці й на дошці Assemble.</div>'
-    // ── 1. THE BRIEF ─────────────────────────────────────────────────────────────
-    +'<div style="font-size:12px;color:var(--muted);margin-bottom:5px">Опис треку</div>'
-    +'<textarea id="musPrompt" rows="4" placeholder="Напр.: весела швидка пісня в стилі k-pop про Tai Chi walking, для 30-секундного ролика" style="width:100%;font-size:14px;padding:10px;border-radius:10px"></textarea>'
-    // Recipes REPLACE the description with a complete brief; tablets APPEND a modifier.
-    // Both write into the field you can see — nothing happens invisibly.
-    +'<div id="musChips" style="margin:8px 0 0"></div>'
-    // ✨ sits right under the brief zone it works on, not down by Generate.
-    +'<div style="display:flex;gap:10px;align-items:center;margin:10px 0 18px">'
-      +'<button id="musAuto" style="padding:10px 18px;font-size:13.5px;font-weight:600;border:1px solid var(--accent2);color:var(--accent2)" title="Gemini дочистить опис до повного музичного брифу (жанр, BPM, тональність, інструменти, структура, вокал) і дасть три варіанти">✨ Скласти промпт</button>'
-      +'<span class="hint" style="margin:0">Gemini перепише опис у повний бриф і запропонує 3 варіанти. Слова пісні він не чіпає.</span>'
-    +'</div>'
-    // ── 2. THE LYRICS — always open: this is the product (the ad copy, sung) ─────
-    +'<div id="musLyrWrap">'
-      +'<div style="font-size:12px;margin-bottom:5px"><b style="color:var(--accent2)">Слова пісні</b> <span id="musLyrReq" style="color:var(--accent)">— обовʼязково</span></div>'
-      +'<textarea id="musLyrics" rows="8" placeholder="[Verse 1]&#10;Tai Chi Walking,&#10;the kind of movement you don&#39;t mind doing.&#10;&#10;[Chorus]&#10;Ten minutes of Tai Chi Walking (walking)&#10;let&#39;s get moving!" style="width:100%;font-size:13px;padding:10px;border-radius:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace"></textarea>'
-      +'<div class="hint">Теги секцій: <b>[Intro]</b> <b>[Verse 1]</b> <b>[Pre-chorus]</b> <b>[Chorus]</b> <b>[Bridge]</b> <b>[Outro]</b>. Слово в дужках — підпівка або ехо: «Let’s go (go)». Хочеш, щоб текст написала Lyria — лиши порожнім і опиши в описі, про що він.</div>'
-    +'</div>'
-    // ── 3. FORMAT + GENERATE ────────────────────────────────────────────────────
-    +'<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:16px 0 14px">'
-      +'<div class="seg" id="musKind"><button type="button" data-v="clip" class="active">Clip · 30 c</button><button type="button" data-v="song">Song · 2–3 хв</button></div>'
-      // NOTE: never nest <label> in <label> — the parser closes the outer one and the markup
-      // falls apart. Text stays a <span>; the switch keeps its own label.
-      +'<span style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)" title="Фонова музика без вокалу — під голос диктора">Без слів (фонова)'
-        +'<label class="switch"><input type="checkbox" id="musInstr"><span class="slider"></span></label></span>'
-      +'<span style="display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)">Варіантів'
-        +'<select id="musTakes" style="font-size:13px"><option>1</option><option selected>2</option><option>3</option></select></span>'
-      +'<button id="musFrameBtn" style="font-size:12px;padding:7px 11px" title="Додати поточний кадр з Edit як референс — Lyria складе музику під його настрій">🖼 Кадр як референс: вимк</button>'
-      +'<span style="flex:1"></span>'
-      +'<button id="musGo" class="primary" style="padding:12px 26px;font-size:15px;font-weight:700">♪ Згенерувати</button>'
-    +'</div>'
-    +'<div id="musOut"></div>'
-    +'<div id="musLib" style="margin-top:22px;padding-top:16px;border-top:1px solid var(--line)"></div></div>';
-  renderMusChips();
-  $("musKind").querySelectorAll("button").forEach(b=>b.onclick=()=>{
-    $("musKind").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));});
-  if($("musInstr"))$("musInstr").addEventListener("change",musSyncVocals);
-  musSyncVocals();
-  $("musFrameBtn").onclick=()=>{musUseFrame=!musUseFrame;
-    $("musFrameBtn").textContent="🖼 Кадр як референс: "+(musUseFrame?"увімк":"вимк");
-    $("musFrameBtn").style.color=musUseFrame?"var(--accent2)":"";};
-  $("musGo").onclick=musGenerate;
-  if($("musAuto"))$("musAuto").onclick=musAutoPrompt;
-  renderMusicTracks();
-  loadMusicLibrary();
-}
-// Style tablets — grouped, multi-select, loaded from the shared music_styles.json so the team
-// can extend them the same way the caption exception lists are extended.
-async function renderMusChips(){
-  const box=$("musChips");if(!box)return;
-  if(!MUS_STYLES){
-    box.innerHTML="<div class='hint'>Завантажую пресети…</div>";
-    try{const r=await fetch(API+"/api/music/styles");
-      MUS_STYLES=r.ok?await r.json():{recipes:[],tablets:[],_stale:(r.status===404||r.status===405)};}
-    catch(e){MUS_STYLES={recipes:[],tablets:[],_stale:true};}
-  }
-  const rec=(MUS_STYLES&&MUS_STYLES.recipes)||[], tab=(MUS_STYLES&&MUS_STYLES.tablets)||[];
-  if(!rec.length&&!tab.length){
-    box.innerHTML=(MUS_STYLES&&MUS_STYLES._stale)
-      ? "<div class='hint' style='color:var(--accent);font-weight:600'>⚠ Сервер працює на старому коді — перезапусти <b>run.command</b>, і пресети зʼявляться.</div>"
-      : "<div class='hint'>Пресетів немає — перевір music_styles.json.</div>";
-    return;}
-  const chip=(label,title,attr)=>"<span class='chip' "+attr+" title=\""+String(title).replace(/"/g,"&quot;")+"\" style='flex:0 0 auto;font-size:11.5px;padding:5px 9px;cursor:pointer'>"+String(label).replace(/</g,"&lt;")+"</span>";
-  box.innerHTML=
-    (rec.length?("<div style='display:flex;gap:7px;align-items:baseline;flex-wrap:wrap;margin-bottom:5px'>"
-      +"<span style='flex:0 0 96px;font-size:11px;color:var(--muted);text-align:right'>рецепти</span>"
-      +"<span style='display:flex;flex-wrap:wrap;gap:5px;flex:1'>"
-      +rec.map((r,i)=>chip(r.label,"Підставити готовий бриф (замінить опис):\n\n"+r.text,"data-mrec='"+i+"'")).join("")
-      +"</span></div>"):"")
-    +(tab.length?("<div style='display:flex;gap:7px;align-items:baseline;flex-wrap:wrap'>"
-      +"<span style='flex:0 0 96px;font-size:11px;color:var(--muted);text-align:right'>+ до опису</span>"
-      +"<span style='display:flex;flex-wrap:wrap;gap:5px;flex:1'>"
-      +tab.map((t,i)=>chip(t.label,"Дописати в опис: "+t.text,"data-mtab='"+i+"'")).join("")
-      +"</span></div>"):"")
-    +"<div class='hint'><b>Рецепт</b> підставляє готовий бриф у поле опису, <b>+ до опису</b> дописує модифікатор. Усе видно в полі — можеш правити руками. Свої пресети: <b>~/.assembler/music_styles.json</b>.</div>";
-  const ta=()=>$("musPrompt");
-  box.querySelectorAll("[data-mrec]").forEach(c=>c.onclick=()=>{
-    const r=rec[+c.dataset.mrec];if(!r)return;
-    const cur=ta().value.trim();
-    if(cur&&!confirm("Замінити поточний опис рецептом «"+r.label+"»?"))return;
-    ta().value=r.text;ta().focus();
-    setStatus("Рецепт «"+r.label+"» у полі опису — правь як треба.","ok");});
-  box.querySelectorAll("[data-mtab]").forEach(c=>c.onclick=()=>{
-    const t=tab[+c.dataset.mtab];if(!t)return;
-    const cur=ta().value.trim();
-    ta().value=(cur?cur.replace(/[.,;\s]+$/,"")+", ":"")+t.text;
-    ta().focus();try{ta().setSelectionRange(ta().value.length,ta().value.length);}catch(e){}});
-}
-// "Без слів" means there is nothing to sing — so the lyrics box (and its "обовʼязково"
-// marker) steps aside instead of sitting there contradicting the switch.
-function musSyncVocals(){
-  const instr=$("musInstr")&&$("musInstr").checked;
-  const wrap=$("musLyrWrap");if(wrap)wrap.style.display=instr?"none":"block";
-  const req=$("musLyrReq");if(req)req.style.display=instr?"none":"inline";
-}
-// ✨ Auto-prompt: lyrics + a few words + tablets → three finished briefs to choose from.
-// It writes the musical DIRECTION only; the lyrics stay yours and are sent separately.
-async function musAutoPrompt(){
-  const b=$("musAuto");if(!b)return;
-  const kind=($("musKind").querySelector("button.active")||{}).dataset?.v||"clip";
-  const payload={lyrics:($("musLyrics")?$("musLyrics").value.trim():""),
-                 brief:$("musPrompt").value.trim(),chips:[...musPicked],
-                 kind,instrumental:$("musInstr").checked};
-  if(!payload.lyrics&&!payload.brief&&!payload.chips.length){
-    setStatus("Дай хоч щось: текст пісні, кілька слів у промпті або таблетки стилю.","err");return;}
-  b.disabled=true;const old=b.textContent;b.textContent="✨ …";
-  setStatus("Складаю музичний бриф…","",true);
-  try{
-    const r=await fetch(API+"/api/music/autoprompt",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(payload)});
-    const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(apiErr(r,d,"failed"));
-    showAutoPrompts(d.options||[],d.model);
-    setStatus((d.options||[]).length+" варіант(и) брифу — вибери, підставлю в промпт.","ok");
-  }catch(e){setStatus("Не склалось: "+e.message,"err");}
-  b.disabled=false;b.textContent=old;
-}
-function showAutoPrompts(opts,model){
-  let box=$("musAutoOut");
-  if(!box){box=document.createElement("div");box.id="musAutoOut";box.style.margin="0 0 14px";
-    const anchor=$("musChips");if(anchor&&anchor.parentNode)anchor.parentNode.insertBefore(box,anchor.nextSibling);}
-  if(!opts.length){box.innerHTML="";return;}
-  box.innerHTML="<div style='font-size:12px;color:var(--muted);margin-bottom:6px'>✨ Варіанти брифу"+(model?(" <span style='opacity:.6'>("+model+")</span>"):"")+" — клік підставить у промпт:</div>"
-    +opts.map((o,i)=>"<div data-apick='"+i+"' style='cursor:pointer;padding:9px 11px;margin-bottom:6px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)'>"
-      +"<div style='font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:3px'>"+String(o.title).replace(/</g,"&lt;")+"</div>"
-      +"<div style='font-size:12px;line-height:1.5'>"+String(o.prompt).replace(/</g,"&lt;")+"</div>"
-      +(o.notes?("<div style='font-size:11px;color:var(--muted);margin-top:4px'>"+String(o.notes).replace(/</g,"&lt;")+"</div>"):"")
-      +"</div>").join("");
-  box.querySelectorAll("[data-apick]").forEach(el=>el.onclick=()=>{
-    const o=opts[+el.dataset.apick];if(!o)return;
-    $("musPrompt").value=o.prompt;
-    box.querySelectorAll("[data-apick]").forEach(x=>x.style.borderColor="var(--line)");
-    el.style.borderColor="var(--accent2)";
-    setStatus("Бриф «"+o.title+"» у промпті. Можеш правити — і ♪ Згенерувати.","ok");});
-}
-// Load a track's RECIPE back into the prompt box. Lyria can't edit an existing track (single
-// pass, non-deterministic), so a "remix" is an honest re-generation from the same brief with
-// the lyrics you changed — siblings of the winner, not the winner with a new intro.
-function musRemix(rec){
-  const ta=$("musPrompt");if(!ta)return;
-  ta.value=rec.prompt||"";
-  if(rec.kind)$("musKind").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===rec.kind));
-  if($("musInstr"))$("musInstr").checked=!!rec.instrumental;
-  if($("musLyrics")){$("musLyrics").value=rec.lyrics_in||"";
-    if(rec.lyrics_in&&$("musLyrWrap"))$("musLyrWrap").open=true;}   // open the box so the lines are right there
-  ta.scrollIntoView({behavior:"smooth",block:"center"});ta.focus();
-  try{ta.setSelectionRange(ta.value.length,ta.value.length);}catch(e){}
-  setStatus("Рецепт завантажено. Поправ рядки або структуру і тисни ♪ Згенерувати — вийдуть варіації того ж брифу.","ok");
-}
-async function loadMusicLibrary(){
-  const box=$("musLib");if(!box)return;
-  box.innerHTML="<div style='font-size:12px;color:var(--muted)'>Завантажую бібліотеку…</div>";
-  try{
-    const d=await(await fetch(API+"/api/music/library")).json();
-    const items=d.items||[];
-    if(!d.dir_ok){box.innerHTML="<div style='font-size:12px;color:var(--accent)'>⚠ Папка бібліотеки недоступна — збережені треки не видно.</div>";return;}
-    if(!items.length){box.innerHTML="<div style='font-size:12px;color:var(--muted)'>У бібліотеці ще немає треків. Збережи згенерований — і зможеш реміксувати його потім.</div>";return;}
-    box.innerHTML="<div style='font-size:12px;color:var(--muted);margin-bottom:8px'>🎵 <b style='color:var(--txt)'>У бібліотеці</b> ("+items.length+") — тут лежать переможці. ⟳ підніме рецепт треку в промпт:</div>"
-      +items.map((t,i)=>
-        "<div style='padding:10px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)'>"
-        +"<div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap'>"
-        +"<span style='flex:0 0 auto;font-size:12px;font-weight:600'>"+String(t.name).replace(/</g,"&lt;")+"</span>"
-        +(t.instrumental?"<span style='font-size:9.5px;font-weight:700;background:var(--accent2);color:#08120c;padding:2px 6px;border-radius:4px'>INSTR</span>":"")
-        +"<audio controls preload='none' src='"+API+t.url+"' style='flex:1;min-width:240px;height:32px'></audio>"
-        +"<span style='font-size:11px;color:var(--muted)'>"+(t.size_mb||0)+" MB"+(t.created?(" · "+t.created):"")+"</span>"
-        +(t.prompt?("<button data-mremix='"+i+"' style='font-size:12px;padding:6px 11px' title='Підняти рецепт цього треку в промпт'>⟳ Remix</button>"):"<span style='font-size:11px;color:var(--muted)' title='Цей файл додали в папку руками — рецепту немає'>без рецепту</span>")
-        +"</div>"
-        +(t.prompt?("<div style='font-size:11.5px;color:var(--muted);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' title='"+String(t.prompt).replace(/"/g,"&quot;")+"'>"+String(t.prompt).replace(/</g,"&lt;")+"</div>"):"")
-        +"</div>").join("");
-    box.querySelectorAll("[data-mremix]").forEach(b=>b.onclick=()=>musRemix(items[+b.dataset.mremix]));
-  }catch(e){box.innerHTML="<div style='font-size:12px;color:var(--muted)'>Бібліотека недоступна.</div>";}
-}
-// a frame of the creative as a music reference (Lyria takes up to 10 images)
-function currentFrameB64(){
-  try{
-    if(!videoLoaded||!video||!video.videoWidth)return null;
-    const c=document.createElement("canvas");
-    const s=Math.min(1,720/Math.max(video.videoWidth,video.videoHeight));
-    c.width=Math.round(video.videoWidth*s);c.height=Math.round(video.videoHeight*s);
-    c.getContext("2d").drawImage(video,0,0,c.width,c.height);
-    return c.toDataURL("image/jpeg",0.85).split(",")[1];
-  }catch(e){return null;}
-}
-async function musGenerate(){
-  const prompt=$("musPrompt").value.trim();
-  const kind=($("musKind").querySelector("button.active")||{}).dataset?.v||"clip";
-  const instrumental=$("musInstr").checked;
-  const lyrics=($("musLyrics")?$("musLyrics").value.trim():"");
-  const takes=+$("musTakes").value||1;
-  let images=null;
-  if(musUseFrame){const b=currentFrameB64();
-    if(b)images=[{mime_type:"image/jpeg",data:b}];
-    else setStatus("Кадр не взявся — у Edit не завантажене відео. Генерую без референсу.","");}
-  if(!instrumental&&!lyrics){
-    setStatus("Впиши слова пісні — це головне в наших треках. Або увімкни «Без слів (фонова)».","err");
-    if($("musLyrics"))$("musLyrics").focus();return;}
-  if(!prompt&&!images){setStatus("Опиши трек кількома словами або візьми рецепт.","err");return;}
-  const g=$("musGo");g.disabled=true;const old=g.textContent;g.textContent="♪ …";
-  busyStart("Генерую музику: "+takes+" варіант(ів)…");
-  try{
-    const r=await fetch(API+"/api/music/generate",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId||"",prompt,kind,instrumental,lyrics,takes,images})});
-    const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(apiErr(r,d,"failed"));
-    (d.tracks||[]).forEach(t=>musTracks.unshift({...t,file_id:d.file_id,prompt,kind,instrumental,lyrics_in:lyrics}));
-    renderMusicTracks();
-    if(typeof chime==="function")chime("render");
-    busyDone((d.tracks||[]).length+" трек(ів) готові");
-    setStatus((d.tracks||[]).length+" трек(ів) — послухай і збережи потрібний."
-      +((d.errors||[]).length?(" ⚠ "+d.errors[0]):""),"ok");
-  }catch(e){setStatus("Музика не вдалась: "+e.message,"err");busyStop();}
-  g.disabled=false;g.textContent=old;
-}
-function renderMusicTracks(){
-  const box=$("musOut");if(!box)return;
-  if(!musTracks.length){box.innerHTML="<div style='color:var(--muted);font-size:13px'>Ще нічого не згенеровано.</div>";return;}
-  box.innerHTML="<div style='font-size:12px;color:var(--muted);margin-bottom:8px'>Ця сесія ("+musTracks.length+"):</div>"
-    +musTracks.map((t,i)=>
-      "<div style='padding:11px 13px;margin-bottom:9px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)'>"
-      +"<div style='display:flex;gap:10px;align-items:center;flex-wrap:wrap'>"
-      +"<span style='background:"+(t.instrumental?"var(--accent2)":"var(--accent)")+";color:#0d0e12;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px'>"
-      +(t.instrumental?"INSTR":"VOCAL")+" · "+(t.kind==="song"?"2–3 хв":"30 с")+"</span>"
-      +"<audio controls preload='none' src='"+API+t.url+"' style='flex:1;min-width:260px;height:34px'></audio>"
-      +"<span style='font-size:11px;color:var(--muted)'>"+t.size_mb+" MB · "+t.seconds+"s</span>"
-      +"<input data-msave='"+i+"' placeholder='назва для бібліотеки' style='flex:0 0 190px;font-size:12px'>"
-      +"<button data-mkeep='"+i+"' style='font-size:12px;padding:6px 11px'>♥ Зберегти</button>"
-      +"<button data-mrx='"+i+"' style='font-size:12px;padding:6px 9px' title='Підняти рецепт цього варіанта в промпт'>⟳</button>"
-      +"<a href='"+API+t.url+"' download style='font-size:12px;color:var(--accent2);text-decoration:none'>⬇</a>"
-      +"</div>"
-      +"<div style='font-size:11.5px;color:var(--muted);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' title='"+String(t.prompt||"").replace(/"/g,"&quot;")+"'>"+String(t.prompt||"").replace(/</g,"&lt;")+"</div>"
-      +(t.lyrics?("<details style='margin-top:5px'><summary style='cursor:pointer;font-size:11.5px;color:var(--muted)'>Текст / структура</summary><pre style='white-space:pre-wrap;font-size:11.5px;color:var(--txt);margin:5px 0 0'>"+String(t.lyrics).replace(/</g,"&lt;")+"</pre></details>"):"")
-      +"</div>").join("");
-  box.querySelectorAll("[data-mrx]").forEach(b=>b.onclick=()=>musRemix(musTracks[+b.dataset.mrx]||{}));
-  box.querySelectorAll("[data-mkeep]").forEach(b=>b.onclick=async()=>{
-    const i=+b.dataset.mkeep,t=musTracks[i];if(!t)return;
-    const nameEl=box.querySelector("[data-msave='"+i+"']");
-    const nm=(nameEl&&nameEl.value.trim())||"";
-    if(!nm){setStatus("Дай треку назву — під нею він ляже в бібліотеку.","err");if(nameEl)nameEl.focus();return;}
-    b.disabled=true;
-    try{const r=await fetch(API+"/api/music/save",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:t.file_id||"",name:t.name,save_as:nm,prompt:t.prompt,
-          kind:t.kind,instrumental:t.instrumental,model:t.model,lyrics:t.lyrics||"",
-          lyrics_in:t.lyrics_in||""})});
-      const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(apiErr(r,d,"failed"));
-      setStatus("Збережено в бібліотеку: "+d.saved+" — вже доступний у панелі Audio.","ok");
-      if(typeof loadLibrary==="function")loadLibrary();
-      if(typeof loadMusicLibrary==="function")loadMusicLibrary();
-    }catch(e){setStatus("Не зберіглось: "+e.message,"err");}
-    b.disabled=false;});
-}
-
 // LOC workspace shell — localizations only (built out in the next increments).
 // Country/language data — powers both the language chips and the waiting-quiz.
 const LOC_LANGS={
@@ -4267,16 +3845,18 @@ function buildStudioLayout(){
   const presets=$("presets"), ph=presets?presets.parentElement:null;
   if(presets)$("presetRail").appendChild(presets);
   if(ph)ph.style.display="none";                       // hide the now-empty "Presets" header in the sidebar
-  const gcol=$("groupCol");if(gcol&&$("filmstrip"))gcol.appendChild($("filmstrip"));   // hook/project strip lives in its own vertical column
+  const gcol=$("groupCol");if(gcol&&$("filmstrip"))gcol.appendChild($("filmstrip"));
+  if(typeof renderHookStrip==="function")renderHookStrip();   // hide the empty Projects header from the start   // hook/project strip lives in its own vertical column
   const pc=$("previewCol");
   [$("viewport"),$("transport"),$("trimRow")].forEach(el=>{if(el)pc.appendChild(el);});
+  // the original row is empty now (only whitespace text left, so :empty never matches); as a
+  // 0-px flex child it still cost the stage a 12-px gap
+  const _pr=document.querySelector(".preview-row");if(_pr&&!_pr.children.length)_pr.style.display="none";
   const ez=document.querySelector(".editzone");
   if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all — same compact pill shape as Save preset
   if(ez&&$("saveStyleBtn2")){$("saveStyleBtn2").textContent="＋ Save preset";$("saveStyleBtn2").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("saveStyleBtn2"),ez.children[1]||null);}  // #9 Save preset — compact green pill by the presets
   const qp=$("quickPanel");
-  // ⚖ Compliance rides along with Transcription: it checks that very transcript, so it has to
-  // live next to it in the quick panel — not orphaned in the sidebar section the studio empties.
-  [$("grpTranscribe"),$("grpBaseText"),$("grpSmart"),$("grpCompliance")].forEach(el=>{if(el)qp.appendChild(el);});
+  [$("grpTranscribe"),$("grpBaseText"),$("grpSmart")].forEach(el=>{if(el)qp.appendChild(el);});
   const tb=$("transcribeBtn"),mr=$("modelRow");
   if(tb&&mr){tb.style.width="100%";tb.style.margin="6px 0 0";tb.className="primary";mr.insertAdjacentElement("afterend",tb);}   // Transcribe sits with the settings (above the text field)
   const ptb=$("packTranscribeBtn");
@@ -4305,14 +3885,6 @@ function showSection(sec){setMode(sec==="compose"?"asm":"edit");}
 
 // ---------- tutorial mode (step-by-step hand-drawn coach) ----------
 const TUT={
-  mus:[
-    {sel:"#musPrompt",  ua:"1. Опиши трек: жанр, настрій, BPM, інструменти. Або тицьни чипс нижче", en:"1. Describe the track: genre, mood, BPM, instruments — or tap a chip below"},
-    {sel:"#musKind",    ua:"2. Clip — рівно 30 с (швидко перебирати). Song — 2–3 хв з куплетами", en:"2. Clip — exactly 30s (fast to audition). Song — 2–3 min with verses"},
-    {sel:"#musInstr",   ua:"3. Instrumental — для беду під голос. Вимкнений = пісня з вокалом", en:"3. Instrumental — for a bed under a voice-over. Off = a sung track"},
-    {sel:"#musTakes",   ua:"4. Результат щоразу інший, тому бери 2–3 варіанти й вибирай", en:"4. Results vary every call, so take 2–3 and pick"},
-    {sel:"#musGo",      ua:"5. Генеруй, послухай — і ♥ Зберегти покладе трек у спільну бібліотеку", en:"5. Generate, listen — ♥ Save puts the track into the shared library"},
-    {sel:"#musLib", fallback:"#musOut", ua:"6. Тут переможці з бібліотеки. ⟳ підніме рецепт треку назад у промпт", en:"6. Winners from the library live here. ⟳ loads a track's recipe back into the prompt"},
-  ],
   edit:[
     {sel:"#loadBtn",     ua:"1. Завантаж відео. Кілька файлів = пак хуків одразу", en:"1. Load a video. Pick several = a whole hook pack"},
     {sel:"#transcribeBtn", ua:"2. Транскрибуй — слова й тайминги (мову визначить авто)", en:"2. Transcribe — words & timings (language auto-detected)"},
@@ -4544,9 +4116,7 @@ function renderBatchStage(){
   if(musicTracks.length)html+="<div style='margin:16px auto 0;max-width:620px;padding:9px 12px;border-radius:8px;background:var(--panel2);border-left:4px solid var(--accent);font-size:12px;text-align:center;color:var(--muted)'>🎵 "+musicTracks.length+" музичн"+(musicTracks.length>1?"і доріжки":"а доріжка")+" · налаштування в панелі <b>Audio</b> ліворуч</div>";
   const n=shown.length;
   html+="<div style='display:flex;gap:12px;justify-content:center;align-items:center;margin-top:22px'><button id='boardBuild' class='primary' style='padding:15px 44px;font-size:17px;font-weight:700;letter-spacing:.3px'>🎬 Render "+n+" video"+(n>1?"s":"")+"</button>"
-    // pre-flight: measure the real output length (hook+bodies+packshot, trims applied) against
-    // the network's 58s cap BEFORE spending a render on something that will be rejected
-    +"<button id='boardLen' title='Порахувати довжину кожного креатива (хук + боді + пекшот, з трімами) і порівняти з лімітом AppLovin 58с' style='padding:14px 18px;font-size:14px'>§ 58с</button>"
+
     // Re-run the SAME session after tweaking something upstream: clearing the results unlocks
     // the board (hooks/bodies/titles stay put) instead of forcing a fresh session.
     +(hasFinals?"<button id='clearFinals' title='Прибрати результати останнього рендеру — хуки, боді й налаштування лишаються. Можеш піти поправити титри/трім і зібрати знову.' style='padding:14px 20px;font-size:14px'>↺ Новий прогін</button>":"")
@@ -4629,7 +4199,6 @@ function renderBatchStage(){
   el.querySelectorAll("[data-pick]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();openPicker(t.dataset.pick,t,t.dataset.slot===''?null:+t.dataset.slot);});
   el.querySelectorAll("[data-add]").forEach(t=>t.onclick=ev=>{ev.stopPropagation();if(t.dataset.add==='hook'){$("batchFiles").click();}else{bodyParts.push("");renderBatchStage();}});
   const bb=el.querySelector("#boardBuild");if(bb)bb.onclick=()=>$("batchAssembleBtn").click();
-  const bl=el.querySelector("#boardLen");if(bl)bl.onclick=checkBoardLength;
   const cf=el.querySelector("#clearFinals");
   if(cf)cf.onclick=()=>{
     if(!confirm("Прибрати результати останнього прогону?\n\nГотові файли лишаються на диску (і в папці сесії), просто зникають з дошки. Хуки, боді, титри й тайтли не змінюються."))return;
@@ -4637,46 +4206,6 @@ function renderBatchStage(){
     renderBatchStage();
     setStatus("Дошка готова до нового прогону — можеш повернутись у EDIT, поправити і зібрати знову.","ok");};
   if(typeof renderTrackList==="function")renderTrackList();   // keep per-track "Start at" options in sync with segments
-  if(lastLenCheck)renderLenCheck(lastLenCheck);               // survive board re-renders
-}
-
-// 58-second pre-flight for the WHOLE creative. Measured on the same recipes Build sends, with
-// each segment's trim applied — so "62.4s" is the file you would have got, not an estimate.
-// Shown per creative, because a body part that fits in EN can overrun in DE.
-let lastLenCheck=null;
-async function checkBoardLength(){
-  if(!hooks.length){setStatus("Спершу додай хуки.","err");return;}
-  if(!fileId){setStatus("Немає сесії.","err");return;}
-  const btn=$("boardLen");if(btn){btn.disabled=true;btn.textContent="§ …";}
-  try{
-    const recipes=buildRecipes();
-    const r=await fetch(API+"/api/compliance/length",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,recipes,profile:"applovin"})});
-    const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"length check failed"));
-    lastLenCheck=d;renderBatchStage();
-    const bad=(d.items||[]).filter(i=>!i.ok);
-    setStatus(bad.length?(bad.length+" креатив(и) довші за "+d.limit+"с — на скільки різати, видно на дошці."):
-      "Усі креативи вкладаються в "+d.limit+"с 👌",bad.length?"err":"ok");
-  }catch(e){setStatus("Не порахував довжину: "+e.message,"err");}
-  if(btn){btn.disabled=false;btn.textContent="§ 58с";}
-}
-function renderLenCheck(d){
-  const el=$("batchStage");if(!el)return;
-  const items=d.items||[];if(!items.length)return;
-  const row=i=>"<div style='display:flex;gap:8px;align-items:baseline;padding:5px 9px;border-radius:7px;background:var(--panel2);border-left:3px solid "+(i.ok?"var(--ok)":"var(--accent)")+";font-size:12px'>"
-    +"<span style='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+String(i.name).replace(/</g,"&lt;")+"</span>"
-    +"<span style='font-variant-numeric:tabular-nums;color:"+(i.ok?"var(--ok)":"var(--accent)")+";font-weight:600'>"+i.seconds.toFixed(1)+"s</span>"
-    +(i.ok?"":"<span style='color:var(--accent);font-size:11px'>−"+i.over.toFixed(1)+"s</span>")
-    +(i.missing?"<span style='color:var(--muted);font-size:10.5px'>"+i.missing+" файл(и) не знайдено</span>":"")
-    +"<span style='color:var(--muted);font-size:10.5px'>"+i.parts.filter(p=>p.seconds>0).map(p=>p.seconds.toFixed(1)).join(" + ")+"</span></div>";
-  const box=document.createElement("div");
-  box.style.cssText="max-width:620px;margin:16px auto 0";
-  box.innerHTML="<div style='display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:6px'>"
-    +"<b style='color:var(--txt)'>§ Довжина проти ліміту "+d.limit+"с</b>"
-    +"<span style='color:var(--muted);font-size:11px'>хук + боді + пекшот, з трімами</span></div>"
-    +"<div style='display:flex;flex-direction:column;gap:4px'>"+items.map(row).join("")+"</div>"
-    +"<div style='margin-top:6px;font-size:11px;color:var(--muted)'>Довше за ліміт → вертайся в EDIT і ріж трімом, або прибери боді-частину. Знахідки по тексту — панель <b>§ Compliance</b> в EDIT.</div>";
-  el.appendChild(box);
 }
 
 // ---------- init ----------
@@ -4739,9 +4268,9 @@ $("overlayFile").onchange=e=>{const f=e.target.files[0];if(f)addOverlay(f);e.tar
 function decorateGroupIcons(){
   // Flat, monochrome glyphs only. ⚖ / ✨ / 🎵 default to EMOJI presentation on macOS, so the
   // system draws them in colour at its own size and they clash with the rest of the set —
-  // that's what made the Compliance header look broken. Every group is listed here on
+  // that's what made a header icon look broken. Every group is listed here on
   // purpose: a title that falls through to "•" looks like a bug, not like a default.
-  const MAP=[["transcription","✦"],["base text","T"],["smart captions","✧"],["compliance","§"],
+  const MAP=[["transcription","✦"],["base text","T"],["smart captions","✧"],
              ["style regions","◫"],["stroke","A"],["shadow","☼"],["scrim","▚"],["plate","▭"],
              ["gradients","▨"],["karaoke","★"],["animation","∿"],["titles","¶"],["overlays","▣"],
              ["export","↧"],["localize","⊕"],["hooks","☰"],["audio","♪"],["music","♪"],
@@ -4765,7 +4294,9 @@ async function init(){
   autoGrow();
   try{const r=await fetch(API+"/api/info");const d=await r.json();
     IS_MAINTAINER=!!d.maintainer;if(typeof renderPresetRail==="function")renderPresetRail();   // reveal the 'Save as app default' button only in the repo clone
-    $("encBadge").innerHTML="encoder: <b>"+d.encoder+"</b>"+(d.version?'  ·  v<b>'+d.version+'</b>':'');
+    // version FIRST: when the bar is tight the ellipsis eats the encoder name, never the version
+    $("encBadge").innerHTML=(d.version?'v<b>'+d.version+'</b>  ·  ':'')+d.encoder;
+    $("encBadge").title="encoder: "+d.encoder+(d.version?"  ·  version "+d.version:"");
     if(d.allowed===false){$("lockScreen").classList.add("show");if(d.machine_id)$("lockMid").textContent=d.machine_id;}
     if(!d.scribe_key_present){const b=$("engineSeg")&&$("engineSeg").querySelector('button[data-v=scribe]');if(b){b.disabled=true;b.title="No ElevenLabs API key";b.style.opacity=".4";}}
     if(!d.heygen_key_present){const o=$("locProvider").querySelector('option[value=heygen]');if(o)o.textContent+=" — no API key";}

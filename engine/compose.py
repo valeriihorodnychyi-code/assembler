@@ -584,8 +584,8 @@ def trim_clip(clip_path, start, end, output_path):
 def cut_spans(clip_path, spans, output_path, fps=None):
     """Remove one or more time ranges from the MIDDLE of a clip (video AND audio together).
 
-    trim_clip can only take the head or the tail; this is what a compliance fix needs when the
-    offending phrase sits at 0:34 of a 0:58 creative. Boundaries are snapped to whole frames of
+    trim_clip can only take the head or the tail; this removes a span from anywhere in the clip
+    (e.g. a phrase at 0:34 of a 0:58 creative) without touching the rest. Boundaries are snapped to whole frames of
     the SOURCE's real fps, so a join lands on a frame and not between two.
 
     Built from trim/atrim + concat rather than select/aselect on purpose: aselect can only keep

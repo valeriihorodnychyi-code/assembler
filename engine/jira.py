@@ -194,36 +194,96 @@ def _num(v):
         return None
 
 
+# Jira REST v3 returns every RICH-TEXT field (multi-line text, description) as an ADF document
+# — {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"…"}]}]} —
+# not as a string. Plain-text and URL fields stay strings. Which one a custom field is depends
+# on how an admin configured it, so every text-ish field goes through _text(): it accepts a
+# string, an ADF document, an option object or a list, and always returns a plain string.
+_ADF_BLOCKS = {"paragraph", "heading", "blockquote", "codeBlock", "listItem", "tableRow",
+               "rule", "panel", "mediaSingle", "bulletList", "orderedList"}
+
+
+def _adf_text(node):
+    if isinstance(node, list):
+        return "".join(_adf_text(n) for n in node)
+    if not isinstance(node, dict):
+        return ""
+    t = node.get("type")
+    if t == "text":
+        return node.get("text", "")
+    if t == "hardBreak":
+        return "\n"
+    if t in ("mention", "emoji", "status"):
+        a = node.get("attrs") or {}
+        return a.get("text") or a.get("shortName") or ""
+    if t in ("inlineCard", "blockCard"):
+        return (node.get("attrs") or {}).get("url", "")
+    inner = _adf_text(node.get("content") or [])
+    return inner + ("\n" if t in _ADF_BLOCKS else "")
+
+
+def _text(v):
+    """Any Jira field value → plain text (never a dict, never None)."""
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, list):
+        return ", ".join(x for x in (_text(i) for i in v) if x)
+    if isinstance(v, dict):
+        if v.get("type") == "doc" or "content" in v:
+            return re.sub(r"\n{3,}", "\n\n", _adf_text(v)).strip()
+        for k in ("value", "name", "url", "href", "text"):
+            if isinstance(v.get(k), (str, int, float)):
+                return str(v[k])
+    return ""
+
+
+_URL = re.compile(r"https://[^\s<>\"')\]]+")
+
+
+def _url(v):
+    """A URL field, or a rich-text field that holds one → the first https URL in it, or None."""
+    t = _text(v).strip()
+    if not t:
+        return None
+    m = _URL.search(t)
+    return m.group(0) if m else None
+
+
 def normalize(issue, site=DEFAULT_SITE, fmap=None):
     """A raw Jira issue → the record Assembler works with."""
     fm = fmap or FIELDS
     f = issue.get("fields") or {}
     g = lambda k: f.get(fm[k])
-    nsub, final = g("nsub"), g("final")
-    langs = _vals(g("langs"))
-    script = (g("script") or g("script2") or "").strip()
+    nsub, final = _url(g("nsub")), _url(g("final"))
+    langs = [x for x in (_text(v) for v in (g("langs") if isinstance(g("langs"), list) else [g("langs")])) if x]
+    script = (_text(g("script")) or _text(g("script2"))).strip()
+    summary = _text(f.get("summary")).strip()
     rec = {
-        "key": issue.get("key", ""),
-        "link": f"https://{site}/browse/{issue.get('key', '')}",
-        "asset": g("asset") or f.get("summary") or "",
-        "summary": f.get("summary") or "",
+        "key": _text(issue.get("key")),
+        "link": f"https://{site}/browse/{_text(issue.get('key'))}",
+        "asset": _text(g("asset")).strip() or summary,
+        "summary": summary,
         "video": nsub or final or None,
         "has_nsub": bool(nsub),
         # no clean master → the only file has captions burned in; putting ours on top would
         # print two caption tracks, so the UI must say so instead of silently using it
         "burned_in": (not nsub) and bool(final),
-        "thumb": g("thumb") or g("preview") or None,
+        "thumb": _url(g("thumb")) or _url(g("preview")),
         "langs": langs,
         "lang": (langs[0].lower() if langs else ""),
-        "localized": (_val(g("localized")) == "Localized"),
+        "localized": (_text(g("localized")) == "Localized"),
         "size": (_vals(g("size")) or [""])[0],
-        "cid": _num(g("cid")),
-        "baseid": _num(g("baseid")),
-        "brand": (_vals(g("brand")) or [""])[0],
-        "idea": _val(g("idea")) or "",
-        "parent": g("parent") or "",
+        "cid": _num(_text(g("cid"))),
+        "baseid": _num(_text(g("baseid"))),
+        "brand": _text((_vals(g("brand")) or [""])[0]),
+        "idea": _text(g("idea")),
+        "parent": _text(g("parent")).strip(),
         "script": script,
-        "status": _val(f.get("status")) or "",
+        "status": _text(f.get("status")),
         "warn": "",
     }
     if rec["burned_in"]:
@@ -241,8 +301,7 @@ def normalize(issue, site=DEFAULT_SITE, fmap=None):
 def resolve(text, requests=None):
     """Pasted text → {"items": [record...], "errors": [...], "unrecognized": [...]}.
 
-    Metadata only, nothing downloaded — so the UI (and a compliance pre-scan over the
-    voice-over text) can run on 50 tasks in seconds.
+    Metadata only, nothing downloaded — fast enough to run on 50 tasks in seconds.
     """
     if requests is None:
         import requests  # noqa: F811 — lazy, and injectable for tests
@@ -271,7 +330,7 @@ def resolve(text, requests=None):
                 jql = (f'cf[{fm["cid"].split("_")[-1]}] = {cid}' if cid
                        else f'summary ~ "\\"{name}\\""')
                 hits = _search(jql, site, email, token, want, requests)
-                exact = [h for h in hits if (h.get("fields") or {}).get("summary") == name]
+                exact = [h for h in hits if _text((h.get("fields") or {}).get("summary")).strip() == name]
                 if not exact:
                     raise JiraError(f"{name}: таски з такою назвою не знайдено")
                 issue = exact[0]
