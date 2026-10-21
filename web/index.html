@@ -163,7 +163,13 @@
   .twords .w{cursor:pointer;border-radius:4px;padding:0 1px;color:#5f6270;transition:color .18s,background .18s}   /* inactive = dimmed (focus mode) */
   .twords .w:hover{color:var(--accent)}
   .twords .w.kt{border-bottom:2px solid rgba(255,90,44,.5)}
-  .twords .w.cur{color:#fff;background:rgba(255,90,44,.22)}   /* the phrase currently on screen */
+  .twords .w.cur{color:#fff;background:rgba(255,90,44,.22)}
+  .twords .w.sel{outline:1.5px solid var(--accent2);outline-offset:1px;color:#fff}   /* the word the [ / ] tools act on */
+  .twords .w.man{border-bottom:2px dotted var(--accent2)}
+  #revoiceBox{margin-top:8px;padding:9px 10px;border:1px solid rgba(124,92,255,.45);border-radius:10px;background:rgba(124,92,255,.08);font-size:12px}
+  #revoiceBox .rvrow{display:flex;gap:6px;align-items:center;margin-top:6px}
+  #revoiceBox .rvrow .rvwhat{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+  #revoiceBox .rvrow input{flex:1 1 90px;min-width:70px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 7px;font-size:12px}                            /* its time was set by hand */   /* the phrase currently on screen */
   /* Text/Words toggle — compact, distinct from the orange setting segs */
   #txtViewSeg{flex:0 0 auto;background:#0f1014;border:1px solid var(--line);border-radius:10px;gap:0;overflow:hidden;padding:3px}
   #txtViewSeg button{flex:0 0 auto;padding:6px 20px;font-size:12.5px;font-weight:600;border:0;border-radius:7px;color:var(--muted);background:transparent}
@@ -443,6 +449,8 @@
         <input type="hidden" id="language" value="">
         <!-- padding-right keeps the toggle clear of the language sticker pinned to the box's top-right corner -->
         <div style="display:flex;justify-content:flex-end;margin:4px 0 7px;padding-right:78px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
+          <button type="button" id="restoreTimingsBtn" class="ghost" disabled style="margin-right:auto;font-size:11px;padding:5px 9px;white-space:nowrap"
+            title="Накласти поточний текст на ОРИГІНАЛЬНІ тайминги транскрайбу. Твої правки тексту лишаються, зіпсований час повертається — без нового транскрайбу. (Ручні правки часу слів теж скинуться.)">↺ Тайминги</button>
           <div class="seg" id="txtViewSeg">
             <button type="button" data-v="text" class="active">Text</button>
             <button type="button" data-v="words">Words</button>
@@ -451,7 +459,15 @@
           <span id="langSticker" class="lang-sticker" style="display:none"></span>
           <textarea id="transcript" rows="3" style="min-height:210px;max-height:360px;overflow-y:auto;resize:vertical;font-size:15px" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
           <div id="transcriptWords" class="twords" contenteditable="true" spellcheck="false" style="display:none"></div>
+          <div id="wordTools" style="display:none;flex-direction:column;gap:6px;margin-top:6px;font-size:11.5px;color:var(--muted)">
+            <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Слово: <b id="wtWord" style="color:var(--txt)">— клікни слово</b> <span id="wtTime"></span></div>
+            <div style="display:flex;gap:6px">
+              <button type="button" id="wtStart" style="flex:1;font-size:11px;padding:6px 8px" title="Початок слова = поточний кадр плейхеда (клавіша [)">⇤ Початок тут&nbsp;&nbsp;[</button>
+              <button type="button" id="wtEnd" style="flex:1;font-size:11px;padding:6px 8px" title="Кінець слова = поточний кадр плейхеда (клавіша ])">]&nbsp;&nbsp;Кінець тут ⇥</button>
+            </div>
+          </div>
         </div>
+        <div id="revoiceBox" style="display:none"></div>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
         <div class="row" style="margin-top:8px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків; крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label><label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
         <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
@@ -842,7 +858,7 @@
 const $=id=>document.getElementById(id);
 const API="";   // same origin
 let ratio="9:16", customFontName=null, videoFile=null, fileId=null, realWords=null;
-let _capRange=null, txtView="text";   // Words-view: current caption range + active view (text|words)
+let _capRange=null, txtView="text", _wSel=-1;   // _wSel = the word the [ / ] tools act on   // Words-view: current caption range + active view (text|words)
 let splitOn=false, editingSlot="A", styleB=null;
 let variants={}, activeVar="en", enVideoUrl=null;   // language variants (en + dubbed)
 let editPack=[], activeHook=-1, sharedCtrl=null;     // EDIT batch: pack of original hooks (each: {clip,videoUrl,words,ctrl,lang})
@@ -1680,7 +1696,7 @@ async function transcribePack(){
         body:JSON.stringify({file_id:fileId,clip:h.clip,engine:eng,model_size:ms,language:"",   // "" = auto-detect
                              script:(h.jira&&h.jira.script)||""})});   // Jira text fixes misheard words, timings untouched
       const d=await r.json();if(!r.ok)throw new Error(d.detail||"transcribe failed");
-      h.words=d.words; if(d.language)h.lang=d.language;
+      h.words=d.words; h.origWords=JSON.parse(JSON.stringify(d.words)); if(d.language)h.lang=d.language;   // origWords = the recogniser's own timings, the rescue for ↺
       h.scriptFixes=(d.script_fixes||[]);fixedTotal+=h.scriptFixes.length;
     ok++;}catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
   }
@@ -1711,9 +1727,9 @@ function selectHook(i){
   if(i<0||i>=editPack.length)return;
   editingHook=null;
   saveActiveHook();
-  const h=editPack[i];activeHook=i;
+  const h=editPack[i];activeHook=i;_wSel=-1;
   if(h.jira&&h.jira.burned_in)setTimeout(()=>setStatus("⚠ "+h.jira.key+": у файлі вже вшиті титри (чистого _nSub у таски нема). Свої титри зверху дадуть подвійні.","err"),0);
-  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,style:h.ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null}};activeVar="en";
+  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,origWords:h.origWords||null,style:h.ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null}};activeVar="en";
   if(typeof updateCutsLabel==="function")updateCutsLabel();
   videoFile=null;                                  // in-session clip — re-transcribe targets it, no session fork
   if($("language"))$("language").value=h.lang||""; // force the hook's language on re-transcribe
@@ -1771,6 +1787,7 @@ function copyStyleToAll(){
   renderHookStrip();setStatus("Стиль активного хука скопійовано на всі "+editPack.length+" 🎯","ok");
 }
 function updateEditButtons(){
+  if(typeof updateWordTools==="function")updateWordTools();
   const pack=editPack.length>0, editing=!!editingHook, locpack=pack&&packMode==="loc";
   const show=(id,on)=>{const e=$(id);if(e)e.style.display=on?"inline-block":"none";};
   show("renderBtn",!pack&&!editing);show("sLocBtn",!pack&&!editing);
@@ -1842,6 +1859,7 @@ document.addEventListener("keydown",(e)=>{
   if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||e.target.isContentEditable)return;
   const k=e.key.toLowerCase();
   // I / O stamp the playhead into the trim (NLE muscle memory)
+  if((e.key==="["||e.key==="]")&&txtView==="words"&&_wSel>=0){e.preventDefault();setWordEdge(e.key==="["?"start":"end");return;}
   if(k==="i"&&$("trimRow")&&$("trimRow").style.display!=="none"){e.preventDefault();setTrimFromPlayhead("in");return;}
   if(k==="o"&&$("trimRow")&&$("trimRow").style.display!=="none"){e.preventDefault();setTrimFromPlayhead("out");return;}
   // Alt + ← / → nudges the ARMED trim handle by a frame (Shift = 10); plain ← / → moves the playhead
@@ -2515,6 +2533,7 @@ $("transcript").addEventListener("input",()=>{
     if(variants[activeVar])variants[activeVar].words=realWords;
   }
   if(typeof scheduleExact==="function")scheduleExact();
+  if(typeof scheduleRevoiceBox==="function")scheduleRevoiceBox();
 });
 // Caption break markers: a NEWLINE (Enter) or a '*' between words forces a new caption at
 // that spot — invisible in the burned caption, layout-independent. Sets brk="soft" on the
@@ -2648,13 +2667,14 @@ $("txtViewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
   $("txtViewSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
   txtView=b.dataset.v;
   const ta=$("transcript"), box=$("transcriptWords");
+  if($("wordTools"))$("wordTools").style.display=(txtView==="words")?"flex":"none";
   if(txtView==="words"){ if(ta)ta.style.display="none"; if(box){box.style.display="block";renderWordsView();} }
   else { if(ta){ if(realWords&&realWords.length)ta.value=wordsToText(realWords); ta.style.display=""; if(typeof autoGrow==="function")autoGrow(); } if(box)box.style.display="none"; }   // switching to Text → show the latest words (incl. Words-tab edits)
 });
 function renderWordsView(){
   const box=$("transcriptWords"); if(!box)return; box.innerHTML="";
-  (realWords||[]).forEach(w=>{
-    const sp=document.createElement("span");sp.className="w";sp.dataset.start=w.start;
+  (realWords||[]).forEach((w,i)=>{
+    const sp=document.createElement("span");sp.className="w"+(i===_wSel?" sel":"")+(w.manual?" man":"");sp.dataset.start=w.start;sp.dataset.i=i;
     sp.textContent=(w.word||w.text||""); sp.title=_fmtCut(+w.start);
     box.appendChild(sp); box.appendChild(document.createTextNode(" "));
     if(w.brk==="soft") box.appendChild(document.createElement("br"));
@@ -2664,13 +2684,185 @@ function renderWordsView(){
 (function wireWordsView(){
   const box=$("transcriptWords"); if(!box)return;
   box.addEventListener("click",e=>{ const sp=e.target.closest&&e.target.closest(".w"); if(!sp)return;
+    _wSel=+sp.dataset.i; box.querySelectorAll(".w.sel").forEach(x=>x.classList.remove("sel")); sp.classList.add("sel"); updateWordTools();
     const st=+sp.dataset.start; if(video&&videoLoaded){ try{video.currentTime=st;}catch(_){} if(video.paused){try{render(st,video.duration||0);}catch(_){}} if(typeof scheduleExact==="function")scheduleExact(); } });
   box.addEventListener("input",()=>{ // edit in-place → re-map onto word timings (same as the Text field)
     if(realWords&&realWords.length){ realWords=parseBreaksToWords(box.innerText, realWords); if(variants[activeVar])variants[activeVar].words=realWords;
       const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords); }   // mirror edits into the Text field so BOTH tabs + export/layout use the same words
-    if(typeof scheduleExact==="function")scheduleExact(); });
+    if(typeof scheduleExact==="function")scheduleExact();
+    if(typeof scheduleRevoiceBox==="function")scheduleRevoiceBox(); });
+  box.addEventListener("keydown",e=>{ if((e.key==="["||e.key==="]")&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&_wSel>=0){ e.preventDefault(); setWordEdge(e.key==="["?"start":"end"); } });
   box.addEventListener("blur",()=>{ renderWordsView(); });   // normalize spans after editing
 })();
+// ---------- caption timing tools: ↺ back to the recogniser's timings, and word edge = playhead ----------
+// write the current word list back to every place that holds it, then refresh the preview
+function commitWords(ws){
+  realWords=ws;
+  if(variants[activeVar])variants[activeVar].words=ws;
+  const h=(typeof openHookRef==="function")?openHookRef():null; if(h)h.words=ws;
+  if(txtView==="words")renderWordsView();
+  else{const ta=$("transcript"); if(ta){ta.value=wordsToText(ws); if(typeof autoGrow==="function")autoGrow();}}
+  if(typeof invalidateLayout==="function")invalidateLayout();
+  if(typeof scheduleExact==="function")scheduleExact();
+  updateWordTools();
+}
+function origWordsNow(){
+  const v=variants[activeVar]; if(v&&v.origWords&&v.origWords.length)return v.origWords;
+  const h=(typeof openHookRef==="function")?openHookRef():null; return (h&&h.origWords&&h.origWords.length)?h.origWords:null;
+}
+function restoreTimings(){
+  const o=origWordsNow();
+  if(!o){setStatus("Для цього кліпу немає збережених таймингів транскрайбу (його транскрибували до 1.9.64). Зроби ① Transcribe ще раз — далі ↺ працюватиме.","err");return;}
+  const text=(txtView==="words")?wordsToText(realWords):$("transcript").value;
+  const before=JSON.stringify((realWords||[]).map(w=>[+w.start,+w.end]));
+  const ws=parseBreaksToWords(text,o);
+  const moved=ws.filter((w,i)=>!realWords[i]||Math.abs(+w.start-(+realWords[i].start))>0.005).length;
+  commitWords(ws);
+  setStatus(JSON.stringify(ws.map(w=>[+w.start,+w.end]))===before
+    ? "Тайминги й так збігаються з транскрайбом 👌"
+    : "Повернув тайминги транскрайбу: виправлено час "+moved+" сл. Текст лишився твій.","ok");
+}
+function updateWordTools(){
+  const w=(_wSel>=0&&realWords)?realWords[_wSel]:null;
+  if($("wtWord"))$("wtWord").textContent=w?("«"+(w.word||w.text||"")+"»"):"— клікни слово";
+  if($("wtTime"))$("wtTime").textContent=w?(" "+(+w.start).toFixed(3)+" → "+(+w.end).toFixed(3)+" с"+(w.manual?" · вручну":"")):"";
+  ["wtStart","wtEnd"].forEach(id=>{if($(id))$(id).disabled=!w||!videoLoaded;});
+  if(typeof scheduleRevoiceBox==="function")scheduleRevoiceBox();
+  if($("restoreTimingsBtn"))$("restoreTimingsBtn").disabled=!origWordsNow();
+}
+// Put the selected word's start (or end) on the CURRENT FRAME. Neighbours are trimmed so words
+// never overlap, and the word can't jump past its neighbours (that would reorder the sentence).
+function setWordEdge(which){
+  if(!(realWords&&realWords[_wSel])||!videoLoaded){setStatus("Клікни слово в режимі Words і стань плейхедом на потрібний кадр.","err");return;}
+  const ws=realWords.map(w=>({...w}));
+  const w=ws[_wSel], prev=ws[_wSel-1], next=ws[_wSel+1];
+  const step=1/(typeof fps==="function"?fps():30), snap=(typeof snapFrame==="function")?snapFrame:(t=>t);
+  let t=snap(video.currentTime||0), note="";
+  if(which==="start"){
+    const lo=prev?(+prev.start+step):0, hi=next?(+next.start-step):(video.duration||t+1);
+    if(t<lo){t=lo;note=" (не раніше за попереднє слово)";} if(t>hi){t=hi;note=" (не пізніше за наступне слово)";}
+    const dur=Math.max(step*2,(+w.end)-(+w.start));
+    w.start=t; if(+w.end<=t+step)w.end=Math.min(hi+step,t+dur);
+    if(prev&&+prev.end>t)prev.end=t;
+  }else{
+    const lo=+w.start+step, hi=next?(+next.start):(video.duration||t+1);
+    if(t<lo){t=lo;note=" (кінець не може бути раніше за початок)";} if(t>hi){t=hi;note=" (не далі за початок наступного слова)";}
+    w.end=t;
+  }
+  w.manual=true;
+  commitWords(ws);
+  setStatus("«"+(w.word||w.text)+"»: "+(which==="start"?"початок ":"кінець ")+t.toFixed(3)+" с (кадр "+Math.round(t/step)+")"+note,note?"":"ok");
+}
+if($("restoreTimingsBtn"))$("restoreTimingsBtn").onclick=restoreTimings;
+if($("wtStart"))$("wtStart").onclick=()=>setWordEdge("start");
+if($("wtEnd"))$("wtEnd").onclick=()=>setWordEdge("end");
+// ---------- 🎙 re-voice: the words you changed, back into the AUDIO, in the clip's own voice ----------
+// "Changed" means: different from what was actually SAID — the recogniser's original words
+// (origWords), not the previous edit. Case and punctuation don't count (they don't change the
+// sound). A deletion leaves the audio alone; an insertion or replacement can be re-voiced.
+let _rvSay={}, _rvTimer=null, _rvBusy=false;
+const rvNorm=s=>String(s||"").toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
+function changedSpans(){
+  const cur=realWords||[], orig=origWordsNow();
+  if(!orig||!orig.length||!cur.length)return [];
+  const A=cur.map(w=>rvNorm(w.word||w.text)), B=orig.map(w=>rvNorm(w.word||w.text)), n=A.length, m=B.length;
+  const dp=Array.from({length:n+1},()=>new Int32Array(m+1));
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i][j]=(A[i]===B[j])?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+  const pairs=[];{let i=0,j=0;while(i<n&&j<m){if(A[i]===B[j]){pairs.push([i,j]);i++;j++;}else if(dp[i+1][j]>=dp[i][j+1])i++;else j++;}}
+  const bounds=[[-1,-1],...pairs,[n,m]], out=[];
+  const dur=(video&&videoLoaded&&video.duration)||((+orig[m-1].end)+0.5);
+  const W=w=>w.word||w.text||"";
+  for(let g=0;g<bounds.length-1;g++){
+    const ns=bounds[g][0]+1, ne=bounds[g+1][0], os=bounds[g][1]+1, oe=bounds[g+1][1];
+    if(ne-ns<=0)continue;                                   // deletion: the audio is left as it is
+    const prevO=os>0?orig[os-1]:null, nextO=oe<m?orig[oe]:null;
+    const a=(oe>os)?+orig[os].start:(prevO?+prevO.end:0), b=(oe>os)?+orig[oe-1].end:a;
+    const text=cur.slice(ns,ne).map(W).join(" ");
+    out.push({ns,ne,os,oe,text,old:orig.slice(os,oe).map(W).join(" "),a,b,
+      lo:Math.min(prevO?+prevO.end:0,a), hi:Math.max(nextO?+nextO.start:dur,b),
+      prevText:cur.slice(Math.max(0,ns-14),ns).map(W).join(" "), nextText:cur.slice(ne,ne+14).map(W).join(" "),
+      sig:os+":"+oe+":"+text});
+  }
+  return out;
+}
+function rvUndoStack(){const v=variants[activeVar],h=(typeof openHookRef==="function")?openHookRef():null;
+  return (v&&v._rvFrom&&v._rvFrom.length)?v._rvFrom:((h&&h._rvFrom&&h._rvFrom.length)?h._rvFrom:null);}
+function scheduleRevoiceBox(){clearTimeout(_rvTimer);_rvTimer=setTimeout(renderRevoiceBox,450);}
+function renderRevoiceBox(){
+  const box=$("revoiceBox");if(!box)return;
+  const ae=document.activeElement;
+  if(ae&&ae.tagName==="INPUT"&&box.contains(ae)){scheduleRevoiceBox();return;}   // never re-render under the caret (a focused button is fine)
+  box.querySelectorAll("input[data-rvsig]").forEach(i=>{_rvSay[i.dataset.rvsig]=i.value;});
+  const v=variants[activeVar];
+  const spans=(currentMode==="edit"&&fileId&&v&&v.clip&&videoLoaded)?changedSpans():[];
+  const undo=rvUndoStack();
+  if(!spans.length&&!undo){box.style.display="none";box.innerHTML="";return;}
+  const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  let h="<div style='display:flex;align-items:baseline;gap:6px'><b style='color:var(--txt)'>🎙 Переозвучка</b>"
+    +"<span style='color:var(--muted);font-size:11px'>тим самим голосом, ElevenLabs</span></div>";
+  if(spans.length)h+=spans.map((sp,k)=>"<div class='rvrow'>"
+      +"<span class='rvwhat' title='було в озвучці: «"+esc(sp.old||"—")+"»'>«"+esc(sp.old||"+")+"» →</span>"
+      +"<input data-rvsig='"+esc(sp.sig)+"' value='"+esc(_rvSay[sp.sig]!=null?_rvSay[sp.sig]:sp.text)+"' title='Як має ЗВУЧАТИ (у титрах лишиться «"+esc(sp.text)+"»). Наприклад, «Tie Chee» для «Tai Chi».'>"
+      +"<button type='button' data-rvone='"+k+"' style='font-size:11px;padding:5px 9px' "+(_rvBusy?"disabled":"")+">🎙</button></div>").join("");
+  h+="<div style='display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap'>"
+    +(spans.length>1?"<button type='button' id='rvAll' class='primary' style='font-size:11px;padding:6px 10px' "+(_rvBusy?"disabled":"")+">🎙 Переозвучити все ("+spans.length+")</button>":"")
+    +(undo?"<button type='button' id='rvUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути попередній звук і текст'>↩ Повернути звук</button>":"")
+    +"<span style='color:var(--muted);font-size:10.5px;flex:1;min-width:140px'>"+(spans.length?"Довжина кліпу не зміниться. Поле — як має звучати.":"")+"</span></div>";
+  box.innerHTML=h;box.style.display="block";
+  box.querySelectorAll("[data-rvone]").forEach(b=>b.onclick=()=>doRevoice([spans[+b.dataset.rvone]]));
+  if($("rvAll"))$("rvAll").onclick=()=>doRevoice(spans);
+  if($("rvUndo"))$("rvUndo").onclick=undoRevoice;
+}
+function rvTargets(clip){const set=new Set();const v=variants[activeVar];if(v)set.add(v);
+  const h=(typeof openHookRef==="function")?openHookRef():null;if(h)set.add(h);
+  (hooks||[]).forEach(x=>{if(x.clip===clip)set.add(x);});(editPack||[]).forEach(x=>{if(x.clip===clip)set.add(x);});return [...set];}
+function rvLoadVideo(url){const t=video.currentTime||0;video.src=url;
+  video.onloadedmetadata=()=>{videoLoaded=true;try{video.currentTime=Math.min(t,(video.duration||t));}catch(_){}};}
+async function doRevoice(list){
+  const v=variants[activeVar];
+  if(!v||!v.clip||!fileId){setStatus("Переозвучка працює з кліпом у сесії — спершу завантаж і транскрибуй його.","err");return;}
+  const box=$("revoiceBox");if(box)box.querySelectorAll("input[data-rvsig]").forEach(i=>{_rvSay[i.dataset.rvsig]=i.value;});
+  const spans=list.map(s=>({a:s.a,b:s.b,lo:s.lo,hi:s.hi,text:s.text,say:String(_rvSay[s.sig]!=null?_rvSay[s.sig]:s.text).trim()||s.text,
+                            prev_text:s.prevText,next_text:s.nextText}));
+  _rvBusy=true;renderRevoiceBox();
+  busyStart("🎙 Переозвучка: клоную голос з кліпу і генерую "+(list.length>1?list.length+" фрагменти":"«"+spans[0].say+"»")+"…");
+  try{
+    const r=await fetch(API+"/api/revoice",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:v.clip,spans})});
+    const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"re-voice failed"));
+    const before={clip:v.clip,videoUrl:v.videoUrl,words:(realWords||[]).map(w=>({...w})),origWords:(origWordsNow()||[]).map(w=>({...w}))};
+    // new words in: from the LAST span back to the first, so earlier indices stay valid
+    const cur=before.words.map(w=>({...w})), orig=before.origWords.map(w=>({...w}));
+    list.map((s,i)=>i).sort((x,y)=>list[y].ns-list[x].ns).forEach(i=>{
+      const s=list[i], nw=((d.spans||[])[i]||{}).words||[], lastBrk=(cur[s.ne-1]||{}).brk||null;
+      const fresh=nw.map((w,j)=>({word:w.word,start:+w.start,end:+w.end,brk:(j===nw.length-1)?lastBrk:null}));
+      cur.splice(s.ns,s.ne-s.ns,...fresh.map(w=>({...w})));
+      orig.splice(s.os,s.oe-s.os,...fresh.map(w=>({word:w.word,start:w.start,end:w.end})));   // the audio now SAYS this
+    });
+    // swap the clip IN PLACE (Edit, LOC and the board hold the same objects); keep the old file for ↩
+    rvTargets(v.clip).forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;o.origWords=orig.map(w=>({...w}));});
+    if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);   // ours — don't let the board re-add it as a new hook
+    _rvSay={};
+    rvLoadVideo(API+d.url);
+    commitWords(cur);
+    if(typeof renderHookStrip==="function")renderHookStrip();
+    const fast=(d.spans||[]).filter(x=>x.tempo>1.001);
+    busyDone("Переозвучено");
+    setStatus("🎙 Переозвучено "+list.length+" фрагм. за "+d.seconds+" с"+(fast.length?(" · трохи прискорено (×"+Math.max(...fast.map(x=>x.tempo)).toFixed(2)+"), щоб влізти в місце"):"")
+      +(d.voice_deleted?" · тимчасовий клон голосу видалено":" · ⚠ клон голосу не видалився — прибери його в ElevenLabs вручну ("+d.voice_id+")")+". ↩ — повернути як було.","ok");
+  }catch(e){busyStop();setStatus("Переозвучка: "+e.message,"err");}
+  _rvBusy=false;renderRevoiceBox();
+}
+function undoRevoice(){
+  const st=rvUndoStack();if(!st||!st.length)return;
+  const prev=st[st.length-1], cur=variants[activeVar]&&variants[activeVar].clip;
+  rvTargets(cur).forEach(o=>{if(o._rvFrom&&o._rvFrom.length&&o._rvFrom[o._rvFrom.length-1]===prev)o._rvFrom.pop();
+    o.clip=prev.clip;o.videoUrl=prev.videoUrl;o.origWords=prev.origWords.map(w=>({...w}));});
+  rvLoadVideo(prev.videoUrl);
+  commitWords(prev.words.map(w=>({...w})));
+  if(typeof renderHookStrip==="function")renderHookStrip();
+  setStatus("↩ Звук і текст повернуто як було до переозвучки. Файл переозвучки лишився в сесії.","ok");
+}
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
@@ -2742,7 +2934,7 @@ $("transcribeBtn").onclick=async()=>{
       const r=await fetch(API+"/api/transcribe",{method:"POST",body:fd});d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
       fileId=d.file_id;
       if(enVideoUrl){video.src=enVideoUrl;video.onloadedmetadata=()=>{videoLoaded=true;};}
-      variants={en:{clip:"source.mp4",videoUrl:enVideoUrl,words:d.words,style:readControls(),language:d.language||"en",trim:(variants.en&&variants.en.trim)||null}};activeVar="en";buildVarTabs();
+      variants={en:{clip:"source.mp4",videoUrl:enVideoUrl,words:d.words,origWords:JSON.parse(JSON.stringify(d.words)),style:readControls(),language:d.language||"en",trim:(variants.en&&variants.en.trim)||null}};activeVar="en";buildVarTabs();
       videoFile=null;   // the clip now lives in the session — re-transcribe must target it, not re-upload (which would fork a new session and orphan localized clips)
       if($("language"))$("language").value=d.language||"";
     }else{           // re-transcribe a clip already in the session (a pack hook / localized hook)
@@ -2750,9 +2942,10 @@ $("transcribeBtn").onclick=async()=>{
         body:JSON.stringify({file_id:fileId,clip:curClip,engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value,
                              script:((activeHook>=0&&editPack[activeHook]&&editPack[activeHook].jira&&editPack[activeHook].jira.script)||"")})});
       d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
-      if(variants.en)variants.en.words=d.words;
-      if(activeHook>=0&&editPack[activeHook])editPack[activeHook].words=d.words;
-      if(editingHook)editingHook.words=d.words;
+      const _ow=()=>JSON.parse(JSON.stringify(d.words));
+      if(variants.en){variants.en.words=d.words;variants.en.origWords=_ow();}
+      if(activeHook>=0&&editPack[activeHook]){editPack[activeHook].words=d.words;editPack[activeHook].origWords=_ow();}
+      if(editingHook){editingHook.words=d.words;editingHook.origWords=_ow();}
     }
     realWords=d.words;$("transcript").value=wordsToText(realWords);autoGrow();
     if(typeof setLangSticker==="function")setLangSticker(d.language);
@@ -2893,35 +3086,61 @@ const dlLink=(url,label,name)=>{const a=document.createElement("a");a.href=API+u
 // Keep edited text on the original timecodes. Unchanged words keep their EXACT time;
 // only edited/inserted spans get their time interpolated from neighbours (LCS align).
 // So fixing a word or a number no longer makes the whole caption drift.
+// @@remapWords:start — extracted verbatim by tests/test_remap.js; keep the markers
+// Put edited TEXT back onto WORD TIMINGS. Runs on every keystroke, and again on every save,
+// clip switch and send-to-board, so it must be idempotent: the same text on the same words
+// changes nothing, however many times it runs.
+//
+// Alignment is by CONTENT, never by position. (Until 1.9.64, an equal word count meant
+// "assign by index" — delete one word and add another elsewhere, and every word between the two
+// edits slid by one slot; each later edit then started from the broken timings, so the error
+// compounded and only a re-transcribe could undo it.)
+//   unchanged word         → keeps its exact time
+//   word replaced 1-for-1  → takes the replaced word's exact time (a corrected spelling)
+//   N words replace M      → share the replaced words' own time span, weighted by length
+//   word inserted          → uses the pause before the next word if there is room, otherwise
+//                            the second half of the previous word — never a 0.1 s sliver
 function remapWords(text, stored){
   const toks=text.trim().split(/\s+/).filter(Boolean);
   if(!stored||!stored.length){const slot=3/Math.max(toks.length,1);return toks.map((t,i)=>({word:t,start:i*slot,end:(i+1)*slot}));}
-  if(toks.length===stored.length) return stored.map((w,i)=>({word:toks[i],start:+w.start,end:+w.end,brk:w.brk||null}));  // keep manual line/chunk breaks
   const norm=s=>String(s||"").toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
   const A=toks.map(norm), B=stored.map(w=>norm(w.word||w.text));
   const n=A.length, m=B.length;
-  // LCS to align unchanged words
+  // LCS → the words both versions share, in order: those are the anchors
   const dp=Array.from({length:n+1},()=>new Int32Array(m+1));
   for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i][j]=(A[i]===B[j])?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
-  const match=new Array(n).fill(-1); let i=0,j=0;
-  while(i<n&&j<m){ if(A[i]===B[j]){match[i]=j;i++;j++;} else if(dp[i+1][j]>=dp[i][j+1]) i++; else j++; }
-  const t0=+stored[0].start, t1=+stored[stored.length-1].end;
+  const pairs=[]; {let i=0,j=0;
+    while(i<n&&j<m){ if(A[i]===B[j]){pairs.push([i,j]);i++;j++;} else if(dp[i+1][j]>=dp[i][j+1]) i++; else j++; }}
   const out=toks.map(t=>({word:t,start:null,end:null,brk:null}));
-  for(let k=0;k<n;k++) if(match[k]>=0){const w=stored[match[k]]; out[k].start=+w.start; out[k].end=+w.end; out[k].brk=w.brk||null;}
-  if(!out.some(o=>o.start!=null)){                                  // nothing matched → even spread (old behaviour)
-    const span=Math.max(t1-t0,0.1),slot=span/Math.max(n,1);
-    return toks.map((t,k)=>({word:t,start:t0+k*slot,end:t0+(k+1)*slot,brk:null}));
-  }
-  let k=0;                                                          // interpolate only the unmatched gaps
-  while(k<n){
-    if(out[k].start!=null){k++;continue;}
-    const s=k; while(k<n&&out[k].start==null)k++; const e=k;        // gap = [s, e)
-    const gs=(s>0)?out[s-1].end:t0, ge=(e<n)?out[e].start:t1;
-    const cnt=e-s, slot=Math.max(ge-gs,0.05)/cnt;
-    for(let g=0;g<cnt;g++){ out[s+g].start=gs+g*slot; out[s+g].end=gs+(g+1)*slot; }
+  pairs.forEach(([a,b])=>{const w=stored[b];out[a].start=+w.start;out[a].end=+w.end;out[a].brk=w.brk||null;if(w.manual)out[a].manual=true;});
+  // spread new words over [s,e], longer words get proportionally more time
+  const spread=(ns,ne,s,e)=>{let tot=0;for(let k=ns;k<ne;k++)tot+=Math.max(1,toks[k].length);
+    let t=s;for(let k=ns;k<ne;k++){const d=(e-s)*Math.max(1,toks[k].length)/tot;out[k].start=t;out[k].end=t+d;t+=d;}};
+  // walk the gaps between consecutive anchors (plus the head and the tail)
+  const bounds=[[-1,-1],...pairs,[n,m]];
+  for(let g=0;g<bounds.length-1;g++){
+    const ns=bounds[g][0]+1, ne=bounds[g+1][0];      // new words in this gap
+    const os=bounds[g][1]+1, oe=bounds[g+1][1];      // stored words they stand in for
+    const nCnt=ne-ns, oCnt=oe-os;
+    if(nCnt<=0)continue;                              // pure deletion: nothing to place
+    if(oCnt>0){                                       // replacement
+      if(nCnt===oCnt){for(let k=0;k<nCnt;k++){const w=stored[os+k];out[ns+k].start=+w.start;out[ns+k].end=+w.end;out[ns+k].brk=w.brk||null;if(w.manual)out[ns+k].manual=true;}continue;}
+      const s0=+stored[os].start, e0=+stored[oe-1].end;
+      spread(ns,ne,s0,Math.max(e0,s0+0.08*nCnt));continue;
+    }
+    const L=(ns>0)?out[ns-1]:null, R=(ne<n)?out[ne]:null;   // pure insertion
+    if(L&&R){
+      if(R.start-L.end>=0.12*nCnt){spread(ns,ne,L.end,R.start);}          // fits in the pause
+      else{const mid=L.start+(L.end-L.start)/2; L.end=mid; spread(ns,ne,mid,Math.max(R.start,mid+0.08*nCnt));}
+    }else if(R){                                                          // inserted at the very start
+      if(R.start>=0.12*nCnt) spread(ns,ne,Math.max(0,R.start-0.3*nCnt),R.start);
+      else{const mid=R.start+(R.end-R.start)/2; spread(ns,ne,R.start,mid); R.start=mid;}
+    }else if(L){ spread(ns,ne,L.end,L.end+0.3*nCnt); }                    // appended at the end
+    else spread(ns,ne,0,0.3*nCnt);
   }
   return out;
 }
+// @@remapWords:end
 
 $("localizeBtn").onclick=async()=>{
   if(!fileId){setStatus("Transcribe (upload) the source first.","err");return;}
@@ -2937,7 +3156,7 @@ $("localizeBtn").onclick=async()=>{
     const box=$("locResults");box.innerHTML="";
     d.results.forEach(res=>{
       // each language becomes a variant; its style inherits EN by default, edited independently
-      variants[res.lang]={clip:res.clip,videoUrl:API+res.url,words:res.words,
+      variants[res.lang]={clip:res.clip,videoUrl:API+res.url,words:res.words,origWords:JSON.parse(JSON.stringify(res.words||[])),
         style:JSON.parse(JSON.stringify(variants.en?variants.en.style:readControls())),language:res.language};
       box.appendChild(dlLink(res.url,"⬇ "+res.lang.toUpperCase()+" caption-free clip ("+res.clip+")",res.clip));
     });
@@ -3700,7 +3919,7 @@ async function localizePack(){
       const errs=d.errors||{};
       Object.keys(errs).forEach(k=>failed.push((s.name||s.clip)+" · "+String(k).toUpperCase()+": "+errs[k]));
       (d.results||[]).forEach(res=>{if(hooks.some(h=>h.clip===res.clip))return;
-        const hook={name:res.clip,clip:res.clip,lang:res.lang,words:res.words,src:"loc",
+        const hook={name:res.clip,clip:res.clip,lang:res.lang,words:res.words,origWords:JSON.parse(JSON.stringify(res.words||[])),src:"loc",
                     videoUrl:API+"/clip/"+fileId+"/"+res.clip};
         if(s.style)hook.style=s.style;            // localized inherits the original's caption style
         if(s.ctrl)hook.ctrl=JSON.parse(JSON.stringify(s.ctrl));  // own controls copy for thumbnail + ✎ edit
@@ -3742,7 +3961,7 @@ function editLocHook(h){
   const url=API+"/clip/"+fileId+"/"+h.clip;
   const ctrl=h.ctrl||sharedCtrl||readControls();
   enVideoUrl=url;realWords=h.words||[];
-  variants={en:{clip:h.clip,videoUrl:url,words:h.words,style:ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null}};activeVar="en";
+  variants={en:{clip:h.clip,videoUrl:url,words:h.words,origWords:h.origWords||null,style:ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null}};activeVar="en";
   if(typeof updateCutsLabel==="function")updateCutsLabel();
   videoFile=null;                                  // edit the in-session clip — never re-upload (no session fork)
   if($("language"))$("language").value=h.lang||""; // force re-transcribe to the localized language (not auto-detect → EN)

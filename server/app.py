@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 # allow "python -m server.app" and direct execution
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, synclab, jira  # noqa: E402
+from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, synclab, jira, revoice  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(ROOT, "web")
@@ -749,6 +749,48 @@ def api_jira_import(req: JiraReq):
     _log_timing("jira_import", _t.time() - t0, f"{len(done)} clips")
     return {"file_id": fid, "items": done, "errors": res["errors"],
             "unrecognized": res["unrecognized"]}
+
+
+# ---------- 🎙 re-voice: a changed word/phrase back into the clip's AUDIO, same voice ----------
+class RevoiceReq(BaseModel):
+    file_id: str
+    clip: str
+    spans: List[dict] = []   # [{a, b, lo, hi, text, say, prev_text, next_text}] in clip seconds
+
+
+@app.post("/api/revoice")
+def api_revoice(req: RevoiceReq):
+    """Re-voice the changed spans of ONE clip with ONE temporary voice clone (deleted after).
+
+    Writes a NEW file next to the original ("<name>_rvN") and leaves the original untouched,
+    so the UI can swap the clip in place and still offer ↩. The length never changes.
+    """
+    import re as _re, time as _t
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Кліп «{name}» не знайдено в сесії")
+    if not os.environ.get("ELEVENLABS_API_KEY"):
+        raise HTTPException(400, "Немає ключа ElevenLabs — додай його в ⚙ Settings.")
+    if not req.spans:
+        raise HTTPException(400, "Нема що переозвучувати")
+    stem, ext = os.path.splitext(name)
+    stem = _re.sub(r"_rv\d+$", "", stem)            # x_rv1 → x_rv2, never x_rv1_rv1
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"{stem}_rv{k}{ext}")):
+        k += 1
+    out_name = f"{stem}_rv{k}{ext}"
+    t0 = _t.time()
+    try:
+        res = revoice.revoice(src, req.spans, os.path.join(sdir, out_name))
+    except revoice.RevoiceError as e:
+        raise HTTPException(400, str(e))
+    secs = _t.time() - t0
+    _log_timing("revoice", secs, f"{len(req.spans)} span(s)")
+    return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "spans": res["spans"],
+            "voice_deleted": res["voice_deleted"], "voice_id": res.get("voice_id"),
+            "seconds": round(secs, 1)}
 
 
 class LipsyncReq(BaseModel):
