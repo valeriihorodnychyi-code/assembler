@@ -118,6 +118,7 @@
   .hmrow .hmbar{flex:1;height:3px;border-radius:2px;background:#2a2d36;overflow:hidden}
   .hmrow .hmbar i{display:block;height:100%;width:0;background:var(--accent2)}
   .hmrow .hmtake{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .hmrow .hmsel{width:100%;font-size:11px;padding:3px 5px;background:#23262f;color:var(--txt);border:1px solid var(--line);border-radius:6px}
   .histRow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding-top:6px;border-top:1px dashed var(--line)}
   .histRow .hstep{padding:2px 7px;border-radius:10px;background:#23262f;border:1px solid var(--line);white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis}
   .histRow .hstep.cur{color:var(--txt);border-color:#4a4d58}
@@ -130,6 +131,9 @@
   .ratio-tabs{display:flex;gap:6px}
   .ratio-tabs button.active{background:var(--accent2);color:#fff}
   #filmstrip{display:none;flex-direction:column;gap:10px;overflow-y:auto;max-height:60vh;padding:4px}
+  .fcard .fclose{position:absolute;top:3px;right:3px;z-index:3;width:20px;height:20px;padding:0;border-radius:50%;font-size:11px;line-height:20px;background:rgba(0,0,0,.75);color:#fff;border:1px solid rgba(255,255,255,.25);display:none}
+  .fcard:hover .fclose{display:block}
+  .fcard .fclose:hover{background:var(--accent)}
   .fcard{flex:0 0 auto;width:84px;cursor:pointer;border:2px solid transparent;border-radius:9px;overflow:hidden;background:#000;position:relative;opacity:.5;transition:.15s}
   .fcard:hover{opacity:.85}
   .fcard.active{opacity:1;border-color:var(--accent)}
@@ -1884,10 +1888,28 @@ function renderHookStrip(){
       jb.style.cssText="position:absolute;left:3px;right:3px;bottom:3px;font:700 8px/1.2 system-ui;padding:2px 3px;border-radius:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
         +(h.jira.burned_in?"background:var(--accent);color:#fff":"background:rgba(0,0,0,.7);color:#cfe3ff");
       card.appendChild(jb);card.title=jb.title;}
+    const x=document.createElement("button");x.type="button";x.className="fclose";x.textContent="✕";
+    x.title="Close this project (прибрати з паку; файли в сесії лишаються)";
+    x.onclick=e=>{e.stopPropagation();closeProject(i);};card.appendChild(x);
     card.onclick=()=>selectHook(i);
     fs.appendChild(card);
     drawThumb(cv,{videoUrl:h.videoUrl,words:h.words,style:h.ctrl},"hook"+i);
   });
+}
+// ✕ on a project card: take a clip loaded by mistake OUT of the pack (files stay in the session).
+function closeProject(i){
+  const h=editPack[i]; if(!h)return;
+  if(editPack.length===1){setStatus("Це єдиний проект у паку — завантаж інший (LOAD VIDEO / JIRA), щоб замінити.","");return;}
+  const name=(h.jira&&h.jira.key)||("Hook "+(i+1));
+  if(!confirm("Close "+name+"? Його правки в паку зникнуть, файли в сесії лишаються."))return;
+  saveActiveHook();
+  const wasActive=(i===activeHook);
+  editPack.splice(i,1);
+  if(wasActive){activeHook=-1;selectHook(Math.min(i,editPack.length-1));}
+  else{if(i<activeHook)activeHook--;}
+  renderHookStrip();updateEditButtons();
+  if(typeof hmRenderList==="function")hmRenderList();
+  setStatus("Закрито "+name+". У паку "+editPack.length+".","ok");
 }
 function sendPack(target){
   if(!editPack.length)return;
@@ -3438,7 +3460,10 @@ function hmRefreshUndo(){const any=hmHooks().some(o=>hmTop(o));
 const hmClean=o=>{const t=hmTop(o);return t?t.clip:o.clip;};   // the hook BEFORE any music we laid
 // Every Generate is a new TAKE (the model never gives the same thing twice): keep them all per
 // hook, flip ◀ ▶ between them, ↻ re-rolls one hook only. Apply uses the take you're on.
-function hmCur(o){const t=(_hm.tracks||{})[hmClean(o)];return t&&t.takes&&t.takes.length?t.takes[t.i]:null;}
+// any generated track can go under any hook: a hook's pick is either one of its own takes or a
+// track made for another hook (same scene, one vibe). Pool = every take of every hook.
+function hmPool(){const out=[];hmHooks().forEach((o,hi)=>{const s=(_hm.tracks||{})[hmClean(o)];if(s)s.takes.forEach((t,ti)=>out.push({t,label:"Hook "+(hi+1)+" · take "+(ti+1)+" · "+t.preset+" · "+tc(t.length)}));});return out;}
+function hmCur(o){const s=(_hm.tracks||{})[hmClean(o)];if(!s)return null;if(s.pick)return s.pick;return s.takes&&s.takes.length?s.takes[s.i]:null;}
 async function hmGenerate(only){
   if(!fileId){setStatus("Hook music: спершу завантаж хук у сесію (Transcribe або пак).","err");return;}
   const all=hmHooks(), list=only?[only]:all; if(!list.length){setStatus("Hook music: немає хуків.","err");return;}
@@ -3451,7 +3476,7 @@ async function hmGenerate(only){
     _hm.tracks=_hm.tracks||{}; const errs=[], notes=new Set();
     (d.items||[]).forEach(it=>{if(it.error){errs.push(it.clip+": "+it.error);return;}
       it.preset=HM_LABELS[_hm.preset]||"custom"; if(it.note)notes.add(it.note);
-      const slot=(_hm.tracks[it.clip]=_hm.tracks[it.clip]||{takes:[],i:0}); slot.takes.push(it); slot.i=slot.takes.length-1;});
+      const slot=(_hm.tracks[it.clip]=_hm.tracks[it.clip]||{takes:[],i:0}); slot.takes.push(it); slot.i=slot.takes.length-1; slot.pick=null;});   // a fresh take for THIS hook becomes its pick
     _hm.track=true; hmRenderList();
     busyDone("Музика готова");
     setStatus("♪ Нова версія для "+(d.items.length-errs.length)+"/"+d.items.length+" хук(ів) за "+d.seconds+" с."+(notes.size?" "+[...notes].join(" · "):"")+(errs.length?" Помилки: "+errs.join(" · "):" ◀ ▶ — попередні версії, ↻ — ще раз для одного хука."),errs.length?"err":"ok");
@@ -3465,11 +3490,15 @@ function hmRenderList(){
   const box=$("hmList"); if(!box)return;
   const list=hmHooks();
   box.innerHTML=list.map((o,i)=>{const slot=(_hm.tracks||{})[hmClean(o)], t=hmCur(o), n=slot?slot.takes.length:0;
-    const take=n>1?"<button type='button' class='tmini ticon' data-hmflip='"+i+":-1' title='Попередня версія'>◀</button><span class='hmtake'>"+(slot.i+1)+"/"+n+"</span><button type='button' class='tmini ticon' data-hmflip='"+i+":1' title='Наступна версія'>▶</button>":"";
+    const pool=hmPool();
+    const take=pool.length>1?"<select data-hmsel='"+i+"' class='hmsel' title='Який трек покласти під цей хук — його власна версія або трек іншого хука'>"
+      +pool.map((p,k)=>"<option value='"+k+"'"+(t&&p.t===t?" selected":"")+">"+p.label+"</option>").join("")+"</select>":"";
     const playing=_hmPlaying&&t&&(_hmPlaying.url===t.url||_hmPlaying.url===t.sfx_url);
     return "<div class='hmrow' data-hmrow='"+i+"'><div class='hmtop'><span class='hmname'><b>Hook "+(i+1)+"</b>"
-      +(t?" · "+tc(t.span[1]-t.span[0])+(o.trim?" ✂":"")+" · "+t.preset:" · no track yet")+"</span>"+take
+      +(t?"":" · no track yet")+"</span>"
       +"<button type='button' class='tmini ticon' data-hmre='"+i+"' title='Ще одна версія лише для цього хука'>↻</button></div>"
+      +(take?"<div style='margin-top:4px'>"+take+"</div>":"")
+      +(t&&o.trim&&(t.length+0.05)<(o.trim[1]-o.trim[0])?"<div style='color:#ffb38f;margin-top:3px'>⚠ трек коротший за хук ("+tc(t.length)+" < "+tc(o.trim[1]-o.trim[0])+") — кінець буде без музики</div>":"")
       +(t?"<div class='hmplay'><button type='button' data-hmplay='"+i+":m' class='"+(playing&&_hmPlaying.url===t.url?"on":"")+"'>"+(playing&&_hmPlaying.url===t.url&&!$("hmAudio").paused?"❚❚":"▶")+" Music</button>"
         +(t.sfx_url?"<button type='button' data-hmplay='"+i+":s' class='"+(playing&&_hmPlaying.url===t.sfx_url?"on":"")+"'>"+(playing&&_hmPlaying.url===t.sfx_url&&!$("hmAudio").paused?"❚❚":"▶")+" SFX</button>":"")
         +"<span class='hmbar'><i id='hmBar"+i+"'></i></span></div>":"")+"</div>";}).join("");
@@ -3486,6 +3515,11 @@ function hmPlay(i,kind){
 }
 (function wireHm(){
   const box=$("hmList"), a=$("hmAudio"); if(!box)return;
+  box.addEventListener("change",e=>{const s=e.target.closest&&e.target.closest("[data-hmsel]"); if(!s)return;
+    const i=+s.dataset.hmsel, o=hmHooks()[i], p=hmPool()[+s.value]; if(!o||!p)return;
+    const slot=(_hm.tracks[hmClean(o)]=_hm.tracks[hmClean(o)]||{takes:[],i:0}); slot.pick=p.t;
+    if(a&&!a.paused)a.pause(); _hmPlaying=null; hmRenderList();
+    setStatus("♪ Hook "+(i+1)+" ← "+p.label+". Apply, щоб покласти.","");});
   box.addEventListener("click",e=>{
     const t=e.target.closest&&e.target.closest("button"); if(!t)return;
     if(t.dataset.hmplay){const [i,k]=t.dataset.hmplay.split(":");hmPlay(+i,k);return;}
