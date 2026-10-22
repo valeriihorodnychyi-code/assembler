@@ -385,7 +385,9 @@ def _loc_record(rec, lang, master, u=None, folder=None):
     if u is None:
         u = urlsplit(rec["video"])
         folder = u.path.rsplit("/", 1)[0]
-    names = localized_names(rec["asset"], lang, master)
+    # Portuguese is "PR" in file names but "PT" in ADAM's UI (and maybe in the task) — try both
+    alt = {"PT": ["PT", "PR"], "PR": ["PR", "PT"]}.get(lang.upper(), [lang.upper()])
+    names = [n for a in alt for n in localized_names(rec["asset"], a, master)]
     if not names:
         return None
     mk = lambda fn: urlunsplit((u.scheme, u.netloc, f"{folder}/{fn}", "", ""))
@@ -457,6 +459,20 @@ def resolve(text, requests=None):
                        else f'summary ~ "\\"{name}\\""')
                 hits = _search(jql, site, email, token, want, requests)
                 exact = [h for h in hits if _text((h.get("fields") or {}).get("summary")).strip() == name]
+                if not exact and m:
+                    # the creative-id field can be empty or different on some projects (WCP-16117 had
+                    # the right summary but the id search found nothing) → search the TEXT too: the
+                    # "brand_cid_baseid" phrase finds the master and all its siblings
+                    pre = "_".join(name.split("_")[:3])
+                    seen = {h.get("key") for h in hits}
+                    for q in (f'summary ~ "\\"{name}\\""', f'summary ~ "\\"{pre}\\""'):
+                        try:
+                            more = _search(q, site, email, token, want, requests)
+                        except Exception:
+                            more = []
+                        hits += [h for h in more if h.get("key") not in seen]
+                        seen |= {h.get("key") for h in more}
+                    exact = [h for h in hits if _text((h.get("fields") or {}).get("summary")).strip() == name]
                 if not exact:
                     # a LOCALIZED name has no task of its own: find its EN master (same ids and
                     # size, any idea) and take this language from it

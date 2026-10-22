@@ -1760,6 +1760,8 @@ function openJiraPop(){
   if($("jiraToSettings"))$("jiraToSettings").onclick=()=>{p.remove();if($("settingsBtn"))$("settingsBtn").click();};
   $("jiraGo").onclick=jiraImport;
   $("jiraText").focus();
+  // ask the server, don't trust a flag set at page load (it showed "add your token" over a working setup)
+  fetch(API+"/api/jira/status").then(r=>r.json()).then(d=>{jiraReady=!!d.configured;if($("jiraWarn"))$("jiraWarn").style.display=jiraReady?"none":"block";}).catch(()=>{});
 }
 async function jiraImport(){
   const text=($("jiraText")||{}).value||"";

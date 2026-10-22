@@ -77,9 +77,14 @@ class FakeJira:
         self.calls.append(("POST", url))
         if not url.endswith("/search/jql"):
             return _R(404)
-        cid = int(json.loads(data)["jql"].split("=")[1])
+        jql = json.loads(data)["jql"]
+        if "summary ~" in jql:                       # text search: phrase inside the summary
+            phrase = jql.split('"')[2].strip('\\') if '\\"' in jql else jql.split('"')[1]
+            return _R(200, {"issues": [i for i in self.db.values() if phrase in i["fields"]["summary"]]})
+        cid = int(jql.split("=")[1])
         return _R(200, {"issues": [i for i in self.db.values()
-                                   if int(i["fields"]["customfield_10628"]) == cid]})
+                                   if i["fields"]["customfield_10628"] is not None
+                                   and int(i["fields"]["customfield_10628"]) == cid]})
 
 
 # ---------------------------------------------------------------- tests
@@ -205,6 +210,21 @@ def test_an_adam_link_without_any_task_is_taken_as_is():
     link = f"{ADAM}/WF/1/WF_1_2_WO_FR_tai_DAV_Vid_Loc_1080x1920_nSub.mp4"
     res = J.resolve(link, requests=FakeJira([]))
     assert not res["errors"] and res["items"][0]["lang"] == "fr" and res["items"][0]["candidates"][0] == (link, True)
+
+
+def test_task_without_the_creative_id_field_is_found_by_its_name():
+    """1.9.82 in production: WCP-16117 exists with exactly this summary, but the id search found
+    nothing (the creative-id field was empty) → "таски з такою назвою не знайдено"."""
+    en = "WF_112007_111994_WO_EN_tai_DAV_Vid_New_1080x1920"
+    iss = make_issue("WCP-16117", "WF", 112007, 111994, idea="New", langs=("EN", "ES"))
+    iss["fields"]["summary"] = iss["fields"]["customfield_10646"] = en
+    iss["fields"]["customfield_10628"] = None
+    res = J.resolve(en, requests=FakeJira([iss]))
+    assert not res["errors"], res["errors"]
+    assert res["items"][0]["key"] == "WCP-16117"
+    # and its DE localization finds the same master the same way
+    res = J.resolve(en.replace("_EN_", "_DE_"), requests=FakeJira([iss]))
+    assert not res["errors"] and res["items"][0]["loc_of"] == "WCP-16117", res
 
 
 def test_one_bad_task_does_not_sink_the_batch():
