@@ -95,9 +95,14 @@ def video_segment(clip_path, out_path, start=0.0, end=None):
     return out_path
 
 
-def video_to_music(video_path, description, tags, requests, api_key=None, model=None):
-    """→ mp3 bytes scored TO the video (its cuts, pace and mood). Template text steers the style."""
+def video_to_music(video_path, description, tags, requests, api_key=None, model=None, sfx=False):
+    """→ mp3 bytes scored TO the video (its cuts, pace and mood). Template text steers the style.
+    sfx=True → (music_bytes, sfx_bytes|None): SFX synced to the picture (steps, doors, hits,
+    whooshes) come back as a SEPARATE track, so the designer sets their level apart from the music."""
     data = {"description": (description or "")[:4100]}
+    if sfx:
+        data["add_sfx"] = "true"
+        data["separate_tracks"] = "true"
     if tags:
         data["tags"] = list(tags)[:10]
     if model:
@@ -112,7 +117,31 @@ def video_to_music(video_path, description, tags, requests, api_key=None, model=
         raise MusicError(_auth(r, "Music Generation"))
     if not r.content or len(r.content) < 1000:
         raise MusicError("ElevenLabs не повернув аудіо.")
-    return r.content
+    if not sfx:
+        return r.content
+    return split_tracks(r.content)
+
+
+def split_tracks(content):
+    """separate_tracks answer: a ZIP with a music file and an SFX file → (music, sfx). Names are not
+    documented, so: a file whose name says sfx/effect is the SFX, the other one is the music. A
+    plain audio answer (no ZIP) = music only."""
+    import io
+    import zipfile
+    if not content.startswith(b"PK"):
+        return content, None
+    music, fx = None, None
+    with zipfile.ZipFile(io.BytesIO(content)) as z:
+        files = [n for n in z.namelist() if not n.endswith("/") and n.lower().rsplit(".", 1)[-1] in ("mp3", "wav", "m4a", "aac", "ogg", "flac")]
+        for n in files:
+            low = os.path.basename(n).lower()
+            if fx is None and any(k in low for k in ("sfx", "effect", "fx")):
+                fx = z.read(n)
+            elif music is None:
+                music = z.read(n)
+    if music is None:
+        raise MusicError("ElevenLabs повернув архів без музичної доріжки.")
+    return music, fx
 
 
 def isolate_voice(clip_path, out_path, requests, api_key=None, start=0.0, end=None):
@@ -165,7 +194,7 @@ def has_audio(path):
 
 
 def mix(clip_path, music_path, out_path, volume=0.35, duck=True, voice_path=None, offset=0.0,
-        start_at=0.0, end_at=None):
+        start_at=0.0, end_at=None, sfx_path=None, sfx_volume=0.8):
     """Lay `music_path` under the hook. Base = isolated voice (voice_path) or the clip's own audio.
     Music covers [start_at, end_at] of the clip (= the trim: what is cut off gets no music, and the
     fade-out lands where the hook really ends), from `offset` s into the track, ducked under voice."""
@@ -190,12 +219,23 @@ def mix(clip_path, music_path, out_path, volume=0.35, duck=True, voice_path=None
           f"[{mi}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:{span:.3f},asetpts=PTS-STARTPTS,"
           f"volume={vol:.3f},afade=t=in:d={FADE_IN},afade=t=out:st={fo:.3f}:d={FADE_OUT},"
           f"adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[m]"]
+    layers = "[mz]" if duck else "[m]"
     if duck:
         fc.append("[v]asplit=2[v1][v2]")
         fc.append("[m][v2]sidechaincompress=threshold=0.04:ratio=6:attack=25:release=450[mz]")
-        fc.append("[v1][mz]amix=inputs=2:duration=first:normalize=0[aout]")
-    else:
-        fc.append("[v][m]amix=inputs=2:duration=first:normalize=0[aout]")
+    n = 2
+    if sfx_path:
+        # SFX belong to the PICTURE: same window and clock as the music, never ducked (a door
+        # slam under a line is still a door slam), only a short fade at the trim edges
+        si = mi + 1
+        cmd += ["-i", sfx_path]
+        sv = max(0.0, min(2.0, float(sfx_volume)))
+        fc.append(f"[{si}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:{span:.3f},asetpts=PTS-STARTPTS,"
+                  f"volume={sv:.3f},afade=t=in:d=0.03,afade=t=out:st={max(0.0, span - 0.15):.3f}:d=0.15,"
+                  f"adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[fx]")
+        layers += "[fx]"
+        n = 3
+    fc.append(("[v1]" if duck else "[v]") + layers + f"amix=inputs={n}:duration=first:normalize=0[aout]")
     cmd += ["-filter_complex", "; ".join(fc), "-map", "0:v?", "-map", "[aout]", "-c:v", "copy",
             "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-t", f"{dur:.3f}", out_path]
     _run(cmd)

@@ -774,10 +774,12 @@
         <div class="chips" id="hmPresets" style="flex-wrap:wrap;margin:6px 0"></div>
         <textarea id="hmPrompt" rows="3" style="width:100%;font-size:12px;resize:vertical" placeholder="Describe the vibe (English works best)…"></textarea>
         <div class="row" style="margin-top:6px"><label title="ElevenLabs Video-to-Music: музика пишеться під картинку хука. Вимкни — тоді тільки з промпту.">Score to the video</label><label class="switch"><input type="checkbox" id="hmFromVideo" checked><span class="slider"></span></label></div>
+        <div class="row"><label title="Звуки за подіями на відео (кроки, двері, удари, свуші) — окремою доріжкою від музики. Тільки разом зі Score to the video. Повертає SFX, які прибирає Remove original music.">Add SFX</label><label class="switch"><input type="checkbox" id="hmSfx"><span class="slider"></span></label></div>
         <button class="primary" id="hmGen" style="width:100%;margin-top:6px">♪ Generate music</button>
         <div id="hmTrack" style="display:none;margin-top:8px">
           <div id="hmList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
           <div class="row"><label>Volume</label><input type="range" id="hmVol" min="0" max="100" value="35"><span class="val" id="hmVolLbl">35</span></div>
+          <div class="row" id="hmSfxVolRow" style="display:none"><label>SFX volume</label><input type="range" id="hmSfxVol" min="0" max="150" value="80"><span class="val" id="hmSfxVolLbl">80</span></div>
           <div class="row"><label title="Музика тихшає, коли звучить голос">Duck under voice</label><label class="switch"><input type="checkbox" id="hmDuck" checked><span class="slider"></span></label></div>
           <div class="row"><label title="Прибрати стару музику з хука (ElevenLabs Audio Isolation): лишається тільки голос. Разом зі старою музикою йдуть і старі SFX / атмосфера.">Remove original music</label><label class="switch"><input type="checkbox" id="hmStrip" checked><span class="slider"></span></label></div>
           <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
@@ -3389,7 +3391,7 @@ async function hmGenerate(){
   const hooksReq=list.map(o=>({clip:hmClean(o),trim:o.trim||null}));
   busyStart("♪ "+(fromVideo?"Аналізую відео і пишу":"Генерую")+" музику для "+list.length+" хук(ів) ("+(HM_LABELS[_hm.preset]||"custom")+")…");$("hmGen").disabled=true;
   try{const r=await fetch(API+"/api/hookmusic/generate",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",hooks:hooksReq,from_video:fromVideo})});
+      body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",hooks:hooksReq,from_video:fromVideo,add_sfx:!!(fromVideo&&$("hmSfx")&&$("hmSfx").checked)})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"music failed"));
     _hm.tracks=_hm.tracks||{}; const errs=[], notes=new Set();
     (d.items||[]).forEach(it=>{if(it.error)errs.push(it.clip+": "+it.error);else{_hm.tracks[it.clip]=it;if(it.note)notes.add(it.note);}});
@@ -3403,9 +3405,11 @@ function hmRenderList(){
   const box=$("hmList"); if(!box)return;
   const list=hmHooks(); const rows=list.map((o,i)=>{const t=(_hm.tracks||{})[hmClean(o)];
     return t?"<div style='font-size:11px;color:var(--muted)'>Hook "+(i+1)+" · "+tc(t.span[1]-t.span[0])+(o.trim?" (trimmed)":"")
-      +"<audio controls preload='none' src='"+API+t.url+"' style='width:100%;height:30px;margin-top:2px'></audio></div>"
+      +"<audio controls preload='none' src='"+API+t.url+"' style='width:100%;height:30px;margin-top:2px'></audio>"
+      +(t.sfx_url?"<div style='margin-top:2px'>SFX</div><audio controls preload='none' src='"+API+t.sfx_url+"' style='width:100%;height:30px'></audio>":"")+"</div>"
       :"<div style='font-size:11px;color:var(--muted)'>Hook "+(i+1)+" · немає треку — Generate</div>";});
   box.innerHTML=rows.join(""); $("hmTrack").style.display=Object.keys(_hm.tracks||{}).length?"block":"none";
+  if($("hmSfxVolRow"))$("hmSfxVolRow").style.display=Object.values(_hm.tracks||{}).some(t=>t.sfx)?"":"none";
 }
 async function hmApply(list){
   if(!_hm.tracks||!Object.keys(_hm.tracks).length){setStatus("Спершу ♪ Generate music.","err");return;}
@@ -3419,7 +3423,8 @@ async function hmApply(list){
     try{
       setStatus("♪ Хук "+(i+1)+"/"+list.length+"…","",true);
       const r=await fetch(API+"/api/hookmusic/apply",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:before.clip,track:trk.name,volume:vol,duck,strip_original:strip,trim:o.trim||null})});
+        body:JSON.stringify({file_id:fileId,clip:before.clip,track:trk.name,volume:vol,duck,strip_original:strip,trim:o.trim||null,
+          sfx:trk.sfx||"",sfx_volume:(+(($("hmSfxVol")||{}).value||80))/100})});
       const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"apply failed"));
       hmTargets(o).forEach(x=>{const s=(x._rvFrom=x._rvFrom||[]);if(top&&s.length&&s[s.length-1]===top)s.pop();   // re-apply = replace OUR music, never stack beds
         s.push(before);x.clip=d.clip;x.videoUrl=API+d.url;});
@@ -3447,6 +3452,8 @@ if($("hmApplyAll"))$("hmApplyAll").onclick=()=>hmApply(hmHooks());
 if($("hmApplyOne"))$("hmApplyOne").onclick=()=>{const h=openHookRef(),v=variants[activeVar];hmApply([h||v].filter(Boolean));};
 if($("hmUndo"))$("hmUndo").onclick=hmUndoAll;
 if($("hmVol"))$("hmVol").oninput=e=>{$("hmVolLbl").textContent=e.target.value;};
+if($("hmSfxVol"))$("hmSfxVol").oninput=e=>{$("hmSfxVolLbl").textContent=e.target.value;};
+if($("hmFromVideo"))$("hmFromVideo").onchange=e=>{if($("hmSfx")){$("hmSfx").disabled=!e.target.checked;if(!e.target.checked)$("hmSfx").checked=false;}};
 hmInit();
 function updateWordHighlight(){
   if(txtView!=="words")return;

@@ -74,6 +74,15 @@ class Fake11:
         if url.endswith("/v1/music/video-to-music"):
             assert files and files[0][0] == "videos" and data.get("description")
             self.v2m = data
+            if data.get("add_sfx") == "true":
+                assert data.get("separate_tracks") == "true", "SFX must come as their OWN track"
+                import io
+                import zipfile
+                buf = io.BytesIO()
+                with zipfile.ZipFile(buf, "w") as z:
+                    z.writestr("music.mp3", tone_mp3(880, 3.0, os.path.join(TMP, "v2m.mp3")))
+                    z.writestr("sfx.mp3", tone_mp3(1200, 3.0, os.path.join(TMP, "v2m_fx.mp3")))
+                return _R(200, buf.getvalue())
             return _R(200, tone_mp3(880, 3.0, os.path.join(TMP, "v2m.mp3")))
         if url.endswith("/v1/audio-isolation"):
             return _R(200, tone_mp3(300, 4.0, os.path.join(TMP, "voice.mp3")))
@@ -141,6 +150,27 @@ def test_video_to_music_gets_only_the_trimmed_picture_and_the_template():
     f = Fake11()
     mp3 = M.video_to_music(seg, M.PRESETS["drama"], ["drama"], f)
     assert len(mp3) > 1000 and f.v2m["tags"] == ["drama"] and "strings" in f.v2m["description"]
+
+
+def test_sfx_come_as_a_separate_track_and_sit_under_the_trim():
+    hook, out = os.path.join(TMP, "hook7.mp4"), os.path.join(TMP, "out7.mp4")
+    make_hook(hook)
+    seg = M.video_segment(hook, os.path.join(TMP, "seg7.mp4"), 1.0, 3.0)
+    music, fx = M.video_to_music(seg, M.PRESETS["action"], ["action"], Fake11(), sfx=True)
+    assert music and fx, "music and SFX must both come back"
+    mp, fp = os.path.join(TMP, "m7.mp3"), os.path.join(TMP, "f7.mp3")
+    open(mp, "wb").write(music)
+    open(fp, "wb").write(fx)
+    M.mix(hook, mp, out, volume=0.4, duck=True, start_at=1.0, end_at=3.0, sfx_path=fp, sfx_volume=0.8)
+    assert abs(M.duration(out) - M.duration(hook)) < 0.06
+    # music is ducked under the (continuous) voice, the SFX are NOT
+    assert level(out, 1200, 1.8) > 500 and level(out, 880, 1.8) > 30, "SFX / music missing in the trim"
+    assert level(out, 1200, 0.4) < 50 and level(out, 1200, 3.4) < 50, "SFX outside the trim"
+    assert level(out, 300, 1.8) > 1000, "voice lost"
+
+
+def test_a_plain_audio_answer_is_music_only():
+    assert M.split_tracks(b"ID3" + b"x" * 2000) == (b"ID3" + b"x" * 2000, None)
 
 
 def test_missing_permission_names_the_switch_to_turn_on():

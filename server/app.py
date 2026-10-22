@@ -889,6 +889,7 @@ class HookMusicGenReq(BaseModel):
     prompt: str = ""          # empty → the preset's template
     hooks: List[dict] = []    # [{clip, trim:[in,out]|None}] — ONE track per hook, scored to ITS picture
     from_video: bool = True   # False = text-only (Compose) at the hook's trimmed length
+    add_sfx: bool = False     # Video-to-Music also returns SFX synced to the picture (separate track)
 
 
 @app.get("/api/hookmusic/presets")
@@ -922,13 +923,18 @@ def hookmusic_generate(req: HookMusicGenReq):
         while os.path.exists(os.path.join(sdir, f"hookmusic_{stem}_{k}.mp3")):
             k += 1
         out = os.path.join(sdir, f"hookmusic_{stem}_{k}.mp3")
-        note = ""
+        note, fx = "", None
         try:
             if req.from_video:
                 seg = os.path.join(sdir, f"_v2m_{stem}.mp4")
                 music11.video_segment(src, seg, s, e)
                 try:
-                    mp3 = music11.video_to_music(seg, prompt, tags, _rq)
+                    if req.add_sfx:
+                        mp3, fx = music11.video_to_music(seg, prompt, tags, _rq, sfx=True)
+                        if fx is None:
+                            note = "SFX не прийшли окремою доріжкою — лише музика"
+                    else:
+                        mp3 = music11.video_to_music(seg, prompt, tags, _rq)
                 finally:
                     try:
                         os.remove(seg)
@@ -939,13 +945,19 @@ def hookmusic_generate(req: HookMusicGenReq):
         except music11.MusicError as ex:
             if req.from_video and "Video to Music" in str(ex):     # plan without it → still a track
                 mp3 = music11.compose(prompt, (e - s) + 0.5, _rq)
-                note = "Video to Music недоступний — згенеровано з промпту"
+                note = "Video to Music недоступний — згенеровано з промпту" + (" (без SFX)" if req.add_sfx else "")
             else:
                 return {"clip": name, "error": str(ex)}
         with open(out, "wb") as f:
             f.write(mp3)
-        return {"clip": name, "name": os.path.basename(out), "url": f"/clip/{req.file_id}/{os.path.basename(out)}",
+        item = {"clip": name, "name": os.path.basename(out), "url": f"/clip/{req.file_id}/{os.path.basename(out)}",
                 "length": round(music11.duration(out), 2), "span": [round(s, 3), round(e, 3)], "note": note}
+        if fx:
+            fxp = out[:-4] + "_sfx.mp3"
+            with open(fxp, "wb") as f:
+                f.write(fx)
+            item.update(sfx=os.path.basename(fxp), sfx_url=f"/clip/{req.file_id}/{os.path.basename(fxp)}")
+        return item
 
     t0 = _t.time()
     with ThreadPoolExecutor(max_workers=3) as ex:
@@ -966,6 +978,8 @@ class HookMusicApplyReq(BaseModel):
     strip_original: bool = True   # remove the old per-shot music (voice isolation)
     offset: float = 0.0
     trim: Optional[List[float]] = None   # music only over the kept part; fade-out at the trim out
+    sfx: str = ""                        # the SFX track that came with this music (optional)
+    sfx_volume: float = 0.8
 
 
 @app.post("/api/hookmusic/apply")
@@ -1000,7 +1014,10 @@ def hookmusic_apply(req: HookMusicApplyReq):
                                       end=(float(tr[1]) if tr else None))
         music11.mix(src, trk, os.path.join(sdir, out_name), volume=req.volume, duck=req.duck,
                     voice_path=voice, offset=req.offset,
-                    start_at=(float(tr[0]) if tr else 0.0), end_at=(float(tr[1]) if tr else None))
+                    start_at=(float(tr[0]) if tr else 0.0), end_at=(float(tr[1]) if tr else None),
+                    sfx_path=(os.path.join(sdir, os.path.basename(req.sfx))
+                              if req.sfx and os.path.exists(os.path.join(sdir, os.path.basename(req.sfx))) else None),
+                    sfx_volume=req.sfx_volume)
     except music11.MusicError as e:
         raise HTTPException(400, str(e))
     secs = _t.time() - t0
