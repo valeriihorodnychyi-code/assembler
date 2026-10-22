@@ -184,6 +184,29 @@ def test_localized_candidates_are_checked_nsub_first_then_final():
     assert es["script"] == "", "the EN voice-over text must never 'fix' a localized transcript"
 
 
+def test_a_pasted_localized_link_finds_its_master_and_takes_that_language():
+    """1.9.81 in production: a DE link pasted into ⇩ JIRA → "таски з такою назвою не знайдено"
+    (localizations have no task). Also: this DE file kept the idea (Var), it was NOT renamed to Loc."""
+    en = "WF_111420_107837_WO_EN_tai_DAV_Vid_Var_1080x1920"
+    iss = make_issue("WCP-13999", "WF", 111420, 107837, idea="Var", langs=("EN", "DE", "ES"))
+    iss["fields"]["summary"] = iss["fields"]["customfield_10646"] = en
+    iss["fields"]["customfield_18500"] = f"{ADAM}/WF/111420/{en}_nSub.mp4"
+    link = f"{ADAM}/WF/111420/WF_111420_107837_WO_DE_tai_DAV_Vid_Var_1080x1920.mp4"
+    res = J.resolve(link, requests=FakeJira([iss]))
+    assert not res["errors"], res["errors"]
+    loc = res["items"][0]
+    assert loc["lang"] == "de" and loc["loc_of"] == "WCP-13999" and loc["video"] is None
+    assert loc["candidates"][0][0].endswith("DE_tai_DAV_Vid_Var_1080x1920_nSub.mp4"), "clean sibling first"
+    got = J.pick_localized(loc, _HeadFake({"WF_111420_107837_WO_DE_tai_DAV_Vid_Var_1080x1920.mp4"}))
+    assert got["video"] == link and got["burned_in"] and got["asset"].endswith("_Var_1080x1920")
+
+
+def test_an_adam_link_without_any_task_is_taken_as_is():
+    link = f"{ADAM}/WF/1/WF_1_2_WO_FR_tai_DAV_Vid_Loc_1080x1920_nSub.mp4"
+    res = J.resolve(link, requests=FakeJira([]))
+    assert not res["errors"] and res["items"][0]["lang"] == "fr" and res["items"][0]["candidates"][0] == (link, True)
+
+
 def test_one_bad_task_does_not_sink_the_batch():
     res = J.resolve("YCP-8482 YCP-9999", requests=FakeJira([make_issue("YCP-8482", "YG", 104973, 99257)]))
     assert len(res["items"]) == 1 and res["errors"][0]["input"] == "YCP-9999"

@@ -725,13 +725,25 @@ def api_jira_import(req: JiraReq):
     os.makedirs(os.path.join(sdir, "output"), exist_ok=True)
 
     from concurrent.futures import ThreadPoolExecutor
-    todo = [r for r in res["items"] if r.get("video")]
+    todo = [r for r in res["items"] if r.get("video") and not r.get("candidates")]
+    # a pasted localized name / ADAM link: the file is checked in ADAM first (clean _nSub before final)
+    picks = [r for r in res["items"] if r.get("candidates")]
+    if picks:
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            got = list(ex.map(jira.pick_localized, picks))
+        for c, g in zip(picks, got):
+            if g:
+                todo.append(g)
+            else:
+                res["errors"].append({"input": c["asset"], "error": "у ADAM немає ні _nSub, ні фіналу з такою назвою"})
     for r in res["items"]:
-        if not r.get("video"):
+        if not r.get("video") and not r.get("candidates"):
             res["errors"].append({"input": r["key"], "error": r["warn"] or "немає відео"})
     if req.localized:
         # localized versions: built from the naming rule, CHECKED on ADAM before downloading
-        cands = [c for r in todo for c in jira.localized(r)]
+        have = {r.get("asset") for r in todo}
+        cands = [c for r in todo if not r.get("loc_of") and r.get("key") and r.get("link") for c in jira.localized(r)
+                 if c["asset"] not in have]
         with ThreadPoolExecutor(max_workers=6) as ex:
             found = list(ex.map(jira.pick_localized, cands))
         for c, f in zip(cands, found):

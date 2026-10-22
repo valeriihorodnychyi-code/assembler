@@ -94,6 +94,35 @@ def configured():
 
 # ---------------------------------------------------------------- input parsing
 
+def _is_adam(url):
+    from urllib.parse import urlparse
+    try:
+        return urlparse(url).hostname in ALLOWED_HOSTS
+    except Exception:
+        return False
+
+
+def _lang_of(name):
+    """WF_111420_107837_WO_DE_… → 'DE' (the token after WO), or ''."""
+    toks = (name or "").split("_")
+    for i, t in enumerate(toks[:6]):
+        if t == "WO" and i + 1 < len(toks):
+            return toks[i + 1].upper()
+    return ""
+
+
+def _shape(name):
+    """Name with the LANG and idea slots blanked — what an EN master and its localizations share."""
+    toks = (name or "").split("_")
+    li = next((i + 1 for i, t in enumerate(toks[:6]) if t == "WO"), None)
+    if li is None or len(toks) < 8:
+        return None
+    toks = list(toks)
+    toks[li] = "*"
+    toks[-2] = "*"
+    return "_".join(toks)
+
+
 def parse_items(text):
     """Whatever the designer pasted → [{"kind": "key"|"asset", "value": ...}, ...].
 
@@ -123,7 +152,10 @@ def parse_items(text):
             item = ("asset", name)
         if item not in seen:
             seen.add(item)
-            out.append({"kind": item[0], "value": item[1]})
+            rec = {"kind": item[0], "value": item[1]}
+            if item[0] == "asset" and tok.startswith("https://") and _is_adam(tok):
+                rec["url"] = tok.split("?")[0]          # a pasted ADAM link: the exact file to take
+            out.append(rec)
     return out, bad
 
 
@@ -305,6 +337,18 @@ def normalize(issue, site=DEFAULT_SITE, fmap=None):
 # Language codes are ADAM's own (PR = Portuguese, not PT) — taken from the task's languages field,
 # so nothing is mapped by hand. The file sits in the same ADAM folder as the master.
 
+def localized_names(asset, lang, master_lang=None):
+    """Both spellings ADAM uses for a localization: the idea kept (…_Vid_Var_…, seen on WF_111420)
+    or turned into Loc (…_Vid_Loc_…, seen on WF_112007). Most likely first."""
+    loc = localized_name(asset, lang, master_lang)
+    if not loc:
+        return []
+    keep = loc.split("_")
+    keep[-2] = asset.split("_")[-2]
+    keep = "_".join(keep)
+    return [loc] if keep == loc else [loc, keep]
+
+
 def localized_name(asset, lang, master_lang=None):
     """EN asset name → the name of its `lang` version, or None if the name doesn't parse."""
     toks = (asset or "").split("_")
@@ -332,13 +376,22 @@ def localized(rec):
     folder = u.path.rsplit("/", 1)[0]
     out = []
     for lang in (rec.get("langs") or [])[1:]:
-        name = localized_name(rec["asset"], lang, master)
-        if not name:
-            continue
-        mk = lambda fn: urlunsplit((u.scheme, u.netloc, f"{folder}/{fn}", "", ""))
-        out.append(dict(rec, lang=lang.lower(), asset=name, loc_of=rec["key"], script="", warn="",
-                        langs=[lang], candidates=[(mk(name + "_nSub.mp4"), True), (mk(name + ".mp4"), False)]))
-    return out
+        out.append(_loc_record(rec, lang, master, u, folder))
+    return [r for r in out if r]
+
+
+def _loc_record(rec, lang, master, u=None, folder=None):
+    from urllib.parse import urlsplit, urlunsplit
+    if u is None:
+        u = urlsplit(rec["video"])
+        folder = u.path.rsplit("/", 1)[0]
+    names = localized_names(rec["asset"], lang, master)
+    if not names:
+        return None
+    mk = lambda fn: urlunsplit((u.scheme, u.netloc, f"{folder}/{fn}", "", ""))
+    cands = [(mk(n + "_nSub.mp4"), True) for n in names] + [(mk(n + ".mp4"), False) for n in names]
+    return dict(rec, lang=lang.lower(), asset=names[0], loc_of=rec["key"], script="", warn="",
+                langs=[lang.upper()], candidates=cands, video=None)   # video is set only once a candidate is FOUND
 
 
 def exists(url, requests=None):
@@ -363,6 +416,7 @@ def pick_localized(cand, requests=None):
         if exists(url, requests):
             r = {k: v for k, v in cand.items() if k != "candidates"}
             r.update(video=url, has_nsub=nsub, burned_in=not nsub,
+                     asset=re.sub(r"(?:_nSub)?\.mp4$", "", url.rsplit("/", 1)[-1]),
                      warn="" if nsub else "немає чистого _nSub — у файлі вже вшиті титри, свої зверху не клади")
             return r
     return None
@@ -404,6 +458,25 @@ def resolve(text, requests=None):
                 hits = _search(jql, site, email, token, want, requests)
                 exact = [h for h in hits if _text((h.get("fields") or {}).get("summary")).strip() == name]
                 if not exact:
+                    # a LOCALIZED name has no task of its own: find its EN master (same ids and
+                    # size, any idea) and take this language from it
+                    lang = _lang_of(name)
+                    shp = _shape(name)
+                    master = [h for h in hits if _shape(_text((h.get("fields") or {}).get("summary")).strip()) == shp]
+                    if lang and master:
+                        mrec = normalize(master[0], site, fm)
+                        loc = _loc_record(mrec, lang, _lang_of(mrec["asset"]) or "EN") if mrec.get("video") else None
+                        if loc:
+                            if it.get("url"):                    # the exact pasted file goes first — its clean _nSub sibling before it
+                                u0 = it["url"]
+                                first = [(u0, True)] if u0.endswith("_nSub.mp4") else \
+                                    [(re.sub(r"\.mp4$", "_nSub.mp4", u0), True), (u0, False)]
+                                loc["candidates"] = first + [c for c in loc["candidates"] if c[0] not in {x[0] for x in first}]
+                            out.append(loc)
+                            continue
+                    if it.get("url"):                            # no task at all — take the link as is
+                        out.append(_direct_record(it["url"], name))
+                        continue
                     raise JiraError(f"{name}: таски з такою назвою не знайдено")
                 issue = exact[0]
             rec = normalize(issue, site, fm)
@@ -417,6 +490,17 @@ def resolve(text, requests=None):
         except Exception as e:  # network etc. — one bad line must not sink the batch
             errors.append({"input": it["value"], "error": f"{type(e).__name__}: {e}"})
     return {"items": out, "errors": errors, "unrecognized": unrec}
+
+
+def _direct_record(url, name):
+    """A pasted ADAM link with no Jira task behind it: download it as it is."""
+    lang = _lang_of(name)
+    nsub = url.endswith("_nSub.mp4")
+    return {"key": name.split("_")[0] + "_" + (name.split("_")[1] if "_" in name else ""), "link": "", "asset": name,
+            "summary": name, "video": url, "has_nsub": nsub, "burned_in": not nsub, "langs": [lang] if lang else [],
+            "lang": lang.lower(), "script": "", "loc_of": None,
+            "candidates": ([(url, True)] if nsub else [(re.sub(r"\.mp4$", "_nSub.mp4", url), True), (url, False)]),
+            "warn": "" if nsub else "файл без _nSub — у ньому, швидше за все, вже вшиті титри"}
 
 
 # ---------------------------------------------------------------- download
