@@ -38,6 +38,9 @@
   /* the current call-to-action glows & pulses on its own (no hover needed) to invite a click */
   @keyframes ctaPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
   .pulse-cta{animation:ctaPulse 1.5s ease-out infinite}
+  button.txcta{min-height:46px;font-size:15px;letter-spacing:.2px}   /* the first step of the whole flow: bigger than anything around it */
+  button.txquiet{background:transparent;border:1px solid var(--line);color:var(--muted);font-weight:500;font-size:12px;min-height:0;padding:6px 10px}
+  button.txquiet:hover{color:var(--txt);border-color:#4a4d58}
   button.go{background:var(--ok);color:#06210f;font-weight:700}
   button.ghost{background:transparent;border:1px solid var(--line)}
   .stage{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:18px;gap:12px;overflow:auto;background-color:var(--bg);background-image:radial-gradient(rgba(255,255,255,.055) 1px,transparent 1.5px);background-size:24px 24px;background-position:-1px -1px}
@@ -108,7 +111,7 @@
   .presetdel:hover{background:var(--accent);color:#fff}
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:7px;overflow:hidden}
   .seg button{flex:1;font-size:12px;color:var(--muted);background:transparent;border:0;border-radius:0;padding:6px}
-  .seg button.active{background:var(--accent);color:#fff;font-weight:600}
+  .seg button.active{background:#3b3e4a;color:#fff;font-weight:600;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}   /* a CHOSEN SETTING is neutral — orange is reserved for the next ACTION, so it can't hide among the pills */
   .grp{background:var(--bg);border:0.5px solid var(--line);border-radius:12px;margin:12px 12px 0;overflow:hidden;position:relative}
   /* Higher specificity than the generic .switch rule ON PURPOSE: that rule sets
      position:relative and lives later in the sheet, so a plain .hdrsw would lose its
@@ -192,7 +195,7 @@
   #txtViewSeg{flex:0 0 auto;background:#0f1014;border:1px solid var(--line);border-radius:10px;gap:0;overflow:hidden;padding:3px}
   @media (max-width:1399px){#restoreTimingsBtn .rtl{display:none}}   /* narrow panel: 3 tabs + the button don't fit — icon only, the tooltip explains */
   #txtViewSeg button{flex:0 0 auto;padding:6px 12px;font-size:12.5px;font-weight:600;border:0;border-radius:7px;color:var(--muted);background:transparent}
-  #txtViewSeg button.active{background:var(--accent);color:#fff}
+  #txtViewSeg button.active{background:#3b3e4a;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
   /* The toggle must size itself ANYWHERE, not only inside a .row. When this rule was
      .row .switch, a switch placed elsewhere lost its size and position:relative — its
      absolutely-positioned .slider then latched onto the page and covered the whole screen
@@ -1827,15 +1830,19 @@ function updateEditButtons(){
   // Transcribe is the FIRST step, so it has to look like it: filled + pulsing while the loaded
   // clip still has no words, quiet once there's a transcript.
   const tb=$("transcribeBtn");
-  if(tb){tb.textContent="① Transcribe";                               // single = active hook only
-    const need=videoLoaded&&!(realWords&&realWords.length);
-    tb.classList.toggle("primary",need);tb.classList.toggle("pulse-cta",need);}
+  // ONE call to action at a time: with a pack to do, the green pack button is THE step and the
+  // single one steps back to a quiet "лише цей кліп"; once there's a transcript it goes quiet too.
   const ptb=$("packTranscribeBtn");                                   // pack = all pending, shown only when there's a pack to do
-  if(ptb){const pend=editPack.filter(h=>!h.words||!h.words.length).length;
-    const showPtb=(pack&&!editing&&pend>0);
-    ptb.style.display=showPtb?"inline-block":"none";
-    ptb.classList.toggle("primary",showPtb);ptb.classList.toggle("pulse-cta",showPtb);
-    ptb.textContent="① Transcribe pack ("+pend+")";}
+  const pend=editPack.filter(h=>!h.words||!h.words.length).length, showPtb=!!(ptb&&pack&&!editing&&pend>0);
+  if(ptb){ptb.style.display=showPtb?"block":"none";
+    ptb.classList.remove("primary");ptb.classList.add("go");
+    ptb.classList.toggle("txcta",showPtb);ptb.classList.toggle("pulse-cta",showPtb);
+    ptb.textContent="① Transcribe pack · "+pend+" кліп"+(pend===1?"":(pend<5?"и":"ів"));}
+  if(tb){const has=!!(realWords&&realWords.length), need=videoLoaded&&!has;
+    const lead=need&&!showPtb;
+    tb.textContent=showPtb?(need?"① лише цей кліп":"↻ цей кліп ще раз"):(has?"↻ Transcribe ще раз":"① Transcribe");
+    tb.classList.toggle("primary",lead);tb.classList.toggle("txcta",lead);tb.classList.toggle("pulse-cta",lead);
+    tb.classList.toggle("txquiet",!lead);}
 }
 const dz=$("dropzone");
 dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");});
@@ -4314,7 +4321,7 @@ function buildStudioLayout(){
   const tb=$("transcribeBtn"),mr=$("modelRow");
   if(tb&&mr){tb.style.width="100%";tb.style.margin="6px 0 0";tb.className="primary";mr.insertAdjacentElement("afterend",tb);}   // Transcribe sits with the settings (above the text field)
   const ptb=$("packTranscribeBtn");
-  if(ptb&&tb){ptb.style.width="100%";ptb.style.margin="6px 0 0";ptb.className="go";tb.insertAdjacentElement("afterend",ptb);ptb.onclick=transcribePack;}
+  if(ptb&&tb){ptb.style.width="100%";ptb.style.margin="6px 0 0";ptb.className="go";tb.insertAdjacentElement("beforebegin",ptb);ptb.onclick=transcribePack;}
   qp.addEventListener("input",()=>{saveLastStyle();scheduleExact();});qp.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
   initGrpAccordion();
 }
