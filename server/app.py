@@ -793,6 +793,94 @@ def api_revoice(req: RevoiceReq):
             "seconds": round(secs, 1)}
 
 
+# ---------- ✂ cut a segment out of the MIDDLE of a clip (video + audio together) ----------
+class CutReq(BaseModel):
+    file_id: str
+    clip: str
+    spans: List[List[float]] = []     # [[a, b], ...] clip seconds to REMOVE
+    words: List[dict] = []            # current caption words — re-timed for the shorter clip
+    orig_words: List[dict] = []       # what the audio said — re-timed the same way
+    speech: bool = False              # True = cutting SPEECH (a sentence): land in the pauses
+
+
+def _cut_edges(src, a, b, words, speech, dur):
+    """Where the cut really goes. Speech cuts land in the middle of the pauses around the
+    removed words, so the join keeps a natural gap instead of two pauses back to back. A
+    timeline cut stays frame-exact — unless an edge falls INSIDE a spoken word, then it moves
+    to the silence beside that word: half a word on the seam is never what anyone wants."""
+    ws = sorted([w for w in (words or []) if "start" in w and "end" in w], key=lambda w: float(w["start"]))
+    inside = lambda t: next((w for w in ws if float(w["start"]) < t < float(w["end"])), None)
+    before = [float(w["end"]) for w in ws if float(w["end"]) <= a + 1e-3]
+    after = [float(w["start"]) for w in ws if float(w["start"]) >= b - 1e-3]
+    prev_end = max(before) if before else None
+    next_start = min(after) if after else None
+    if speech:
+        s = revoice.snap_to_audio(src, {"a": a, "b": b, "lo": prev_end if prev_end is not None else max(0.0, a - 0.4),
+                                        "hi": next_start if next_start is not None else min(dur, b + 0.4)}, dur)
+        na, nb = float(s["a"]), float(s["b"])
+        if prev_end is not None and prev_end < na:
+            na = (prev_end + na) / 2.0
+        if next_start is not None and next_start > nb:
+            nb = (nb + next_start) / 2.0
+        return max(0.0, na), min(dur, nb)
+    w = inside(a)
+    if w:
+        a = float(revoice.snap_to_audio(src, {"a": float(w["start"]), "b": float(w["end"]),
+                                              "lo": max(0.0, float(w["start"]) - 0.4), "hi": float(w["end"])}, dur)["a"])
+    w = inside(b)
+    if w:
+        b = float(revoice.snap_to_audio(src, {"a": float(w["start"]), "b": float(w["end"]),
+                                              "lo": float(w["start"]), "hi": min(dur, float(w["end"]) + 0.4)}, dur)["b"])
+    return max(0.0, a), min(dur, b)
+
+
+@app.post("/api/cut")
+def api_cut(req: CutReq):
+    """Remove segment(s) from the middle of ONE clip → a NEW file "<name>_cutN" (the original
+    stays for ↩). Words are re-timed here with the same frame grid the cut used."""
+    import re as _re, time as _t
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip «{name}» not found in the session")
+    dur = revoice.duration(src)
+    spans = []
+    for sp in req.spans or []:
+        if len(sp) != 2:
+            continue
+        a, b = sorted((float(sp[0]), float(sp[1])))
+        a, b = _cut_edges(src, max(0.0, a), min(dur, b), req.words, req.speech, dur)
+        if b - a >= 0.02:
+            spans.append([a, b])
+    if not spans:
+        raise HTTPException(400, "Нічого вирізати: відрізок порожній.")
+    kept = dur - sum(b - a for a, b in compose._merge_spans(spans))
+    if kept < 0.3:
+        raise HTTPException(400, "Так вирізається майже весь кліп — для цього є трім.")
+    p = compose._stream_params(src) or (None,) * 8
+    fps = float(p[2] or 30.0)
+    stem, ext = os.path.splitext(name)
+    stem = _re.sub(r"_cut\d+$", "", stem)
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"{stem}_cut{k}{ext}")):
+        k += 1
+    out_name = f"{stem}_cut{k}{ext}"
+    t0 = _t.time()
+    try:
+        _, removed = compose.cut_spans(src, spans, os.path.join(sdir, out_name), fps=fps)
+    except Exception as e:
+        raise HTTPException(500, f"Cut failed: {e}")
+    secs = _t.time() - t0
+    _log_timing("cut", secs, f"{len(spans)} span(s), {removed:.2f}s removed")
+    r = lambda t: round(round(t * fps) / fps, 4)
+    snapped = [[r(a), r(b)] for a, b in compose._merge_spans(spans)]
+    return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "spans": snapped,
+            "removed": removed, "fps": fps, "seconds": round(secs, 1),
+            "words": compose.shift_words_cut(req.words, spans, fps=fps),
+            "orig_words": compose.shift_words_cut(req.orig_words, spans, fps=fps)}
+
+
 class LipsyncReq(BaseModel):
     file_id: str
     clip: str = "source.mp4"

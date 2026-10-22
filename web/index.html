@@ -73,7 +73,7 @@
   .transport{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;width:100%;max-width:520px}
   .transport input[type=range]{flex:1 1 90px;min-width:80px}
   .transport.tl #seek{display:none}   /* the timeline bar is the scrubber — no second playhead */
-  .transport #timeLbl{min-width:44px!important;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);white-space:nowrap}
+  .transport #timeLbl{min-width:118px!important;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);white-space:nowrap}
   .transport #timeLbl b{color:var(--txt);font-weight:600}
   .tbtn{background:#2a2d36;color:var(--txt);border:1px solid var(--line);font-size:14px;font-weight:700;padding:6px 11px;min-width:36px}
   .tbtn:hover{background:#343844}
@@ -100,6 +100,13 @@
   #trimAll{color:var(--accent2)}
   .tmini{font-size:11px;padding:4px 8px;background:#2a2d36;border:1px solid var(--line);white-space:nowrap}
   .tmini.ticon{padding:4px 7px}
+  #cutMark{position:absolute;top:0;bottom:0;display:none;pointer-events:none;z-index:2;background:repeating-linear-gradient(135deg,rgba(255,70,50,.55) 0 5px,rgba(255,70,50,.25) 5px 10px);border-left:2px solid #ff5a44;border-right:2px solid #ff5a44}
+  #cutMark.open{border-right-style:dashed;background:rgba(255,70,50,.18)}
+  .cutRow{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);padding-top:6px;border-top:1px dashed var(--line);flex-wrap:wrap}
+  .cutRow .clbl{font-weight:600;color:var(--txt);margin-right:2px}
+  .cutRow #cutLbl{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}   /* flex-basis 0: the label never widens the centre column (it is auto-sized) */
+  .tmini.tcut:not(:disabled){background:#ff5a44;border-color:#ff5a44;color:#fff;font-weight:600}
+  .tmini:disabled{opacity:.45;cursor:default}
   .status{font-size:12px;color:var(--muted);min-height:16px;text-align:center}
   .status.err{color:#ff7a6b}.status.ok{color:var(--ok)}
   #exactToggle.on{background:var(--ok);color:#06210f;border-color:var(--ok);font-weight:700}
@@ -454,6 +461,7 @@
       <div id="trimBar" title="Клік або тягни — плейхед. Тягни [ ] — трім.">
         <div id="trimDimL" class="tdim"></div><div id="trimDimR" class="tdim"></div>
         <div id="trimSel"></div>
+        <div id="cutMark"></div>
         <div id="trimCuts" style="position:absolute;inset:0;pointer-events:none"></div>
         <div id="trimHIn" class="thandle tin" title="In — тягни (або клік і Alt+← / →)"><i></i></div>
         <div id="trimHOut" class="thandle tout" title="Out — тягни (або клік і Alt+← / →)"><i></i></div>
@@ -461,7 +469,7 @@
       </div>
       <div class="trimInfo">
         <span class="tgrp">
-          <button id="trimSetIn" class="tmini" title="In = кадр плейхеда (клавіша I)">⇤ In тут</button>
+          <button id="trimSetIn" class="tmini" title="In = кадр плейхеда (клавіша I)">⇤ Set In</button>
           <span class="tval"><b id="trimInLbl">0.000s</b></span>
           <button id="trimPlayIn" class="tmini ticon" title="Подивитись стик: 1.5 с від In">▶</button>
         </span>
@@ -471,8 +479,17 @@
         <span class="tgrp" style="justify-content:flex-end">
           <button id="trimPlayOut" class="tmini ticon" title="Подивитись хвіст: 1.5 с до Out">▶</button>
           <span class="tval"><b id="trimOutLbl">0.000s</b></span>
-          <button id="trimSetOut" class="tmini" title="Out = кадр плейхеда (клавіша O)">Out тут ⇥</button>
+          <button id="trimSetOut" class="tmini" title="Out = кадр плейхеда (клавіша O)">Set Out ⇥</button>
         </span>
+      </div>
+      <div class="cutRow" title="Вирізати шматок ПОСЕРЕДИНІ кліпу: відео і звук разом, титри зсуваються">
+        <span class="clbl">✂ Cut</span>
+        <button id="cutFrom" class="tmini" title="Початок шматка = кадр плейхеда">[ From</button>
+        <button id="cutTo" class="tmini" title="Кінець шматка = кадр плейхеда">To ]</button>
+        <span id="cutLbl" class="tval"></span>
+        <button id="cutUndo" class="tmini" style="display:none" title="Повернути вирізане">↩ Undo cut</button>
+        <button id="cutClear" class="tmini ticon" style="display:none" title="Скасувати позначку">✕</button>
+        <button id="cutGo" class="tmini tcut" disabled title="Вирізати позначений шматок">✂ Cut segment</button>
       </div>
       <input type="hidden" id="trimIn" value="0"><input type="hidden" id="trimOut" value="0">
     </div>
@@ -1980,11 +1997,12 @@ function drawTrimBar(){
   $("trimSel").style.left=li+"%";$("trimSel").style.width=Math.max(0,lo-li)+"%";
   $("trimDimL").style.width=li+"%";$("trimDimR").style.width=Math.max(0,100-lo)+"%";   // what gets CUT is dimmed, what stays is clear
   $("trimHIn").style.left=li+"%";$("trimHOut").style.left=lo+"%";
+  if(typeof drawCutMark==="function")drawCutMark();
   // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
   $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
   $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
   const cut=(i>0.0005||o<dur-0.0005);
-  $("trimDurLbl").innerHTML=(cut?"лишається ":"довжина ")+"<b style='color:var(--txt)'>"+tc(o-i)+"</b>";
+  $("trimDurLbl").innerHTML=(cut?"Kept ":"Length ")+"<b style='color:var(--txt)'>"+tc(o-i)+"</b>";
   $("trimDurLbl").title=(o-i).toFixed(3)+" с · "+(frameOf(o)-frameOf(i))+" кадрів · "+Math.round(fps())+" fps"+(cut?" · відрізано "+tc(dur-(o-i)):"");
 }
 function xToTime(clientX){const r=$("trimBar").getBoundingClientRect();const f=Math.min(1,Math.max(0,(clientX-r.left)/r.width));return f*(video.duration||0);}
@@ -3022,14 +3040,106 @@ async function doRevoice(list){
 }
 function undoRevoice(){
   const st=rvUndoStack();if(!st||!st.length)return;
-  const prev=st[st.length-1], cur=variants[activeVar]&&variants[activeVar].clip;
+  const prev=st[st.length-1], v=variants[activeVar], cur=v&&v.clip, h=openHookRef();
   rvTargets(cur).forEach(o=>{if(o._rvFrom&&o._rvFrom.length&&o._rvFrom[o._rvFrom.length-1]===prev)o._rvFrom.pop();
-    o.clip=prev.clip;o.videoUrl=prev.videoUrl;o.origWords=prev.origWords.map(w=>({...w}));});
-  rvLoadVideo(prev.videoUrl);
+    o.clip=prev.clip;o.videoUrl=prev.videoUrl;o.origWords=prev.origWords.map(w=>({...w}));
+    if(prev.kind==="cut"&&o!==v&&o!==h){o.trim=prev.trim;o.cuts=prev.cuts;}});
+  if(prev.kind==="cut"){            // a cut moved every time in the clip — put them ALL back
+    const J=x=>x==null?x:JSON.parse(JSON.stringify(x));
+    v.trim=J(prev.trim);v.overlays=J(prev.overlays);v.capIn=prev.capIn;v.capOut=prev.capOut;_syncCuts(J(prev.cuts));
+    if(h){h.trim=J(prev.trim);if(prev.hookTitles!==undefined)h.titles=J(prev.hookTitles);if(prev.hookCap){h.cap_in=prev.hookCap[0];h.cap_out=prev.hookCap[1];}}
+    titles=J(prev.titles)||[];
+    if(typeof loadCapWin==="function")loadCapWin(h||v);
+    if(typeof renderTitles==="function")try{renderTitles();}catch(_){}
+    cutLoadVideo(prev.videoUrl);
+  }else rvLoadVideo(prev.videoUrl);
   commitWords(prev.words.map(w=>({...w})));
   if(typeof renderHookStrip==="function")renderHookStrip();
-  setStatus("↩ Звук і текст повернуто як було до переозвучки. Файл переозвучки лишився в сесії.","ok");
+  setStatus(prev.kind==="cut"?"↩ Вирізаний шматок повернуто — відео, звук, титри, трім і тайтли як були.":"↩ Звук і текст повернуто як було до переозвучки. Файл переозвучки лишився в сесії.","ok");
+  if(typeof drawCutMark==="function")drawCutMark();
 }
+// ---------- ✂ Cut segment: remove a piece from the MIDDLE of the clip ----------
+// A cut makes a NEW file (server: "<name>_cutN"), swapped in place like a re-voice, so preview,
+// exact, render, board and LOC simply see a shorter clip — nothing downstream has to know.
+// Everything timed in clip seconds moves with it: words, trim, scene cuts, titles, stickers,
+// the caption window. ↩ restores all of it from one snapshot.
+var _cut={a:null,b:null};   // var, not let: drawTrimBar can run before this line on first load
+function cutRemapT(t,spans){let off=0;for(const [a,b] of spans){if(t>=b)off+=(b-a);else if(t>a)return Math.max(0,a-off);}return Math.max(0,t-off);}
+const cutInside=(t,spans)=>spans.some(([a,b])=>t>a&&t<b);
+function drawCutMark(){
+  const el=$("cutMark"),dur=video.duration||0; if(!el)return;
+  if(!_cut)return; const {a,b}=_cut;
+  if(a==null||!dur){el.style.display="none";}
+  else{const e=(b!=null)?b:Math.max(a,video.currentTime||a);
+    el.style.display="block";el.classList.toggle("open",b==null);
+    el.style.left=(a/dur*100)+"%";el.style.width=Math.max(0.3,(e-a)/dur*100)+"%";}
+  if($("cutLbl"))$("cutLbl").innerHTML=(a==null)?"<span style='opacity:.7'>playhead → From → To</span>"
+    :("<b>"+tc(a)+"</b> → "+(b!=null?"<b>"+tc(b)+"</b> · "+tc(b-a):"…"));
+  if($("cutGo"))$("cutGo").disabled=!(a!=null&&b!=null&&b>a)||!fileId;
+  if($("cutClear"))$("cutClear").style.display=(a!=null)?"":"none";
+  const st=rvUndoStack(); if($("cutUndo"))$("cutUndo").style.display=(st&&st.length&&st[st.length-1].kind==="cut")?"":"none";
+}
+function cutMarkFromPlayhead(which){
+  if(!videoLoaded)return; const t=snapFrame(video.currentTime||0);
+  if(which==="a"){_cut.a=t;if(_cut.b!=null&&_cut.b<=t)_cut.b=null;}
+  else{if(_cut.a==null){setStatus("Спершу [ From — початок шматка.","err");return;}
+    if(t<=_cut.a){setStatus("To має бути пізніше за From.","err");return;} _cut.b=t;}
+  drawCutMark();
+}
+function cutSnapshot(v,h){
+  const J=x=>x==null?x:JSON.parse(JSON.stringify(x));
+  return {kind:"cut",clip:v.clip,videoUrl:v.videoUrl,words:(realWords||[]).map(w=>({...w})),origWords:(origWordsNow()||[]).map(w=>({...w})),
+    trim:J(v.trim),cuts:J(v.cuts),overlays:J(v.overlays),capIn:v.capIn,capOut:v.capOut,
+    titles:J(titles),hookTitles:h?J(h.titles):undefined,hookCap:h?[h.cap_in,h.cap_out]:undefined};
+}
+function cutApplyTimes(v,h,spans,oldDur){
+  const R=t=>(t==null||t===""||isNaN(+t))?t:+cutRemapT(+t,spans).toFixed(3);
+  const newDur=Math.max(0,oldDur-spans.reduce((s,[a,b])=>s+(b-a),0));
+  if(v.trim){const [i,o]=v.trim;v.trim=[R(i),(o>=oldDur-0.002)?+newDur.toFixed(3):R(o)];}
+  if(h&&h.trim){const [i,o]=h.trim;h.trim=[R(i),(o>=oldDur-0.002)?+newDur.toFixed(3):R(o)];}
+  if(v.cuts)_syncCuts(v.cuts.filter(c=>!cutInside(c,spans)).map(c=>R(c)));
+  (v.overlays||[]).forEach(o=>{o.in=R(o.in);o.out=R(o.out);});
+  const rt=list=>(list||[]).forEach(t=>{if(t.in!==""&&t.in!=null)t.in=R(t.in);if(t.out!==""&&t.out!=null)t.out=R(t.out);});
+  rt(titles); if(h&&h.titles&&h.titles!==titles)rt(h.titles);
+  if(v.capIn!=null)v.capIn=R(v.capIn); if(v.capOut!=null)v.capOut=R(v.capOut);
+  if(h){if(h.cap_in!=null)h.cap_in=R(h.cap_in);if(h.cap_out!=null)h.cap_out=R(h.cap_out);}
+  if(typeof loadCapWin==="function")loadCapWin(h||v);
+  if(typeof renderTitles==="function")try{renderTitles();}catch(_){}
+}
+function cutLoadVideo(url){const t=video.currentTime||0;video.src=url;
+  video.onloadedmetadata=()=>{videoLoaded=true;try{video.currentTime=Math.min(t,(video.duration||t));}catch(_){}
+    if(typeof syncTrim==="function")syncTrim(); if(typeof updateCutsLabel==="function")updateCutsLabel(); drawCutMark();};}
+async function doCut(spans,speech){
+  const v=variants[activeVar], h=openHookRef();
+  if(!v||!v.clip||!fileId){setStatus("Cut працює з кліпом у сесії — спершу завантаж відео.","err");return;}
+  const oldDur=video.duration||0;
+  busyStart("✂ Вирізаю шматок…");
+  try{
+    const r=await fetch(API+"/api/cut",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:v.clip,spans,speech:!!speech,words:realWords||[],orig_words:origWordsNow()||[]})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"cut failed"));
+    const before=cutSnapshot(v,h);
+    cutApplyTimes(v,h,d.spans,oldDur);
+    rvTargets(v.clip).forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
+      o.origWords=(d.orig_words||[]).map(w=>({...w}));if(o!==v&&o!==h){o.trim=v.trim;o.cuts=v.cuts;}});
+    if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
+    _cut={a:null,b:null}; _wRng=null; _sentPick=null;
+    cutLoadVideo(API+d.url);
+    commitWords((d.words||[]).map(w=>({...w})));
+    if(typeof renderHookStrip==="function")renderHookStrip();
+    busyDone("Вирізано");
+    const moved=d.spans.map(([a,b],k)=>{const o=spans[k];return o&&(Math.abs(o[0]-a)>0.02||Math.abs(o[1]-b)>0.02);}).some(Boolean);
+    setStatus("✂ Вирізано "+tc(d.removed)+" ("+d.removed.toFixed(2)+" с) за "+d.seconds+" с"+(moved?" · межі зсунуто в паузу, щоб не різати слово":"")+". ↩ Undo cut — повернути.","ok");
+  }catch(e){busyStop();setStatus("Cut: "+e.message,"err");}
+  drawCutMark();
+}
+if($("cutFrom"))$("cutFrom").onclick=()=>cutMarkFromPlayhead("a");
+if($("cutTo"))$("cutTo").onclick=()=>cutMarkFromPlayhead("b");
+if($("cutClear"))$("cutClear").onclick=()=>{_cut={a:null,b:null};drawCutMark();};
+if($("cutGo"))$("cutGo").onclick=()=>{if(_cut.a!=null&&_cut.b!=null)doCut([[_cut.a,_cut.b]],false);};
+if($("cutUndo"))$("cutUndo").onclick=()=>undoRevoice();
+if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{if(_cut.a!=null&&_cut.b==null)drawCutMark();});
+
 // ---------- Sentences view: edit and re-voice WHOLE SENTENCES ----------
 // One place for both: the row text IS the caption text AND what ElevenLabs speaks (⋯ holds an
 // optional "як звучатиме" for pronunciation only). A sentence — not a caption — is the unit,
@@ -3086,7 +3196,8 @@ function renderSentsView(force){
       +"<div class='sacts'><button type='button' data-svoice='"+k+"' "+((!canVoice||_rvBusy)?"disabled":"")+" title='"+(canVoice?"Переозвучити це речення тим самим голосом":"Потрібен транскрибований кліп у сесії")+"'>🎙</button>"
       +"<button type='button' class='ghost' data-smore='"+k+"' title='Як звучатиме (вимова)'>⋯</button></div>"
       +"<div class='smeta' style='"+(meta?"":"display:none")+"'>"+meta+"</div>"
-      +(more?"<div class='smore'>як звучатиме:<input data-ssay='"+k+"' placeholder='"+esc(inf.text)+"' value='"+esc(_rvSay[sig]||"")+"' title='Лише вимова для ElevenLabs. У титрах лишиться текст рядка. Напр. «Tie Chee» для «Tai Chi».'></div>":"")
+      +(more?"<div class='smore'>як звучатиме:<input data-ssay='"+k+"' placeholder='"+esc(inf.text)+"' value='"+esc(_rvSay[sig]||"")+"' title='Лише вимова для ElevenLabs. У титрах лишиться текст рядка. Напр. «Tie Chee» для «Tai Chi».'>"
+        +"<button type='button' class='tmini' data-scut='"+k+"' title='Вирізати це речення з відео і звуку; стики — у паузах'>✂ Cut sentence</button></div>":"")
       +"</div>";}).join("");
   renderSentBar(canVoice);
 }
@@ -3095,13 +3206,19 @@ function renderSentBar(canVoice){
   const undo=rvUndoStack(), n=_sentPick?(_sentPick[1]-_sentPick[0]):0;
   let h="";
   if(n>1)h+="<button type='button' id='sentVoicePick' class='primary' style='font-size:11px;padding:6px 10px' "+((!canVoice||_rvBusy)?"disabled":"")+">🎙 Озвучити "+n+" речення однією фразою</button>"
+    +"<button type='button' id='sentCutPick' class='ghost' style='font-size:11px;padding:6px 10px' title='Вирізати виділені речення з відео і звуку'>✂ Cut "+n+" sentences</button>"
     +"<button type='button' id='sentPickX' class='ghost' style='font-size:11px;padding:6px 8px' title='Зняти виділення (Esc)'>✕</button>";
   if(undo)h+="<button type='button' id='sentUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути попередній звук і текст'>↩ Повернути звук</button>";
   h+="<span style='flex:1;min-width:150px'>Правиш текст у рядку — титр міняється одразу; 🎙 — щоб змінився і звук. Довжина кліпу не зміниться.</span>";
   bar.innerHTML=h; bar.style.display=(txtView==="sents")?"flex":"none";
   if($("sentVoicePick"))$("sentVoicePick").onclick=()=>voiceSentences(_sentPick[0],_sentPick[1]);
+  if($("sentCutPick"))$("sentCutPick").onclick=()=>cutSentences(_sentPick[0],_sentPick[1]);
   if($("sentPickX"))$("sentPickX").onclick=()=>{_sentPick=null;renderSentsView(true);};
   if($("sentUndo"))$("sentUndo").onclick=undoRevoice;
+}
+function cutSentences(k0,k1){
+  const a=_sentRanges[k0], b=_sentRanges[k1-1], ws=realWords||[]; if(!a||!b||!ws[a[0]]||!ws[b[1]-1])return;
+  doCut([[+ws[a[0]].start,+ws[b[1]-1].end]],true);
 }
 function voiceSentences(k0,k1){
   const a=_sentRanges[k0], b=_sentRanges[k1-1]; if(!a||!b)return;
@@ -3123,6 +3240,7 @@ function voiceSentences(k0,k1){
       const inf=sentInfo(k); if(inf&&video&&videoLoaded){try{video.currentTime=Math.max(0,inf.start-0.05);_sentStopAt=inf.end+0.12;video.play();}catch(_){}}
       return;}
     const vb=e.target.closest&&e.target.closest("[data-svoice]"); if(vb){const k=+vb.dataset.svoice;voiceSentences(k,k+1);return;}
+    const cb=e.target.closest&&e.target.closest("[data-scut]"); if(cb){const k=+cb.dataset.scut;cutSentences(k,k+1);return;}
     const mb=e.target.closest&&e.target.closest("[data-smore]"); if(mb){const k=+mb.dataset.smore;_sentMore.has(k)?_sentMore.delete(k):_sentMore.add(k);renderSentsView(true);return;}
   });
   box.addEventListener("input",e=>{
