@@ -23,6 +23,8 @@ Endpoints (checked against the docs, Oct 2026): POST /v1/voices/add · POST
 Key: ELEVENLABS_API_KEY (per machine, never in the repo).
 """
 import base64
+import struct
+import math
 import json
 import os
 import re
@@ -200,6 +202,59 @@ def caption_words(text, said, t0, t1):
 
 # ---------------------------------------------------------------- the job
 
+def _frames_db(path, t0, t1, hop=0.01):
+    """Loudness (dB) of 10 ms frames in [t0, t1] — [(time, db)]."""
+    t0 = max(0.0, t0)
+    if t1 - t0 < 0.02:
+        return []
+    raw = subprocess.run(["ffmpeg", "-v", "quiet", "-ss", f"{t0:.3f}", "-t", f"{t1 - t0:.3f}", "-i", path,
+                          "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True).stdout
+    n = int(16000 * hop)
+    vals = struct.unpack("<%dh" % (len(raw) // 2), raw[:len(raw) // 2 * 2])
+    out = []
+    for i in range(0, len(vals) - n + 1, n):
+        s = vals[i:i + n]
+        rms = math.sqrt(sum(x * x for x in s) / n)
+        out.append((t0 + (i + n / 2) / 16000.0, 20 * math.log10(rms + 1e-9)))
+    return out
+
+
+def snap_to_audio(clip_path, span, clip_dur):
+    """Move the span's edges onto the REAL silence around the old words.
+
+    Recogniser word times are approximate — the first word after a pause typically starts
+    50–200 ms EARLIER than reported. Muting from the reported start leaves that onset audible
+    and the clip says "A… Another". So: look for the quietest stretch just before the old words
+    (and just after them) and cut there. With no real dip (words run together, or loud music
+    under the voice) fall back to a small safety margin instead of guessing."""
+    a, b = float(span["a"]), float(span["b"])
+    if b <= a:                                   # pure insertion — nothing old to mute
+        return dict(span)
+    lo, hi = float(span.get("lo", 0.0)), float(span.get("hi", clip_dur))
+    out = dict(span)
+
+    def quiet(frames, pick_last):
+        if len(frames) < 3:
+            return None
+        dbs = [d for _, d in frames]
+        floor, peak = min(dbs), max(dbs)
+        if peak - floor < 8:                     # no audible dip anywhere in the window
+            return None
+        cand = [t for t, d in frames if d <= floor + 6]
+        return cand[-1] if pick_last else cand[0]
+
+    w0 = max(0.0, lo - 0.08, a - 0.40)
+    s = quiet(_frames_db(clip_path, w0, a + 0.05), pick_last=True)
+    new_a = s if s is not None else max(lo, a - 0.06)
+    new_a = max(w0, min(a, new_a))
+    w1 = min(clip_dur, hi + 0.08, b + 0.40)
+    e = quiet(_frames_db(clip_path, b - 0.05, w1), pick_last=False)
+    new_b = e if e is not None else min(hi, b + 0.06)
+    new_b = min(w1, max(b, new_b))
+    out.update(a=round(new_a, 3), b=round(new_b, 3), lo=round(min(lo, new_a), 3), hi=round(max(hi, new_b), 3))
+    return out
+
+
 def plan_patch(span, speech_len, clip_dur):
     """Where the new audio goes and how fast. Pure arithmetic, so it is testable alone.
 
@@ -260,6 +315,7 @@ def revoice(clip_path, spans, out_path, requests=None, api_key=None, workdir=Non
                 s0, s1 = 0.0, duration(raw)
             cut0, cut1 = max(0.0, s0 - LEAD), s1 + TAIL
             speech_len = cut1 - cut0
+            sp = snap_to_audio(clip_path, sp, clip_dur)   # cut on the real silence, not the recogniser's guess
             pl = plan_patch(sp, speech_len, clip_dur)
             # loudness: match the voice around the old words (a window, so an insertion into a
             # pause still has a reference)

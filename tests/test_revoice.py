@@ -187,6 +187,27 @@ def test_two_spans_one_clone_one_pass():
     assert len(res["spans"]) == 2 and abs(freq(out, 4.2) - 880) < 40
 
 
+def test_late_recogniser_start_does_not_leak_the_old_onset():
+    """1.9.69 in production: re-voicing a sentence left "A… Another". The recogniser put the
+    first word 120 ms after it really started; muting from there kept the old onset audible."""
+    clip, out = os.path.join(TMP, "clip8.mp4"), os.path.join(TMP, "out8.mp4")
+    make_clip(clip)                                   # the old word REALLY sounds 1.60–2.20
+    late = dict(SPAN, a=1.72, b=2.10)                 # …but the recogniser says 1.72–2.10
+    res = RV.revoice(clip, [late], out, requests=Fake11(speech=0.50))
+    for t in (1.60, 1.64, 2.12, 2.16):
+        f = freq(out, t, 0.04)
+        assert abs(f - 500) > 60, f"old word still audible at {t}s ({f} Hz)"
+    assert abs(freq(out, 1.2) - 300) < 15 and abs(freq(out, 2.6) - 300) < 15, "neighbours touched"
+    assert abs(RV.duration(out) - RV.duration(clip)) < 0.06
+
+
+def test_snap_falls_back_to_a_margin_when_there_is_no_silence():
+    clip = os.path.join(TMP, "clip9.mp4")
+    sh("ffmpeg", "-y", "-f", "lavfi", "-i", "sine=f=300:d=3", "-ac", "2", "-c:a", "aac", clip)   # no dip anywhere
+    s = RV.snap_to_audio(clip, {"a": 1.0, "b": 1.5, "lo": 0.9, "hi": 1.6}, 3.0)
+    assert abs(s["a"] - 0.94) < 1e-6 and abs(s["b"] - 1.56) < 1e-6, s
+
+
 def test_restricted_key_says_which_permission_is_missing():
     """1.9.65 in production: a key that transcribes fine got a bare '401' on clone."""
     class F(Fake11):
