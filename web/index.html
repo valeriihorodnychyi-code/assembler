@@ -70,9 +70,36 @@
   .dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;width:340px;max-width:100%;height:470px;max-height:72vh;border:2px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;padding:20px}
   .dropzone.drag{border-color:var(--accent);color:var(--txt)}
   .dropzone .big{font-size:42px}
-  .transport{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;width:100%;max-width:520px}
+  .transport{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;width:100%;max-width:520px}
   .transport input[type=range]{flex:1 1 90px;min-width:80px}
-  .transport #timeLbl{min-width:44px!important}
+  .transport.tl #seek{display:none}   /* the timeline bar is the scrubber — no second playhead */
+  .transport #timeLbl{min-width:44px!important;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);white-space:nowrap}
+  .transport #timeLbl b{color:var(--txt);font-weight:600}
+  .tbtn{background:#2a2d36;color:var(--txt);border:1px solid var(--line);font-size:14px;font-weight:700;padding:6px 11px;min-width:36px}
+  .tbtn:hover{background:#343844}
+  .tbtn.tplay{background:#f2f2f4;color:#111;border-color:#f2f2f4;padding:6px 16px;min-width:48px}
+  .tbtn.tplay:hover{background:#fff}
+  #trimBar{position:relative;height:36px;border-radius:8px;background:#23262f;border:1px solid var(--line);user-select:none;touch-action:none;cursor:pointer;overflow:visible}
+  #trimBar .tdim{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,rgba(0,0,0,.55) 0 6px,rgba(0,0,0,.38) 6px 12px);pointer-events:none}
+  #trimDimL{left:0;border-radius:8px 0 0 8px}#trimDimR{right:0;border-radius:0 8px 8px 0}
+  #trimSel{position:absolute;top:0;bottom:0;border-top:2px solid rgba(255,255,255,.55);border-bottom:2px solid rgba(255,255,255,.55);pointer-events:none}
+  .thandle{position:absolute;top:-3px;bottom:-3px;width:18px;margin-left:-9px;cursor:ew-resize;z-index:3;display:flex;align-items:center;justify-content:center}
+  .thandle i{display:block;width:8px;height:100%;border:2px solid #e9e9ee;background:rgba(255,255,255,.08)}
+  .thandle.tin i{border-right:0;border-radius:4px 0 0 4px;margin-left:8px}
+  .thandle.tout i{border-left:0;border-radius:0 4px 4px 0;margin-right:8px}
+  .thandle:hover i,.thandle.armed i{border-color:var(--accent2);background:rgba(124,92,255,.18)}
+  #trimPlayhead{position:absolute;top:-6px;bottom:-6px;left:0;width:2px;margin-left:-1px;background:#fff;pointer-events:none;z-index:4;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+  #trimPlayhead b{position:absolute;top:-4px;left:-5px;width:12px;height:8px;background:#fff;border-radius:2px 2px 6px 6px}
+  .trimInfo{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+  .trimInfo .tgrp{display:flex;align-items:center;gap:5px;min-width:0}
+  .trimInfo .tval{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .trimInfo .tval b{color:var(--txt);font-weight:600}
+  .trimInfo .tmid{display:flex;gap:10px;align-items:center;white-space:nowrap}
+  .trimInfo .tlink{cursor:pointer;color:var(--muted);text-decoration:underline dotted;text-underline-offset:3px}
+  .trimInfo .tlink:hover{color:var(--txt)}
+  #trimAll{color:var(--accent2)}
+  .tmini{font-size:11px;padding:4px 8px;background:#2a2d36;border:1px solid var(--line);white-space:nowrap}
+  .tmini.ticon{padding:4px 7px}
   .status{font-size:12px;color:var(--muted);min-height:16px;text-align:center}
   .status.err{color:#ff7a6b}.status.ok{color:var(--ok)}
   #exactToggle.on{background:var(--ok);color:#06210f;border-color:var(--ok);font-weight:700}
@@ -411,37 +438,41 @@
       </div>
       <div id="filmstrip"></div>
     </div>
+    <!-- ONE timeline: the transport row (play, frame step, time) + the bar below it, which is BOTH
+         the scrubber (click / drag anywhere) and the trim (drag the [ ] handles). One pair of ⟨ ⟩
+         only: park the playhead frame-exact, then "In тут" / "Out тут" (keys I / O). -->
     <div class="transport" id="transport">
-      <button id="frameBack" title="−1 кадр (←)" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 12px">⟨</button>
-      <button id="playBtn" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 16px">▶</button>
-      <button id="frameFwd" title="+1 кадр (→)" style="background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;padding:6px 12px">⟩</button>
+      <button id="frameBack" class="tbtn" title="−1 кадр (←, Shift = 10)">⟨</button>
+      <button id="playBtn" class="tbtn tplay" title="Play / Pause (пробіл)">▶</button>
+      <button id="frameFwd" class="tbtn" title="+1 кадр (→, Shift = 10)">⟩</button>
       <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
-      <span class="val" id="timeLbl" style="display:inline-block;min-width:56px;text-align:left;font-variant-numeric:tabular-nums">0.0s</span>
-      <span class="vtools" style="display:inline-flex;gap:8px;flex:0 0 auto"><button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
+      <span class="val" id="timeLbl" title="Плейхед · кадр">0.0s</span>
+      <span class="vtools" style="display:inline-flex;gap:8px;flex:0 0 auto;margin-left:auto"><button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
       <button id="safeToggle" title="Safe zones for social (TikTok / Reels / Shorts) — keeps captions clear of the platform UI. Guide only, not exported." style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">⧉ Safe</button></span>
     </div>
-    <div id="trimRow" style="display:none;max-width:520px;margin:8px auto 0;flex-direction:column;gap:6px">
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)">
-        <span>Trim ✂ <b id="trimInLbl" style="color:var(--text)">0.0s</b> → <b id="trimOutLbl" style="color:var(--text)">0.0s</b> <span id="trimDurLbl" style="color:var(--accent)"></span></span>
-        <span><span id="trimAll" title="Застосувати цей трім до всіх кліпів паку (локалізації тайм-align до оригіналу)" style="cursor:pointer;color:var(--accent2);margin-right:10px;display:none">⧉ на всі</span><span id="trimReset" style="cursor:pointer">reset</span></span>
-      </div>
-      <!-- frame-exact controls: arm a handle (click it or these buttons), then ← / → nudge it by
-           one frame; I / O snap a handle to the playhead you already parked on the right frame -->
-      <div style="display:flex;gap:5px;align-items:center;font-size:11px;flex-wrap:wrap">
-        <button id="trimSetIn" title="In = поточний кадр (клавіша I)" style="padding:4px 8px">⇤ In = кадр</button>
-        <span id="trimNudgeIn" style="display:inline-flex;gap:3px"><button data-tn="in:-1" title="In −1 кадр">⟨</button><button data-tn="in:1" title="In +1 кадр">⟩</button></span>
-        <button id="trimPlayIn" title="Подивитись стик: 1.5с від In" style="padding:4px 8px">▶ стик</button>
-        <span style="flex:1"></span>
-        <span id="trimNudgeOut" style="display:inline-flex;gap:3px"><button data-tn="out:-1" title="Out −1 кадр">⟨</button><button data-tn="out:1" title="Out +1 кадр">⟩</button></span>
-        <button id="trimPlayOut" title="Подивитись хвіст: 1.5с до Out" style="padding:4px 8px">▶ хвіст</button>
-        <button id="trimSetOut" title="Out = поточний кадр (клавіша O)" style="padding:4px 8px">Out = кадр ⇥</button>
-      </div>
-      <div id="trimBar" style="position:relative;height:28px;border-radius:8px;background:var(--panel2);border:0.5px solid var(--line);user-select:none;touch-action:none">
-        <div id="trimSel" style="position:absolute;top:0;bottom:0;left:0;width:100%;background:rgba(255,58,34,.22);border-left:2px solid var(--accent);border-right:2px solid var(--accent);border-radius:6px"></div>
-        <div id="trimPlayhead" style="position:absolute;top:-3px;bottom:-3px;left:0;width:2px;background:#fff;opacity:.75;pointer-events:none"></div>
-        <div id="trimHIn" style="position:absolute;top:0;bottom:0;left:0;width:16px;margin-left:-8px;cursor:ew-resize;display:flex;align-items:center;justify-content:center;z-index:2"><div style="width:4px;height:62%;background:var(--accent);border-radius:2px"></div></div>
-        <div id="trimHOut" style="position:absolute;top:0;bottom:0;left:100%;width:16px;margin-left:-8px;cursor:ew-resize;display:flex;align-items:center;justify-content:center;z-index:2"><div style="width:4px;height:62%;background:var(--accent);border-radius:2px"></div></div>
+    <div id="trimRow" style="display:none;max-width:520px;width:100%;margin:8px auto 0;flex-direction:column;gap:6px">
+      <div id="trimBar" title="Клік або тягни — плейхед. Тягни [ ] — трім.">
+        <div id="trimDimL" class="tdim"></div><div id="trimDimR" class="tdim"></div>
+        <div id="trimSel"></div>
         <div id="trimCuts" style="position:absolute;inset:0;pointer-events:none"></div>
+        <div id="trimHIn" class="thandle tin" title="In — тягни (або клік і Alt+← / →)"><i></i></div>
+        <div id="trimHOut" class="thandle tout" title="Out — тягни (або клік і Alt+← / →)"><i></i></div>
+        <div id="trimPlayhead"><b></b></div>
+      </div>
+      <div class="trimInfo">
+        <span class="tgrp">
+          <button id="trimSetIn" class="tmini" title="In = кадр плейхеда (клавіша I)">⇤ In тут</button>
+          <span class="tval"><b id="trimInLbl">0.000s</b></span>
+          <button id="trimPlayIn" class="tmini ticon" title="Подивитись стик: 1.5 с від In">▶</button>
+        </span>
+        <span class="tmid"><span id="trimDurLbl"></span>
+          <span id="trimAll" class="tlink" title="Застосувати цей трім до всіх кліпів паку (локалізації тайм-align до оригіналу)" style="display:none">⧉ на всі</span>
+          <span id="trimReset" class="tlink" title="Прибрати трім">reset</span></span>
+        <span class="tgrp" style="justify-content:flex-end">
+          <button id="trimPlayOut" class="tmini ticon" title="Подивитись хвіст: 1.5 с до Out">▶</button>
+          <span class="tval"><b id="trimOutLbl">0.000s</b></span>
+          <button id="trimSetOut" class="tmini" title="Out = кадр плейхеда (клавіша O)">Out тут ⇥</button>
+        </span>
       </div>
       <input type="hidden" id="trimIn" value="0"><input type="hidden" id="trimOut" value="0">
     </div>
@@ -1531,8 +1562,9 @@ function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
 
 const video=$("video");let videoLoaded=false,demoT=0,lastTs=0;
 function loop(ts){let t,dur;
-  if(videoLoaded){t=video.currentTime;dur=video.duration||4;$("seek").value=(t/dur)*100;$("timeLbl").textContent=t.toFixed(1)+"s";
-    if($("trimRow").style.display!=="none"&&$("trimPlayhead"))$("trimPlayhead").style.left=Math.max(0,Math.min(100,(t/dur)*100))+"%";}
+  if(videoLoaded){t=video.currentTime;dur=video.duration||4;$("seek").value=(t/dur)*100;{const _tl=$("timeLbl"),_k=frameOf(t)+"/"+frameOf(dur);if(_tl._k!==_k){_tl._k=_k;_tl.innerHTML="<b>"+tc(t)+"</b> / "+tc(dur);_tl.title=t.toFixed(3)+" с · кадр "+frameOf(t);}}
+    const _onTl=$("trimRow").style.display!=="none";$("transport").classList.toggle("tl",_onTl);
+    if(_onTl&&$("trimPlayhead"))$("trimPlayhead").style.left=Math.max(0,Math.min(100,(t/dur)*100))+"%";}
   else{const dt=(ts-lastTs)/1000||0;demoT=(demoT+dt)%4;t=demoT;dur=4;}
   lastTs=ts;render(t,dur);
   // headline sits on top of the captions and only inside its own [in,out] window
@@ -1855,6 +1887,10 @@ const FPS=30;   // render fps — the fallback grid when the source fps isn't kn
 let clipFps=FPS;
 function fps(){return clipFps>0?clipFps:FPS;}
 function frameOf(t){return Math.round((+t||0)*fps());}
+// Timecode MM:SS:FF (HH: when needed) — what After Effects / Premiere show, so a time reads the same
+// in both. Exact seconds stay in the tooltips.
+function tc(t){const r=Math.max(1,Math.round(fps())),f=Math.max(0,frameOf(t)),ff=f%r,s=Math.floor(f/r),ss=s%60,m=Math.floor(s/60)%60,hh=Math.floor(s/3600);
+  const p=n=>String(n).padStart(2,"0");return (hh?p(hh)+":":"")+p(m)+":"+p(ss)+":"+p(ff);}
 function snapFrame(t){return Math.max(0,Math.round((+t||0)*fps()))/fps();}   // quantize to the frame grid
 let _fpsKey="";
 async function loadClipFps(){
@@ -1929,8 +1965,8 @@ function writeTrim(){
 let trimArmed="in";     // which handle ← / → nudges (click a handle or its ⟨ ⟩ to arm it)
 function armTrim(which){
   trimArmed=which;
-  const paint=(el,on)=>{if(el)el.style.filter=on?"drop-shadow(0 0 4px var(--accent))":"";};
-  paint($("trimHIn"),which==="in");paint($("trimHOut"),which==="out");
+  if($("trimHIn"))$("trimHIn").classList.toggle("armed",which==="in");
+  if($("trimHOut"))$("trimHOut").classList.toggle("armed",which==="out");
 }
 function trimCuts(){const v=variants[activeVar];return (v&&v.cuts&&v.cuts.length)?v.cuts:[];}
 // Magnet to scene cuts is OFF: it fought the user — once a handle stuck to a cut you could no
@@ -1942,14 +1978,14 @@ function drawTrimBar(){
   const i=pf($("trimIn").value,0),o=pf($("trimOut").value,dur)||dur;
   const li=Math.max(0,Math.min(100,(i/dur)*100)),lo=Math.max(0,Math.min(100,(o/dur)*100));
   $("trimSel").style.left=li+"%";$("trimSel").style.width=Math.max(0,lo-li)+"%";
+  $("trimDimL").style.width=li+"%";$("trimDimR").style.width=Math.max(0,100-lo)+"%";   // what gets CUT is dimmed, what stays is clear
   $("trimHIn").style.left=li+"%";$("trimHOut").style.left=lo+"%";
-  // exact seconds + FRAME number: this is what makes "кадр в кадр" checkable by eye
-  $("trimInLbl").textContent=i.toFixed(3)+"s · f"+frameOf(i);
-  $("trimOutLbl").textContent=o.toFixed(3)+"s · f"+frameOf(o);
-  $("trimDurLbl").textContent="("+(o-i).toFixed(3)+"s · "+(frameOf(o)-frameOf(i))+"f · "+Math.round(fps())+"fps)";
-  const cb=$("trimCuts");
-  if(cb)cb.innerHTML=trimCuts().map(c=>{const l=Math.max(0,Math.min(100,(c/dur)*100));
-    return "<div style='position:absolute;top:2px;bottom:2px;left:"+l+"%;width:1px;background:var(--accent2);opacity:.75'></div>";}).join("");
+  // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
+  $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
+  $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
+  const cut=(i>0.0005||o<dur-0.0005);
+  $("trimDurLbl").innerHTML=(cut?"лишається ":"довжина ")+"<b style='color:var(--txt)'>"+tc(o-i)+"</b>";
+  $("trimDurLbl").title=(o-i).toFixed(3)+" с · "+(frameOf(o)-frameOf(i))+" кадрів · "+Math.round(fps())+" fps"+(cut?" · відрізано "+tc(dur-(o-i)):"");
 }
 function xToTime(clientX){const r=$("trimBar").getBoundingClientRect();const f=Math.min(1,Math.max(0,(clientX-r.left)/r.width));return f*(video.duration||0);}
 // Set a handle to an exact time: quantized to the frame grid, magnet-snapped to scene cuts,
@@ -1981,12 +2017,24 @@ function trimDrag(which){return e=>{
   document.addEventListener("pointermove",move);document.addEventListener("pointerup",up);
 };}
 $("trimHIn").addEventListener("pointerdown",trimDrag("in"));
+// the bar itself is the SCRUBBER: click / drag anywhere that isn't a handle = move the playhead
+$("trimBar").addEventListener("pointerdown",e=>{
+  if(!videoLoaded||(e.target.closest&&e.target.closest(".thandle")))return;
+  e.preventDefault();
+  const go=ev=>{const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
+    const t=snapFrame(xToTime(cx));video.currentTime=Math.min(t,Math.max(0,(video.duration||0)-0.001));
+    if(!video.paused){video.pause();$("playBtn").textContent="▶";}
+    if(typeof scheduleExact==="function")scheduleExact();};
+  go(e);
+  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);};
+  document.addEventListener("pointermove",go);document.addEventListener("pointerup",up);
+});
 $("trimHOut").addEventListener("pointerdown",trimDrag("out"));
 // I / O + buttons: park the playhead on the right frame with ⟨ ⟩, then stamp it into the trim
 function setTrimFromPlayhead(which){
   if(!videoLoaded)return;
   const t=setTrimEdge(which,(video.currentTime||0),{noMagnet:true});
-  setStatus((which==="in"?"In":"Out")+" = "+t.toFixed(3)+"s (кадр "+frameOf(t)+")","ok");
+  setStatus((which==="in"?"In":"Out")+" = "+tc(t)+" ("+t.toFixed(3)+" с, кадр "+frameOf(t)+")","ok");
 }
 if($("trimSetIn"))$("trimSetIn").onclick=()=>setTrimFromPlayhead("in");
 if($("trimSetOut"))$("trimSetOut").onclick=()=>setTrimFromPlayhead("out");
@@ -2772,7 +2820,7 @@ function restoreTimings(){
 function updateWordTools(){
   const w=(_wSel>=0&&realWords)?realWords[_wSel]:null;
   if($("wtWord"))$("wtWord").textContent=w?("«"+(w.word||w.text||"")+"»"):"— клікни слово";
-  if($("wtTime"))$("wtTime").textContent=w?(" "+(+w.start).toFixed(3)+" → "+(+w.end).toFixed(3)+" с"+(w.manual?" · вручну":"")):"";
+  if($("wtTime"))$("wtTime").textContent=w?(" "+tc(+w.start)+" → "+tc(+w.end)+(w.manual?" · вручну":"")):"";
   ["wtStart","wtEnd"].forEach(id=>{if($(id))$(id).disabled=!w||!videoLoaded;});
   if(typeof scheduleRevoiceBox==="function")scheduleRevoiceBox();
   if(typeof updatePlayheadReadout==="function")updatePlayheadReadout();
@@ -2799,7 +2847,7 @@ function setWordEdge(which){
   }
   w.manual=true;
   commitWords(ws);
-  setStatus("«"+(w.word||w.text)+"»: "+(which==="start"?"початок ":"кінець ")+t.toFixed(3)+" с (кадр "+Math.round(t/step)+")"+note,note?"":"ok");
+  setStatus("«"+(w.word||w.text)+"»: "+(which==="start"?"початок ":"кінець ")+tc(t)+" ("+t.toFixed(3)+" с)"+note,note?"":"ok");
 }
 if($("restoreTimingsBtn"))$("restoreTimingsBtn").onclick=restoreTimings;
 if($("wtStart"))$("wtStart").onclick=()=>setWordEdge("start");
@@ -2813,7 +2861,7 @@ function updatePlayheadReadout(){
   if(w){const d=t-(+w.start), e=t-(+w.end);
     rel=Math.abs(d)<0.0005?" = поточний початок слова (посунь плейхед)":Math.abs(e)<0.0005?" = поточний кінець слова":
         d<0?" · на "+(-d).toFixed(2)+" с раніше за слово":e>0?" · на "+e.toFixed(2)+" с після слова":" · всередині слова";}
-  el.textContent=t.toFixed(3)+" с"+rel;
+  el.textContent=tc(t)+rel;
 }
 if(typeof video!=="undefined"&&video){["timeupdate","seeked","loadedmetadata"].forEach(ev=>video.addEventListener(ev,updatePlayheadReadout));}
 // ---------- 🎙 re-voice: the words you changed, back into the AUDIO, in the clip's own voice ----------
@@ -2999,7 +3047,7 @@ function splitSentences(ws){
   }
   return out;
 }
-const _fmtT=t=>{t=Math.max(0,+t||0);const m=Math.floor(t/60),s=t-m*60;return String(m).padStart(2,"0")+":"+s.toFixed(1).padStart(4,"0");};
+const _fmtT=t=>tc(t);   // same MM:SS:FF timecode as the timeline
 function sentInfo(k){
   const r=_sentRanges[k]; if(!r)return null;
   const W=w=>w.word||w.text||"", ws=(realWords||[]).slice(r[0],r[1]);
@@ -4068,9 +4116,8 @@ function renderCutTicks(){
   const v=variants[activeVar],dur=video.duration||0;
   if(!v||!v.cuts||!v.cuts.length||!dur)return;
   v.cuts.forEach(c=>{const d=document.createElement("div");d.className="cutTick";
-    d.title="Кат "+(+c).toFixed(2)+"с — клік прибрати";
-    d.style.cssText="position:absolute;top:-4px;bottom:-4px;width:2px;background:#ffd400;z-index:3;cursor:pointer;left:"+Math.max(0,Math.min(100,(c/dur)*100))+"%";
-    d.onclick=(e)=>{e.stopPropagation();_syncCuts((v.cuts||[]).filter(x=>x!==c));updateCutsLabel();if(typeof scheduleExact==="function")scheduleExact();};
+    // marker only — scrubbing across the bar used to DELETE a cut on click; remove cuts via the 🎬 chips
+    d.style.cssText="position:absolute;top:3px;bottom:3px;width:2px;margin-left:-1px;background:#ffd400;opacity:.8;z-index:2;pointer-events:none;border-radius:1px;left:"+Math.max(0,Math.min(100,(c/dur)*100))+"%";
     bar.appendChild(d);});
 }
 function updateCutsLabel(){const v=variants[activeVar];const n=(v&&v.cuts)?v.cuts.length:0;const el=$("cutsLabel");if(el)el.textContent=n?(n+" cuts"):"none";renderCutTicks();renderCutChips();}
