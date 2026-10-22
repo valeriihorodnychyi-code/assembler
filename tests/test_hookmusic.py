@@ -71,6 +71,10 @@ class Fake11:
             assert json["force_instrumental"] is True and 3000 <= json["music_length_ms"] <= 600000
             self.length = json["music_length_ms"] / 1000
             return _R(200, tone_mp3(880, self.length, os.path.join(TMP, "trk.mp3")))
+        if url.endswith("/v1/music/video-to-music"):
+            assert files and files[0][0] == "videos" and data.get("description")
+            self.v2m = data
+            return _R(200, tone_mp3(880, 3.0, os.path.join(TMP, "v2m.mp3")))
         if url.endswith("/v1/audio-isolation"):
             return _R(200, tone_mp3(300, 4.0, os.path.join(TMP, "voice.mp3")))
         return _R(404)
@@ -113,6 +117,30 @@ def test_music_fades_out_at_the_end_of_the_hook():
     tone_mp3(880, 5, trk)
     M.mix(hook, trk, out, volume=0.5, duck=False)
     assert level(out, 880, 3.85, 0.1) < level(out, 880, 2.0, 0.1) * 0.35, "no fade-out before the body"
+
+
+def test_music_only_under_the_trim_and_fades_at_the_trim_out():
+    """A 6-minute master with a trimmed-off body got a 6-minute track over everything. Now the
+    bed covers ONLY the kept part and ends (fade-out) where the trim ends."""
+    hook, out = os.path.join(TMP, "hook5.mp4"), os.path.join(TMP, "out5.mp4")
+    make_hook(hook)
+    trk = os.path.join(TMP, "bed5.mp3")
+    tone_mp3(880, 5, trk)
+    M.mix(hook, trk, out, volume=0.5, duck=False, start_at=1.0, end_at=3.0)
+    assert abs(M.duration(out) - M.duration(hook)) < 0.06
+    assert level(out, 880, 0.3) < 50 and level(out, 880, 3.4) < 50, "music outside the trim"
+    assert level(out, 880, 1.8) > 500, "music missing inside the trim"
+    assert level(out, 880, 2.85, 0.1) < level(out, 880, 1.8, 0.1) * 0.4, "no fade-out at the trim out"
+
+
+def test_video_to_music_gets_only_the_trimmed_picture_and_the_template():
+    hook = os.path.join(TMP, "hook6.mp4")
+    make_hook(hook)
+    seg = M.video_segment(hook, os.path.join(TMP, "seg6.mp4"), 1.0, 3.0)
+    assert abs(M.duration(seg) - 2.0) < 0.15 and not M.has_audio(seg)
+    f = Fake11()
+    mp3 = M.video_to_music(seg, M.PRESETS["drama"], ["drama"], f)
+    assert len(mp3) > 1000 and f.v2m["tags"] == ["drama"] and "strings" in f.v2m["description"]
 
 
 def test_missing_permission_names_the_switch_to_turn_on():

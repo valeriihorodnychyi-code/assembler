@@ -100,6 +100,18 @@ def freq(path, t, win=0.12):
     return round(crossings / 2 / (len(v) / 44100.0))
 
 
+def tone_power(path, f, t, win=0.2):
+    """Goertzel power of one frequency in a window (robust where zero-crossings are not)."""
+    import math
+    raw = subprocess.run(["ffmpeg", "-v", "quiet", "-ss", str(t), "-t", str(win), "-i", path, "-ac", "1",
+                          "-ar", "8000", "-f", "s16le", "-"], capture_output=True).stdout
+    x = struct.unpack("<%dh" % (len(raw) // 2), raw[:len(raw) // 2 * 2])
+    k, s1, s2 = 2 * math.cos(2 * math.pi * f / 8000), 0.0, 0.0
+    for v in x:
+        s1, s2 = v + k * s1 - s2, s1
+    return math.sqrt(max(0.0, s1 * s1 + s2 * s2 - k * s1 * s2)) / max(1, len(x))
+
+
 SPAN = {"a": 1.6, "b": 2.2, "lo": 1.48, "hi": 2.32, "text": "Tai Chi", "say": "Tie Chee",
         "prev_text": "I start the", "next_text": "challenge this Monday"}
 
@@ -206,6 +218,45 @@ def test_snap_falls_back_to_a_margin_when_there_is_no_silence():
     sh("ffmpeg", "-y", "-f", "lavfi", "-i", "sine=f=300:d=3", "-ac", "2", "-c:a", "aac", clip)   # no dip anywhere
     s = RV.snap_to_audio(clip, {"a": 1.0, "b": 1.5, "lo": 0.9, "hi": 1.6}, 3.0)
     assert abs(s["a"] - 0.94) < 1e-6 and abs(s["b"] - 1.56) < 1e-6, s
+
+
+def test_clone_is_made_from_the_speaker_who_says_the_span():
+    """1.9.75 in production: a drama hook, the heroine's first line re-voiced in someone else's
+    voice — the clone was made from the WHOLE clip (every character mixed). Now: diarize, and
+    clone only from the speaker of the span. A speaks at 300 Hz, B (the span) at 500 Hz."""
+    clip, out = os.path.join(TMP, "clip10.mp4"), os.path.join(TMP, "out10.mp4")
+    expr = ("if(between(t,0,2)+between(t,5.2,7),0.5*sin(2*PI*300*t),"
+            "if(between(t,2.2,5),0.5*sin(2*PI*500*t),0))")
+    sh("ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=320x240:rate=25:duration=7", "-f", "lavfi",
+       "-i", f"aevalsrc='{expr}':s=44100:d=7", "-shortest", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "44100", "-ac", "2", clip)
+    words = []
+    for s0, s1, spk in ((0.0, 2.0, "speaker_0"), (2.2, 5.0, "speaker_1"), (5.2, 7.0, "speaker_0")):
+        t = s0
+        while t + 0.4 <= s1 + 1e-6:
+            words.append({"text": "w", "type": "word", "start": round(t, 2), "end": round(t + 0.35, 2), "speaker_id": spk})
+            t += 0.4
+
+    class F(Fake11):
+        samples = []
+
+        def post(self, url, headers=None, data=None, files=None, params=None, timeout=None):
+            if url.endswith("/v1/speech-to-text"):
+                assert data["diarize"] == "true"
+                return _R(200, {"words": words})
+            if url.endswith("/v1/voices/add"):
+                p = os.path.join(TMP, f"sample_{len(F.samples)}.mp3")
+                open(p, "wb").write(files[0][1][1].read())
+                F.samples.append(p)
+            return Fake11.post(self, url, headers=headers, data=data, files=files, params=params, timeout=timeout)
+
+    span = dict(SPAN, a=3.0, b=3.6, lo=2.95, hi=3.8)
+    res = RV.revoice(clip, [span], out, requests=F())
+    assert len(F.samples) == 1 and res["spans"][0]["speaker"] == "speaker_1"
+    d = RV.duration(F.samples[0])
+    assert 2.5 < d < 3.2, f"sample should be ONLY speaker_1's ~2.8 s, got {d:.2f}"
+    for t in (0.3, 1.2, 2.0):
+        a, b = tone_power(F.samples[0], 300, t), tone_power(F.samples[0], 500, t)
+        assert b > 20 * a, f"another character's voice leaked into the clone sample at {t}s (300 Hz {a:.0f} vs 500 Hz {b:.0f})"
 
 
 def test_restricted_key_says_which_permission_is_missing():

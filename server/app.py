@@ -783,14 +783,15 @@ def api_revoice(req: RevoiceReq):
     out_name = f"{stem}_rv{k}{ext}"
     t0 = _t.time()
     try:
-        res = revoice.revoice(src, req.spans, os.path.join(sdir, out_name))
+        res = revoice.revoice(src, req.spans, os.path.join(sdir, out_name),
+                              diarize_cache=os.path.join(sdir, f"_diar_{os.path.splitext(name)[0]}.json"))
     except revoice.RevoiceError as e:
         raise HTTPException(400, str(e))
     secs = _t.time() - t0
     _log_timing("revoice", secs, f"{len(req.spans)} span(s)")
     return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "spans": res["spans"],
             "voice_deleted": res["voice_deleted"], "voice_id": res.get("voice_id"),
-            "seconds": round(secs, 1)}
+            "note": res.get("note", ""), "seconds": round(secs, 1)}
 
 
 # ---------- ✂ cut a segment out of the MIDDLE of a clip (video + audio together) ----------
@@ -886,8 +887,8 @@ class HookMusicGenReq(BaseModel):
     file_id: str
     preset: str = "drama"
     prompt: str = ""          # empty → the preset's template
-    length: float = 15.0      # seconds — used when no clips are given
-    clips: List[str] = []     # the hooks it will go under → length = the longest one
+    hooks: List[dict] = []    # [{clip, trim:[in,out]|None}] — ONE track per hook, scored to ITS picture
+    from_video: bool = True   # False = text-only (Compose) at the hook's trimmed length
 
 
 @app.get("/api/hookmusic/presets")
@@ -897,29 +898,63 @@ def hookmusic_presets():
 
 @app.post("/api/hookmusic/generate")
 def hookmusic_generate(req: HookMusicGenReq):
+    """Music FOR each hook: the hook's own trimmed picture goes to ElevenLabs Video-to-Music, the
+    template steers the style. So the bed follows that hook's cuts, pace and emotion — and a
+    6-minute master with a trimmed-off body gets music for the part that is kept, not 6 minutes."""
     import requests as _rq, time as _t
+    from concurrent.futures import ThreadPoolExecutor
     sdir = _session_dir(req.file_id)
     prompt = (req.prompt or "").strip() or music11.PRESETS.get(req.preset) or music11.PRESETS["drama"]
-    k = 1
-    while os.path.exists(os.path.join(sdir, f"hookmusic_{k}.mp3")):
-        k += 1
-    name = f"hookmusic_{k}.mp3"
-    length = float(req.length)
-    durs = [music11.duration(os.path.join(sdir, os.path.basename(c))) for c in (req.clips or [])
-            if os.path.exists(os.path.join(sdir, os.path.basename(c)))]
-    if durs:
-        length = max(durs)
+    tags = [req.preset] if req.preset in music11.PRESETS else []
+    if not req.hooks:
+        raise HTTPException(400, "Немає хуків для музики")
+
+    def one(hk):
+        name = os.path.basename(hk.get("clip") or "")
+        src = os.path.join(sdir, name)
+        if not os.path.exists(src):
+            return {"clip": name, "error": "кліп не знайдено в сесії"}
+        tr = hk.get("trim") or None
+        dur = music11.duration(src)
+        s, e = (float(tr[0]), float(tr[1])) if tr and len(tr) == 2 else (0.0, dur)
+        stem = os.path.splitext(name)[0]
+        k = 1
+        while os.path.exists(os.path.join(sdir, f"hookmusic_{stem}_{k}.mp3")):
+            k += 1
+        out = os.path.join(sdir, f"hookmusic_{stem}_{k}.mp3")
+        note = ""
+        try:
+            if req.from_video:
+                seg = os.path.join(sdir, f"_v2m_{stem}.mp4")
+                music11.video_segment(src, seg, s, e)
+                try:
+                    mp3 = music11.video_to_music(seg, prompt, tags, _rq)
+                finally:
+                    try:
+                        os.remove(seg)
+                    except OSError:
+                        pass
+            else:
+                mp3 = music11.compose(prompt, (e - s) + 0.5, _rq)
+        except music11.MusicError as ex:
+            if req.from_video and "Video to Music" in str(ex):     # plan without it → still a track
+                mp3 = music11.compose(prompt, (e - s) + 0.5, _rq)
+                note = "Video to Music недоступний — згенеровано з промпту"
+            else:
+                return {"clip": name, "error": str(ex)}
+        with open(out, "wb") as f:
+            f.write(mp3)
+        return {"clip": name, "name": os.path.basename(out), "url": f"/clip/{req.file_id}/{os.path.basename(out)}",
+                "length": round(music11.duration(out), 2), "span": [round(s, 3), round(e, 3)], "note": note}
+
     t0 = _t.time()
-    try:
-        mp3 = music11.compose(prompt, length + 0.5, _rq)
-    except music11.MusicError as e:
-        raise HTTPException(400, str(e))
-    with open(os.path.join(sdir, name), "wb") as f:
-        f.write(mp3)
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        items = list(ex.map(one, req.hooks))
     secs = _t.time() - t0
-    _log_timing("hookmusic_generate", secs, f"{req.preset} {length:.1f}s")
-    return {"name": name, "url": f"/clip/{req.file_id}/{name}", "prompt": prompt,
-            "length": round(music11.duration(os.path.join(sdir, name)), 2), "seconds": round(secs, 1)}
+    _log_timing("hookmusic_generate", secs, f"{req.preset} × {len(items)}")
+    if all(it.get("error") for it in items):
+        raise HTTPException(400, items[0]["error"])
+    return {"items": items, "prompt": prompt, "seconds": round(secs, 1)}
 
 
 class HookMusicApplyReq(BaseModel):
@@ -930,6 +965,7 @@ class HookMusicApplyReq(BaseModel):
     duck: bool = True
     strip_original: bool = True   # remove the old per-shot music (voice isolation)
     offset: float = 0.0
+    trim: Optional[List[float]] = None   # music only over the kept part; fade-out at the trim out
 
 
 @app.post("/api/hookmusic/apply")
@@ -955,12 +991,16 @@ def hookmusic_apply(req: HookMusicApplyReq):
     t0 = _t.time()
     voice = None
     try:
+        tr = req.trim if (req.trim and len(req.trim) == 2) else None
         if req.strip_original and music11.has_audio(src):
-            voice = os.path.join(sdir, f"_voice_{stem}.wav")       # cached: isolation is paid once per clip
+            tag = f"_{tr[0]:.2f}_{tr[1]:.2f}" if tr else ""
+            voice = os.path.join(sdir, f"_voice_{stem}{tag}.wav")   # cached: isolation is paid once per clip + trim
             if not os.path.exists(voice):
-                music11.isolate_voice(src, voice, _rq)
+                music11.isolate_voice(src, voice, _rq, start=(float(tr[0]) if tr else 0.0),
+                                      end=(float(tr[1]) if tr else None))
         music11.mix(src, trk, os.path.join(sdir, out_name), volume=req.volume, duck=req.duck,
-                    voice_path=voice, offset=req.offset)
+                    voice_path=voice, offset=req.offset,
+                    start_at=(float(tr[0]) if tr else 0.0), end_at=(float(tr[1]) if tr else None))
     except music11.MusicError as e:
         raise HTTPException(400, str(e))
     secs = _t.time() - t0

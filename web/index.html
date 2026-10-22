@@ -90,7 +90,8 @@
   .thandle:hover i,.thandle.armed i{border-color:var(--accent2);background:rgba(124,92,255,.18)}
   #trimPlayhead{position:absolute;top:-6px;bottom:-6px;left:0;width:2px;margin-left:-1px;background:#fff;pointer-events:none;z-index:4;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
   #trimPlayhead b{position:absolute;top:-4px;left:-5px;width:12px;height:8px;background:#fff;border-radius:2px 2px 6px 6px}
-  .trimInfo{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+  .trimInfo{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 6px;font-size:11.5px;color:var(--muted)}
+  .trimInfo .tmid{order:3;width:100%;justify-content:center}   /* own line: in a pack (narrow centre + "All clips") it overlapped the In/Out buttons */
   .trimInfo .tgrp{display:flex;align-items:center;gap:5px;min-width:0}
   .trimInfo .tval{font-variant-numeric:tabular-nums;white-space:nowrap}
   .trimInfo .tval b{color:var(--txt);font-weight:600}
@@ -107,6 +108,10 @@
   .cutRow #cutLbl{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}   /* flex-basis 0: the label never widens the centre column (it is auto-sized) */
   .tmini.tcut:not(:disabled){background:#ff5a44;border-color:#ff5a44;color:#fff;font-weight:600}
   .tmini:disabled{opacity:.45;cursor:default}
+  .histRow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding-top:6px;border-top:1px dashed var(--line)}
+  .histRow .hstep{padding:2px 7px;border-radius:10px;background:#23262f;border:1px solid var(--line);white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis}
+  .histRow .hstep.cur{color:var(--txt);border-color:#4a4d58}
+  .histRow .harr{opacity:.5}
   .status{font-size:12px;color:var(--muted);min-height:16px;text-align:center}
   .status.err{color:#ff7a6b}.status.ok{color:var(--ok)}
   #exactToggle.on{background:var(--ok);color:#06210f;border-color:var(--ok);font-weight:700}
@@ -474,7 +479,7 @@
           <button id="trimPlayIn" class="tmini ticon" title="Подивитись стик: 1.5 с від In">▶</button>
         </span>
         <span class="tmid"><span id="trimDurLbl"></span>
-          <span id="trimAll" class="tlink" title="Застосувати цей трім до всіх кліпів паку (локалізації тайм-align до оригіналу)" style="display:none">⧉ на всі</span>
+          <span id="trimAll" class="tlink" title="Застосувати цей трім до всіх кліпів паку (локалізації тайм-align до оригіналу)" style="display:none">⧉ All clips</span>
           <span id="trimReset" class="tlink" title="Прибрати трім">reset</span></span>
         <span class="tgrp" style="justify-content:flex-end">
           <button id="trimPlayOut" class="tmini ticon" title="Подивитись хвіст: 1.5 с до Out">▶</button>
@@ -491,6 +496,7 @@
         <button id="cutClear" class="tmini ticon" style="display:none" title="Скасувати позначку">✕</button>
         <button id="cutGo" class="tmini tcut" disabled title="Вирізати позначений шматок">✂ Cut segment</button>
       </div>
+      <div id="histRow" class="histRow" style="display:none"></div>
       <input type="hidden" id="trimIn" value="0"><input type="hidden" id="trimOut" value="0">
     </div>
     <div class="status" id="status"></div>
@@ -764,13 +770,13 @@
     <details class="grp" id="grpHookMusic">
       <summary><span>Hook music · ElevenLabs</span> <span class="chev">›</span></summary>
       <div class="body">
-        <div class="hint" style="margin-top:0">ONE music bed under the whole hook instead of a different one per shot. Bodies stay as they are.</div>
+        <div class="hint" style="margin-top:0">ONE music bed under the whole hook instead of a different one per shot — scored to the hook's own picture (cuts, pace, emotion). Only the trimmed part counts. Bodies stay as they are.</div>
         <div class="chips" id="hmPresets" style="flex-wrap:wrap;margin:6px 0"></div>
         <textarea id="hmPrompt" rows="3" style="width:100%;font-size:12px;resize:vertical" placeholder="Describe the vibe (English works best)…"></textarea>
+        <div class="row" style="margin-top:6px"><label title="ElevenLabs Video-to-Music: музика пишеться під картинку хука. Вимкни — тоді тільки з промпту.">Score to the video</label><label class="switch"><input type="checkbox" id="hmFromVideo" checked><span class="slider"></span></label></div>
         <button class="primary" id="hmGen" style="width:100%;margin-top:6px">♪ Generate music</button>
         <div id="hmTrack" style="display:none;margin-top:8px">
-          <audio id="hmAudio" controls style="width:100%;height:32px"></audio>
-          <div id="hmTrackLbl" class="hint" style="margin:2px 0 6px"></div>
+          <div id="hmList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
           <div class="row"><label>Volume</label><input type="range" id="hmVol" min="0" max="100" value="35"><span class="val" id="hmVolLbl">35</span></div>
           <div class="row"><label title="Музика тихшає, коли звучить голос">Duck under voice</label><label class="switch"><input type="checkbox" id="hmDuck" checked><span class="slider"></span></label></div>
           <div class="row"><label title="Прибрати стару музику з хука (ElevenLabs Audio Isolation): лишається тільки голос. Разом зі старою музикою йдуть і старі SFX / атмосфера.">Remove original music</label><label class="switch"><input type="checkbox" id="hmStrip" checked><span class="slider"></span></label></div>
@@ -2970,6 +2976,15 @@ function setWordRange(a,b){
   if(box)box.querySelectorAll(".w").forEach(sp=>{const i=+sp.dataset.i;sp.classList.toggle("rng",!!(_wRng&&i>=_wRng[0]&&i<_wRng[1]));});
   renderRevoiceBox();
 }
+// put a changed span's TEXT back to what the audio actually says (the recogniser's words + times)
+function revertSpan(sp){
+  const o=origWordsNow(); if(!sp||!o||!realWords)return;
+  const cur=realWords.map(w=>({...w})), back=o.slice(sp.os,sp.oe).map(w=>({word:w.word||w.text,start:+w.start,end:+w.end}));
+  if(back.length&&cur[sp.ne-1]&&cur[sp.ne-1].brk)back[back.length-1].brk=cur[sp.ne-1].brk;
+  cur.splice(sp.ns,sp.ne-sp.ns,...back);
+  commitWords(cur);
+  setStatus("↺ Текст повернуто: «"+(sp.text||"—")+"» → «"+(sp.old||"—")+"». Звук не чіпали.","ok");
+}
 function rvUndoStack(){const v=variants[activeVar],h=(typeof openHookRef==="function")?openHookRef():null;
   return (v&&v._rvFrom&&v._rvFrom.length)?v._rvFrom:((h&&h._rvFrom&&h._rvFrom.length)?h._rvFrom:null);}
 function scheduleRevoiceBox(){clearTimeout(_rvTimer);_rvTimer=setTimeout(renderRevoiceBox,450);}
@@ -2986,7 +3001,7 @@ function renderRevoiceBox(){
   // ✕ on a row = "leave this one's audio as it is" (only the caption changes)
   const all=(live?changedSpans():[]).filter(s=>!sel||s.ne<=sel.ns||s.ns>=sel.ne);
   const spans=all.filter(s=>!_rvSkip.has(s.sig)), hidden=all.length-spans.length;
-  const undo=rvUndoStack();
+  const _st=rvUndoStack(), undo=!!(_st&&_st.length&&_st[_st.length-1].kind==="revoice");   // ↩ here undoes a RE-VOICE only — never a cut or music
   if(!spans.length&&!undo&&!sel&&!hidden){box.style.display="none";box.innerHTML="";return;}
   const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   const btn="font-size:11px;padding:5px 9px";
@@ -3006,11 +3021,12 @@ function renderRevoiceBox(){
       +"<span class='rvwhat' title='було в озвучці: «"+esc(sp.old||"—")+"»'>«"+esc(sp.old||"+")+"» →</span>"
       +"<input data-rvsig='"+esc(sp.sig)+"' value='"+esc(_rvSay[sp.sig]!=null?_rvSay[sp.sig]:sp.text)+"' title='Як має ЗВУЧАТИ (у титрах лишиться «"+esc(sp.text)+"»). Наприклад, «Tie Chee» для «Tai Chi».'>"
       +"<button type='button' data-rvone='"+k+"' style='"+btn+"' "+(_rvBusy?"disabled":"")+">🎙</button>"
-      +"<button type='button' data-rvskip='"+k+"' class='ghost' style='font-size:11px;padding:5px 7px' title='Не переозвучувати: звук лишиться старим, зміниться лише титр'>✕</button></div>").join("");
+      +"<button type='button' data-rvrevert='"+k+"' class='ghost' style='font-size:11px;padding:5px 7px' title='Revert: повернути текст до того, що реально звучить («"+esc(sp.old||"—")+"»)'>↺</button>"
+      +"<button type='button' data-rvskip='"+k+"' class='ghost' style='font-size:11px;padding:5px 7px' title='Сховати: не переозвучувати, лишити новий текст тільки в титрах'>✕</button></div>").join("");
   }
   h+="<div style='display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap'>"
     +(spans.length>1?"<button type='button' id='rvAll' class='primary' style='font-size:11px;padding:6px 10px' "+(_rvBusy?"disabled":"")+">🎙 Переозвучити все ("+spans.length+")</button>":"")
-    +(undo?"<button type='button' id='rvUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути попередній звук і текст'>↩ Повернути звук</button>":"")
+    +(undo?"<button type='button' id='rvUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути звук і текст до цієї переозвучки'>↩ Undo re-voice</button>":"")
     +(hidden?"<button type='button' id='rvUnskip' class='ghost' style='font-size:11px;padding:6px 10px' title='Показати рядки, прибрані ✕'>сховано: "+hidden+" · показати</button>":"")
     +"<span style='color:var(--muted);font-size:10.5px;flex:1;min-width:140px'>"
     +(sel?"Довжина кліпу не зміниться.":"Ціла фраза: <b>подвійний клік</b> по слову — речення, або клік + <b>Shift+клік</b> — від слова до слова.")+"</span></div>";
@@ -3019,6 +3035,7 @@ function renderRevoiceBox(){
   if($("rvSelX"))$("rvSelX").onclick=()=>setWordRange(null);
   if($("rvUnskip"))$("rvUnskip").onclick=()=>{_rvSkip.clear();renderRevoiceBox();};
   box.querySelectorAll("[data-rvone]").forEach(b=>b.onclick=()=>doRevoice([spans[+b.dataset.rvone]]));
+  box.querySelectorAll("[data-rvrevert]").forEach(b=>b.onclick=()=>revertSpan(spans[+b.dataset.rvrevert]));
   box.querySelectorAll("[data-rvskip]").forEach(b=>b.onclick=()=>{_rvSkip.add(spans[+b.dataset.rvskip].sig);rvHilite(null);renderRevoiceBox();});
   box.querySelectorAll("[data-rvrng]").forEach(r=>{const [x,y]=r.dataset.rvrng.split(",").map(Number);
     r.onmouseenter=()=>rvHilite([x,y]);r.onmouseleave=()=>rvHilite(null);});
@@ -3042,7 +3059,8 @@ async function doRevoice(list){
     const r=await fetch(API+"/api/revoice",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({file_id:fileId,clip:v.clip,spans})});
     const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"re-voice failed"));
-    const before={clip:v.clip,videoUrl:v.videoUrl,words:(realWords||[]).map(w=>({...w})),origWords:(origWordsNow()||[]).map(w=>({...w}))};
+    const before={kind:"revoice",label:"🎙 Re-voice «"+(spans.map(s=>s.text).join(" · ").slice(0,40))+"»",
+      clip:v.clip,videoUrl:v.videoUrl,words:(realWords||[]).map(w=>({...w})),origWords:(origWordsNow()||[]).map(w=>({...w}))};
     // new words in: from the LAST span back to the first, so earlier indices stay valid
     const cur=before.words.map(w=>({...w})), orig=before.origWords.map(w=>({...w}));
     list.map((s,i)=>i).sort((x,y)=>list[y].ns-list[x].ns).forEach(i=>{
@@ -3063,11 +3081,13 @@ async function doRevoice(list){
     const fast=(d.spans||[]).filter(x=>x.tempo>1.001);
     busyDone("Переозвучено");
     setStatus("🎙 Переозвучено "+list.length+" фрагм. за "+d.seconds+" с"+(fast.length?(" · трохи прискорено (×"+Math.max(...fast.map(x=>x.tempo)).toFixed(2)+"), щоб влізти в місце"):"")
-      +(d.voice_deleted?" · тимчасовий клон голосу видалено":" · ⚠ клон голосу не видалився — прибери його в ElevenLabs вручну ("+d.voice_id+")")+". ↩ — повернути як було.","ok");
+      +((d.spans||[]).some(x=>x&&x.speaker)?" · голос: "+[...new Set((d.spans||[]).filter(x=>x&&x.speaker).map(x=>x.speaker.replace("speaker_","мовець ")+(x.sample_s?" ("+x.sample_s+" с зразка)":"")))].join(", "):"")
+      +(d.note?" · "+d.note:"")
+      +(d.voice_deleted?" · тимчасовий клон видалено":" · ⚠ клон не видалився — прибери в ElevenLabs вручну ("+d.voice_id+")")+". ↩ Undo re-voice — повернути.","ok");
   }catch(e){busyStop();
     const tight=/скороти текст/.test(e.message||"");
     setStatus("Переозвучка: "+e.message+(tight?" Або візьми ширше: Shift+клік по сусідніх словах чи подвійний клік (усе речення) — у фрази більше місця, і темп розподілиться рівно.":""),"err");}
-  _rvBusy=false;renderRevoiceBox();
+  _rvBusy=false;renderRevoiceBox();if(typeof renderHistory==="function")renderHistory();
 }
 function undoRevoice(){
   const st=rvUndoStack();if(!st||!st.length)return;
@@ -3105,7 +3125,8 @@ function drawCutMark(){
     :("<b>"+tc(a)+"</b> → "+(b!=null?"<b>"+tc(b)+"</b> · "+tc(b-a):"…"));
   if($("cutGo"))$("cutGo").disabled=!(a!=null&&b!=null&&b>a)||!fileId;
   if($("cutClear"))$("cutClear").style.display=(a!=null)?"":"none";
-  const st=rvUndoStack(); if($("cutUndo"))$("cutUndo").style.display=(st&&st.length&&st[st.length-1].kind==="cut")?"":"none";
+  if($("cutUndo"))$("cutUndo").style.display="none";   // one named ↩ lives in the History row now
+  renderHistory();
 }
 function cutMarkFromPlayhead(which){
   if(!videoLoaded)return; const f=curFrame(), t=(which==="a"?f:f+1)/fps();   // From = first frame removed, To = last frame removed (both the frame you see)
@@ -3163,6 +3184,7 @@ async function doCut(spans,speech){
       body:JSON.stringify({file_id:fileId,clip:v.clip,spans,speech:!!speech,words:realWords||[],orig_words:origWordsNow()||[]})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"cut failed"));
     const before=cutSnapshot(v,h), targets=rvTargets(v.clip);
+    before.label="✂ Cut "+tc(d.removed)+" @ "+tc(d.spans[0][0]);
     cutApplyTimes(targets,d.spans,oldDur,d.words||[]);
     targets.forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
       o.origWords=(d.orig_words||[]).map(w=>({...w}));});
@@ -3184,6 +3206,21 @@ if($("cutTo"))$("cutTo").onclick=()=>cutMarkFromPlayhead("b");
 if($("cutClear"))$("cutClear").onclick=()=>{_cut={a:null,b:null};drawCutMark();};
 if($("cutGo"))$("cutGo").onclick=()=>{if(_cut.a!=null&&_cut.b!=null)doCut([[_cut.a,_cut.b]],false);};
 if($("cutUndo"))$("cutUndo").onclick=()=>undoRevoice();
+// History of THIS clip's versions: Original → ✂ Cut → 🎙 Re-voice → ♪ Music. One ↩, and it says
+// exactly which step it takes back (it used to be a nameless "↩ Повернути звук" that could undo a cut).
+const HIST_NAME={cut:"cut",revoice:"re-voice",music:"music"};
+function renderHistory(){
+  const el=$("histRow"); if(!el)return;
+  const st=rvUndoStack()||[];
+  if(!st.length){el.style.display="none";el.innerHTML="";return;}
+  const steps=["Original"].concat(st.map(s=>s.label||(s.kind==="cut"?"✂ Cut":s.kind==="music"?"♪ Music":"🎙 Re-voice")));
+  const top=st[st.length-1];
+  el.style.display="flex";
+  el.innerHTML="<span style='font-weight:600;color:var(--txt)'>History</span>"
+    +steps.map((s,i)=>(i?"<span class='harr'>→</span>":"")+"<span class='hstep"+(i===steps.length-1?" cur":"")+"' title='"+String(s).replace(/'/g,"&#39;")+"'>"+s+"</span>").join("")
+    +"<span style='flex:1'></span><button type='button' id='histUndo' class='tmini' title='Скасувати останній крок: "+String(top.label||"").replace(/'/g,"&#39;")+"'>↩ Undo "+(HIST_NAME[top.kind]||"re-voice")+"</button>";
+  $("histUndo").onclick=()=>{undoRevoice();renderHistory();if(typeof hmRefreshUndo==="function")hmRefreshUndo();};
+}
 if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{if(_cut.a!=null&&_cut.b==null)drawCutMark();});
 
 // ---------- Sentences view: edit and re-voice WHOLE SENTENCES ----------
@@ -3216,7 +3253,8 @@ function sentMetaHTML(k,esc){
   if(!inf.changes.length)return "";
   const sp=rangeSpan(inf.r[0],inf.r[1]);
   return "змінено: "+inf.changes.map(c=>"<b>"+esc(c.old||"＋")+"</b> → <b>"+esc(c.text||"—")+"</b>").join(", ")
-    +(sp?" · місце в аудіо "+Math.max(0,sp.hi-sp.lo).toFixed(2)+" с":"")+" · натисни 🎙, щоб звук теж змінився";
+    +(sp?" · місце в аудіо "+Math.max(0,sp.hi-sp.lo).toFixed(2)+" с":"")+" · 🎙 — щоб звук теж змінився · "
+    +"<span class='tlink' data-srevert='"+k+"' style='cursor:pointer;text-decoration:underline dotted' title='Повернути текст до того, що реально звучить'>↺ Revert text</span>";
 }
 function renderSentsView(force){
   const box=$("transcriptSents"); if(!box||txtView!=="sents")return;
@@ -3249,12 +3287,12 @@ function renderSentsView(force){
 }
 function renderSentBar(canVoice){
   const bar=$("sentBar"); if(!bar)return;
-  const undo=rvUndoStack(), n=_sentPick?(_sentPick[1]-_sentPick[0]):0;
+  const _st=rvUndoStack(), undo=!!(_st&&_st.length&&_st[_st.length-1].kind==="revoice"), n=_sentPick?(_sentPick[1]-_sentPick[0]):0;
   let h="";
   if(n>1)h+="<button type='button' id='sentVoicePick' class='primary' style='font-size:11px;padding:6px 10px' "+((!canVoice||_rvBusy)?"disabled":"")+">🎙 Озвучити "+n+" речення однією фразою</button>"
     +"<button type='button' id='sentCutPick' class='ghost' style='font-size:11px;padding:6px 10px' title='Вирізати виділені речення з відео і звуку'>✂ Cut "+n+" sentences</button>"
     +"<button type='button' id='sentPickX' class='ghost' style='font-size:11px;padding:6px 8px' title='Зняти виділення (Esc)'>✕</button>";
-  if(undo)h+="<button type='button' id='sentUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути попередній звук і текст'>↩ Повернути звук</button>";
+  if(undo)h+="<button type='button' id='sentUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути звук і текст до цієї переозвучки'>↩ Undo re-voice</button>";
   h+="<span style='flex:1;min-width:150px'>Правиш текст у рядку — титр міняється одразу; 🎙 — щоб змінився і звук. Довжина кліпу не зміниться.</span>";
   bar.innerHTML=h; bar.style.display=(txtView==="sents")?"flex":"none";
   if($("sentVoicePick"))$("sentVoicePick").onclick=()=>voiceSentences(_sentPick[0],_sentPick[1]);
@@ -3286,6 +3324,8 @@ function voiceSentences(k0,k1){
       const inf=sentInfo(k); if(inf&&video&&videoLoaded){try{video.currentTime=Math.max(0,inf.start-0.05);_sentStopAt=inf.end+0.12;video.play();}catch(_){}}
       return;}
     const vb=e.target.closest&&e.target.closest("[data-svoice]"); if(vb){const k=+vb.dataset.svoice;voiceSentences(k,k+1);return;}
+    const rv=e.target.closest&&e.target.closest("[data-srevert]");
+    if(rv){const inf=sentInfo(+rv.dataset.srevert); if(inf)inf.changes.slice().sort((x,y)=>y.ns-x.ns).forEach(revertSpan); renderSentsView(true); return;}
     const cb=e.target.closest&&e.target.closest("[data-scut]"); if(cb){const k=+cb.dataset.scut;cutSentences(k,k+1);return;}
     const mb=e.target.closest&&e.target.closest("[data-smore]"); if(mb){const k=+mb.dataset.smore;_sentMore.has(k)?_sentMore.delete(k):_sentMore.add(k);renderSentsView(true);return;}
   });
@@ -3341,33 +3381,45 @@ function hmTargets(o){   // every object holding this hook's clip
 function hmTop(o){const s=o._rvFrom;return (s&&s.length&&s[s.length-1].kind==="music")?s[s.length-1]:null;}
 function hmRefreshUndo(){const any=hmHooks().some(o=>hmTop(o));
   if($("hmUndo"))$("hmUndo").style.display=any?"":"none";}
+const hmClean=o=>{const t=hmTop(o);return t?t.clip:o.clip;};   // the hook BEFORE any music we laid
 async function hmGenerate(){
   if(!fileId){setStatus("Hook music: спершу завантаж хук у сесію (Transcribe або пак).","err");return;}
   const list=hmHooks(); if(!list.length){setStatus("Hook music: немає хуків.","err");return;}
-  // generate for the CLEAN clips (before any music we laid), so the length is the real hook length
-  const clips=list.map(o=>{const t=hmTop(o);return t?t.clip:o.clip;});
-  busyStart("♪ Генерую музику ("+(HM_LABELS[_hm.preset]||"custom")+")…");$("hmGen").disabled=true;
+  const fromVideo=$("hmFromVideo")?$("hmFromVideo").checked:true;
+  const hooksReq=list.map(o=>({clip:hmClean(o),trim:o.trim||null}));
+  busyStart("♪ "+(fromVideo?"Аналізую відео і пишу":"Генерую")+" музику для "+list.length+" хук(ів) ("+(HM_LABELS[_hm.preset]||"custom")+")…");$("hmGen").disabled=true;
   try{const r=await fetch(API+"/api/hookmusic/generate",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",clips})});
+      body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",hooks:hooksReq,from_video:fromVideo})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"music failed"));
-    _hm.track=d; $("hmTrack").style.display="block"; $("hmAudio").src=API+d.url;
-    $("hmTrackLbl").textContent=d.name+" · "+tc(d.length)+" · за "+d.seconds+" с";
-    busyDone("Музика готова"); setStatus("♪ Музика готова ("+tc(d.length)+"). Послухай і тисни Apply.","ok");
+    _hm.tracks=_hm.tracks||{}; const errs=[], notes=new Set();
+    (d.items||[]).forEach(it=>{if(it.error)errs.push(it.clip+": "+it.error);else{_hm.tracks[it.clip]=it;if(it.note)notes.add(it.note);}});
+    _hm.track=true; hmRenderList();
+    busyDone("Музика готова");
+    setStatus("♪ Музика готова для "+(d.items.length-errs.length)+"/"+d.items.length+" хук(ів) за "+d.seconds+" с."+(notes.size?" "+[...notes].join(" · "):"")+(errs.length?" Помилки: "+errs.join(" · "):" Послухай і тисни Apply."),errs.length?"err":"ok");
   }catch(e){busyStop();setStatus("Hook music: "+e.message,"err");}
   $("hmGen").disabled=false;
 }
+function hmRenderList(){
+  const box=$("hmList"); if(!box)return;
+  const list=hmHooks(); const rows=list.map((o,i)=>{const t=(_hm.tracks||{})[hmClean(o)];
+    return t?"<div style='font-size:11px;color:var(--muted)'>Hook "+(i+1)+" · "+tc(t.span[1]-t.span[0])+(o.trim?" (trimmed)":"")
+      +"<audio controls preload='none' src='"+API+t.url+"' style='width:100%;height:30px;margin-top:2px'></audio></div>"
+      :"<div style='font-size:11px;color:var(--muted)'>Hook "+(i+1)+" · немає треку — Generate</div>";});
+  box.innerHTML=rows.join(""); $("hmTrack").style.display=Object.keys(_hm.tracks||{}).length?"block":"none";
+}
 async function hmApply(list){
-  if(!_hm.track){setStatus("Спершу ♪ Generate music.","err");return;}
+  if(!_hm.tracks||!Object.keys(_hm.tracks).length){setStatus("Спершу ♪ Generate music.","err");return;}
   const vol=(+$("hmVol").value||0)/100, duck=$("hmDuck").checked, strip=$("hmStrip").checked;
   const v=variants[activeVar]; let ok=0, fail=[];
   busyStart("♪ Кладу музику під "+list.length+" хук(и)"+(strip?" · прибираю стару музику":"")+"…");
   for(let i=0;i<list.length;i++){
-    const o=list[i], top=hmTop(o), isActive=!!(v&&o.clip===v.clip);
-    const before=top||{kind:"music",clip:o.clip,videoUrl:o.videoUrl,words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
+    const o=list[i], top=hmTop(o), isActive=!!(v&&o.clip===v.clip), trk=_hm.tracks[hmClean(o)];
+    if(!trk){fail.push((i+1)+": немає треку — Generate");continue;}
+    const before=top||{kind:"music",label:"♪ Music · "+(HM_LABELS[_hm.preset]||"custom"),clip:o.clip,videoUrl:o.videoUrl,words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
     try{
       setStatus("♪ Хук "+(i+1)+"/"+list.length+"…","",true);
       const r=await fetch(API+"/api/hookmusic/apply",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:before.clip,track:_hm.track.name,volume:vol,duck,strip_original:strip})});
+        body:JSON.stringify({file_id:fileId,clip:before.clip,track:trk.name,volume:vol,duck,strip_original:strip,trim:o.trim||null})});
       const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"apply failed"));
       hmTargets(o).forEach(x=>{const s=(x._rvFrom=x._rvFrom||[]);if(top&&s.length&&s[s.length-1]===top)s.pop();   // re-apply = replace OUR music, never stack beds
         s.push(before);x.clip=d.clip;x.videoUrl=API+d.url;});
@@ -3379,7 +3431,7 @@ async function hmApply(list){
   if(typeof renderHookStrip==="function")renderHookStrip();
   if(fail.length){busyStop();setStatus("♪ Готово "+ok+"/"+list.length+". Помилки — "+fail.join(" · "),"err");}
   else{busyDone("Музику додано");setStatus("♪ Музика під "+ok+" хук(ами)"+(strip?", стару музику прибрано":"")+". ↩ Undo music — повернути.","ok");}
-  hmRefreshUndo();
+  hmRefreshUndo();if(typeof renderHistory==="function")renderHistory();
 }
 function hmUndoAll(){
   const v=variants[activeVar]; let n=0;
@@ -3388,13 +3440,13 @@ function hmUndoAll(){
     if(v&&v.clip===top.clip)rvLoadVideo(top.videoUrl);   // it was the open clip
     n++;});
   if(typeof renderHookStrip==="function")renderHookStrip();
-  setStatus("↩ Музику прибрано з "+n+" хук(ів) — звук як був.","ok"); hmRefreshUndo();
+  setStatus("↩ Музику прибрано з "+n+" хук(ів) — звук як був.","ok"); hmRefreshUndo(); if(typeof renderHistory==="function")renderHistory();
 }
 if($("hmGen"))$("hmGen").onclick=hmGenerate;
 if($("hmApplyAll"))$("hmApplyAll").onclick=()=>hmApply(hmHooks());
 if($("hmApplyOne"))$("hmApplyOne").onclick=()=>{const h=openHookRef(),v=variants[activeVar];hmApply([h||v].filter(Boolean));};
 if($("hmUndo"))$("hmUndo").onclick=hmUndoAll;
-if($("hmVol"))$("hmVol").oninput=e=>{$("hmVolLbl").textContent=e.target.value;if($("hmAudio"))$("hmAudio").volume=Math.min(1,(+e.target.value)/100*2);};
+if($("hmVol"))$("hmVol").oninput=e=>{$("hmVolLbl").textContent=e.target.value;};
 hmInit();
 function updateWordHighlight(){
   if(txtView!=="words")return;

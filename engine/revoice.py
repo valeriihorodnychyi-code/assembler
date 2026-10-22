@@ -280,7 +280,130 @@ def plan_patch(span, speech_len, clip_dur):
     return {"place": round(place, 3), "slot": round(slot, 3), "tempo": round(tempo, 4), "mute": mute}
 
 
-def revoice(clip_path, spans, out_path, requests=None, api_key=None, workdir=None):
+# ---------------------------------------------------------------- whose voice is it?
+# The clone used to be made from the WHOLE clip. A drama hook has several characters, so the
+# clone was a blend — and the new line came out in the wrong (or a mixed) voice, worst of all
+# for a character's first line. Now the clip is diarized once (ElevenLabs Scribe, cached next
+# to the clip) and the clone is made ONLY from the speech of the speaker who says the span.
+
+STT_MODEL = os.environ.get("CS_DIARIZE_MODEL", "scribe_v2")
+MIN_SAMPLE = 2.5        # seconds of one speaker's speech below which a clone is not worth making
+MAX_SAMPLE = 120.0
+
+
+def diarize(clip_path, requests, api_key=None, cache_path=None):
+    """→ [{start, end, speaker}] per spoken word. Cached as JSON (diarizing is paid once per clip)."""
+    if cache_path and os.path.exists(cache_path):
+        try:
+            with open(cache_path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    tmp = tempfile.mktemp(suffix=".mp3")
+    _run(["ffmpeg", "-y", "-i", clip_path, "-vn", "-ac", "1", "-ar", "44100", "-b:a", "128k", tmp])
+    try:
+        with open(tmp, "rb") as f:
+            r = requests.post(f"{API}/v1/speech-to-text", headers={"xi-api-key": _key(api_key)},
+                              data={"model_id": STT_MODEL, "diarize": "true", "timestamps_granularity": "word",
+                                    "tag_audio_events": "false"},
+                              files=[("file", (os.path.basename(tmp), f, "audio/mpeg"))], timeout=300)
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    if r.status_code in (401, 403):
+        raise RevoiceError(_auth_error(r, "розпізнавання мовців (Speech to Text)"))
+    if r.status_code != 200:
+        raise RevoiceError(f"Розпізнавання мовців не вдалось ({r.status_code}): {(r.text or '')[:200]}")
+    words = [{"start": float(w["start"]), "end": float(w["end"]), "speaker": w.get("speaker_id") or "speaker_0"}
+             for w in ((r.json() or {}).get("words") or []) if w.get("type", "word") == "word" and "start" in w]
+    if cache_path:
+        with open(cache_path, "w") as f:
+            json.dump(words, f)
+    return words
+
+
+def speaker_of(span, dwords):
+    """The speaker who says the span's OLD words (most overlap); an insertion takes the nearest word."""
+    a, b = float(span["a"]), float(span["b"])
+    if not dwords:
+        return None
+    tally = {}
+    for w in dwords:
+        ov = min(b, w["end"]) - max(a, w["start"])
+        if ov > 0:
+            tally[w["speaker"]] = tally.get(w["speaker"], 0.0) + ov
+    if tally:
+        return max(tally, key=tally.get)
+    mid = (a + b) / 2.0
+    return min(dwords, key=lambda w: min(abs(w["start"] - mid), abs(w["end"] - mid)))["speaker"]
+
+
+def speaker_ranges(dwords, speaker, gap=0.35, pad=0.06, limit=MAX_SAMPLE):
+    """Merged time ranges where ONLY `speaker` talks (words of others cut the range)."""
+    out = []
+    for w in sorted(dwords, key=lambda x: x["start"]):
+        if w["speaker"] != speaker:
+            if out:
+                out[-1][2] = True          # someone else spoke after this range → close it
+            continue
+        s, e = max(0.0, w["start"] - pad), w["end"] + pad
+        if out and not out[-1][2] and s - out[-1][1] <= gap:
+            out[-1][1] = e
+        else:
+            out.append([s, e, False])
+    rngs, tot = [], 0.0
+    for s, e, _ in out:
+        if tot >= limit:
+            break
+        e = min(e, s + (limit - tot))
+        rngs.append((s, e))
+        tot += e - s
+    return rngs
+
+
+def cut_sample(clip_path, ranges, out_path):
+    """Concatenate `ranges` of the clip's audio into one mp3 (the clone's reference)."""
+    fc = [f"[0:a]atrim=start={s:.3f}:end={e:.3f},asetpts=PTS-STARTPTS[s{i}]" for i, (s, e) in enumerate(ranges)]
+    fc.append("".join(f"[s{i}]" for i in range(len(ranges))) + f"concat=n={len(ranges)}:v=0:a=1[out]")
+    _run(["ffmpeg", "-y", "-i", clip_path, "-filter_complex", "; ".join(fc), "-map", "[out]",
+          "-ac", "1", "-ar", "44100", "-b:a", "128k", out_path])
+    return out_path
+
+
+def voice_plan(clip_path, spans, requests, api_key=None, wd=None, cache_path=None):
+    """→ (groups, note): groups = [{speaker, sample, seconds, idx:[span indices]}]. Falls back to
+    the whole clip (old behaviour) if diarization is unavailable — and says so."""
+    whole = os.path.join(wd, "voice_sample.mp3")
+    try:
+        dw = diarize(clip_path, requests, api_key, cache_path)
+    except RevoiceError as e:
+        _run(["ffmpeg", "-y", "-i", clip_path, "-vn", "-ac", "1", "-ar", "44100", "-t", "180", "-b:a", "128k", whole])
+        return [{"speaker": None, "sample": whole, "seconds": None, "idx": list(range(len(spans)))}], \
+            f"мовців не розпізнано ({e}) — клон з усього кліпу"
+    speakers = sorted({w["speaker"] for w in dw})
+    groups = {}
+    for i, sp in enumerate(spans):
+        groups.setdefault(speaker_of(sp, dw), []).append(i)
+    out, notes = [], []
+    for spk, idx in groups.items():
+        rngs = speaker_ranges(dw, spk) if spk else []
+        secs = sum(e - s for s, e in rngs)
+        if spk and secs >= MIN_SAMPLE:
+            path = os.path.join(wd, f"voice_{spk}.mp3")
+            cut_sample(clip_path, rngs, path)
+            out.append({"speaker": spk, "sample": path, "seconds": round(secs, 1), "idx": idx})
+        else:
+            if not os.path.exists(whole):
+                _run(["ffmpeg", "-y", "-i", clip_path, "-vn", "-ac", "1", "-ar", "44100", "-t", "180", "-b:a", "128k", whole])
+            out.append({"speaker": spk, "sample": whole, "seconds": None, "idx": idx})
+            notes.append(f"у {spk or 'мовця'} лише {secs:.1f} с мови — клон з усього кліпу")
+    note = (f"мовців у кліпі: {len(speakers)}" + ("; " + "; ".join(notes) if notes else "")) if len(speakers) > 1 or notes else ""
+    return out, note
+
+
+def revoice(clip_path, spans, out_path, requests=None, api_key=None, workdir=None, diarize_cache=None):
     """Re-voice every span in ONE clip with ONE voice clone, then splice them all in one pass.
 
     spans: [{a, b, lo, hi, text, say?, prev_text?, next_text?}] in clip seconds.
@@ -292,14 +415,18 @@ def revoice(clip_path, spans, out_path, requests=None, api_key=None, workdir=Non
         raise RevoiceError("Нема що переозвучувати.")
     clip_dur = duration(clip_path)
     wd = workdir or tempfile.mkdtemp(prefix="cs_rv_")
-    sample = os.path.join(wd, "voice_sample.mp3")
-    # the clip itself is the voice reference — up to 3 minutes is plenty for an instant clone
-    _run(["ffmpeg", "-y", "-i", clip_path, "-vn", "-ac", "1", "-ar", "44100", "-t", "180",
-          "-b:a", "128k", sample])
-    voice_id = clone_voice(sample, requests, api_key)
-    results, patches = [], []
+    # one clone PER SPEAKER, each from that speaker's own speech only
+    groups, note = voice_plan(clip_path, spans, requests, api_key, wd, diarize_cache)
+    voice_of, made = {}, []
+    results, patches = [None] * len(spans), []
     try:
+        for g in groups:
+            vid = clone_voice(g["sample"], requests, api_key)
+            made.append(vid)
+            for i in g["idx"]:
+                voice_of[i] = (vid, g["speaker"], g["seconds"])
         for k, sp in enumerate(spans):
+            voice_id = voice_of[k][0]
             say = (sp.get("say") or sp.get("text") or "").strip()
             text = (sp.get("text") or say).strip()
             if not say:
@@ -333,12 +460,13 @@ def revoice(clip_path, spans, out_path, requests=None, api_key=None, workdir=Non
             said_clip = [{"word": w["word"], "start": to_clip(w["start"]), "end": to_clip(w["end"])} for w in said]
             t0 = said_clip[0]["start"] if said_clip else pl["place"]
             t1 = said_clip[-1]["end"] if said_clip else pl["place"] + plen
-            results.append({"words": caption_words(text, said_clip, t0, t1), "text": text, "say": say,
-                            "tempo": pl["tempo"], "gain_db": round(gain, 1), "place": pl["place"]})
+            results[k] = {"words": caption_words(text, said_clip, t0, t1), "text": text, "say": say,
+                          "tempo": pl["tempo"], "gain_db": round(gain, 1), "place": pl["place"],
+                          "speaker": voice_of[k][1], "sample_s": voice_of[k][2]}
     finally:
-        deleted = delete_voice(voice_id, requests, api_key)
+        left = [v for v in made if not delete_voice(v, requests, api_key)]
     splice(clip_path, patches, out_path)
-    return {"spans": results, "voice_deleted": deleted, "voice_id": None if deleted else voice_id}
+    return {"spans": results, "voice_deleted": not left, "voice_id": (", ".join(left) or None), "note": note}
 
 
 def splice(clip_path, patches, out_path):

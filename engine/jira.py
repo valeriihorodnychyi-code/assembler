@@ -292,7 +292,8 @@ def normalize(issue, site=DEFAULT_SITE, fmap=None):
         rec["warn"] = "у таски ще немає завантаженого відео"
     if len(langs) > 1:
         rec["warn"] = (rec["warn"] + "; " if rec["warn"] else "") + \
-            f"локалізовано в {len(langs)} мов — локалізовані файли прийдуть з ADAM"
+            f"у таски {len(langs)} мов ({', '.join(langs[:6])}{'…' if len(langs) > 6 else ''}) — завантажено тільки " \
+            f"{(langs[0] if langs else 'EN')}-мастер; локалізованих файлів у Jira немає, Ассемблер їх не качає (потрібен ADAM API)"
     return rec
 
 
