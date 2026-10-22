@@ -163,10 +163,11 @@
   .twords .w{cursor:pointer;border-radius:4px;padding:0 1px;color:#5f6270;transition:color .18s,background .18s}   /* inactive = dimmed (focus mode) */
   .twords .w:hover{color:var(--accent)}
   .twords .w.kt{border-bottom:2px solid rgba(255,90,44,.5)}
-  .twords .w.cur{color:#fff;background:rgba(255,90,44,.22)}
+  .twords .w.cur{color:#fff}   /* the phrase on screen now: just brighter text — a filled background read as a SELECTION */
+  .twords .w.rvhl{background:rgba(255,90,44,.30);color:#fff}   /* hovering a 🎙 row lights up its words */
   .twords .w.sel{outline:1.5px solid var(--accent2);outline-offset:1px;color:#fff}   /* the word the [ / ] tools act on */
   .twords .w.man{border-bottom:2px dotted var(--accent2)}
-  .twords .w.rng{color:#fff;background:rgba(120,110,255,.28)}   /* Shift-click / double-click range — re-voiced as one phrase */
+  .twords .w.rng{color:#fff;background:rgba(120,110,255,.45);box-shadow:0 0 0 1px rgba(150,140,255,.7)}   /* Shift-click / double-click range — re-voiced as one phrase */
   #revoiceBox{margin-top:8px;padding:9px 10px;border:1px solid rgba(124,92,255,.45);border-radius:10px;background:rgba(124,92,255,.08);font-size:12px}
   #revoiceBox .rvrow{display:flex;gap:6px;align-items:center;margin-top:6px}
   #revoiceBox .rvrow .rvwhat{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
@@ -224,7 +225,7 @@
   .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0}
   /* only the right tools column sits under the fixed tutorial stickers, so only it steps down */
   .qpanel{display:flex;flex-direction:column;gap:8px;margin-top:46px;max-height:calc(100vh - 168px);overflow-y:auto;padding:0 2px}   /* header 58 + stage padding 36 + sticker strip 46 + status line 28 */
-  #quickPanel .grp{background:transparent;border:0;margin:0 0 4px}
+  #quickPanel .grp{background:transparent;border:0;margin:0 0 4px;flex-shrink:0}   /* the panel SCROLLS — a shrinking group (overflow:hidden) silently clipped the 🎙 box */
   #quickPanel .grp>summary{background:transparent;border-left:0;padding:8px 4px;font-size:12px;color:var(--muted)}
   #quickPanel .grp>summary:hover{background:transparent}
   #quickPanel .grp[open]>summary{background:transparent;color:var(--txt)}
@@ -1861,6 +1862,7 @@ document.addEventListener("keydown",(e)=>{
   if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||e.target.isContentEditable)return;
   const k=e.key.toLowerCase();
   // I / O stamp the playhead into the trim (NLE muscle memory)
+  if(e.key==="Escape"&&_wRng&&typeof setWordRange==="function"){e.preventDefault();setWordRange(null);return;}
   if((e.key==="["||e.key==="]")&&txtView==="words"&&_wSel>=0){e.preventDefault();setWordEdge(e.key==="["?"start":"end");return;}
   if(k==="i"&&$("trimRow")&&$("trimRow").style.display!=="none"){e.preventDefault();setTrimFromPlayhead("in");return;}
   if(k==="o"&&$("trimRow")&&$("trimRow").style.display!=="none"){e.preventDefault();setTrimFromPlayhead("out");return;}
@@ -2697,7 +2699,7 @@ function renderWordsView(){
       const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords); }   // mirror edits into the Text field so BOTH tabs + export/layout use the same words
     if(typeof scheduleExact==="function")scheduleExact();
     if(typeof scheduleRevoiceBox==="function")scheduleRevoiceBox(); });
-  box.addEventListener("keydown",e=>{ if((e.key==="["||e.key==="]")&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&_wSel>=0){ e.preventDefault(); setWordEdge(e.key==="["?"start":"end"); } });
+  box.addEventListener("keydown",e=>{ if(e.key==="Escape"&&_wRng){ e.preventDefault(); setWordRange(null); return; } if((e.key==="["||e.key==="]")&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&_wSel>=0){ e.preventDefault(); setWordEdge(e.key==="["?"start":"end"); } });
   box.addEventListener("mousedown",e=>{ if(e.shiftKey&&_wSel>=0&&e.target.closest&&e.target.closest(".w"))e.preventDefault(); });   // no text-selection drag on Shift+click
   // double-click a word = select its whole SENTENCE (to the nearest . ! ? or a caption break)
   box.addEventListener("dblclick",e=>{ const sp=e.target.closest&&e.target.closest(".w"); if(!sp||!realWords)return;
@@ -2787,8 +2789,9 @@ if(typeof video!=="undefined"&&video){["timeupdate","seeked","loadedmetadata"].f
 // "Changed" means: different from what was actually SAID — the recogniser's original words
 // (origWords), not the previous edit. Case and punctuation don't count (they don't change the
 // sound). A deletion leaves the audio alone; an insertion or replacement can be re-voiced.
-let _rvSay={}, _rvTimer=null, _rvBusy=false;
-const rvNorm=s=>String(s||"").toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
+let _rvSay={}, _rvTimer=null, _rvBusy=false, _rvSkip=new Set();
+function rvHilite(r){const box=$("transcriptWords");if(!box)return;box.querySelectorAll(".w").forEach(sp=>{const i=+sp.dataset.i;sp.classList.toggle("rvhl",!!(r&&i>=r[0]&&i<r[1]));});}
+const rvNorm=s=>String(s||"").toLowerCase().replace(/[\u2019\u2018\u02BC`\u00B4]/g,"'").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
 // LCS of the current words against what the audio actually says → matched [cur i, orig j] pairs
 function rvPairs(cur,orig){
   const A=cur.map(w=>rvNorm(w.word||w.text)), B=orig.map(w=>rvNorm(w.word||w.text)), n=A.length, m=B.length;
@@ -2851,33 +2854,46 @@ function renderRevoiceBox(){
   const v=variants[activeVar];
   const live=(currentMode==="edit"&&fileId&&v&&v.clip&&videoLoaded);
   const sel=live?selectionSpan():null;
-  // edits inside the selected phrase are re-voiced BY the phrase — don't offer them twice
-  const spans=(live?changedSpans():[]).filter(s=>!sel||s.ne<=sel.ns||s.ns>=sel.ne);
+  // edits inside the selected phrase are re-voiced BY the phrase — don't offer them twice;
+  // ✕ on a row = "leave this one's audio as it is" (only the caption changes)
+  const all=(live?changedSpans():[]).filter(s=>!sel||s.ne<=sel.ns||s.ns>=sel.ne);
+  const spans=all.filter(s=>!_rvSkip.has(s.sig)), hidden=all.length-spans.length;
   const undo=rvUndoStack();
-  if(!spans.length&&!undo&&!sel){box.style.display="none";box.innerHTML="";return;}
-  const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  if(!spans.length&&!undo&&!sel&&!hidden){box.style.display="none";box.innerHTML="";return;}
+  const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  const btn="font-size:11px;padding:5px 9px";
   let h="<div style='display:flex;align-items:baseline;gap:6px'><b style='color:var(--txt)'>🎙 Переозвучка</b>"
-    +"<span style='color:var(--muted);font-size:11px'>тим самим голосом, ElevenLabs</span></div>";
+    +"<span style='color:var(--muted);font-size:11px'>тим самим голосом, ElevenLabs · наведи на рядок — підсвітяться його слова</span></div>";
   if(sel){
     const slot=Math.max(0,sel.hi-sel.lo);
-    h+="<div class='rvrow'><span class='rvwhat' style='color:var(--txt)' title='було в озвучці: «"+esc(sel.old||"—")+"»'>Виділене ("+(sel.ne-sel.ns)+" сл., "+slot.toFixed(2)+" с) →</span>"
-      +"<input data-rvsig='"+esc(sel.sig)+"' value='"+esc(_rvSay[sel.sig]!=null?_rvSay[sel.sig]:sel.text)+"' title='Як має ЗВУЧАТИ вся фраза (у титрах лишиться текст транскрипту)'>"
-      +"<button type='button' id='rvSel' class='primary' style='font-size:11px;padding:5px 9px' "+(_rvBusy?"disabled":"")+">🎙</button>"
-      +"<button type='button' id='rvSelX' class='ghost' style='font-size:11px;padding:5px 7px' title='Зняти виділення'>✕</button></div>";
+    h+="<div style='margin-top:8px;font-size:10.5px;color:#a9a3ff'>ВИДІЛЕНА ФРАЗА · "+(sel.ne-sel.ns)+" сл. · місце "+slot.toFixed(2)+" с</div>"
+      +"<div class='rvrow' data-rvrng='"+sel.ns+","+sel.ne+"'>"
+      +"<input data-rvsig='"+esc(sel.sig)+"' value='"+esc(_rvSay[sel.sig]!=null?_rvSay[sel.sig]:sel.text)+"' title='Було в озвучці: «"+esc(sel.old||"—")+"». Тут — як має ЗВУЧАТИ (у титрах лишиться текст транскрипту)'>"
+      +"<button type='button' id='rvSel' class='primary' style='"+btn+"' "+(_rvBusy?"disabled":"")+">🎙 Фразу</button>"
+      +"<button type='button' id='rvSelX' class='ghost' style='font-size:11px;padding:5px 7px' title='Зняти виділення (Esc)'>✕</button></div>";
   }
-  if(spans.length)h+=spans.map((sp,k)=>"<div class='rvrow'>"
+  if(spans.length){
+    h+="<div style='margin-top:8px;font-size:10.5px;color:var(--muted)'>ЗМІНЕНІ СЛОВА · було в озвучці → як звучатиме</div>";
+    h+=spans.map((sp,k)=>"<div class='rvrow' data-rvrng='"+sp.ns+","+sp.ne+"'>"
       +"<span class='rvwhat' title='було в озвучці: «"+esc(sp.old||"—")+"»'>«"+esc(sp.old||"+")+"» →</span>"
       +"<input data-rvsig='"+esc(sp.sig)+"' value='"+esc(_rvSay[sp.sig]!=null?_rvSay[sp.sig]:sp.text)+"' title='Як має ЗВУЧАТИ (у титрах лишиться «"+esc(sp.text)+"»). Наприклад, «Tie Chee» для «Tai Chi».'>"
-      +"<button type='button' data-rvone='"+k+"' style='font-size:11px;padding:5px 9px' "+(_rvBusy?"disabled":"")+">🎙</button></div>").join("");
+      +"<button type='button' data-rvone='"+k+"' style='"+btn+"' "+(_rvBusy?"disabled":"")+">🎙</button>"
+      +"<button type='button' data-rvskip='"+k+"' class='ghost' style='font-size:11px;padding:5px 7px' title='Не переозвучувати: звук лишиться старим, зміниться лише титр'>✕</button></div>").join("");
+  }
   h+="<div style='display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap'>"
     +(spans.length>1?"<button type='button' id='rvAll' class='primary' style='font-size:11px;padding:6px 10px' "+(_rvBusy?"disabled":"")+">🎙 Переозвучити все ("+spans.length+")</button>":"")
     +(undo?"<button type='button' id='rvUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути попередній звук і текст'>↩ Повернути звук</button>":"")
-    +"<span style='color:var(--muted);font-size:10.5px;flex:1;min-width:140px'>"+((spans.length||sel)?"Довжина кліпу не зміниться. Поле — як має звучати.":"")
-    +(sel?"":" Цілу фразу: Shift+клік по першому й останньому слову, або подвійний клік — усе речення.")+"</span></div>";
+    +(hidden?"<button type='button' id='rvUnskip' class='ghost' style='font-size:11px;padding:6px 10px' title='Показати рядки, прибрані ✕'>сховано: "+hidden+" · показати</button>":"")
+    +"<span style='color:var(--muted);font-size:10.5px;flex:1;min-width:140px'>"
+    +(sel?"Довжина кліпу не зміниться.":"Ціла фраза: <b>подвійний клік</b> по слову — речення, або клік + <b>Shift+клік</b> — від слова до слова.")+"</span></div>";
   box.innerHTML=h;box.style.display="block";
   if($("rvSel"))$("rvSel").onclick=()=>doRevoice([sel]);
   if($("rvSelX"))$("rvSelX").onclick=()=>setWordRange(null);
+  if($("rvUnskip"))$("rvUnskip").onclick=()=>{_rvSkip.clear();renderRevoiceBox();};
   box.querySelectorAll("[data-rvone]").forEach(b=>b.onclick=()=>doRevoice([spans[+b.dataset.rvone]]));
+  box.querySelectorAll("[data-rvskip]").forEach(b=>b.onclick=()=>{_rvSkip.add(spans[+b.dataset.rvskip].sig);rvHilite(null);renderRevoiceBox();});
+  box.querySelectorAll("[data-rvrng]").forEach(r=>{const [x,y]=r.dataset.rvrng.split(",").map(Number);
+    r.onmouseenter=()=>rvHilite([x,y]);r.onmouseleave=()=>rvHilite(null);});
   if($("rvAll"))$("rvAll").onclick=()=>doRevoice(spans);
   if($("rvUndo"))$("rvUndo").onclick=undoRevoice;
 }
@@ -3173,7 +3189,7 @@ const dlLink=(url,label,name)=>{const a=document.createElement("a");a.href=API+u
 function remapWords(text, stored){
   const toks=text.trim().split(/\s+/).filter(Boolean);
   if(!stored||!stored.length){const slot=3/Math.max(toks.length,1);return toks.map((t,i)=>({word:t,start:i*slot,end:(i+1)*slot}));}
-  const norm=s=>String(s||"").toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
+  const norm=s=>String(s||"").toLowerCase().replace(/[\u2019\u2018\u02BC`\u00B4]/g,"'").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");   // ’ (Scribe/Whisper) and ' (keyboard) are the same apostrophe
   const A=toks.map(norm), B=stored.map(w=>norm(w.word||w.text));
   const n=A.length, m=B.length;
   // LCS → the words both versions share, in order: those are the anchors

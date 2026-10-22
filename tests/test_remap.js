@@ -56,6 +56,10 @@ const tests = {
     if (!close(at(w, "challenge").start, at(ORIG, "challenge").start)) throw Error("anchor moved while typing");
     if (at(w, "new").end - at(w, "new").start < 0.12) throw Error("new word collapsed while typing");
   },
+  "curly vs straight apostrophe is the same word (I\u2019ll = I'll) — keeps its exact time"() {
+    const src = say("I\u2019ll start next week"), e = remapWords("I'll start next Monday", src);
+    if (!close(at(e, "I'll").start, src[0].start) || !close(at(e, "start").start, src[1].start)) throw Error("moved");
+  },
   "a hand-set time survives later text edits"() {
     const w = ORIG.map(x => ({ ...x })); w[3] = { ...w[3], start: 1.05, end: 1.5, manual: true };   // "challenge" set by hand
     const e = remapWords("I start the big challenge this Monday and I feel great already", w);

@@ -21,4 +21,7 @@ _wRng=[0,6];s=selectionSpan();console.log("grow:",s.ns,s.ne,"|",s.old,"→",s.te
 if(s.ne!==8)throw "should grow over the edited group";
 // 4) unchanged range re-voice (new intonation)
 realWords=ORIG.map(w=>({...w}));_wRng=[0,3];s=selectionSpan();if(s.old!==s.text||s.os!==0||s.oe!==3)throw "plain";
+// 5) curly apostrophe from the recogniser vs a typed one — NOT a change
+ORIG=say("Another year saying I\u2019ll start next week.");realWords=say("Another year saying I'll start next week.");
+if(changedSpans().length)throw "apostrophe counted as a change";
 console.log("ALL OK");
