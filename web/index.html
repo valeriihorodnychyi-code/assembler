@@ -168,13 +168,30 @@
   .twords .w.sel{outline:1.5px solid var(--accent2);outline-offset:1px;color:#fff}   /* the word the [ / ] tools act on */
   .twords .w.man{border-bottom:2px dotted var(--accent2)}
   .twords .w.rng{color:#fff;background:rgba(120,110,255,.45);box-shadow:0 0 0 1px rgba(150,140,255,.7)}   /* Shift-click / double-click range — re-voiced as one phrase */
+  .tsents{display:flex;flex-direction:column;gap:4px;max-height:420px;overflow-y:auto;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+  .srow{border:1px solid transparent;border-radius:8px;padding:6px 6px 6px 4px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 6px;align-items:start}
+  .srow:hover{background:rgba(255,255,255,.03)}
+  .srow.cur{border-color:rgba(255,90,44,.35)}
+  .srow.pick{background:rgba(120,110,255,.16);border-color:rgba(150,140,255,.6)}
+  .srow .stime{font:600 10.5px/1 ui-monospace,Menlo,monospace;color:var(--muted);background:transparent;border:0;padding:5px 4px;cursor:pointer;white-space:nowrap}
+  .srow .stime:hover{color:var(--accent)}
+  .srow .stext{font-size:14px;line-height:1.45;color:var(--txt);outline:none;padding:2px 4px;border-radius:5px;min-height:20px;word-break:break-word}
+  .srow .stext:focus{background:rgba(255,255,255,.05);box-shadow:0 0 0 1px var(--line)}
+  .srow .sacts{display:flex;gap:4px}
+  .srow .sacts button{font-size:11px;padding:4px 7px}
+  .srow .smeta{grid-column:2/4;font-size:10.5px;color:var(--muted);padding:0 4px}
+  .srow .smeta b{color:#ffb38f;font-weight:600}
+  .srow .smore{grid-column:2/4;display:flex;gap:6px;align-items:center;font-size:10.5px;color:var(--muted);padding:2px 4px}
+  .srow .smore input{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px 6px;font-size:12px}
+  #sentBar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:10.5px;color:var(--muted)}
   #revoiceBox{margin-top:8px;padding:9px 10px;border:1px solid rgba(124,92,255,.45);border-radius:10px;background:rgba(124,92,255,.08);font-size:12px}
   #revoiceBox .rvrow{display:flex;gap:6px;align-items:center;margin-top:6px}
   #revoiceBox .rvrow .rvwhat{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
   #revoiceBox .rvrow input{flex:1 1 90px;min-width:70px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 7px;font-size:12px}                            /* its time was set by hand */   /* the phrase currently on screen */
   /* Text/Words toggle — compact, distinct from the orange setting segs */
   #txtViewSeg{flex:0 0 auto;background:#0f1014;border:1px solid var(--line);border-radius:10px;gap:0;overflow:hidden;padding:3px}
-  #txtViewSeg button{flex:0 0 auto;padding:6px 20px;font-size:12.5px;font-weight:600;border:0;border-radius:7px;color:var(--muted);background:transparent}
+  @media (max-width:1399px){#restoreTimingsBtn .rtl{display:none}}   /* narrow panel: 3 tabs + the button don't fit — icon only, the tooltip explains */
+  #txtViewSeg button{flex:0 0 auto;padding:6px 12px;font-size:12.5px;font-weight:600;border:0;border-radius:7px;color:var(--muted);background:transparent}
   #txtViewSeg button.active{background:var(--accent);color:#fff}
   /* The toggle must size itself ANYWHERE, not only inside a .row. When this rule was
      .row .switch, a switch placed elsewhere lost its size and position:relative — its
@@ -452,15 +469,18 @@
         <!-- padding-right keeps the toggle clear of the language sticker pinned to the box's top-right corner -->
         <div style="display:flex;justify-content:flex-end;margin:4px 0 7px;padding-right:78px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
           <button type="button" id="restoreTimingsBtn" class="ghost" disabled style="margin-right:auto;font-size:11px;padding:5px 9px;white-space:nowrap"
-            title="Накласти поточний текст на ОРИГІНАЛЬНІ тайминги транскрайбу. Твої правки тексту лишаються, зіпсований час повертається — без нового транскрайбу. (Ручні правки часу слів теж скинуться.)">↺ Тайминги</button>
+            title="Накласти поточний текст на ОРИГІНАЛЬНІ тайминги транскрайбу. Твої правки тексту лишаються, зіпсований час повертається — без нового транскрайбу. (Ручні правки часу слів теж скинуться.)">↺<span class="rtl"> Тайминги</span></button>
           <div class="seg" id="txtViewSeg">
             <button type="button" data-v="text" class="active">Text</button>
             <button type="button" data-v="words">Words</button>
+            <button type="button" data-v="sents" title="Речення: правка й переозвучка цілими реченнями">Sentences</button>
           </div></div>
         <div style="position:relative">
           <span id="langSticker" class="lang-sticker" style="display:none"></span>
           <textarea id="transcript" rows="3" style="min-height:210px;max-height:360px;overflow-y:auto;resize:vertical;font-size:15px" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
           <div id="transcriptWords" class="twords" contenteditable="true" spellcheck="false" style="display:none"></div>
+          <div id="transcriptSents" class="tsents" style="display:none"></div>
+          <div id="sentBar" style="display:none"></div>
           <div id="wordTools" style="display:none;flex-direction:column;gap:6px;margin-top:6px;font-size:11.5px;color:var(--muted)">
             <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Слово: <b id="wtWord" style="color:var(--txt)">— клікни слово</b> <span id="wtTime"></span></div>
             <div style="display:flex;gap:6px">
@@ -2672,7 +2692,10 @@ $("txtViewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
   txtView=b.dataset.v;
   const ta=$("transcript"), box=$("transcriptWords");
   if($("wordTools"))$("wordTools").style.display=(txtView==="words")?"flex":"none";
-  if(txtView==="words"){ if(ta)ta.style.display="none"; if(box){box.style.display="block";renderWordsView();} }
+  const sb=$("transcriptSents"); if(sb)sb.style.display=(txtView==="sents")?"flex":"none";
+  if($("sentBar"))$("sentBar").style.display="none";
+  if(txtView==="sents"){ if(ta)ta.style.display="none"; if(box)box.style.display="none"; _sentPick=null; renderSentsView(true); }
+  else if(txtView==="words"){ if(ta)ta.style.display="none"; if(box){box.style.display="block";renderWordsView();} }
   else { if(ta){ if(realWords&&realWords.length)ta.value=wordsToText(realWords); ta.style.display=""; if(typeof autoGrow==="function")autoGrow(); } if(box)box.style.display="none"; }   // switching to Text → show the latest words (incl. Words-tab edits)
 });
 function renderWordsView(){
@@ -2718,6 +2741,7 @@ function commitWords(ws){
   const h=(typeof openHookRef==="function")?openHookRef():null; if(h)h.words=ws;
   if(txtView==="words")renderWordsView();
   else{const ta=$("transcript"); if(ta){ta.value=wordsToText(ws); if(typeof autoGrow==="function")autoGrow();}}
+  if(txtView==="sents"&&typeof renderSentsView==="function")renderSentsView();
   if(typeof invalidateLayout==="function")invalidateLayout();
   if(typeof scheduleExact==="function")scheduleExact();
   updateWordTools();
@@ -2826,10 +2850,11 @@ function changedSpans(){
 }
 // The Shift-click / double-click RANGE as one span. Edges grow to swallow any edited group they cut
 // through — half a replaced phrase would leave the other half's old audio in place.
-function selectionSpan(){
+function selectionSpan(){ return _wRng?rangeSpan(_wRng[0],_wRng[1]):null; }
+function rangeSpan(from,to){
   const cur=realWords||[], orig=origWordsNow();
-  if(!_wRng||!orig||!orig.length||!cur.length)return null;
-  let ns=Math.max(0,_wRng[0]), ne=Math.min(cur.length,_wRng[1]); if(ne<=ns)return null;
+  if(!orig||!orig.length||!cur.length)return null;
+  let ns=Math.max(0,from), ne=Math.min(cur.length,to); if(ne<=ns)return null;
   const pairs=rvPairs(cur,orig), jOf=new Map(pairs);
   while(ns>0&&!jOf.has(ns-1)&&!jOf.has(ns))ns--;
   while(ne<cur.length&&!jOf.has(ne)&&!jOf.has(ne-1))ne++;
@@ -2851,6 +2876,7 @@ function renderRevoiceBox(){
   const ae=document.activeElement;
   if(ae&&ae.tagName==="INPUT"&&box.contains(ae)){scheduleRevoiceBox();return;}   // never re-render under the caret (a focused button is fine)
   box.querySelectorAll("input[data-rvsig]").forEach(i=>{_rvSay[i.dataset.rvsig]=i.value;});
+  if(txtView==="sents"){box.style.display="none";box.innerHTML="";if(typeof renderSentsView==="function")renderSentsView();return;}   // Sentences has the 🎙 in every row
   const v=variants[activeVar];
   const live=(currentMode==="edit"&&fileId&&v&&v.clip&&videoLoaded);
   const sel=live?selectionSpan():null;
@@ -2949,6 +2975,129 @@ function undoRevoice(){
   if(typeof renderHookStrip==="function")renderHookStrip();
   setStatus("↩ Звук і текст повернуто як було до переозвучки. Файл переозвучки лишився в сесії.","ok");
 }
+// ---------- Sentences view: edit and re-voice WHOLE SENTENCES ----------
+// One place for both: the row text IS the caption text AND what ElevenLabs speaks (⋯ holds an
+// optional "як звучатиме" for pronunciation only). A sentence — not a caption — is the unit,
+// because caption chunks move with the style (size, lines) and can cut a sentence in half;
+// a sentence keeps the intonation whole and gives the new line all the room its old words had.
+let _sentPick=null, _sentMore=new Set(), _sentStopAt=null, _sentRanges=[];
+const sentEnd=w=>/[.!?…]["»”')\]]?$/.test(w.word||w.text||"")||w.brk==="hard";
+function splitSentences(ws){
+  const out=[]; if(!ws||!ws.length)return out;
+  const punct=ws.some(sentEnd);   // no punctuation at all (Punctuation off at transcribe) → split on pauses
+  let s=0;
+  for(let i=0;i<ws.length;i++){
+    const last=i===ws.length-1, gap=last?0:(+ws[i+1].start)-(+ws[i].end);
+    if(last||(punct?sentEnd(ws[i]):gap>=0.6)||i-s>=24){out.push([s,i+1]);s=i+1;}
+  }
+  return out;
+}
+const _fmtT=t=>{t=Math.max(0,+t||0);const m=Math.floor(t/60),s=t-m*60;return String(m).padStart(2,"0")+":"+s.toFixed(1).padStart(4,"0");};
+function sentInfo(k){
+  const r=_sentRanges[k]; if(!r)return null;
+  const W=w=>w.word||w.text||"", ws=(realWords||[]).slice(r[0],r[1]);
+  const changes=(changedSpans()||[]).filter(s=>s.ns<r[1]&&s.ne>r[0]);
+  return {r,text:ws.map(W).join(" "),start:ws.length?+ws[0].start:0,end:ws.length?+ws[ws.length-1].end:0,changes};
+}
+function sentMetaHTML(k,esc){
+  const v=variants[activeVar], live=(currentMode==="edit"&&fileId&&v&&v.clip&&videoLoaded&&origWordsNow());
+  const inf=sentInfo(k); if(!inf||!live)return "";
+  if(!inf.changes.length)return "";
+  const sp=rangeSpan(inf.r[0],inf.r[1]);
+  return "змінено: "+inf.changes.map(c=>"<b>"+esc(c.old||"＋")+"</b> → <b>"+esc(c.text||"—")+"</b>").join(", ")
+    +(sp?" · місце в аудіо "+Math.max(0,sp.hi-sp.lo).toFixed(2)+" с":"")+" · натисни 🎙, щоб звук теж змінився";
+}
+function renderSentsView(force){
+  const box=$("transcriptSents"); if(!box||txtView!=="sents")return;
+  const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  const ranges=splitSentences(realWords||[]);
+  const focused=box.contains(document.activeElement)&&document.activeElement.classList.contains("stext");
+  const v=variants[activeVar], canVoice=!!(currentMode==="edit"&&fileId&&v&&v.clip&&videoLoaded&&origWordsNow());
+  // while the caret is in a row, never rebuild the DOM: only refresh the meta lines (if the
+  // sentence count is unchanged — a new full stop re-splits on blur)
+  if(focused&&!force){
+    if(ranges.length===box.querySelectorAll(".srow").length){_sentRanges=ranges;
+      box.querySelectorAll(".srow").forEach((row,k)=>{const m=row.querySelector(".smeta");if(m){const hm=sentMetaHTML(k,esc);m.innerHTML=hm;m.style.display=hm?"":"none";}
+        const t=row.querySelector(".stime");if(t)t.firstChild.textContent=_fmtT(sentInfo(k).start)+" ";});}
+    renderSentBar(canVoice);return;
+  }
+  _sentRanges=ranges;
+  if(!ranges.length){box.innerHTML="<div style='color:var(--muted);font-size:12px;padding:8px'>Спершу ① Transcribe — тут з'являться речення.</div>";renderSentBar(false);return;}
+  box.innerHTML=ranges.map((r,k)=>{const inf=sentInfo(k), meta=sentMetaHTML(k,esc), sig="sent:"+r[0]+":"+r[1], more=_sentMore.has(k);
+    const pick=_sentPick&&k>=_sentPick[0]&&k<_sentPick[1];
+    return "<div class='srow"+(pick?" pick":"")+"' data-k='"+k+"'>"
+      +"<button type='button' class='stime' data-sk='"+k+"' title='Клік — програти речення · Shift+клік — виділити кілька речень, щоб озвучити однією фразою'>"+_fmtT(inf.start)+" <span>▶</span></button>"
+      +"<div class='stext' contenteditable='true' spellcheck='false' data-k='"+k+"'>"+esc(inf.text)+"</div>"
+      +"<div class='sacts'><button type='button' data-svoice='"+k+"' "+((!canVoice||_rvBusy)?"disabled":"")+" title='"+(canVoice?"Переозвучити це речення тим самим голосом":"Потрібен транскрибований кліп у сесії")+"'>🎙</button>"
+      +"<button type='button' class='ghost' data-smore='"+k+"' title='Як звучатиме (вимова)'>⋯</button></div>"
+      +"<div class='smeta' style='"+(meta?"":"display:none")+"'>"+meta+"</div>"
+      +(more?"<div class='smore'>як звучатиме:<input data-ssay='"+k+"' placeholder='"+esc(inf.text)+"' value='"+esc(_rvSay[sig]||"")+"' title='Лише вимова для ElevenLabs. У титрах лишиться текст рядка. Напр. «Tie Chee» для «Tai Chi».'></div>":"")
+      +"</div>";}).join("");
+  renderSentBar(canVoice);
+}
+function renderSentBar(canVoice){
+  const bar=$("sentBar"); if(!bar)return;
+  const undo=rvUndoStack(), n=_sentPick?(_sentPick[1]-_sentPick[0]):0;
+  let h="";
+  if(n>1)h+="<button type='button' id='sentVoicePick' class='primary' style='font-size:11px;padding:6px 10px' "+((!canVoice||_rvBusy)?"disabled":"")+">🎙 Озвучити "+n+" речення однією фразою</button>"
+    +"<button type='button' id='sentPickX' class='ghost' style='font-size:11px;padding:6px 8px' title='Зняти виділення (Esc)'>✕</button>";
+  if(undo)h+="<button type='button' id='sentUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути попередній звук і текст'>↩ Повернути звук</button>";
+  h+="<span style='flex:1;min-width:150px'>Правиш текст у рядку — титр міняється одразу; 🎙 — щоб змінився і звук. Довжина кліпу не зміниться.</span>";
+  bar.innerHTML=h; bar.style.display=(txtView==="sents")?"flex":"none";
+  if($("sentVoicePick"))$("sentVoicePick").onclick=()=>voiceSentences(_sentPick[0],_sentPick[1]);
+  if($("sentPickX"))$("sentPickX").onclick=()=>{_sentPick=null;renderSentsView(true);};
+  if($("sentUndo"))$("sentUndo").onclick=undoRevoice;
+}
+function voiceSentences(k0,k1){
+  const a=_sentRanges[k0], b=_sentRanges[k1-1]; if(!a||!b)return;
+  const sp=rangeSpan(a[0],b[1]); if(!sp){setStatus("Переозвучка: для цього кліпу немає таймингів транскрайбу — зроби ① Transcribe.","err");return;}
+  // pronunciation override(s) from ⋯ — joined across the picked sentences
+  const says=[];for(let k=k0;k<k1;k++){const r=_sentRanges[k], o=_rvSay["sent:"+r[0]+":"+r[1]];says.push((o&&o.trim())||sentInfo(k).text);}
+  _rvSay[sp.sig]=says.join(" ");
+  if(sp.ns!==a[0]||sp.ne!==b[1])setStatus("🎙 Озвучую ширше, ніж рядок: правлена група слів виходила за межі речення.","");
+  _sentPick=null;
+  doRevoice([sp]);
+}
+(function wireSents(){
+  const box=$("transcriptSents"); if(!box)return;
+  box.addEventListener("click",e=>{
+    const t=e.target.closest&&e.target.closest("[data-sk]");
+    if(t){const k=+t.dataset.sk;
+      if(e.shiftKey){const base=_sentPick?_sentPick[0]:k;_sentPick=[Math.min(base,k),Math.max(base,k)+1];renderSentsView(true);return;}
+      _sentPick=[k,k+1];box.querySelectorAll(".srow").forEach(r=>r.classList.toggle("pick",+r.dataset.k===k));renderSentBar(!!origWordsNow());
+      const inf=sentInfo(k); if(inf&&video&&videoLoaded){try{video.currentTime=Math.max(0,inf.start-0.05);_sentStopAt=inf.end+0.12;video.play();}catch(_){}}
+      return;}
+    const vb=e.target.closest&&e.target.closest("[data-svoice]"); if(vb){const k=+vb.dataset.svoice;voiceSentences(k,k+1);return;}
+    const mb=e.target.closest&&e.target.closest("[data-smore]"); if(mb){const k=+mb.dataset.smore;_sentMore.has(k)?_sentMore.delete(k):_sentMore.add(k);renderSentsView(true);return;}
+  });
+  box.addEventListener("input",e=>{
+    const s=e.target.closest&&e.target.closest(".stext");
+    if(s){const k=+s.dataset.k, rs=_sentRanges; if(!realWords||!rs[k])return;
+      // rebuild the full text with this row replaced; other rows keep their own words (and breaks)
+      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/\s+/g," ").trim():wordsToText(realWords.slice(r[0],r[1])));
+      const full=parts.map((p,i)=>p+((i<rs.length-1&&realWords[rs[i][1]-1]&&realWords[rs[i][1]-1].brk==="soft"&&i!==k)?"\n":"")).join(" ");
+      realWords=parseBreaksToWords(full,realWords); if(variants[activeVar])variants[activeVar].words=realWords;
+      const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords);
+      if(typeof invalidateLayout==="function")invalidateLayout();
+      if(typeof scheduleExact==="function")scheduleExact();
+      clearTimeout(window._sentMetaT);window._sentMetaT=setTimeout(()=>renderSentsView(),250);
+      return;}
+    const i=e.target.closest&&e.target.closest("[data-ssay]");
+    if(i){const r=_sentRanges[+i.dataset.ssay]; if(r)_rvSay["sent:"+r[0]+":"+r[1]]=i.value;}
+  });
+  box.addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&_sentPick){e.preventDefault();_sentPick=null;renderSentsView(true);return;}
+    if(e.key==="Enter"&&e.target.classList&&e.target.classList.contains("stext")){e.preventDefault();e.target.blur();}   // Enter = done (line breaks belong to the Text tab)
+  });
+  box.addEventListener("focusout",e=>{ if(e.target.classList&&e.target.classList.contains("stext"))setTimeout(()=>{if(!box.contains(document.activeElement)||!document.activeElement.classList.contains("stext"))renderSentsView(true);},0); });
+  if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{
+    if(_sentStopAt!=null&&video.currentTime>=_sentStopAt){_sentStopAt=null;try{video.pause();}catch(_){}}
+    if(txtView!=="sents")return;
+    const t=video.currentTime; box.querySelectorAll(".srow").forEach((row,k)=>{const r=_sentRanges[k],ws=realWords||[];
+      row.classList.toggle("cur",!!(r&&ws[r[0]]&&t>=+ws[r[0]].start&&t<=+ws[r[1]-1].end));});
+  });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&_sentPick&&txtView==="sents"){_sentPick=null;renderSentsView(true);} });
+})();
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
