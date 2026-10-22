@@ -688,6 +688,7 @@ def api_detect_cuts(req: DetectCutsReq):
 class JiraReq(BaseModel):
     text: str
     file_id: str = ""
+    localized: bool = False   # also pull every language version of each task (read-only, from ADAM storage)
 
 
 @app.get("/api/jira/status")
@@ -728,6 +729,17 @@ def api_jira_import(req: JiraReq):
     for r in res["items"]:
         if not r.get("video"):
             res["errors"].append({"input": r["key"], "error": r["warn"] or "немає відео"})
+    if req.localized:
+        # localized versions: built from the naming rule, CHECKED on ADAM before downloading
+        cands = [c for r in todo for c in jira.localized(r)]
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            found = list(ex.map(jira.pick_localized, cands))
+        for c, f in zip(cands, found):
+            if f:
+                todo.append(f)
+            else:
+                res["errors"].append({"input": f"{c['loc_of']} · {c['lang'].upper()}",
+                                      "error": f"у ADAM немає {c['asset']}(_nSub).mp4"})
 
     def pull(rec):
         try:

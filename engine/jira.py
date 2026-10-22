@@ -292,9 +292,80 @@ def normalize(issue, site=DEFAULT_SITE, fmap=None):
         rec["warn"] = "у таски ще немає завантаженого відео"
     if len(langs) > 1:
         rec["warn"] = (rec["warn"] + "; " if rec["warn"] else "") + \
-            f"у таски {len(langs)} мов ({', '.join(langs[:6])}{'…' if len(langs) > 6 else ''}) — завантажено тільки " \
-            f"{(langs[0] if langs else 'EN')}-мастер; локалізованих файлів у Jira немає, Ассемблер їх не качає (потрібен ADAM API)"
+            f"у таски {len(langs)} мов ({', '.join(langs[:6])}{'…' if len(langs) > 6 else ''}) — локалізації можна " \
+            f"підтягнути галочкою «+ Localizations»"
     return rec
+
+
+# ---------------------------------------------------------------- localized versions
+# Localized creatives have no Jira task, but their names follow ONE rule (checked on real
+# ADAM names, Oct 2026):
+#   WF_112007_111994_WO_EN_tai_DAV_Vid_New_1080x1920      ← the EN master (idea: New / Var / Res…)
+#   WF_112007_111994_WO_ES_tai_DAV_Vid_Loc_1080x1920      ← same ids, LANG swapped, idea → "Loc"
+# Language codes are ADAM's own (PR = Portuguese, not PT) — taken from the task's languages field,
+# so nothing is mapped by hand. The file sits in the same ADAM folder as the master.
+
+def localized_name(asset, lang, master_lang=None):
+    """EN asset name → the name of its `lang` version, or None if the name doesn't parse."""
+    toks = (asset or "").split("_")
+    if len(toks) < 8 or not re.fullmatch(r"\d+x\d+", toks[-1] or ""):
+        return None
+    ml = (master_lang or "").upper()
+    li = next((i for i, t in enumerate(toks[:6]) if t.upper() == ml), None) if ml else None
+    if li is None:                              # the WO_<LANG>_ slot
+        li = next((i + 1 for i, t in enumerate(toks[:6]) if t == "WO"), None)
+    if li is None or li >= len(toks) - 2:
+        return None
+    out = list(toks)
+    out[li] = lang.upper()
+    out[-2] = "Loc"
+    return "_".join(out)
+
+
+def localized(rec):
+    """A resolved EN record → one candidate record per OTHER language of the task (not checked yet)."""
+    from urllib.parse import urlsplit, urlunsplit
+    if not rec.get("video") or not rec.get("asset"):
+        return []
+    master = (rec.get("langs") or ["EN"])[0].upper()
+    u = urlsplit(rec["video"])
+    folder = u.path.rsplit("/", 1)[0]
+    out = []
+    for lang in (rec.get("langs") or [])[1:]:
+        name = localized_name(rec["asset"], lang, master)
+        if not name:
+            continue
+        mk = lambda fn: urlunsplit((u.scheme, u.netloc, f"{folder}/{fn}", "", ""))
+        out.append(dict(rec, lang=lang.lower(), asset=name, loc_of=rec["key"], script="", warn="",
+                        langs=[lang], candidates=[(mk(name + "_nSub.mp4"), True), (mk(name + ".mp4"), False)]))
+    return out
+
+
+def exists(url, requests=None):
+    """Is the file there? HEAD on the bucket: 200 = yes; it answers 403 (not 404) for a missing key."""
+    if requests is None:
+        import requests  # noqa: F811
+    check_url(url)
+    try:
+        r = requests.head(url, timeout=(10, 30), allow_redirects=True)
+        if r.status_code == 200:
+            return True
+        # some buckets refuse HEAD but allow GET: ask for ONE byte instead of the whole file
+        with requests.get(url, headers={"Range": "bytes=0-0"}, stream=True, timeout=(10, 30)) as g:
+            return g.status_code in (200, 206)
+    except Exception:
+        return False
+
+
+def pick_localized(cand, requests=None):
+    """Try the clean _nSub first, then the captioned final. → the record ready to download, or None."""
+    for url, nsub in cand.get("candidates", []):
+        if exists(url, requests):
+            r = {k: v for k, v in cand.items() if k != "candidates"}
+            r.update(video=url, has_nsub=nsub, burned_in=not nsub,
+                     warn="" if nsub else "немає чистого _nSub — у файлі вже вшиті титри, свої зверху не клади")
+            return r
+    return None
 
 
 # ---------------------------------------------------------------- resolve

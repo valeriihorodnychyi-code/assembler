@@ -1750,6 +1750,8 @@ function openJiraPop(){
     +"<div id='jiraWarn' class='hint' style='color:var(--accent);margin-bottom:8px;display:"+(jiraReady?"none":"block")+"'>Спершу додай свій Jira email і API token у <b id='jiraToSettings' style='cursor:pointer;text-decoration:underline'>⚙ Settings</b>.</div>"
     +"<textarea id='jiraText' rows='6' spellcheck='false' style='width:100%;font-family:monospace;font-size:12px' placeholder='YCP-8482\nYCP-8483\nhttps://welltech.atlassian.net/browse/WCP-12016\nYG_104973_99257_WO_EN_tch_YDV_Vid_Var_1080x1920\n\n…по рядку, через кому — як скопіюєш'></textarea>"
     +"<div class='hint' style='margin:6px 0 10px'>Береться чистий <b>_nSub</b>-мастер. Якщо в таски його ще нема — фінал із вшитими титрами, і кліп буде позначено ⚠. Уже відкриті кліпи паку лишаються — нові додаються в кінець.</div>"
+    +"<label style='display:flex;gap:8px;align-items:center;margin:0 0 10px;font-size:12px;cursor:pointer' title='Для кожної таски ще й усі мовні версії з ADAM (тільки читання): ім’я будується за правилом EN→мова, New→Loc і перевіряється, чи файл є'>"
+    +"<input type='checkbox' id='jiraLoc'"+(window._jiraLoc?" checked":"")+"> <b>+ Localizations</b> <span style='color:var(--muted)'>— усі мови таски (ES, FR, DE, IT, PR…) з ADAM</span></label>"
     +"<div style='display:flex;gap:8px;align-items:center'><button id='jiraGo' class='primary' style='padding:8px 18px'>Імпортувати</button>"
     +"<span id='jiraNote' style='font-size:12px;color:var(--muted)'></span></div>"
     +"<div id='jiraOut' style='margin-top:10px;max-height:240px;overflow:auto;font-size:12px'></div>";
@@ -1767,7 +1769,7 @@ async function jiraImport(){
   busyStart("Jira → ADAM…");
   try{
     const r=await fetch(API+"/api/jira/import",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({text,file_id:fileId||""})});
+      body:JSON.stringify({text,file_id:fileId||"",localized:!!(window._jiraLoc=!!($("jiraLoc")&&$("jiraLoc").checked))})});
     const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"import failed"));
     fileId=d.file_id;
     // APPEND to the pack that's open: re-importing to add one forgotten task must not wipe
@@ -1779,7 +1781,7 @@ async function jiraImport(){
     (d.items||[]).forEach(it=>{
       if(editPack.some(h=>h.clip===it.clip))return;          // already in this pack
       const hk=makePackHook(it.clip,API+it.url,it.lang||"en");
-      hk.jira={key:it.key,link:it.link,asset:it.asset,script:it.script||"",burned_in:!!it.burned_in,
+      hk.jira={key:it.key,loc:it.loc_of?(it.lang||"").toUpperCase():"",link:it.link,asset:it.asset,script:it.script||"",burned_in:!!it.burned_in,
                has_nsub:!!it.has_nsub,langs:it.langs||[],cid:it.cid,baseid:it.baseid,warn:it.warn||""};
       if(it.burned_in)burned++;
       if(!hooks.some(h=>h.clip===hk.clip))hooks.push(hk);
@@ -1787,7 +1789,7 @@ async function jiraImport(){
     });
     const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/'/g,"&#39;");
     let h=(d.items||[]).map(it=>"<div style='padding:4px 0;border-bottom:1px solid var(--line)'>"
-      +(it.burned_in?"⚠ ":"✓ ")+"<a href='"+esc(it.link)+"' target='_blank' style='color:var(--accent2)'>"+esc(it.key)+"</a> "
+      +(it.burned_in?"⚠ ":"✓ ")+"<a href='"+esc(it.link)+"' target='_blank' style='color:var(--accent2)'>"+esc(it.key)+"</a>"+(it.loc_of?" <b>"+esc((it.lang||"").toUpperCase())+"</b>":"")+" "
       +"<span style='color:var(--muted)'>"+esc(it.asset)+"</span>"
       +(it.warn?"<div style='color:var(--accent);font-size:11px'>"+esc(it.warn)+"</div>":"")+"</div>").join("");
     h+=(d.errors||[]).map(e=>"<div style='padding:4px 0;color:var(--accent)'>✗ "+esc(e.input)+" — "+esc(e.error)+"</div>").join("");
@@ -1883,7 +1885,7 @@ function renderHookStrip(){
       tb.style.cssText="position:absolute;top:4px;right:4px;font:700 9px/1 system-ui;padding:3px 4px;border-radius:5px;background:var(--accent2);color:#08120c";
       card.appendChild(tb);}
     if(h.jira){const jb=document.createElement("div");
-      jb.textContent=(h.jira.burned_in?"⚠ ":"")+h.jira.key;
+      jb.textContent=(h.jira.burned_in?"⚠ ":"")+h.jira.key+(h.jira.loc?" · "+h.jira.loc:"");
       jb.title=h.jira.key+" · "+(h.jira.asset||"")+(h.jira.warn?("\n"+h.jira.warn):"");
       jb.style.cssText="position:absolute;left:3px;right:3px;bottom:3px;font:700 8px/1.2 system-ui;padding:2px 3px;border-radius:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
         +(h.jira.burned_in?"background:var(--accent);color:#fff":"background:rgba(0,0,0,.7);color:#cfe3ff");

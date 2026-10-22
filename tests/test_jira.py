@@ -140,7 +140,48 @@ def test_key_and_summary_of_same_task_collapse_without_extra_request():
 def test_old_creative_without_nsub_is_flagged_burned_in():
     r = J.normalize(make_issue("YCP-7649", "YG", 102821, 99257, nsub=False, langs=("EN", "ES")))
     assert r["burned_in"] and r["video"].endswith("1080x1920.mp4")
-    assert "вшиті титри" in r["warn"] and "ADAM" in r["warn"]
+    assert "вшиті титри" in r["warn"] and "Localizations" in r["warn"]
+
+
+def test_localized_names_follow_the_adam_rule():
+    """Real names from ADAM (Oct 2026): same ids, LANG swapped, idea → Loc, PR = Portuguese."""
+    en = "WF_112007_111994_WO_EN_tai_DAV_Vid_New_1080x1920"
+    assert J.localized_name(en, "ES", "EN") == "WF_112007_111994_WO_ES_tai_DAV_Vid_Loc_1080x1920"
+    assert J.localized_name(en, "PR", "EN") == "WF_112007_111994_WO_PR_tai_DAV_Vid_Loc_1080x1920"
+    assert J.localized_name("not_a_creative", "ES", "EN") is None
+
+
+class _HeadFake:
+    """ADAM bucket: 200 for files that exist, 403 (not 404) for the rest."""
+    def __init__(self, present):
+        self.present, self.calls = set(present), []
+
+    def head(self, url, timeout=None, allow_redirects=True):
+        self.calls.append(url)
+        return _R(200 if url.rsplit("/", 1)[-1] in self.present else 403)
+
+    def get(self, url, headers=None, stream=False, timeout=None):
+        class _C(_R):
+            def __enter__(s): return s
+            def __exit__(s, *a): return False
+        return _C(403)
+
+
+def test_localized_candidates_are_checked_nsub_first_then_final():
+    iss = make_issue("WCP-14001", "WF", 112007, 111994, idea="New", langs=("EN", "ES", "FR", "PR"))
+    iss["fields"]["summary"] = iss["fields"]["customfield_10646"] = "WF_112007_111994_WO_EN_tai_DAV_Vid_New_1080x1920"
+    iss["fields"]["customfield_18500"] = f"{ADAM}/WF/112007/WF_112007_111994_WO_EN_tai_DAV_Vid_New_1080x1920_nSub.mp4"
+    rec = J.normalize(iss)
+    cands = J.localized(rec)
+    assert [c["lang"] for c in cands] == ["es", "fr", "pr"]
+    assert all(c["candidates"][0][0].startswith(f"{ADAM}/WF/112007/") for c in cands), "same ADAM folder as the master"
+    fake = _HeadFake({"WF_112007_111994_WO_ES_tai_DAV_Vid_Loc_1080x1920_nSub.mp4",
+                      "WF_112007_111994_WO_FR_tai_DAV_Vid_Loc_1080x1920.mp4"})
+    es, fr, pr = (J.pick_localized(c, fake) for c in cands)
+    assert es["has_nsub"] and not es["burned_in"] and es["video"].endswith("ES_tai_DAV_Vid_Loc_1080x1920_nSub.mp4")
+    assert fr["burned_in"] and "вшиті титри" in fr["warn"]
+    assert pr is None
+    assert es["script"] == "", "the EN voice-over text must never 'fix' a localized transcript"
 
 
 def test_one_bad_task_does_not_sink_the_batch():
