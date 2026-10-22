@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 # allow "python -m server.app" and direct execution
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, synclab, jira, revoice  # noqa: E402
+from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, synclab, jira, revoice, music11  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(ROOT, "web")
@@ -879,6 +879,94 @@ def api_cut(req: CutReq):
             "removed": removed, "fps": fps, "seconds": round(secs, 1),
             "words": compose.shift_words_cut(req.words, spans, fps=fps),
             "orig_words": compose.shift_words_cut(req.orig_words, spans, fps=fps)}
+
+
+# ---------- ♪ Hook music (ElevenLabs): ONE bed under the hook instead of one per shot ----------
+class HookMusicGenReq(BaseModel):
+    file_id: str
+    preset: str = "drama"
+    prompt: str = ""          # empty → the preset's template
+    length: float = 15.0      # seconds — used when no clips are given
+    clips: List[str] = []     # the hooks it will go under → length = the longest one
+
+
+@app.get("/api/hookmusic/presets")
+def hookmusic_presets():
+    return {"presets": [{"id": k, "prompt": v} for k, v in music11.PRESETS.items()]}
+
+
+@app.post("/api/hookmusic/generate")
+def hookmusic_generate(req: HookMusicGenReq):
+    import requests as _rq, time as _t
+    sdir = _session_dir(req.file_id)
+    prompt = (req.prompt or "").strip() or music11.PRESETS.get(req.preset) or music11.PRESETS["drama"]
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"hookmusic_{k}.mp3")):
+        k += 1
+    name = f"hookmusic_{k}.mp3"
+    length = float(req.length)
+    durs = [music11.duration(os.path.join(sdir, os.path.basename(c))) for c in (req.clips or [])
+            if os.path.exists(os.path.join(sdir, os.path.basename(c)))]
+    if durs:
+        length = max(durs)
+    t0 = _t.time()
+    try:
+        mp3 = music11.compose(prompt, length + 0.5, _rq)
+    except music11.MusicError as e:
+        raise HTTPException(400, str(e))
+    with open(os.path.join(sdir, name), "wb") as f:
+        f.write(mp3)
+    secs = _t.time() - t0
+    _log_timing("hookmusic_generate", secs, f"{req.preset} {length:.1f}s")
+    return {"name": name, "url": f"/clip/{req.file_id}/{name}", "prompt": prompt,
+            "length": round(music11.duration(os.path.join(sdir, name)), 2), "seconds": round(secs, 1)}
+
+
+class HookMusicApplyReq(BaseModel):
+    file_id: str
+    clip: str
+    track: str
+    volume: float = 0.35
+    duck: bool = True
+    strip_original: bool = True   # remove the old per-shot music (voice isolation)
+    offset: float = 0.0
+
+
+@app.post("/api/hookmusic/apply")
+def hookmusic_apply(req: HookMusicApplyReq):
+    """Lay the track under ONE hook → a NEW file "<name>_musN" (original kept for ↩)."""
+    import re as _re, requests as _rq, time as _t
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    trk = os.path.join(sdir, os.path.basename(req.track))
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip «{name}» not found in the session")
+    if not os.path.exists(trk):
+        raise HTTPException(404, "Track not found — generate it first")
+    stem, ext = os.path.splitext(name)
+    base_stem = _re.sub(r"_mus\d+$", "", stem)
+    # re-applying music to a hook that already HAS our music must start from the clean source,
+    # or the beds stack up — the client sends the pre-music clip, this is just a safety net
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"{base_stem}_mus{k}{ext}")):
+        k += 1
+    out_name = f"{base_stem}_mus{k}{ext}"
+    t0 = _t.time()
+    voice = None
+    try:
+        if req.strip_original and music11.has_audio(src):
+            voice = os.path.join(sdir, f"_voice_{stem}.wav")       # cached: isolation is paid once per clip
+            if not os.path.exists(voice):
+                music11.isolate_voice(src, voice, _rq)
+        music11.mix(src, trk, os.path.join(sdir, out_name), volume=req.volume, duck=req.duck,
+                    voice_path=voice, offset=req.offset)
+    except music11.MusicError as e:
+        raise HTTPException(400, str(e))
+    secs = _t.time() - t0
+    _log_timing("hookmusic_apply", secs, name)
+    return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "stripped": bool(voice),
+            "seconds": round(secs, 1)}
 
 
 class LipsyncReq(BaseModel):

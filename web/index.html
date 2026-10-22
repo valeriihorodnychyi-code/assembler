@@ -761,6 +761,29 @@
       </div>
     </details>
 
+    <details class="grp" id="grpHookMusic">
+      <summary><span>Hook music · ElevenLabs</span> <span class="chev">›</span></summary>
+      <div class="body">
+        <div class="hint" style="margin-top:0">ONE music bed under the whole hook instead of a different one per shot. Bodies stay as they are.</div>
+        <div class="chips" id="hmPresets" style="flex-wrap:wrap;margin:6px 0"></div>
+        <textarea id="hmPrompt" rows="3" style="width:100%;font-size:12px;resize:vertical" placeholder="Describe the vibe (English works best)…"></textarea>
+        <button class="primary" id="hmGen" style="width:100%;margin-top:6px">♪ Generate music</button>
+        <div id="hmTrack" style="display:none;margin-top:8px">
+          <audio id="hmAudio" controls style="width:100%;height:32px"></audio>
+          <div id="hmTrackLbl" class="hint" style="margin:2px 0 6px"></div>
+          <div class="row"><label>Volume</label><input type="range" id="hmVol" min="0" max="100" value="35"><span class="val" id="hmVolLbl">35</span></div>
+          <div class="row"><label title="Музика тихшає, коли звучить голос">Duck under voice</label><label class="switch"><input type="checkbox" id="hmDuck" checked><span class="slider"></span></label></div>
+          <div class="row"><label title="Прибрати стару музику з хука (ElevenLabs Audio Isolation): лишається тільки голос. Разом зі старою музикою йдуть і старі SFX / атмосфера.">Remove original music</label><label class="switch"><input type="checkbox" id="hmStrip" checked><span class="slider"></span></label></div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button class="go" id="hmApplyAll" style="flex:1">Apply to all hooks</button>
+            <button id="hmApplyOne" style="flex:1">Apply to this hook</button>
+          </div>
+          <button class="ghost" id="hmUndo" style="width:100%;margin-top:6px;display:none">↩ Undo music</button>
+        </div>
+        <div class="hint">Потрібні дозволи ключа ElevenLabs: <b>Music Generation</b> і <b>Audio Isolation</b>.</div>
+      </div>
+    </details>
+
     <!-- Custom-styles panel removed — Save & Import now live in the Presets rail. These two elements
          stay (hidden) because the rail's Save/Import buttons drive them. -->
     <div style="display:none">
@@ -1908,6 +1931,8 @@ function frameOf(t){return Math.round((+t||0)*fps());}
 // in both. Exact seconds stay in the tooltips.
 function tc(t){const r=Math.max(1,Math.round(fps())),f=Math.max(0,frameOf(t)),ff=f%r,s=Math.floor(f/r),ss=s%60,m=Math.floor(s/60)%60,hh=Math.floor(s/3600);
   const p=n=>String(n).padStart(2,"0");return (hh?p(hh)+":":"")+p(m)+":"+p(ss)+":"+p(ff);}
+// the frame the playhead is SHOWING (we park on frame centres, so floor — never round)
+function curFrame(){return Math.floor(((video&&video.currentTime)||0)*fps()+1e-4);}
 function snapFrame(t){return Math.max(0,Math.round((+t||0)*fps()))/fps();}   // quantize to the frame grid
 let _fpsKey="";
 async function loadClipFps(){
@@ -1927,7 +1952,10 @@ function stepFrame(d){
   const dur=video.duration||0;
   // land on the CENTRE of the target frame — seeking exactly on a boundary can decode the
   // neighbouring frame, which made stepping feel like it skipped
-  let f=frameOf(video.currentTime||0)+d;
+  // the CURRENT frame is floor(t·fps), not round(): after a step we sit on a frame's centre
+  // (f + 0.5), and round() read that as f+1 — so ⟨ landed on the same frame again and got
+  // stuck after a couple of clicks (and ⟩ skipped one)
+  let f=Math.floor((video.currentTime||0)*fps()+1e-4)+d;
   let t=Math.max(0,f/fps()+0.5/fps());
   if(dur)t=Math.min(dur-0.001,t);
   video.currentTime=t;
@@ -2040,7 +2068,7 @@ $("trimBar").addEventListener("pointerdown",e=>{
   if(!videoLoaded||(e.target.closest&&e.target.closest(".thandle")))return;
   e.preventDefault();
   const go=ev=>{const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
-    const t=snapFrame(xToTime(cx));video.currentTime=Math.min(t,Math.max(0,(video.duration||0)-0.001));
+    const t=(Math.floor(xToTime(cx)*fps())+0.5)/fps();video.currentTime=Math.min(t,Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
     if(!video.paused){video.pause();$("playBtn").textContent="▶";}
     if(typeof scheduleExact==="function")scheduleExact();};
   go(e);
@@ -2051,7 +2079,8 @@ $("trimHOut").addEventListener("pointerdown",trimDrag("out"));
 // I / O + buttons: park the playhead on the right frame with ⟨ ⟩, then stamp it into the trim
 function setTrimFromPlayhead(which){
   if(!videoLoaded)return;
-  const t=setTrimEdge(which,(video.currentTime||0),{noMagnet:true});
+  // In = the frame you SEE becomes the first kept frame; Out = the frame you see is the last kept
+  const f=curFrame(), t=setTrimEdge(which,(which==="in"?f:f+1)/fps(),{noMagnet:true});
   setStatus((which==="in"?"In":"Out")+" = "+tc(t)+" ("+t.toFixed(3)+" с, кадр "+frameOf(t)+")","ok");
 }
 if($("trimSetIn"))$("trimSetIn").onclick=()=>setTrimFromPlayhead("in");
@@ -3023,7 +3052,9 @@ async function doRevoice(list){
       orig.splice(s.os,s.oe-s.os,...fresh.map(w=>({word:w.word,start:w.start,end:w.end})));   // the audio now SAYS this
     });
     // swap the clip IN PLACE (Edit, LOC and the board hold the same objects); keep the old file for ↩
-    rvTargets(v.clip).forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;o.origWords=orig.map(w=>({...w}));});
+    const _vh=openHookRef();
+    rvTargets(v.clip).forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;o.origWords=orig.map(w=>({...w}));
+      if(o!==v&&o!==_vh&&("words" in o))o.words=cur.map(w=>({...w}));});   // board / LOC copies: the new words too, or they caption the new audio with the old text
     if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);   // ours — don't let the board re-add it as a new hook
     _rvSay={};_wRng=null;
     rvLoadVideo(API+d.url);
@@ -3043,12 +3074,9 @@ function undoRevoice(){
   const prev=st[st.length-1], v=variants[activeVar], cur=v&&v.clip, h=openHookRef();
   rvTargets(cur).forEach(o=>{if(o._rvFrom&&o._rvFrom.length&&o._rvFrom[o._rvFrom.length-1]===prev)o._rvFrom.pop();
     o.clip=prev.clip;o.videoUrl=prev.videoUrl;o.origWords=prev.origWords.map(w=>({...w}));
-    if(prev.kind==="cut"&&o!==v&&o!==h){o.trim=prev.trim;o.cuts=prev.cuts;}});
+    if(prev.kind!=="cut"&&o!==v&&o!==h&&("words" in o))o.words=prev.words.map(w=>({...w}));});
   if(prev.kind==="cut"){            // a cut moved every time in the clip — put them ALL back
-    const J=x=>x==null?x:JSON.parse(JSON.stringify(x));
-    v.trim=J(prev.trim);v.overlays=J(prev.overlays);v.capIn=prev.capIn;v.capOut=prev.capOut;_syncCuts(J(prev.cuts));
-    if(h){h.trim=J(prev.trim);if(prev.hookTitles!==undefined)h.titles=J(prev.hookTitles);if(prev.hookCap){h.cap_in=prev.hookCap[0];h.cap_out=prev.hookCap[1];}}
-    titles=J(prev.titles)||[];
+    cutRestore(prev);
     if(typeof loadCapWin==="function")loadCapWin(h||v);
     if(typeof renderTitles==="function")try{renderTitles();}catch(_){}
     cutLoadVideo(prev.videoUrl);
@@ -3080,29 +3108,45 @@ function drawCutMark(){
   const st=rvUndoStack(); if($("cutUndo"))$("cutUndo").style.display=(st&&st.length&&st[st.length-1].kind==="cut")?"":"none";
 }
 function cutMarkFromPlayhead(which){
-  if(!videoLoaded)return; const t=snapFrame(video.currentTime||0);
+  if(!videoLoaded)return; const f=curFrame(), t=(which==="a"?f:f+1)/fps();   // From = first frame removed, To = last frame removed (both the frame you see)
   if(which==="a"){_cut.a=t;if(_cut.b!=null&&_cut.b<=t)_cut.b=null;}
   else{if(_cut.a==null){setStatus("Спершу [ From — початок шматка.","err");return;}
     if(t<=_cut.a){setStatus("To має бути пізніше за From.","err");return;} _cut.b=t;}
   drawCutMark();
 }
+// Every object that holds THIS clip (Edit variant, the open pack hook, board copies, LOC tiles)
+// carries its own copies of words / trim / titles / stickers / caption window — each must move.
+const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out"];
 function cutSnapshot(v,h){
-  const J=x=>x==null?x:JSON.parse(JSON.stringify(x));
+  const J=x=>x==null?x:JSON.parse(JSON.stringify(x)), per=new Map();
+  rvTargets(v.clip).forEach(o=>{const s={};CUT_FIELDS.forEach(k=>{if(k in o)s[k]=J(o[k]);});per.set(o,s);});
   return {kind:"cut",clip:v.clip,videoUrl:v.videoUrl,words:(realWords||[]).map(w=>({...w})),origWords:(origWordsNow()||[]).map(w=>({...w})),
-    trim:J(v.trim),cuts:J(v.cuts),overlays:J(v.overlays),capIn:v.capIn,capOut:v.capOut,
-    titles:J(titles),hookTitles:h?J(h.titles):undefined,hookCap:h?[h.cap_in,h.cap_out]:undefined};
+    titles:J(titles),per};
 }
-function cutApplyTimes(v,h,spans,oldDur){
+function cutRestore(prev){
+  if(!prev.per)return;
+  prev.per.forEach((s,o)=>{Object.keys(s).forEach(k=>{o[k]=(s[k]==null)?s[k]:JSON.parse(JSON.stringify(s[k]));});});
+  titles=prev.titles?JSON.parse(JSON.stringify(prev.titles)):[];
+  const v=variants[activeVar];if(v&&v.cuts)_syncCuts(v.cuts);
+}
+function cutApplyTimes(targets,spans,oldDur,newWords){
   const R=t=>(t==null||t===""||isNaN(+t))?t:+cutRemapT(+t,spans).toFixed(3);
   const newDur=Math.max(0,oldDur-spans.reduce((s,[a,b])=>s+(b-a),0));
-  if(v.trim){const [i,o]=v.trim;v.trim=[R(i),(o>=oldDur-0.002)?+newDur.toFixed(3):R(o)];}
-  if(h&&h.trim){const [i,o]=h.trim;h.trim=[R(i),(o>=oldDur-0.002)?+newDur.toFixed(3):R(o)];}
-  if(v.cuts)_syncCuts(v.cuts.filter(c=>!cutInside(c,spans)).map(c=>R(c)));
-  (v.overlays||[]).forEach(o=>{o.in=R(o.in);o.out=R(o.out);});
-  const rt=list=>(list||[]).forEach(t=>{if(t.in!==""&&t.in!=null)t.in=R(t.in);if(t.out!==""&&t.out!=null)t.out=R(t.out);});
-  rt(titles); if(h&&h.titles&&h.titles!==titles)rt(h.titles);
-  if(v.capIn!=null)v.capIn=R(v.capIn); if(v.capOut!=null)v.capOut=R(v.capOut);
-  if(h){if(h.cap_in!=null)h.cap_in=R(h.cap_in);if(h.cap_out!=null)h.cap_out=R(h.cap_out);}
+  const RT=tr=>tr?[R(tr[0]),(tr[1]>=oldDur-0.002)?+newDur.toFixed(3):R(tr[1])]:tr;
+  const done=new Map();   // shared arrays (titles, cuts…) are re-timed ONCE and the result re-shared
+  const once=(arr,fn)=>{if(!arr)return arr;if(!done.has(arr))done.set(arr,fn(arr));return done.get(arr);};
+  const rtTitles=list=>{(list||[]).forEach(t=>{if(t.in!==""&&t.in!=null)t.in=R(t.in);if(t.out!==""&&t.out!=null)t.out=R(t.out);});return list;};
+  const v=variants[activeVar], h=openHookRef();
+  targets.forEach(o=>{
+    if(o.trim)o.trim=once(o.trim,RT);
+    if(o.cuts)o.cuts=once(o.cuts,c=>c.filter(x=>!cutInside(x,spans)).map(R));
+    if(o.overlays)o.overlays=once(o.overlays,l=>{l.forEach(x=>{x.in=R(x.in);x.out=R(x.out);});return l;});
+    if(o.titles)o.titles=once(o.titles,rtTitles);
+    ["capIn","capOut","cap_in","cap_out"].forEach(k=>{if(o[k]!=null)o[k]=R(o[k]);});
+    if(o!==v&&o!==h&&newWords&&("words" in o))o.words=newWords.map(w=>({...w}));   // board / LOC copies get the re-timed captions too
+  });
+  titles=once(titles,rtTitles)||titles;
+  if(v&&v.cuts)_syncCuts(v.cuts);
   if(typeof loadCapWin==="function")loadCapWin(h||v);
   if(typeof renderTitles==="function")try{renderTitles();}catch(_){}
 }
@@ -3118,10 +3162,11 @@ async function doCut(spans,speech){
     const r=await fetch(API+"/api/cut",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({file_id:fileId,clip:v.clip,spans,speech:!!speech,words:realWords||[],orig_words:origWordsNow()||[]})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"cut failed"));
-    const before=cutSnapshot(v,h);
-    cutApplyTimes(v,h,d.spans,oldDur);
-    rvTargets(v.clip).forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
-      o.origWords=(d.orig_words||[]).map(w=>({...w}));if(o!==v&&o!==h){o.trim=v.trim;o.cuts=v.cuts;}});
+    const before=cutSnapshot(v,h), targets=rvTargets(v.clip);
+    cutApplyTimes(targets,d.spans,oldDur,d.words||[]);
+    targets.forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
+      o.origWords=(d.orig_words||[]).map(w=>({...w}));});
+    const other=Object.keys(variants).filter(k=>k!==activeVar);   // dubs were made from the UNCUT clip
     if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
     _cut={a:null,b:null}; _wRng=null; _sentPick=null;
     cutLoadVideo(API+d.url);
@@ -3129,7 +3174,8 @@ async function doCut(spans,speech){
     if(typeof renderHookStrip==="function")renderHookStrip();
     busyDone("Вирізано");
     const moved=d.spans.map(([a,b],k)=>{const o=spans[k];return o&&(Math.abs(o[0]-a)>0.02||Math.abs(o[1]-b)>0.02);}).some(Boolean);
-    setStatus("✂ Вирізано "+tc(d.removed)+" ("+d.removed.toFixed(2)+" с) за "+d.seconds+" с"+(moved?" · межі зсунуто в паузу, щоб не різати слово":"")+". ↩ Undo cut — повернути.","ok");
+    setStatus("✂ Вирізано "+tc(d.removed)+" ("+d.removed.toFixed(2)+" с) за "+d.seconds+" с"+(moved?" · межі зсунуто в паузу, щоб не різати слово":"")+". ↩ Undo cut — повернути."
+      +(other.length?" ⚠ Локалізації ("+other.join(", ").toUpperCase()+") зроблені з НЕвирізаного кліпу — перезроби їх у LOC.":""),other.length?"err":"ok");
   }catch(e){busyStop();setStatus("Cut: "+e.message,"err");}
   drawCutMark();
 }
@@ -3271,6 +3317,85 @@ function voiceSentences(k0,k1){
   });
   document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&_sentPick&&txtView==="sents"){_sentPick=null;renderSentsView(true);} });
 })();
+// ---------- ♪ Hook music (ElevenLabs): one bed for every hook, not one per shot ----------
+let _hm={preset:"drama",track:null,presets:[]};
+const HM_LABELS={drama:"Drama",action:"Action",epic:"Epic",sadness:"Sadness",uplifting:"Uplifting",suspense:"Suspense"};
+async function hmInit(){
+  try{const r=await fetch(API+"/api/hookmusic/presets");const d=await r.json();_hm.presets=d.presets||[];}catch(_){_hm.presets=[];}
+  const box=$("hmPresets"); if(!box)return;
+  box.innerHTML=_hm.presets.map(p=>"<div class='chip"+(p.id===_hm.preset?" on":"")+"' data-mp='"+p.id+"'>"+(HM_LABELS[p.id]||p.id)+"</div>").join("");
+  const cur=_hm.presets.find(p=>p.id===_hm.preset); if(cur&&$("hmPrompt")&&!$("hmPrompt").value)$("hmPrompt").value=cur.prompt;
+  box.querySelectorAll("[data-mp]").forEach(c=>c.onclick=()=>{_hm.preset=c.dataset.mp;
+    box.querySelectorAll("[data-mp]").forEach(x=>x.classList.toggle("on",x===c));
+    const p=_hm.presets.find(x=>x.id===_hm.preset); if(p)$("hmPrompt").value=p.prompt;});
+}
+function hmHooks(){   // the hooks it goes under: the whole pack, or the one open clip
+  if(editPack&&editPack.length)return editPack;
+  const v=variants[activeVar]; return v&&v.clip?[v]:[];
+}
+function hmTargets(o){   // every object holding this hook's clip
+  const v=variants[activeVar];
+  if(v&&o.clip===v.clip)return rvTargets(o.clip);
+  const set=new Set([o]);(hooks||[]).forEach(x=>{if(x.clip===o.clip)set.add(x);});(editPack||[]).forEach(x=>{if(x.clip===o.clip)set.add(x);});return [...set];
+}
+function hmTop(o){const s=o._rvFrom;return (s&&s.length&&s[s.length-1].kind==="music")?s[s.length-1]:null;}
+function hmRefreshUndo(){const any=hmHooks().some(o=>hmTop(o));
+  if($("hmUndo"))$("hmUndo").style.display=any?"":"none";}
+async function hmGenerate(){
+  if(!fileId){setStatus("Hook music: спершу завантаж хук у сесію (Transcribe або пак).","err");return;}
+  const list=hmHooks(); if(!list.length){setStatus("Hook music: немає хуків.","err");return;}
+  // generate for the CLEAN clips (before any music we laid), so the length is the real hook length
+  const clips=list.map(o=>{const t=hmTop(o);return t?t.clip:o.clip;});
+  busyStart("♪ Генерую музику ("+(HM_LABELS[_hm.preset]||"custom")+")…");$("hmGen").disabled=true;
+  try{const r=await fetch(API+"/api/hookmusic/generate",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",clips})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"music failed"));
+    _hm.track=d; $("hmTrack").style.display="block"; $("hmAudio").src=API+d.url;
+    $("hmTrackLbl").textContent=d.name+" · "+tc(d.length)+" · за "+d.seconds+" с";
+    busyDone("Музика готова"); setStatus("♪ Музика готова ("+tc(d.length)+"). Послухай і тисни Apply.","ok");
+  }catch(e){busyStop();setStatus("Hook music: "+e.message,"err");}
+  $("hmGen").disabled=false;
+}
+async function hmApply(list){
+  if(!_hm.track){setStatus("Спершу ♪ Generate music.","err");return;}
+  const vol=(+$("hmVol").value||0)/100, duck=$("hmDuck").checked, strip=$("hmStrip").checked;
+  const v=variants[activeVar]; let ok=0, fail=[];
+  busyStart("♪ Кладу музику під "+list.length+" хук(и)"+(strip?" · прибираю стару музику":"")+"…");
+  for(let i=0;i<list.length;i++){
+    const o=list[i], top=hmTop(o), isActive=!!(v&&o.clip===v.clip);
+    const before=top||{kind:"music",clip:o.clip,videoUrl:o.videoUrl,words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
+    try{
+      setStatus("♪ Хук "+(i+1)+"/"+list.length+"…","",true);
+      const r=await fetch(API+"/api/hookmusic/apply",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:before.clip,track:_hm.track.name,volume:vol,duck,strip_original:strip})});
+      const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"apply failed"));
+      hmTargets(o).forEach(x=>{const s=(x._rvFrom=x._rvFrom||[]);if(top&&s.length&&s[s.length-1]===top)s.pop();   // re-apply = replace OUR music, never stack beds
+        s.push(before);x.clip=d.clip;x.videoUrl=API+d.url;});
+      if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
+      if(isActive)rvLoadVideo(API+d.url);
+      ok++;
+    }catch(e){fail.push((i+1)+": "+e.message);if(/дозволу|Немає ключа/.test(e.message))break;}
+  }
+  if(typeof renderHookStrip==="function")renderHookStrip();
+  if(fail.length){busyStop();setStatus("♪ Готово "+ok+"/"+list.length+". Помилки — "+fail.join(" · "),"err");}
+  else{busyDone("Музику додано");setStatus("♪ Музика під "+ok+" хук(ами)"+(strip?", стару музику прибрано":"")+". ↩ Undo music — повернути.","ok");}
+  hmRefreshUndo();
+}
+function hmUndoAll(){
+  const v=variants[activeVar]; let n=0;
+  hmHooks().forEach(o=>{const top=hmTop(o); if(!top)return;
+    hmTargets(o).forEach(x=>{const s=x._rvFrom; if(s&&s.length&&s[s.length-1]===top)s.pop(); x.clip=top.clip; x.videoUrl=top.videoUrl;});
+    if(v&&v.clip===top.clip)rvLoadVideo(top.videoUrl);   // it was the open clip
+    n++;});
+  if(typeof renderHookStrip==="function")renderHookStrip();
+  setStatus("↩ Музику прибрано з "+n+" хук(ів) — звук як був.","ok"); hmRefreshUndo();
+}
+if($("hmGen"))$("hmGen").onclick=hmGenerate;
+if($("hmApplyAll"))$("hmApplyAll").onclick=()=>hmApply(hmHooks());
+if($("hmApplyOne"))$("hmApplyOne").onclick=()=>{const h=openHookRef(),v=variants[activeVar];hmApply([h||v].filter(Boolean));};
+if($("hmUndo"))$("hmUndo").onclick=hmUndoAll;
+if($("hmVol"))$("hmVol").oninput=e=>{$("hmVolLbl").textContent=e.target.value;if($("hmAudio"))$("hmAudio").volume=Math.min(1,(+e.target.value)/100*2);};
+hmInit();
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
@@ -3337,7 +3462,7 @@ $("transcribeBtn").onclick=async()=>{
   setStatus("Transcribing… (first Whisper run loads the model)","",true);busyStart("Транскрибую…");$("transcribeBtn").disabled=true;
   try{
     let d;
-    if(videoFile){   // fresh single clip → upload + transcribe
+    if(videoFile&&!(fileId&&curClip)){   // fresh single clip → upload + transcribe (once in the session, re-transcribe THAT clip — it may be cut or re-voiced)
       const fd=new FormData();fd.append("file",videoFile);fd.append("engine",$("engine").value);fd.append("model_size",$("modelSize").value);fd.append("language",$("language").value);
       const r=await fetch(API+"/api/transcribe",{method:"POST",body:fd});d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
       fileId=d.file_id;
