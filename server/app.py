@@ -906,7 +906,9 @@ def hookmusic_generate(req: HookMusicGenReq):
     from concurrent.futures import ThreadPoolExecutor
     sdir = _session_dir(req.file_id)
     prompt = (req.prompt or "").strip() or music11.PRESETS.get(req.preset) or music11.PRESETS["drama"]
-    tags = [req.preset] if req.preset in music11.PRESETS else []
+    tags = music11.PRESET_TAGS.get(req.preset, [])
+    if req.preset in ("drama", "action", "epic", "sadness", "suspense"):
+        prompt = prompt.rstrip(". ") + "." + music11.NOT_PLAYFUL
     if not req.hooks:
         raise HTTPException(400, "Немає хуків для музики")
 

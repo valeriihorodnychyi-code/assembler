@@ -43,6 +43,20 @@ PRESETS = {
 }
 
 
+# Video-to-Music lets the PICTURE drive the mood; the description alone was too weak (an "Epic"
+# request came back as curious bells and xylophone). Tags are the strongest steer the endpoint
+# has (max 10) — so each template carries a full, unambiguous set.
+PRESET_TAGS = {
+    "drama":    ["cinematic", "drama", "emotional", "strings", "piano", "underscore", "serious"],
+    "action":   ["action", "trailer", "intense", "driving drums", "synth bass", "tension", "aggressive"],
+    "epic":     ["epic", "orchestral", "trailer", "brass", "big drums", "heroic", "powerful", "dark"],
+    "sadness":  ["sad", "melancholic", "piano", "cello", "slow", "emotional", "minimal"],
+    "uplifting": ["uplifting", "motivational", "hopeful", "pop", "bright", "positive"],
+    "suspense": ["suspense", "thriller", "dark", "tense", "drones", "mysterious", "ominous"],
+}
+NOT_PLAYFUL = " Serious tone — not playful, not whimsical, no bells, no xylophone, no music-box."
+
+
 class MusicError(Exception):
     pass
 

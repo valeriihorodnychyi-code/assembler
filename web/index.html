@@ -480,7 +480,8 @@
         </span>
         <span class="tmid"><span id="trimDurLbl"></span>
           <span id="trimAll" class="tlink" title="Застосувати цей трім до всіх кліпів паку (локалізації тайм-align до оригіналу)" style="display:none">⧉ All clips</span>
-          <span id="trimReset" class="tlink" title="Прибрати трім">reset</span></span>
+          <span id="trimReset" class="tlink" title="Прибрати трім">reset</span>
+          <button id="trimApply" class="tmini" style="display:none" title="Відрізати непотрібне НАЗАВЖДИ: новий файл лише з залишеною частиною. Далі детект сцен, музика, переозвучка працюють тільки з ним. ↩ в History повертає.">✂ Apply trim</button></span>
         <span class="tgrp" style="justify-content:flex-end">
           <button id="trimPlayOut" class="tmini ticon" title="Подивитись хвіст: 1.5 с до Out">▶</button>
           <span class="tval"><b id="trimOutLbl">0.000s</b></span>
@@ -1902,11 +1903,13 @@ function updateEditButtons(){
   show("saveHookBtn",editing);
   // Export CTA: ONE current video → the green Export pulses (export it directly);
   // more than one video (a pack) → Export hides and the Assemble button pulses instead.
-  const eb=$("exportBtn"), showExp=(!pack&&!editing&&videoLoaded);
-  show("exportBtn",showExp); if(eb)eb.classList.toggle("pulse-cta",showExp);
+  // A pack of ONE (a single Jira task) is just one clip — Export stays the main action. In a bigger
+  // pack Export is still there for the open clip, just quiet: Assemble is the step that pulses.
+  const solo=editPack.length<=1, eb=$("exportBtn"), showExp=(!editing&&videoLoaded);
+  show("exportBtn",showExp); if(eb){eb.classList.toggle("pulse-cta",showExp&&solo);eb.textContent=solo?"⬇ Export":"⬇ Export this clip";}
   show("normalizeBtn",showExp);   // same situations as Export: one loaded clip in Edit
   show("srtBtn",showExp&&!!(realWords&&realWords.length));   // needs a transcript to write cues from
-  const ap=$("sendPackAsmBtn"); if(ap)ap.classList.toggle("pulse-cta",pack&&!editing&&!locpack);
+  const ap=$("sendPackAsmBtn"); if(ap)ap.classList.toggle("pulse-cta",pack&&!solo&&!editing&&!locpack);
   // Transcribe is the FIRST step, so it has to look like it: filled + pulsing while the loaded
   // clip still has no words, quiet once there's a transcript.
   const tb=$("transcribeBtn");
@@ -2040,6 +2043,7 @@ function drawTrimBar(){
   const cut=(i>0.0005||o<dur-0.0005);
   $("trimDurLbl").innerHTML=(cut?"Kept ":"Length ")+"<b style='color:var(--txt)'>"+tc(o-i)+"</b>";
   $("trimDurLbl").title=(o-i).toFixed(3)+" с · "+(frameOf(o)-frameOf(i))+" кадрів · "+Math.round(fps())+" fps"+(cut?" · відрізано "+tc(dur-(o-i)):"");
+  if($("trimApply"))$("trimApply").style.display=cut?"":"none";
 }
 function xToTime(clientX){const r=$("trimBar").getBoundingClientRect();const f=Math.min(1,Math.max(0,(clientX-r.left)/r.width));return f*(video.duration||0);}
 // Set a handle to an exact time: quantized to the frame grid, magnet-snapped to scene cuts,
@@ -3125,7 +3129,7 @@ function drawCutMark(){
     el.style.left=(a/dur*100)+"%";el.style.width=Math.max(0.3,(e-a)/dur*100)+"%";}
   if($("cutLbl"))$("cutLbl").innerHTML=(a==null)?"<span style='opacity:.7'>playhead → From → To</span>"
     :("<b>"+tc(a)+"</b> → "+(b!=null?"<b>"+tc(b)+"</b> · "+tc(b-a):"…"));
-  if($("cutGo"))$("cutGo").disabled=!(a!=null&&b!=null&&b>a)||!fileId;
+  if($("cutGo"))$("cutGo").disabled=!(a!=null&&b!=null&&b>a);
   if($("cutClear"))$("cutClear").style.display=(a!=null)?"":"none";
   if($("cutUndo"))$("cutUndo").style.display="none";   // one named ↩ lives in the History row now
   renderHistory();
@@ -3176,7 +3180,29 @@ function cutApplyTimes(targets,spans,oldDur,newWords){
 function cutLoadVideo(url){const t=video.currentTime||0;video.src=url;
   video.onloadedmetadata=()=>{videoLoaded=true;try{video.currentTime=Math.min(t,(video.duration||t));}catch(_){}
     if(typeof syncTrim==="function")syncTrim(); if(typeof updateCutsLabel==="function")updateCutsLabel(); drawCutMark();};}
-async function doCut(spans,speech){
+// ✂ Apply trim: the trim becomes REAL — a new file with only the kept part, so scene detection,
+// music, SFX and re-voice stop working on footage that never goes into the creative.
+function applyTrim(){
+  const dur=video.duration||0, i=pf($("trimIn").value,0), o=pf($("trimOut").value,dur)||dur;
+  const spans=[]; if(i>0.0005)spans.push([0,i]); if(o<dur-0.0005)spans.push([o,dur]);
+  if(!spans.length){setStatus("Трім не встановлено — нічого відрізати.","");return;}
+  doCut(spans,false,{label:"✂ Trim applied · "+tc(o-i),clearTrim:true});
+}
+// a freshly dropped clip isn't on the server yet — put it there (once) so it can be cut
+async function ensureSessionClip(){
+  const v=variants[activeVar]||(variants[activeVar]={clip:null,words:null,style:readControls(),trim:null});
+  if(fileId&&v.clip)return true;
+  if(!videoFile)return false;
+  setStatus("Завантажую кліп у сесію…","",true);
+  const fd=new FormData();fd.append("file",videoFile);fd.append("file_id",fileId||"");
+  const r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});const d=await r.json();
+  if(!r.ok)throw new Error(d.detail||"upload failed");
+  fileId=d.file_id;v.clip=d.name;if(!v.videoUrl)v.videoUrl=video.src;
+  return true;
+}
+async function doCut(spans,speech,opts){
+  opts=opts||{};
+  try{await ensureSessionClip();}catch(e){setStatus("Cut: "+e.message,"err");return;}
   const v=variants[activeVar], h=openHookRef();
   if(!v||!v.clip||!fileId){setStatus("Cut працює з кліпом у сесії — спершу завантаж відео.","err");return;}
   const oldDur=video.duration||0;
@@ -3186,8 +3212,10 @@ async function doCut(spans,speech){
       body:JSON.stringify({file_id:fileId,clip:v.clip,spans,speech:!!speech,words:realWords||[],orig_words:origWordsNow()||[]})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"cut failed"));
     const before=cutSnapshot(v,h), targets=rvTargets(v.clip);
-    before.label="✂ Cut "+tc(d.removed)+" @ "+tc(d.spans[0][0]);
+    before.label=opts.label||("✂ Cut "+tc(d.removed)+" @ "+tc(d.spans[0][0]));
+    if(opts.clearTrim)before.undoName="trim";
     cutApplyTimes(targets,d.spans,oldDur,d.words||[]);
+    if(opts.clearTrim)targets.forEach(o=>{if("trim" in o)o.trim=null;});   // the file IS the trim now
     targets.forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
       o.origWords=(d.orig_words||[]).map(w=>({...w}));});
     const other=Object.keys(variants).filter(k=>k!==activeVar);   // dubs were made from the UNCUT clip
@@ -3203,6 +3231,7 @@ async function doCut(spans,speech){
   }catch(e){busyStop();setStatus("Cut: "+e.message,"err");}
   drawCutMark();
 }
+if($("trimApply"))$("trimApply").onclick=applyTrim;
 if($("cutFrom"))$("cutFrom").onclick=()=>cutMarkFromPlayhead("a");
 if($("cutTo"))$("cutTo").onclick=()=>cutMarkFromPlayhead("b");
 if($("cutClear"))$("cutClear").onclick=()=>{_cut={a:null,b:null};drawCutMark();};
@@ -3220,7 +3249,7 @@ function renderHistory(){
   el.style.display="flex";
   el.innerHTML="<span style='font-weight:600;color:var(--txt)'>History</span>"
     +steps.map((s,i)=>(i?"<span class='harr'>→</span>":"")+"<span class='hstep"+(i===steps.length-1?" cur":"")+"' title='"+String(s).replace(/'/g,"&#39;")+"'>"+s+"</span>").join("")
-    +"<span style='flex:1'></span><button type='button' id='histUndo' class='tmini' title='Скасувати останній крок: "+String(top.label||"").replace(/'/g,"&#39;")+"'>↩ Undo "+(HIST_NAME[top.kind]||"re-voice")+"</button>";
+    +"<span style='flex:1'></span><button type='button' id='histUndo' class='tmini' title='Скасувати останній крок: "+String(top.label||"").replace(/'/g,"&#39;")+"'>↩ Undo "+(top.undoName||HIST_NAME[top.kind]||"re-voice")+"</button>";
   $("histUndo").onclick=()=>{undoRevoice();renderHistory();if(typeof hmRefreshUndo==="function")hmRefreshUndo();};
 }
 if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{if(_cut.a!=null&&_cut.b==null)drawCutMark();});
@@ -3384,9 +3413,12 @@ function hmTop(o){const s=o._rvFrom;return (s&&s.length&&s[s.length-1].kind==="m
 function hmRefreshUndo(){const any=hmHooks().some(o=>hmTop(o));
   if($("hmUndo"))$("hmUndo").style.display=any?"":"none";}
 const hmClean=o=>{const t=hmTop(o);return t?t.clip:o.clip;};   // the hook BEFORE any music we laid
-async function hmGenerate(){
+// Every Generate is a new TAKE (the model never gives the same thing twice): keep them all per
+// hook, flip ◀ ▶ between them, ↻ re-rolls one hook only. Apply uses the take you're on.
+function hmCur(o){const t=(_hm.tracks||{})[hmClean(o)];return t&&t.takes&&t.takes.length?t.takes[t.i]:null;}
+async function hmGenerate(only){
   if(!fileId){setStatus("Hook music: спершу завантаж хук у сесію (Transcribe або пак).","err");return;}
-  const list=hmHooks(); if(!list.length){setStatus("Hook music: немає хуків.","err");return;}
+  const all=hmHooks(), list=only?[only]:all; if(!list.length){setStatus("Hook music: немає хуків.","err");return;}
   const fromVideo=$("hmFromVideo")?$("hmFromVideo").checked:true;
   const hooksReq=list.map(o=>({clip:hmClean(o),trim:o.trim||null}));
   busyStart("♪ "+(fromVideo?"Аналізую відео і пишу":"Генерую")+" музику для "+list.length+" хук(ів) ("+(HM_LABELS[_hm.preset]||"custom")+")…");$("hmGen").disabled=true;
@@ -3394,22 +3426,31 @@ async function hmGenerate(){
       body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",hooks:hooksReq,from_video:fromVideo,add_sfx:!!(fromVideo&&$("hmSfx")&&$("hmSfx").checked)})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"music failed"));
     _hm.tracks=_hm.tracks||{}; const errs=[], notes=new Set();
-    (d.items||[]).forEach(it=>{if(it.error)errs.push(it.clip+": "+it.error);else{_hm.tracks[it.clip]=it;if(it.note)notes.add(it.note);}});
+    (d.items||[]).forEach(it=>{if(it.error){errs.push(it.clip+": "+it.error);return;}
+      it.preset=HM_LABELS[_hm.preset]||"custom"; if(it.note)notes.add(it.note);
+      const slot=(_hm.tracks[it.clip]=_hm.tracks[it.clip]||{takes:[],i:0}); slot.takes.push(it); slot.i=slot.takes.length-1;});
     _hm.track=true; hmRenderList();
     busyDone("Музика готова");
-    setStatus("♪ Музика готова для "+(d.items.length-errs.length)+"/"+d.items.length+" хук(ів) за "+d.seconds+" с."+(notes.size?" "+[...notes].join(" · "):"")+(errs.length?" Помилки: "+errs.join(" · "):" Послухай і тисни Apply."),errs.length?"err":"ok");
+    setStatus("♪ Нова версія для "+(d.items.length-errs.length)+"/"+d.items.length+" хук(ів) за "+d.seconds+" с."+(notes.size?" "+[...notes].join(" · "):"")+(errs.length?" Помилки: "+errs.join(" · "):" ◀ ▶ — попередні версії, ↻ — ще раз для одного хука."),errs.length?"err":"ok");
   }catch(e){busyStop();setStatus("Hook music: "+e.message,"err");}
-  $("hmGen").disabled=false;
+  $("hmGen").disabled=false; $("hmGen").textContent=Object.keys(_hm.tracks||{}).length?"↻ Regenerate for all hooks":"♪ Generate music";
 }
 function hmRenderList(){
   const box=$("hmList"); if(!box)return;
-  const list=hmHooks(); const rows=list.map((o,i)=>{const t=(_hm.tracks||{})[hmClean(o)];
-    return t?"<div style='font-size:11px;color:var(--muted)'>Hook "+(i+1)+" · "+tc(t.span[1]-t.span[0])+(o.trim?" (trimmed)":"")
-      +"<audio controls preload='none' src='"+API+t.url+"' style='width:100%;height:30px;margin-top:2px'></audio>"
-      +(t.sfx_url?"<div style='margin-top:2px'>SFX</div><audio controls preload='none' src='"+API+t.sfx_url+"' style='width:100%;height:30px'></audio>":"")+"</div>"
-      :"<div style='font-size:11px;color:var(--muted)'>Hook "+(i+1)+" · немає треку — Generate</div>";});
-  box.innerHTML=rows.join(""); $("hmTrack").style.display=Object.keys(_hm.tracks||{}).length?"block":"none";
-  if($("hmSfxVolRow"))$("hmSfxVolRow").style.display=Object.values(_hm.tracks||{}).some(t=>t.sfx)?"":"none";
+  const list=hmHooks();
+  box.innerHTML=list.map((o,i)=>{const slot=(_hm.tracks||{})[hmClean(o)], t=hmCur(o);
+    const nav=slot&&slot.takes.length>1?"<button type='button' class='tmini ticon' data-hmprev='"+i+"'>◀</button><span style='margin:0 4px'>take "+(slot.i+1)+"/"+slot.takes.length+"</span><button type='button' class='tmini ticon' data-hmnext='"+i+"'>▶</button>":"";
+    return "<div style='font-size:11px;color:var(--muted)'><div style='display:flex;align-items:center;gap:4px;flex-wrap:wrap'><span style='flex:1'>Hook "+(i+1)
+      +(t?" · "+tc(t.span[1]-t.span[0])+(o.trim?" (trimmed)":"")+" · "+t.preset:" · немає треку")+"</span>"+nav
+      +"<button type='button' class='tmini' data-hmre='"+i+"' title='Згенерувати ще одну версію лише для цього хука (поточний шаблон і промпт)'>↻</button></div>"
+      +(t?"<audio controls preload='none' src='"+API+t.url+"' style='width:100%;height:30px;margin-top:2px'></audio>"
+        +(t.sfx_url?"<div style='margin-top:2px'>SFX</div><audio controls preload='none' src='"+API+t.sfx_url+"' style='width:100%;height:30px'></audio>":""):"")+"</div>";}).join("");
+  box.querySelectorAll("[data-hmre]").forEach(b=>b.onclick=()=>hmGenerate(list[+b.dataset.hmre]));
+  const flip=(i,d)=>{const s=_hm.tracks[hmClean(list[i])];if(!s)return;s.i=(s.i+d+s.takes.length)%s.takes.length;hmRenderList();};
+  box.querySelectorAll("[data-hmprev]").forEach(b=>b.onclick=()=>flip(+b.dataset.hmprev,-1));
+  box.querySelectorAll("[data-hmnext]").forEach(b=>b.onclick=()=>flip(+b.dataset.hmnext,1));
+  $("hmTrack").style.display=Object.keys(_hm.tracks||{}).length?"block":"none";
+  if($("hmSfxVolRow"))$("hmSfxVolRow").style.display=list.some(o=>{const t=hmCur(o);return t&&t.sfx;})?"":"none";
 }
 async function hmApply(list){
   if(!_hm.tracks||!Object.keys(_hm.tracks).length){setStatus("Спершу ♪ Generate music.","err");return;}
@@ -3417,9 +3458,9 @@ async function hmApply(list){
   const v=variants[activeVar]; let ok=0, fail=[];
   busyStart("♪ Кладу музику під "+list.length+" хук(и)"+(strip?" · прибираю стару музику":"")+"…");
   for(let i=0;i<list.length;i++){
-    const o=list[i], top=hmTop(o), isActive=!!(v&&o.clip===v.clip), trk=_hm.tracks[hmClean(o)];
+    const o=list[i], top=hmTop(o), isActive=!!(v&&o.clip===v.clip), trk=hmCur(o);
     if(!trk){fail.push((i+1)+": немає треку — Generate");continue;}
-    const before=top||{kind:"music",label:"♪ Music · "+(HM_LABELS[_hm.preset]||"custom"),clip:o.clip,videoUrl:o.videoUrl,words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
+    const before=top||{kind:"music",label:"♪ Music · "+(trk.preset||HM_LABELS[_hm.preset]||"custom"),clip:o.clip,videoUrl:o.videoUrl,words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
     try{
       setStatus("♪ Хук "+(i+1)+"/"+list.length+"…","",true);
       const r=await fetch(API+"/api/hookmusic/apply",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -3447,7 +3488,7 @@ function hmUndoAll(){
   if(typeof renderHookStrip==="function")renderHookStrip();
   setStatus("↩ Музику прибрано з "+n+" хук(ів) — звук як був.","ok"); hmRefreshUndo(); if(typeof renderHistory==="function")renderHistory();
 }
-if($("hmGen"))$("hmGen").onclick=hmGenerate;
+if($("hmGen"))$("hmGen").onclick=()=>hmGenerate();
 if($("hmApplyAll"))$("hmApplyAll").onclick=()=>hmApply(hmHooks());
 if($("hmApplyOne"))$("hmApplyOne").onclick=()=>{const h=openHookRef(),v=variants[activeVar];hmApply([h||v].filter(Boolean));};
 if($("hmUndo"))$("hmUndo").onclick=hmUndoAll;
