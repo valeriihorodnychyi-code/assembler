@@ -187,6 +187,22 @@ def test_two_spans_one_clone_one_pass():
     assert len(res["spans"]) == 2 and abs(freq(out, 4.2) - 880) < 40
 
 
+def test_restricted_key_says_which_permission_is_missing():
+    """1.9.65 in production: a key that transcribes fine got a bare '401' on clone."""
+    class F(Fake11):
+        def post(self, url, **k):
+            return _R(401, {"detail": {"status": "missing_permissions",
+                                       "message": "The API key you used is missing the permission voices_write to execute this operation."}})
+    clip, out = os.path.join(TMP, "clip7.mp4"), os.path.join(TMP, "out7.mp4")
+    make_clip(clip)
+    try:
+        RV.revoice(clip, [SPAN], out, requests=F())
+    except RV.RevoiceError as e:
+        assert "Voices: Write" in str(e) and "voices_write" in str(e), str(e)
+    else:
+        raise AssertionError("must fail")
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     failed = 0

@@ -83,6 +83,25 @@ def mean_volume(path, start=None, length=None):
 
 # ---------------------------------------------------------------- ElevenLabs calls
 
+def _auth_error(r, what):
+    """401/403 → a message a designer can act on. ElevenLabs keys are RESTRICTED by default: a key
+    that transcribes and dubs fine can still lack the Voices / Text-to-Speech permissions that
+    re-voice needs — the answer then is {"detail": {"status": "missing_permissions", ...}}."""
+    try:
+        d = (r.json() or {}).get("detail") or {}
+    except Exception:
+        d = {}
+    status = d.get("status") if isinstance(d, dict) else ""
+    msg = (d.get("message") if isinstance(d, dict) else str(d)) or ""
+    if status == "missing_permissions" or "permission" in msg.lower():
+        return (f"Ключ ElevenLabs робочий, але без дозволу на {what}. Відкрий elevenlabs.io → "
+                "Developers → API Keys → цей ключ → увімкни Voices: Write і Text to Speech "
+                "(або зроби ключ без обмежень). Відповідь ElevenLabs: " + msg[:160])
+    if status in ("invalid_api_key", "") and r.status_code == 401:
+        return ("ElevenLabs не прийняв ключ (401" + (f", {status}" if status else "") + "). Перевір ключ у ⚙ Settings — "
+                "без пробілів, той самий, що в elevenlabs.io → Developers → API Keys." + (f" ({msg[:120]})" if msg else ""))
+    return f"ElevenLabs відмовив ({r.status_code}{', ' + status if status else ''}): {msg[:200]}"
+
 def clone_voice(sample_path, requests, api_key=None, name=None):
     """Instant voice clone from the clip's own audio → voice_id. Background-noise removal stays
     OFF by default: it degrades clean samples, and the endpoint failed with it on (status
@@ -94,8 +113,8 @@ def clone_voice(sample_path, requests, api_key=None, name=None):
                                 "remove_background_noise": "false"},
                           files=[("files", (os.path.basename(sample_path), f, "audio/mpeg"))],
                           timeout=120)
-    if r.status_code == 401:
-        raise RevoiceError("ElevenLabs не прийняв ключ (401).")
+    if r.status_code in (401, 403):
+        raise RevoiceError(_auth_error(r, "клонування голосу (Voices → Write)"))
     if r.status_code != 200:
         raise RevoiceError(f"Клон голосу не вдався ({r.status_code}): {(r.text or '')[:200]}")
     vid = (r.json() or {}).get("voice_id")
@@ -125,6 +144,8 @@ def synth(voice_id, text, requests, previous_text="", next_text="", api_key=None
                       params={"output_format": "mp3_44100_128"},
                       headers={"xi-api-key": _key(api_key), "Content-Type": "application/json"},
                       data=json.dumps(body), timeout=120)
+    if r.status_code in (401, 403):
+        raise RevoiceError(_auth_error(r, "озвучки (Text to Speech)"))
     if r.status_code != 200:
         raise RevoiceError(f"Генерація не вдалась ({r.status_code}): {(r.text or '')[:200]}")
     d = r.json() or {}
