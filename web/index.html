@@ -1153,6 +1153,10 @@ $("settingsSave").onclick=async()=>{
   const _ld=$("libDir")?$("libDir").value.trim():"";
   if(/^[a-z]+:\/\//i.test(_ld)){   // stop the URL before it ever reaches the server
     setStatus("Це веб-посилання. Потрібен ШЛЯХ до синхронізованої папки на цьому Mac: у Finder правий клік на папці → ⌥⌘C.","err");return;}
+  // Atlassian API tokens start with "ATATT" — anything else in this field is almost certainly
+  // another service's key (an ADAM token once overwrote a working Jira token this way)
+  const _jt=$("jiraToken")?$("jiraToken").value.trim():"";
+  if(_jt&&!/^ATATT/.test(_jt)&&!confirm("Це не схоже на Jira API token (вони починаються з «ATATT»). Може, це ключ іншого сервісу (ADAM, ElevenLabs)? Зберегти все одно?"))return;
   try{const r=await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({elevenlabs_api_key:$("keyEleven").value,heygen_api_key:$("keyHeygen").value,
         synclab_api_key:($("keySynclab")?$("keySynclab").value:""),
