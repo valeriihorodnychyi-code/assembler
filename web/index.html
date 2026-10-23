@@ -1761,7 +1761,12 @@ function openJiraPop(){
   $("jiraGo").onclick=jiraImport;
   $("jiraText").focus();
   // ask the server, don't trust a flag set at page load (it showed "add your token" over a working setup)
-  fetch(API+"/api/jira/status").then(r=>r.json()).then(d=>{jiraReady=!!d.configured;if($("jiraWarn"))$("jiraWarn").style.display=jiraReady?"none":"block";}).catch(()=>{});
+  fetch(API+"/api/jira/status?check=1").then(r=>r.json()).then(d=>{jiraReady=!!d.configured;
+    const w=$("jiraWarn"); if(!w)return;
+    if(!d.configured){w.style.display="block";return;}
+    if(d.ok===false){w.innerHTML="⚠ "+String(d.error||"Jira не відповідає").replace(/</g,"&lt;")+" <b id='jiraToSettings2' style='cursor:pointer;text-decoration:underline'>⚙ Settings</b>";w.style.display="block";
+      if($("jiraToSettings2"))$("jiraToSettings2").onclick=()=>{p.remove();if($("settingsBtn"))$("settingsBtn").click();};return;}
+    w.style.display="block";w.style.color="var(--ok)";w.textContent="✓ Jira: "+(d.name||d.email)+(d.gateway?" (токен зі scopes)":"");}).catch(()=>{});
 }
 async function jiraImport(){
   const text=($("jiraText")||{}).value||"";

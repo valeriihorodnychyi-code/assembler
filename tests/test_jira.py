@@ -69,6 +69,8 @@ class FakeJira:
 
     def get(self, url, params=None, headers=None, timeout=None, **k):
         self.calls.append(("GET", url))
+        if url.endswith("/myself"):
+            return _R(200, {"displayName": "Test", "accountId": "x"})
         key = url.rsplit("/", 1)[-1]
         return _R(200, self.db[key]) if key in self.db else _R(404)
 
@@ -225,6 +227,37 @@ def test_task_without_the_creative_id_field_is_found_by_its_name():
     # and its DE localization finds the same master the same way
     res = J.resolve(en.replace("_EN_", "_DE_"), requests=FakeJira([iss]))
     assert not res["errors"] and res["items"][0]["loc_of"] == "WCP-16117", res
+
+
+def test_a_bad_token_says_so_instead_of_not_found():
+    """Jira answers a search with bad credentials as ANONYMOUS: 200, zero issues → the UI said
+    "no task with this name" for tasks that exist. /myself first catches it."""
+    class Dead(FakeJira):
+        def get(self, url, **k):
+            return _R(401) if "myself" in url else _R(404)
+    J._CONN.clear()
+    try:
+        J.resolve("WF_112007_111994_WO_EN_tai_DAV_Vid_New_1080x1920", requests=Dead([]))
+    except J.JiraError as e:
+        assert "не приймає токен" in str(e)
+    else:
+        raise AssertionError("must fail loudly")
+
+
+def test_scoped_token_goes_through_the_api_gateway():
+    class Scoped(FakeJira):
+        def get(self, url, **k):
+            if url.endswith("/_edge/tenant_info"):
+                return _R(200, {"cloudId": "c-123"})
+            if "/myself" in url:
+                return _R(200, {"displayName": "V"}) if url.startswith("https://api.atlassian.com/ex/jira/c-123") else _R(401)
+            return FakeJira.get(self, url, **k)
+    J._CONN.clear()
+    fake = Scoped([make_issue("YCP-8482", "YG", 104973, 99257)])
+    res = J.resolve("YCP-8482", requests=fake)
+    assert res["items"] and any(u.startswith("https://api.atlassian.com/ex/jira/c-123/rest/api/3/issue/") for _, u in fake.calls)
+    assert res["items"][0]["link"].startswith("https://welltech.atlassian.net/browse/"), "links stay on the site"
+    J._CONN.clear()
 
 
 def test_one_bad_task_does_not_sink_the_batch():

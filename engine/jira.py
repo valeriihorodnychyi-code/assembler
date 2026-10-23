@@ -167,6 +167,44 @@ def _headers(email, token):
             "Content-Type": "application/json"}
 
 
+# ---------------------------------------------------------------- connection
+# Two things make a token look "fine" while every search comes back EMPTY:
+#  * Jira answers a search with bad / expired credentials as an ANONYMOUS user → 200 and zero
+#    results, so the UI said "no task with this name" for tasks that exist (Oct 2026).
+#  * API tokens "with scopes" (Atlassian's newer default) are not accepted on the site URL at all;
+#    they only work through the gateway https://api.atlassian.com/ex/jira/<cloudId>.
+# So before any search: who am I? (/myself). If the site says 401, try the gateway; if both say
+# no, stop with a message that says what to do — instead of a misleading "not found".
+_CONN = {}
+
+
+def connect(site, email, token, requests):
+    """→ (api_host_path, me) — the base to call and the account the token belongs to."""
+    ck = (site, email, token)
+    if ck in _CONN:
+        return _CONN[ck]
+    h = _headers(email, token)
+    r = requests.get(f"https://{site}/rest/api/3/myself", headers=h, timeout=20)
+    if r.status_code == 200:
+        _CONN[ck] = (site, r.json() or {})
+        return _CONN[ck]
+    # scoped token? → the API gateway of this site's cloud
+    try:
+        t = requests.get(f"https://{site}/_edge/tenant_info", timeout=15)
+        cloud = (t.json() or {}).get("cloudId") if t.status_code == 200 else None
+    except Exception:
+        cloud = None
+    if cloud:
+        api = f"api.atlassian.com/ex/jira/{cloud}"
+        g = requests.get(f"https://{api}/rest/api/3/myself", headers=h, timeout=20)
+        if g.status_code == 200:
+            _CONN[ck] = (api, g.json() or {})
+            return _CONN[ck]
+    raise JiraError("Jira не приймає токен (" + str(r.status_code) + "): він прострочений, відкликаний або від іншого email. "
+                    "Перевипусти на id.atlassian.com → Security → API tokens (для токена зі scopes потрібні "
+                    "read:jira-work і read:jira-user) і збережи в ⚙ Settings.")
+
+
 def _get_issue(key, site, email, token, fields, requests):
     r = requests.get(f"https://{site}/rest/api/3/issue/{key}",
                      params={"fields": ",".join(fields)},
@@ -436,6 +474,7 @@ def resolve(text, requests=None):
     site, email, token = load_creds()
     if not (email and token):
         raise JiraError("Jira не налаштована: додай email і API token у ⚙ Settings")
+    api, _me = connect(site, email, token, requests)   # calls go to `api`, links keep `site`
     fm = fields_map()
     want = ["summary", "status"] + list(fm.values())
     items, unrec = parse_items(text)
@@ -447,7 +486,7 @@ def resolve(text, requests=None):
             if it["kind"] == "asset" and it["value"] in by_name:
                 continue
             if it["kind"] == "key":
-                issue = _get_issue(it["value"], site, email, token, want, requests)
+                issue = _get_issue(it["value"], api, email, token, want, requests)
             else:
                 name = it["value"]
                 m = _ASSET.match(name)
@@ -457,7 +496,7 @@ def resolve(text, requests=None):
                 # whose summary is EXACTLY this name — text search tokenizes on "_".
                 jql = (f'cf[{fm["cid"].split("_")[-1]}] = {cid}' if cid
                        else f'summary ~ "\\"{name}\\""')
-                hits = _search(jql, site, email, token, want, requests)
+                hits = _search(jql, api, email, token, want, requests)
                 exact = [h for h in hits if _text((h.get("fields") or {}).get("summary")).strip() == name]
                 if not exact and m:
                     # the creative-id field can be empty or different on some projects (WCP-16117 had
@@ -467,7 +506,7 @@ def resolve(text, requests=None):
                     seen = {h.get("key") for h in hits}
                     for q in (f'summary ~ "\\"{name}\\""', f'summary ~ "\\"{pre}\\""'):
                         try:
-                            more = _search(q, site, email, token, want, requests)
+                            more = _search(q, api, email, token, want, requests)
                         except Exception:
                             more = []
                         hits += [h for h in more if h.get("key") not in seen]

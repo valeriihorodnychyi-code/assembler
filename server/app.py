@@ -692,9 +692,21 @@ class JiraReq(BaseModel):
 
 
 @app.get("/api/jira/status")
-def api_jira_status():
-    site, email, _ = jira.load_creds()
-    return {"configured": jira.configured(), "site": site, "email": email}
+def api_jira_status(check: bool = False):
+    """check=1 → really ask Jira who the token belongs to (the import window shows the answer)."""
+    site, email, token = jira.load_creds()
+    out = {"configured": jira.configured(), "site": site, "email": email}
+    if check and out["configured"]:
+        import requests as _rq
+        try:
+            api, me = jira.connect(site, email, token, _rq)
+            out.update(ok=True, name=me.get("displayName") or me.get("emailAddress") or email,
+                       gateway=api.startswith("api.atlassian.com"))
+        except jira.JiraError as e:
+            out.update(ok=False, error=str(e))
+        except Exception as e:
+            out.update(ok=False, error=f"Jira недоступна: {type(e).__name__}")
+    return out
 
 
 @app.post("/api/jira/resolve")
