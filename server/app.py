@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 # allow "python -m server.app" and direct execution
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, synclab, jira, revoice, music11  # noqa: E402
+from engine import styles as st, compose, transcribe, ffmpeg_utils, localize, library, subtitles, textrules, synclab, jira, revoice, music11, bodydetect  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(ROOT, "web")
@@ -682,6 +682,29 @@ def api_detect_cuts(req: DetectCutsReq):
     except Exception as e:
         raise HTTPException(500, f"Cut detection failed: {e}")
     return {"cuts": cuts}
+
+
+class DetectBodyReq(BaseModel):
+    file_id: str
+    clips: List[str] = []
+
+
+@app.post("/api/detect_body")
+def api_detect_body(req: DetectBodyReq):
+    """Hook | Body boundary for every clip of the pack — found by comparing the clips' tails."""
+    import time as _t
+    sdir = _session_dir(req.file_id)
+    clips = []
+    for c in req.clips:
+        p = os.path.join(sdir, os.path.basename(c))
+        if os.path.exists(p):
+            clips.append({"id": os.path.basename(c), "path": p})
+    if len(clips) < 2:
+        return {"items": {}, "note": "для порівняння потрібні хоча б 2 кліпи"}
+    t0 = _t.time()
+    res = bodydetect.detect(clips)
+    _log_timing("detect_body", _t.time() - t0, f"{len(clips)} clips")
+    return {"items": res, "seconds": round(_t.time() - t0, 1)}
 
 
 # ---------- Jira → session: paste task keys / links / asset names, get the videos ----------

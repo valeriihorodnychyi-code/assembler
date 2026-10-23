@@ -1,6 +1,6 @@
 """Captions Studio engine — unified subtitle + localization pipeline."""
 from . import (styles, subtitles, compose, transcribe, ffmpeg_utils,
-               dub, heygen, synclab, jira, revoice, music11, localize, library)
+               dub, heygen, synclab, jira, revoice, music11, bodydetect, localize, library)
 
 __all__ = ["styles", "subtitles", "compose", "transcribe", "ffmpeg_utils",
            "dub", "heygen", "synclab", "jira", "revoice", "localize", "library"]

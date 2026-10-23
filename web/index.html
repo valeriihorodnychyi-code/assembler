@@ -105,9 +105,26 @@
   #cutMark.open{border-right-style:dashed;background:rgba(255,70,50,.18)}
   .cutRow{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);padding-top:6px;border-top:1px dashed var(--line);flex-wrap:wrap}
   .cutRow .clbl{font-weight:600;color:var(--txt);margin-right:2px}
-  .cutRow #cutLbl{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}   /* flex-basis 0: the label never widens the centre column (it is auto-sized) */
+  .cutRow #cutLbl{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}   /* flex-basis 0: the label never widens the centre column (it is auto-sized) */
   .tmini.tcut:not(:disabled){background:#ff5a44;border-color:#ff5a44;color:#fff;font-weight:600}
   .tmini:disabled{opacity:.45;cursor:default}
+  #trimBar .cutTick{position:absolute;top:0;bottom:0;width:9px;margin-left:-4.5px;z-index:3;cursor:pointer}
+  #trimBar .cutTick::after{content:"";position:absolute;left:3.5px;top:3px;bottom:3px;width:2px;border-radius:1px;background:#ffd400;opacity:.85}
+  #trimBar .cutTick:hover::after{background:#fff;opacity:1}
+  #bodyZone{position:absolute;top:0;bottom:0;display:none;pointer-events:none;background:rgba(56,189,248,.10);border-left:2px solid #38bdf8}
+  #bodyMark{position:absolute;top:-14px;bottom:-3px;width:14px;margin-left:-7px;display:none;z-index:5;pointer-events:none}   /* only the flag grabs — a cut under the boundary stays double-clickable */
+  #bodyMark b{pointer-events:auto;cursor:ew-resize;position:absolute;top:0;left:7px;font:700 8px/12px system-ui;padding:0 4px;border-radius:3px;background:#38bdf8;color:#04202c;white-space:nowrap}
+  .toolRow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .tchip{font-size:11px;padding:4px 9px;border-radius:7px;background:#23262f;border:1px solid #3a3e4a;color:var(--txt);display:inline-flex;gap:6px;align-items:center}
+  .tchip:hover{border-color:#5a5f6e;background:#2a2e38}
+  .tchip.off{opacity:.55}
+  .tchip .tdot{width:7px;height:7px;border-radius:50%;background:#ffd400}
+  .tchip.body .tdot{background:#38bdf8}
+  .tpop{position:fixed;z-index:220;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;min-width:220px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12px}
+  .tpop button{display:block;width:100%;text-align:left;background:transparent;border:0;padding:7px 9px;border-radius:6px;font-size:12px}
+  .tpop button:hover{background:#2a2d36}
+  .tpop .tsep{height:1px;background:var(--line);margin:4px 2px}
+  .tpop label{display:flex;gap:8px;align-items:center;padding:6px 9px;cursor:pointer;color:var(--muted)}
   .hmrow{border:1px solid var(--line);border-radius:8px;padding:6px 7px;background:#1b1d24;font-size:11px;color:var(--muted)}
   .hmrow .hmtop{display:flex;align-items:center;gap:5px}
   .hmrow .hmname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -303,7 +320,11 @@
   #quickPanel .grp>summary:hover{background:transparent}
   #quickPanel .grp[open]>summary{background:transparent;color:var(--txt)}
   #quickPanel .grp .body{padding:6px 4px 10px}
-  #filmstrip{flex-direction:row!important;flex-wrap:wrap;justify-content:center;max-height:none;gap:8px}
+  #filmstrip{flex-direction:row!important;flex-wrap:wrap;justify-content:center;align-items:flex-start;max-height:none;gap:8px}
+  #filmstrip .fgroup{display:flex;flex-direction:column;align-items:center;gap:5px}
+  #filmstrip .fsub{display:flex;flex-direction:column;gap:5px;padding:5px 0 2px;border-left:2px solid var(--accent2);padding-left:5px;margin-left:8px}
+  #filmstrip .fcard.fmini{width:46px}
+  #filmstrip .fcard.fmini canvas{width:46px;height:82px}
   #filmstrip .fcard{width:56px}
   #filmstrip .fcard canvas{width:56px;height:99px}
   #quickPanel .row{margin:7px 0}
@@ -481,6 +502,8 @@
         <div id="trimDimL" class="tdim"></div><div id="trimDimR" class="tdim"></div>
         <div id="trimSel"></div>
         <div id="cutMark"></div>
+        <div id="bodyZone"></div>
+        <div id="bodyMark" title="Hook | Body — тягни, щоб пересунути"><b>BODY ▸</b></div>
         <div id="trimCuts" style="position:absolute;inset:0;pointer-events:none"></div>
         <div id="trimHIn" class="thandle tin" title="In — тягни (або клік і Alt+← / →)"><i></i></div>
         <div id="trimHOut" class="thandle tout" title="Out — тягни (або клік і Alt+← / →)"><i></i></div>
@@ -501,6 +524,11 @@
           <span class="tval"><b id="trimOutLbl">0.000s</b></span>
           <button id="trimSetOut" class="tmini" title="Out = кадр плейхеда (клавіша O)">Set Out ⇥</button>
         </span>
+      </div>
+      <div class="toolRow">
+        <button type="button" id="tbCuts" class="tchip" title="Scene cuts: автоматично для кожного кліпу; подвійний клік по жовтій рисці — прибрати кат"><span class="tdot"></span><span id="tbCutsLbl">Cuts</span> ▾</button>
+        <button type="button" id="tbBody" class="tchip body" title="Межа Hook | Body: знаходиться порівнянням кліпів паку"><span class="tdot"></span><span id="tbBodyLbl">Body</span> ▾</button>
+        <span id="tbStatus" style="font-size:10.5px;color:var(--muted)"></span>
       </div>
       <div class="cutRow" title="Вирізати шматок ПОСЕРЕДИНІ кліпу: відео і звук разом, титри зсуваються">
         <span class="clbl">✂ Cut</span>
@@ -1676,7 +1704,8 @@ requestAnimationFrame(loop);
 // ---------- video ----------
 function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if($("language"))$("language").value="";if(typeof setLangSticker==="function")setLangSticker(null);
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
-  video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();updateEditButtons();};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
+  video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();updateEditButtons();
+    if(typeof AUTO!=="undefined"&&AUTO.cuts&&!editPack.length)setTimeout(()=>autoAnalyze(),400);};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
   variants={en:{clip:null,videoUrl:url,words:null,style:readControls(),trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
   if(typeof invalidateLayout==="function")invalidateLayout();
   setStatus("Video loaded. Transcribe for captions, or just trim & Send to Compose as-is.","");}
@@ -1734,6 +1763,7 @@ function finishPack(ok,focus){
   if(ok){busyDone(ok+" хуків завантажено");
     $("dropzone").style.display="none";video.hidden=false;canvas.hidden=false;videoLoaded=true;
     activeHook=-1;renderHookTiles();selectHook(Math.max(0,Math.min(focus||0,editPack.length-1)));updateEditButtons();
+    setTimeout(()=>{if(typeof autoAnalyze==="function")autoAnalyze();},300);   // cuts per clip + the Hook | Body boundary, in the background
     setStatus(ok+" хуків завантажено. Обери модель (small / medium) і тисни «① Transcribe pack».","ok");
   } else busyStop();
 }
@@ -1887,39 +1917,64 @@ function renderHookStrip(){
   if(gh)gh.style.display=editPack.length?"":"none";        // an empty "Projects" column costs no width
   if(!editPack.length){fs.style.display="none";fs.innerHTML="";return;}
   fs.style.display="flex";fs.innerHTML="";
-  editPack.forEach((h,i)=>{
-    const card=document.createElement("div");card.className="fcard"+(i===activeHook?" active":"");card.title="Поправити хук "+(i+1);
-    const cv=document.createElement("canvas");cv.width=180;cv.height=320;card.appendChild(cv);
-    const badge=document.createElement("div");badge.className="fb";badge.textContent=(i+1);card.appendChild(badge);
-    if(h.titles&&h.titles.length){const tb=document.createElement("div");   // this clip has its own titles
-      tb.textContent="T"+(h.titles.length>1?h.titles.length:"");tb.title=h.titles.length+" тайтл(и) на цьому кліпі";
-      tb.style.cssText="position:absolute;top:4px;right:4px;font:700 9px/1 system-ui;padding:3px 4px;border-radius:5px;background:var(--accent2);color:#08120c";
-      card.appendChild(tb);}
-    if(h.jira){const jb=document.createElement("div");
-      jb.textContent=(h.jira.burned_in?"⚠ ":"")+h.jira.key+(h.jira.loc?" · "+h.jira.loc:"");
-      jb.title=h.jira.key+" · "+(h.jira.asset||"")+(h.jira.warn?("\n"+h.jira.warn):"");
-      jb.style.cssText="position:absolute;left:3px;right:3px;bottom:3px;font:700 8px/1.2 system-ui;padding:2px 3px;border-radius:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-        +(h.jira.burned_in?"background:var(--accent);color:#fff":"background:rgba(0,0,0,.7);color:#cfe3ff");
-      card.appendChild(jb);card.title=jb.title;}
-    const x=document.createElement("button");x.type="button";x.className="fclose";x.textContent="✕";
-    x.title="Close this project (прибрати з паку; файли в сесії лишаються)";
-    x.onclick=e=>{e.stopPropagation();closeProject(i);};card.appendChild(x);
-    card.onclick=()=>selectHook(i);
-    fs.appendChild(card);
-    drawThumb(cv,{videoUrl:h.videoUrl,words:h.words,style:h.ctrl},"hook"+i);
+  // EN = the PROJECT, its localizations = sub-items: one column per project, the language
+  // versions stacked under it and shown only while that project (or one of its languages) is
+  // open. Purely visual — editPack stays flat, so Transcribe pack / Send pack / music don't change.
+  const groups=packGroups();
+  groups.forEach(g=>{
+    const col=document.createElement("div");col.className="fgroup";
+    const open=g.idx.includes(activeHook);
+    col.appendChild(mkHookCard(g.idx[0],false,g.idx.length-1));
+    if(g.idx.length>1&&open){const sub=document.createElement("div");sub.className="fsub";
+      g.idx.slice(1).forEach(i=>sub.appendChild(mkHookCard(i,true,0)));col.appendChild(sub);}
+    fs.appendChild(col);
   });
+}
+// [{idx:[parent, ...localizations]}] — a localization joins the project with the same Jira key
+function packGroups(){
+  const out=[], byKey={};
+  editPack.forEach((h,i)=>{const j=h.jira, isLoc=!!(j&&j.loc);
+    if(!isLoc){const g={idx:[i]};out.push(g);if(j&&j.key)byKey[j.key]=byKey[j.key]||g;}});
+  editPack.forEach((h,i)=>{const j=h.jira; if(!(j&&j.loc))return;
+    const g=byKey[j.key]; if(g)g.idx.push(i); else out.push({idx:[i]});});   // a language without its EN in the pack stands alone
+  return out;
+}
+function mkHookCard(i,mini,nLoc){
+  const h=editPack[i];
+  const card=document.createElement("div");card.className="fcard"+(i===activeHook?" active":"")+(mini?" fmini":"");card.title="Поправити хук "+(i+1);
+  const cv=document.createElement("canvas");cv.width=180;cv.height=320;card.appendChild(cv);
+  if(!mini){const badge=document.createElement("div");badge.className="fb";badge.textContent=(i+1);card.appendChild(badge);}   // a language card says its language at the bottom
+  if(!mini&&h.titles&&h.titles.length){const tb=document.createElement("div");   // this clip has its own titles
+    tb.textContent="T"+(h.titles.length>1?h.titles.length:"");tb.title=h.titles.length+" тайтл(и) на цьому кліпі";
+    tb.style.cssText="position:absolute;top:4px;right:4px;font:700 9px/1 system-ui;padding:3px 4px;border-radius:5px;background:var(--accent2);color:#08120c";
+    card.appendChild(tb);}
+  if(h.jira){const jb=document.createElement("div");
+    jb.textContent=mini?((h.jira.burned_in?"⚠ ":"")+(h.jira.loc||"")):((h.jira.burned_in?"⚠ ":"")+h.jira.key+(nLoc?" · 🌍"+nLoc:""));
+    jb.title=h.jira.key+(h.jira.loc?" · "+h.jira.loc:"")+" · "+(h.jira.asset||"")+(h.jira.warn?("\n"+h.jira.warn):"")+(nLoc?"\n🌍 "+nLoc+" локалізац. — клікни, щоб розгорнути":"");
+    jb.style.cssText="position:absolute;left:3px;right:3px;bottom:3px;font:700 8px/1.2 system-ui;padding:2px 3px;border-radius:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+      +(h.jira.burned_in?"background:var(--accent);color:#fff":"background:rgba(0,0,0,.7);color:#cfe3ff");
+    card.appendChild(jb);card.title=jb.title;}
+  const x=document.createElement("button");x.type="button";x.className="fclose";x.textContent="✕";
+  x.title=nLoc?"Close this project with its "+nLoc+" localizations":"Close (прибрати з паку; файли в сесії лишаються)";
+  x.onclick=e=>{e.stopPropagation();closeProject(i);};card.appendChild(x);
+  card.onclick=()=>selectHook(i);
+  drawThumb(cv,{videoUrl:h.videoUrl,words:h.words,style:h.ctrl},"hook"+i);
+  return card;
 }
 // ✕ on a project card: take a clip loaded by mistake OUT of the pack (files stay in the session).
 function closeProject(i){
   const h=editPack[i]; if(!h)return;
   if(editPack.length===1){setStatus("Це єдиний проект у паку — завантаж інший (LOAD VIDEO / JIRA), щоб замінити.","");return;}
-  const name=(h.jira&&h.jira.key)||("Hook "+(i+1));
-  if(!confirm("Close "+name+"? Його правки в паку зникнуть, файли в сесії лишаються."))return;
+  const g=packGroups().find(x=>x.idx[0]===i), drop=(g&&!(h.jira&&h.jira.loc))?g.idx.slice():[i];   // closing a PROJECT takes its languages too
+  if(drop.length>=editPack.length){setStatus("Це єдиний проект у паку — завантаж інший (LOAD VIDEO / JIRA), щоб замінити.","");return;}
+  const name=((h.jira&&h.jira.key)||("Hook "+(i+1)))+(h.jira&&h.jira.loc?" · "+h.jira.loc:"");
+  if(!confirm("Close "+name+(drop.length>1?" і "+(drop.length-1)+" локалізац.":"")+"? Правки в паку зникнуть, файли в сесії лишаються."))return;
   saveActiveHook();
-  const wasActive=(i===activeHook);
-  editPack.splice(i,1);
-  if(wasActive){activeHook=-1;selectHook(Math.min(i,editPack.length-1));}
-  else{if(i<activeHook)activeHook--;}
+  const curClip=editPack[activeHook]&&editPack[activeHook].clip, wasActive=drop.includes(activeHook);
+  const keep=editPack.filter((_,k)=>!drop.includes(k));
+  editPack.length=0; keep.forEach(x=>editPack.push(x));
+  if(wasActive){activeHook=-1;selectHook(Math.min(Math.min(...drop),editPack.length-1));}
+  else{activeHook=editPack.findIndex(x=>x.clip===curClip);}
   renderHookStrip();updateEditButtons();
   if(typeof hmRenderList==="function")hmRenderList();
   setStatus("Закрито "+name+". У паку "+editPack.length+".","ok");
@@ -2083,6 +2138,7 @@ function drawTrimBar(){
   $("trimDimL").style.width=li+"%";$("trimDimR").style.width=Math.max(0,100-lo)+"%";   // what gets CUT is dimmed, what stays is clear
   $("trimHIn").style.left=li+"%";$("trimHOut").style.left=lo+"%";
   if(typeof drawCutMark==="function")drawCutMark();
+  if(typeof drawBodyMark==="function")drawBodyMark();
   // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
   $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
   $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
@@ -3189,7 +3245,7 @@ function cutMarkFromPlayhead(which){
 }
 // Every object that holds THIS clip (Edit variant, the open pack hook, board copies, LOC tiles)
 // carries its own copies of words / trim / titles / stickers / caption window — each must move.
-const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out"];
+const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out","body"];
 function cutSnapshot(v,h){
   const J=x=>x==null?x:JSON.parse(JSON.stringify(x)), per=new Map();
   rvTargets(v.clip).forEach(o=>{const s={};CUT_FIELDS.forEach(k=>{if(k in o)s[k]=J(o[k]);});per.set(o,s);});
@@ -3215,7 +3271,7 @@ function cutApplyTimes(targets,spans,oldDur,newWords){
     if(o.cuts)o.cuts=once(o.cuts,c=>c.filter(x=>!cutInside(x,spans)).map(R));
     if(o.overlays)o.overlays=once(o.overlays,l=>{l.forEach(x=>{x.in=R(x.in);x.out=R(x.out);});return l;});
     if(o.titles)o.titles=once(o.titles,rtTitles);
-    ["capIn","capOut","cap_in","cap_out"].forEach(k=>{if(o[k]!=null)o[k]=R(o[k]);});
+    ["capIn","capOut","cap_in","cap_out","body"].forEach(k=>{if(o[k]!=null)o[k]=R(o[k]);});
     if(o!==v&&o!==h&&newWords&&("words" in o))o.words=newWords.map(w=>({...w}));   // board / LOC copies get the re-timed captions too
   });
   titles=once(titles,rtTitles)||titles;
@@ -3589,6 +3645,102 @@ if($("hmVol"))$("hmVol").oninput=e=>{$("hmVolLbl").textContent=e.target.value;};
 if($("hmSfxVol"))$("hmSfxVol").oninput=e=>{$("hmSfxVolLbl").textContent=e.target.value;};
 if($("hmFromVideo"))$("hmFromVideo").onchange=e=>{if($("hmSfx")){$("hmSfx").disabled=!e.target.checked;if(!e.target.checked)$("hmSfx").checked=false;}};
 hmInit();
+// ---------- Auto: scene cuts + the Hook | Body boundary ----------
+// Cuts are detected for every clip as soon as it lands in the session (a cheap decode of a
+// 320-px copy); the body boundary is found by comparing the clips of the pack (one shared body,
+// different hooks). Both can be switched OFF per designer (remembered in this browser) — then
+// they run only from the ▾ menus. Double-click a yellow cut to remove it (L- / J-cuts).
+function _pref(k,d){try{const v=localStorage.getItem(k);return v==null?d:v==="1";}catch(_){return d;}}
+function _prefSet(k,v){try{localStorage.setItem(k,v?"1":"0");}catch(_){}}
+const AUTO={cuts:_pref("cs_autoCuts",true),body:_pref("cs_autoBody",true)};
+let _autoBusy=false;
+function cutHolder(){return openHookRef()||variants[activeVar]||null;}
+function autoStatus(t){const el=$("tbStatus");if(el)el.textContent=t||"";}
+function setCutsFor(o,cuts){o.cuts=cuts;o._cutsDone=true;const v=variants[activeVar];
+  if(v&&(v===o||v.clip===o.clip)){_syncCuts(cuts);updateCutsLabel();if(typeof scheduleExact==="function")scheduleExact();}}
+async function cutsFor(o){
+  const thr=$("cutSens")?+$("cutSens").value:0.3;
+  const r=await fetch(API+"/api/detect_cuts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,clip:o.clip,threshold:thr})});
+  const d=await r.json(); if(!r.ok)throw new Error(d.detail||"detect failed"); return d.cuts||[];
+}
+const snapToCut=(t,cuts)=>{if(t==null)return t;let best=null;(cuts||[]).forEach(c=>{if(Math.abs(c-t)<=0.6&&(best==null||Math.abs(c-t)<Math.abs(best-t)))best=c;});return best!=null?+best.toFixed(3):t;};
+async function runBody(force){
+  if(editPack.length<2){if(force)setStatus("Body: для порівняння потрібно ≥2 кліпи в паку. Можна поставити вручну — Set body here.","");return;}
+  autoStatus("◧ шукаю боді…");
+  const r=await fetch(API+"/api/detect_body",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,clips:editPack.map(h=>h.clip)})});
+  const d=await r.json(); if(!r.ok)throw new Error(d.detail||"body failed");
+  const items=d.items||{}; let found=0;
+  editPack.forEach(h=>{if(h.bodyManual&&!force)return; const it=items[h.clip];
+    h.body=it&&it.body!=null?snapToCut(it.body,h.cuts):null; h.bodyN=it?it.matched:0; h.bodyManual=false; if(h.body!=null)found++;});
+  // a localization that matched nobody takes its EN project's boundary (same timeline)
+  if(typeof packGroups==="function")packGroups().forEach(g=>{const p=editPack[g.idx[0]];g.idx.slice(1).forEach(i=>{const c=editPack[i];if(c.body==null&&p&&p.body!=null){c.body=p.body;c.bodyN=p.bodyN;}});});
+  const v=variants[activeVar],h=openHookRef(); if(v&&h)v.body=h.body;
+  if(force||found)setStatus(found?("◧ Боді знайдено в "+found+"/"+editPack.length+" кліпів"+(found<editPack.length?" · решта — Set body here":"")+"."):"◧ Спільного боді не знайдено — у кліпів різні хвости. Постав межу вручну: Body ▾ → Set body here.",found?"ok":"");
+}
+async function autoAnalyze(what){
+  if(_autoBusy)return; _autoBusy=true;
+  try{
+    if(!editPack.length){try{if(!(await ensureSessionClip()))return;}catch(_){return;}}
+    const list=editPack.length?editPack.slice():[variants[activeVar]].filter(Boolean);
+    if(what==="cuts"||(!what&&AUTO.cuts)){
+      for(let i=0;i<list.length;i++){const o=list[i]; if(!what&&(o._cutsDone||(o.cuts&&o.cuts.length)))continue;
+        autoStatus("✂ кати "+(i+1)+"/"+list.length+"…");
+        try{setCutsFor(o,await cutsFor(o));}catch(e){autoStatus("✂ "+e.message);}}
+    }
+    if(what==="body"||(!what&&AUTO.body&&editPack.length>=2))await runBody(what==="body");
+  }catch(e){setStatus("Auto: "+e.message,"err");}
+  finally{_autoBusy=false;autoStatus("");renderToolBtns();drawBodyMark();}
+}
+function renderToolBtns(){
+  const o=cutHolder(), n=(variants[activeVar]&&variants[activeVar].cuts||[]).length;
+  if($("tbCutsLbl"))$("tbCutsLbl").textContent="Cuts · "+n;
+  if($("tbBodyLbl"))$("tbBodyLbl").textContent="Body · "+(o&&o.body!=null?tc(o.body):"—");
+  if($("tbCuts"))$("tbCuts").classList.toggle("off",!AUTO.cuts);
+  if($("tbBody"))$("tbBody").classList.toggle("off",!AUTO.body);
+}
+function drawBodyMark(){
+  const o=cutHolder(), dur=video.duration||0, m=$("bodyMark"), z=$("bodyZone"); if(!m||!z)return;
+  if(!o||o.body==null||!dur){m.style.display="none";z.style.display="none";renderToolBtns();return;}
+  const l=Math.max(0,Math.min(100,o.body/dur*100));
+  m.style.display="block";m.style.left=l+"%";z.style.display="block";z.style.left=l+"%";z.style.width=(100-l)+"%";
+  m.title="Hook | Body @ "+tc(o.body)+(o.bodyManual?" (вручну)":o.bodyN?" · збіг з "+o.bodyN+" кліп(ами)":"")+" — тягни, щоб пересунути";
+  renderToolBtns();
+}
+function setBody(t,manual){const o=cutHolder(); if(!o)return; o.body=(t==null)?null:+t.toFixed(3); o.bodyManual=!!manual;
+  const v=variants[activeVar],h=openHookRef(); if(v&&h){v.body=o.body;h.body=o.body;h.bodyManual=o.bodyManual;}
+  drawBodyMark();}
+(function wireBodyMark(){
+  const m=$("bodyMark"); if(!m)return;
+  m.querySelector("b").addEventListener("pointerdown",e=>{e.preventDefault();e.stopPropagation();
+    const move=ev=>{const t=snapFrame(xToTime(ev.clientX));setBody(t,true);if(videoLoaded&&video.paused)video.currentTime=Math.min(t,(video.duration||t)-0.001);};
+    const up=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up);
+      const o=cutHolder(); if(o&&o.body!=null)setStatus("◧ Body з "+tc(o.body)+" (вручну).","ok");};
+    document.addEventListener("pointermove",move);document.addEventListener("pointerup",up);});
+})();
+function toolPop(btn,items){
+  const old=$("tpop"); if(old){old.remove(); if(old._for===btn)return;}
+  const p=document.createElement("div");p.id="tpop";p.className="tpop";p._for=btn;
+  items.forEach(it=>{if(it==="-"){const s=document.createElement("div");s.className="tsep";p.appendChild(s);return;}
+    if(it.check!=null){const l=document.createElement("label");l.innerHTML="<input type='checkbox'"+(it.check?" checked":"")+"> "+it.label;
+      l.querySelector("input").onchange=e=>{it.on(e.target.checked);};p.appendChild(l);return;}
+    const b=document.createElement("button");b.type="button";b.textContent=it.label;if(it.title)b.title=it.title;
+    b.onclick=()=>{p.remove();it.on();};p.appendChild(b);});
+  document.body.appendChild(p);
+  const r=btn.getBoundingClientRect(); p.style.left=Math.min(r.left,innerWidth-p.offsetWidth-8)+"px"; p.style.top=(r.bottom+6)+"px";
+  if(r.bottom+6+p.offsetHeight>innerHeight)p.style.top=(r.top-6-p.offsetHeight)+"px";
+  setTimeout(()=>document.addEventListener("pointerdown",function off(e){if(!p.contains(e.target)&&e.target!==btn&&!btn.contains(e.target)){p.remove();document.removeEventListener("pointerdown",off);}}),0);
+}
+if($("tbCuts"))$("tbCuts").onclick=()=>toolPop($("tbCuts"),[
+  {label:"↻ Detect cuts now",title:"Перерахувати кати цього кліпу",on:async()=>{const o=cutHolder();if(!o)return;
+    try{await ensureSessionClip();autoStatus("✂ рахую…");setCutsFor(o,await cutsFor(o));setStatus("✂ Катів: "+(o.cuts||[]).length+". Подвійний клік по рисці — прибрати.","ok");}catch(e){setStatus("Cuts: "+e.message,"err");}autoStatus("");renderToolBtns();}},
+  {label:"↻ Detect for all clips",on:()=>{editPack.forEach(h=>h._cutsDone=false);autoAnalyze("cuts");}},
+  {label:"✕ Clear cuts of this clip",on:()=>{clearCuts();renderToolBtns();}},
+  "-",{label:"Auto-detect when clips load",check:AUTO.cuts,on:v=>{AUTO.cuts=v;_prefSet("cs_autoCuts",v);renderToolBtns();}}]);
+if($("tbBody"))$("tbBody").onclick=()=>toolPop($("tbBody"),[
+  {label:"↻ Detect body (compare the pack)",title:"Порівняти кліпи паку з кінця: де закінчується спільний хвіст — там боді",on:()=>autoAnalyze("body")},
+  {label:"⇥ Set body here (playhead)",on:()=>{setBody(curFrame()/fps(),true);setStatus("◧ Body з "+tc(curFrame()/fps())+".","ok");}},
+  {label:"✕ No body (whole clip is the hook)",on:()=>{setBody(null,true);}},
+  "-",{label:"Auto-detect when a pack loads",check:AUTO.body,on:v=>{AUTO.body=v;_prefSet("cs_autoBody",v);renderToolBtns();}}]);
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
@@ -4552,8 +4704,14 @@ function renderCutTicks(){
   const v=variants[activeVar],dur=video.duration||0;
   if(!v||!v.cuts||!v.cuts.length||!dur)return;
   v.cuts.forEach(c=>{const d=document.createElement("div");d.className="cutTick";
-    // marker only — scrubbing across the bar used to DELETE a cut on click; remove cuts via the 🎬 chips
-    d.style.cssText="position:absolute;top:3px;bottom:3px;width:2px;margin-left:-1px;background:#ffd400;opacity:.8;z-index:2;pointer-events:none;border-radius:1px;left:"+Math.max(0,Math.min(100,(c/dur)*100))+"%";
+    // a wide invisible hit area around a 2-px line. Single click falls through to scrubbing;
+    // DOUBLE-click removes the cut (an L-cut / J-cut is not a scene change for the captions)
+    d.title="Scene cut "+tc(+c)+" — double-click to remove";
+    d.style.left=Math.max(0,Math.min(100,(c/dur)*100))+"%";
+    d.ondblclick=e=>{e.stopPropagation();e.preventDefault();
+      const cur=((variants[activeVar]||{}).cuts||[]).filter(x=>Math.abs(x-c)>=0.001);_syncCuts(cur);updateCutsLabel();
+      if(typeof scheduleExact==="function")scheduleExact();if(typeof renderToolBtns==="function")renderToolBtns();
+      setStatus("Кат "+tc(+c)+" прибрано.","ok");};
     bar.appendChild(d);});
 }
 function updateCutsLabel(){const v=variants[activeVar];const n=(v&&v.cuts)?v.cuts.length:0;const el=$("cutsLabel");if(el)el.textContent=n?(n+" cuts"):"none";renderCutTicks();renderCutChips();}
