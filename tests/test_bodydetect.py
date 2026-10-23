@@ -41,6 +41,29 @@ def test_boundary_is_where_each_hook_ends():
     assert res["1es"]["matched"] >= 2, "the localization is compared with the OTHER projects"
 
 
+def test_noisy_frames_inside_the_body_do_not_stop_the_walk():
+    """1.9.87 in production: 4 creatives, body from 0:16 in all — found at 0:18, 0:16, 1:11, 1:29,
+    because single differing frames inside the body ended the comparison."""
+    from engine import bodydetect as BB
+    import random
+    random.seed(1)
+    body = [bytes([random.randrange(256) for _ in range(256)]) for _ in range(200)]
+    def clip(hook_seed, glitch):
+        random.seed(hook_seed)
+        hook = [bytes([random.randrange(256) for _ in range(256)]) for _ in range(64)]
+        fr = hook + [bytes(body[i]) for i in range(200)]
+        for k in glitch:                           # re-encode glitches inside the body — in ONE clip only
+            fr[k] = bytes(255 - x for x in fr[k])
+        return fr
+    a, b = clip(7, (90, 91, 140, 170, 171, 172)), clip(8, ())
+    assert BB.tail_match(a, b) == 200, BB.tail_match(a, b)
+    old = 0                                        # what the 1.9.87 walk would have said
+    for k in range(min(len(a), len(b))):
+        if BB._mad(a[-1 - k], b[-1 - k]) < BB.THR: old = k + 1
+        elif k + 1 < len(a) and BB._mad(a[-2 - k], b[-2 - k]) >= BB.THR: break
+    assert old < 200, "fixture must reproduce the old failure"
+
+
 def test_a_clip_that_matches_nobody_gets_no_body():
     a = make("x1.mp4", "color=c=green", 3.0, body_len=3.0)
     b = os.path.join(TMP, "x2.mp4")

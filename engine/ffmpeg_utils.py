@@ -82,10 +82,10 @@ def detect_scene_cuts(path: str, threshold: float = 0.3) -> list:
     sensitive (catches softer transitions), higher = only hard cuts.
     """
     import re
-    # scored on a 320-px copy: the scene score is a frame-difference measure, it barely changes
-    # with resolution, and decoding + scoring a 6-minute 1080p master gets several times faster
+    # full resolution: a 320-px copy (1.9.87) was faster but visibly worse on AI footage —
+    # soft dissolves and motion read as cuts, real cuts got missed
     cmd = [FFMPEG, "-i", path, "-filter:v",
-           f"scale=320:-2,select='gt(scene,{float(threshold)})',metadata=print:file=-",
+           f"select='gt(scene,{float(threshold)})',metadata=print:file=-",
            "-an", "-f", "null", "-"]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     blob = (proc.stdout or b"").decode("utf-8", "ignore") + (proc.stderr or b"").decode("utf-8", "ignore")

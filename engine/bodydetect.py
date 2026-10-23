@@ -34,18 +34,27 @@ def _mad(a, b):
     return sum(abs(x - y) for x, y in zip(a, b)) / float(len(a) or 1)
 
 
-def tail_match(a, b, thr=THR):
-    """How many trailing frames of a and b are the same picture (1 noisy frame is forgiven)."""
-    k, miss, best = 0, 0, 0
-    while k < len(a) and k < len(b):
-        if _mad(a[-1 - k], b[-1 - k]) < thr:
-            miss = 0
+WINDOW = 8            # samples (2 s at 4 fps): the walk stops only when a WHOLE window mostly differs
+
+
+def tail_match(a, b, thr=THR, window=WINDOW):
+    """How many trailing frames of a and b are the same picture.
+
+    Real bodies are not bit-identical in every creative (re-encodes, motion blur, a dissolve):
+    the first version stopped at the 2nd differing frame and put the "body" at 1:11 of a body
+    that starts at 0:16. Now single bad frames are forgiven; the walk ends only where a 2-second
+    window has fewer than half of its frames matching — that is where the hooks really differ.
+    """
+    n = min(len(a), len(b))
+    ok = [_mad(a[-1 - k], b[-1 - k]) < thr for k in range(n)]
+    best = 0
+    for k in range(n):
+        if ok[k]:
             best = k + 1
-        else:
-            miss += 1
-            if miss > 1:
-                break
-        k += 1
+            continue
+        w = ok[k:k + window]
+        if len(w) >= min(window, n - k) and sum(w) * 2 < len(w):
+            break
     return best
 
 
@@ -69,7 +78,8 @@ def detect(clips, fps=FPS):
             if m / fps >= MIN_BODY:
                 lens.append(m)
         if lens:
-            L = max(lens)
+            lens.sort()
+            L = lens[len(lens) // 2]          # the median pair: one odd clip can't drag the boundary
             out[i] = {"body": round((len(a) - L) / fps, 3), "matched": len(lens), "length": round(len(a) / fps, 3)}
         else:
             out[i] = {"body": None, "matched": 0, "length": round(len(a) / fps, 3)}

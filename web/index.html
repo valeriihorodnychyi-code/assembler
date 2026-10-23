@@ -3652,7 +3652,7 @@ hmInit();
 // they run only from the ▾ menus. Double-click a yellow cut to remove it (L- / J-cuts).
 function _pref(k,d){try{const v=localStorage.getItem(k);return v==null?d:v==="1";}catch(_){return d;}}
 function _prefSet(k,v){try{localStorage.setItem(k,v?"1":"0");}catch(_){}}
-const AUTO={cuts:_pref("cs_autoCuts",true),body:_pref("cs_autoBody",true)};
+const AUTO={cuts:_pref("cs_autoCuts",false),body:_pref("cs_autoBody",true)};   // auto-cuts OFF by default: on AI footage they were more noise than help
 let _autoBusy=false;
 function cutHolder(){return openHookRef()||variants[activeVar]||null;}
 function autoStatus(t){const el=$("tbStatus");if(el)el.textContent=t||"";}
@@ -3739,6 +3739,10 @@ if($("tbCuts"))$("tbCuts").onclick=()=>toolPop($("tbCuts"),[
 if($("tbBody"))$("tbBody").onclick=()=>toolPop($("tbBody"),[
   {label:"↻ Detect body (compare the pack)",title:"Порівняти кліпи паку з кінця: де закінчується спільний хвіст — там боді",on:()=>autoAnalyze("body")},
   {label:"⇥ Set body here (playhead)",on:()=>{setBody(curFrame()/fps(),true);setStatus("◧ Body з "+tc(curFrame()/fps())+".","ok");}},
+  {label:"⧉ Same body for ALL clips (this time)",title:"Поставити цю саму межу всім кліпам паку — коли хуки однакової довжини",on:()=>{const o=cutHolder();
+    if(!o||o.body==null){setStatus("Спершу постав межу на цьому кліпі (Set body here або потягни BODY ▸).","err");return;}
+    editPack.forEach(h=>{h.body=o.body;h.bodyManual=true;}); drawBodyMark();
+    setStatus("◧ Body з "+tc(o.body)+" — на всіх "+editPack.length+" кліпах.","ok");}},
   {label:"✕ No body (whole clip is the hook)",on:()=>{setBody(null,true);}},
   "-",{label:"Auto-detect when a pack loads",check:AUTO.body,on:v=>{AUTO.body=v;_prefSet("cs_autoBody",v);renderToolBtns();}}]);
 function updateWordHighlight(){
