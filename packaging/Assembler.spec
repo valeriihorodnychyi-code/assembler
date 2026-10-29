@@ -13,6 +13,11 @@ PKG = os.path.join(REPO, "packaging")
 STAGED_CODE = os.path.join(PKG, "build", "code")            # snapshot made by build_app.sh
 VENDOR_BIN = os.path.join(PKG, "vendor", "bin")             # ffmpeg + ffprobe (arm64)
 PRECONFIG = os.path.join(PKG, "preconfig.json")             # shared keys (git-ignored)
+try:                                                         # the code version this bundle ships with
+    import json as _json
+    APP_VERSION = _json.load(open(os.path.join(REPO, "version.json")))["version"]
+except Exception:
+    APP_VERSION = "1.0.0"
 
 # ---- data shipped inside the .app (Contents/Resources) ----------------------
 datas = [
@@ -78,7 +83,7 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "Assembler",
         "CFBundleDisplayName": "Assembler",
-        "CFBundleShortVersionString": "1.0.0",
+        "CFBundleShortVersionString": APP_VERSION,   # Finder → Get Info shows the real baseline (was always 1.0.0)
         "LSMinimumSystemVersion": "12.0",
         "NSHighResolutionCapable": True,
         # No camera/mic/etc. needed. Network is used for localization + updates.
