@@ -972,7 +972,7 @@ def api_cut(req: CutReq):
     _log_timing("cut", secs, f"{len(spans)} span(s), {removed:.2f}s removed")
     r = lambda t: round(round(t * fps) / fps, 4)
     snapped = [[r(a), r(b)] for a, b in compose._merge_spans(spans)]
-    return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "spans": snapped,
+    return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "spans": snapped, "dur_before": round(dur, 3),
             "removed": removed, "fps": fps, "seconds": round(secs, 1),
             "words": compose.shift_words_cut(req.words, spans, fps=fps),
             "orig_words": compose.shift_words_cut(req.orig_words, spans, fps=fps)}

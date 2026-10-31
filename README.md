@@ -62,6 +62,7 @@ python3 tests/test_jira.py        python3 tests/test_cut.py
 python3 tests/test_revoice.py     python3 tests/test_hookmusic.py
 python3 tests/test_bodydetect.py  python3 tests/test_render_onepass.py
 node tests/test_remap.js          node tests/test_revoice_select.js
+node tests/test_ui_refs.js        python3 tests/test_transcribe_trim.py
 ```
 
 ## Збірка Assembler.app

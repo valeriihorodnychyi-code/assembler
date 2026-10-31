@@ -1,5 +1,5 @@
 {
-  "version": "1.9.94",
+  "version": "1.9.95",
   "channel": "main",
-  "notes": "The BODY ▸ boundary now drives the hook: Hook music is analysed and laid only from trim In to the body (fade-out there), and the Hook / Body caption styles switch exactly at the boundary. FIX: the hook/body style split used to change only the preview — render, Export and SRT ignored it; it is now part of the regions every path uses (board hooks carry them too)."
+  "notes": "Apply to: This clip · Project (EN + its localizations) · Pack — trim and ✂ Cut segment go to every clip of the scope (Re-voice and Cut sentence stay per clip). FIX (regression in 1.9.93): Cut segment, Transcribe with a trim and auto-detect failed with 'ensureSessionClip is not defined'. New test tests/test_ui_refs.js catches any called-but-undefined UI function."
 }

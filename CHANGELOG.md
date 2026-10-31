@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-10-31** — Apply to: This clip · Project · Pack for trim and Cut segment; fix ensureSessionClip regression (1.9.95)
 - **2026-10-31** — Body boundary drives hook music and hook/body caption styles; split now baked into renders (1.9.94)
 - **2026-10-31** — Trim is a frame everywhere; transcribe only the trim zone; Apply trim removed (1.9.93)
 - **2026-10-31** — Export / Import my setup for moving to a new Mac (1.9.92)

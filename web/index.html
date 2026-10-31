@@ -115,6 +115,10 @@
   #bodyMark{position:absolute;top:-14px;bottom:-3px;width:14px;margin-left:-7px;display:none;z-index:5;pointer-events:none}   /* only the flag grabs — a cut under the boundary stays double-clickable */
   #bodyMark b{pointer-events:auto;cursor:ew-resize;position:absolute;top:0;left:7px;font:700 8px/12px system-ui;padding:0 4px;border-radius:3px;background:#38bdf8;color:#04202c;white-space:nowrap}
   .toolRow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .scopeSeg{border:1px solid #3a3e4a;border-radius:7px;overflow:hidden;background:#1b1d24;flex:0 0 auto!important;width:auto!important;padding:0!important;gap:0!important;align-items:stretch}
+  .scopeSeg button{font-size:11px;padding:4px 8px;border:0;border-radius:0;background:transparent;color:var(--muted);flex:0 0 auto!important;white-space:nowrap}
+  .scopeSeg button.active{background:#3b3e4a;color:#fff}
+  .scopeSeg button:disabled{opacity:.35}
   .tchip{font-size:11px;padding:4px 9px;border-radius:7px;background:#23262f;border:1px solid #3a3e4a;color:var(--txt);display:inline-flex;gap:6px;align-items:center}
   .tchip:hover{border-color:#5a5f6e;background:#2a2e38}
   .tchip.off{opacity:.55}
@@ -531,6 +535,9 @@
       <div class="toolRow">
         <button type="button" id="tbCuts" class="tchip" title="Scene cuts: автоматично для кожного кліпу; подвійний клік по жовтій рисці — прибрати кат"><span class="tdot"></span><span id="tbCutsLbl">Cuts</span> ▾</button>
         <button type="button" id="tbBody" class="tchip body" title="Межа Hook | Body: знаходиться порівнянням кліпів паку"><span class="tdot"></span><span id="tbBodyLbl">Body</span> ▾</button>
+        <span id="applyScope" class="seg scopeSeg" style="display:none" title="На що діють трім і ✂ Cut segment">
+          <span style="font-size:10.5px;color:var(--muted);padding:0 6px 0 4px;align-self:center">Apply to</span>
+          <button type="button" data-sc="clip" class="active">This clip</button><button type="button" data-sc="project">Project</button><button type="button" data-sc="pack">Pack</button></span>
         <span id="tbStatus" style="font-size:10.5px;color:var(--muted)"></span>
       </div>
       <div class="cutRow" title="Вирізати шматок ПОСЕРЕДИНІ кліпу: відео і звук разом, титри зсуваються">
@@ -2122,7 +2129,8 @@ function syncTrim(){
   $("trimIn").value=t?t[0]:0;
   $("trimOut").value=t?t[1]:(dur?+dur.toFixed(3):0);
   $("trimRow").style.display=(dur&&$("batchStage").style.display!=="block")?"flex":"none";
-  if($("trimAll"))$("trimAll").style.display=(typeof editPack!=="undefined"&&editPack.length>1)?"inline":"none";
+  if($("trimAll"))$("trimAll").style.display="none";   // replaced by "Apply to: Pack"
+  if(typeof renderScope==="function")renderScope();
   if(typeof loadClipFps==="function")loadClipFps();   // real fps for the frame grid (probed once per clip)
   drawTrimBar();
 }
@@ -2136,6 +2144,7 @@ function writeTrim(){
   const t=(i>0.05||o<dur-0.05)?[i,o]:null;
   if(variants[activeVar])variants[activeVar].trim=t;
   const h=openHookRef();if(h)h.trim=t;      // stick the trim to the CLIP → survives switching clips + goes to the board
+  if(typeof scopeHooks==="function")scopeHooks().forEach(o=>{o.trim=t?[t[0],t[1]]:null;});   // Apply to: Project / Pack
   clearTimeout(writeTrim._t);writeTrim._t=setTimeout(()=>{   // words outside the new zone get dimmed
     const box=$("transcriptWords"); if(txtView==="words"&&box&&document.activeElement!==box)renderWordsView();
     if(txtView==="sents"&&typeof renderSentsView==="function")renderSentsView();},150);
@@ -2249,6 +2258,7 @@ if($("trimAll"))$("trimAll").onclick=()=>{
   setStatus("Трім "+i.toFixed(3)+"→"+o.toFixed(3)+"s застосовано до всіх "+editPack.length+" кліпів. Перевір кожен кнопкою ▶ стик.","ok");};
 $("trimReset").onclick=()=>{if(variants[activeVar])variants[activeVar].trim=null;
   {const h=openHookRef();if(h)h.trim=null;}
+  if(typeof scopeHooks==="function")scopeHooks().forEach(o=>{o.trim=null;});
   syncTrim();};
 video.addEventListener("loadedmetadata",syncTrim);
 
@@ -3283,7 +3293,7 @@ function cutRestore(prev){
   titles=prev.titles?JSON.parse(JSON.stringify(prev.titles)):[];
   const v=variants[activeVar];if(v&&v.cuts)_syncCuts(v.cuts);
 }
-function cutApplyTimes(targets,spans,oldDur,newWords){
+function cutApplyTimes(targets,spans,oldDur,newWords,notActive){
   const R=t=>(t==null||t===""||isNaN(+t))?t:+cutRemapT(+t,spans).toFixed(3);
   const newDur=Math.max(0,oldDur-spans.reduce((s,[a,b])=>s+(b-a),0));
   const RT=tr=>tr?[R(tr[0]),(tr[1]>=oldDur-0.002)?+newDur.toFixed(3):R(tr[1])]:tr;
@@ -3299,6 +3309,7 @@ function cutApplyTimes(targets,spans,oldDur,newWords){
     ["capIn","capOut","cap_in","cap_out","body"].forEach(k=>{if(o[k]!=null)o[k]=R(o[k]);});
     if(o!==v&&o!==h&&newWords&&("words" in o))o.words=newWords.map(w=>({...w}));   // board / LOC copies get the re-timed captions too
   });
+  if(notActive)return;          // another clip of the pack: the editor's own titles / caption window are not its
   titles=once(titles,rtTitles)||titles;
   if(v&&v.cuts)_syncCuts(v.cuts);
   if(typeof loadCapWin==="function")loadCapWin(h||v);
@@ -3307,6 +3318,19 @@ function cutApplyTimes(targets,spans,oldDur,newWords){
 function cutLoadVideo(url){const t=video.currentTime||0;video.src=url;
   video.onloadedmetadata=()=>{videoLoaded=true;try{video.currentTime=Math.min(t,(video.duration||t));}catch(_){}
     if(typeof syncTrim==="function")syncTrim(); if(typeof updateCutsLabel==="function")updateCutsLabel(); drawCutMark();};}
+// a freshly dropped clip isn't on the server yet — put it there (once) so it can be cut
+async function ensureSessionClip(){
+  const v=variants[activeVar]||(variants[activeVar]={clip:null,words:null,style:readControls(),trim:null});
+  if(fileId&&v.clip)return true;
+  if(!videoFile)return false;
+  setStatus("Завантажую кліп у сесію…","",true);
+  const fd=new FormData();fd.append("file",videoFile);fd.append("file_id",fileId||"");
+  const r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});const d=await r.json();
+  if(!r.ok)throw new Error(d.detail||"upload failed");
+  fileId=d.file_id;v.clip=d.name;if(!v.videoUrl)v.videoUrl=video.src;
+  return true;
+}
+
 async function doCut(spans,speech,opts){
   opts=opts||{};
   try{await ensureSessionClip();}catch(e){setStatus("Cut: "+e.message,"err");return;}
@@ -3338,10 +3362,55 @@ async function doCut(spans,speech,opts){
   }catch(e){busyStop();setStatus("Cut: "+e.message,"err");}
   drawCutMark();
 }
+// the same time-based cut on a clip that is NOT open (batch scope): own words, own history
+async function cutOtherHook(o,spans){
+  const targets=hmTargets(o);
+  const r=await fetch(API+"/api/cut",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({file_id:fileId,clip:o.clip,spans,speech:false,words:o.words||[],orig_words:o.origWords||o.words||[]})});
+  const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"cut failed"));
+  const J=x=>x==null?x:JSON.parse(JSON.stringify(x)), per=new Map();
+  targets.forEach(x=>{const s={};CUT_FIELDS.forEach(k=>{if(k in x)s[k]=J(x[k]);});per.set(x,s);});
+  const before={kind:"cut",label:"✂ Cut "+tc(d.removed)+" @ "+tc(d.spans[0][0])+" (batch)",clip:o.clip,videoUrl:o.videoUrl,
+    words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w})),titles:J(titles),per};
+  cutApplyTimes(targets,d.spans,d.dur_before||0,d.words||[],true);
+  targets.forEach(x=>{(x._rvFrom=x._rvFrom||[]).push(before);x.clip=d.clip;x.videoUrl=API+d.url;
+    x.origWords=(d.orig_words||[]).map(w=>({...w}));if("words" in x||x===o)x.words=(d.words||[]).map(w=>({...w}));});
+  if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
+  return d.removed;
+}
+// ---------- Apply to: This clip · Project · Whole pack ----------
+// Time-based edits (trim, ✂ Cut segment) can go to every clip of the open project (EN + its
+// localizations — time-aligned) or of the whole pack. Text-based ones (Re-voice, Cut sentence)
+// stay per clip: every language says its sentence at a different time.
+let applyScope="clip";
+function scopeHooks(){
+  if(!editPack.length||applyScope==="clip")return [];
+  if(applyScope==="pack")return editPack.filter((_,i)=>i!==activeHook);
+  const g=(typeof packGroups==="function"?packGroups():[]).find(x=>x.idx.includes(activeHook));
+  return g?g.idx.filter(i=>i!==activeHook).map(i=>editPack[i]):[];
+}
+function renderScope(){
+  const el=$("applyScope"); if(!el)return;
+  const g=(typeof packGroups==="function"&&editPack.length)?packGroups().find(x=>x.idx.includes(activeHook)):null;
+  el.style.display=editPack.length>1?"inline-flex":"none";
+  if(applyScope==="project"&&!(g&&g.idx.length>1))applyScope="clip";
+  el.querySelectorAll("button").forEach(b=>{b.classList.toggle("active",b.dataset.sc===applyScope);
+    if(b.dataset.sc==="project"){b.disabled=!(g&&g.idx.length>1);b.textContent="Project"+(g&&g.idx.length>1?" · "+g.idx.length:"");}
+    if(b.dataset.sc==="pack")b.textContent="Pack · "+editPack.length;});
+}
+if($("applyScope"))$("applyScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{if(b.disabled)return;applyScope=b.dataset.sc;renderScope();
+  setStatus(applyScope==="clip"?"Дії шкали — тільки для цього кліпу.":"Трім і ✂ Cut segment тепер діють на "+(scopeHooks().length+1)+" кліп(и). Переозвучка й Cut sentence — завжди на один кліп.","");});
 if($("cutFrom"))$("cutFrom").onclick=()=>cutMarkFromPlayhead("a");
 if($("cutTo"))$("cutTo").onclick=()=>cutMarkFromPlayhead("b");
 if($("cutClear"))$("cutClear").onclick=()=>{_cut={a:null,b:null};drawCutMark();};
-if($("cutGo"))$("cutGo").onclick=()=>{if(_cut.a!=null&&_cut.b!=null)doCut([[_cut.a,_cut.b]],false);};
+if($("cutGo"))$("cutGo").onclick=async()=>{if(_cut.a==null||_cut.b==null)return;
+  const spans=[[_cut.a,_cut.b]], others=scopeHooks();
+  await doCut(spans,false);
+  if(!others.length)return;
+  let ok=0;const fail=[];busyStart("✂ Той самий виріз ще на "+others.length+" кліп(ах)…");
+  for(const o of others){try{await cutOtherHook(o,spans);ok++;}catch(e){fail.push((o.jira&&o.jira.loc)||o.clip);}}
+  if(typeof renderHookStrip==="function")renderHookStrip();
+  fail.length?(busyStop(),setStatus("✂ Batch: "+ok+"/"+others.length+" · не вдалось: "+fail.join(", "),"err")):(busyDone("Вирізано"),setStatus("✂ Вирізано на "+(ok+1)+" кліпах. ↩ — на кожному кліпі окремо (History).","ok"));};
 if($("cutUndo"))$("cutUndo").onclick=()=>undoRevoice();
 // History of THIS clip's versions: Original → ✂ Cut → 🎙 Re-voice → ♪ Music. One ↩, and it says
 // exactly which step it takes back (it used to be a nameless "↩ Повернути звук" that could undo a cut).
