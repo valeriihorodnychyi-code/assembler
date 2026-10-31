@@ -986,6 +986,13 @@
       <button id="cacheClear" class="ghost" style="font-size:12px;padding:6px 12px">🧹 Clear cache</button>
     </div>
     </details>
+    <div class="mlbl" style="margin-top:14px">Move to a new Mac</div>
+    <div class="hint">Один zip з твоїми ключами, шляхом до бібліотеки, пресетами стилів і правилами титрів. На новому Mac — Import. <b>У файлі твої ключі: не пересилай його нікому.</b></div>
+    <div style="display:flex;gap:8px;margin-top:7px">
+      <a class="ghost" id="setupExport" href="/api/setup/export" download style="font-size:12px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:var(--txt)">⬇ Export my setup</a>
+      <button class="ghost" id="setupImport" style="font-size:12px;padding:6px 12px">⬆ Import setup…</button>
+      <input type="file" id="setupFile" accept=".zip" hidden>
+    </div>
     </div>
     <div class="mfoot">
       <button class="ghost" id="settingsClose">Close</button>
@@ -3839,6 +3846,15 @@ async function openProjModal(){
 }
 if($("projBtn"))$("projBtn").onclick=openProjModal;
 if($("dzProjects"))$("dzProjects").onclick=e=>{e.stopPropagation();openProjModal();};
+// ⇄ setup import (export is a plain download link)
+if($("setupImport"))$("setupImport").onclick=()=>$("setupFile").click();
+if($("setupFile"))$("setupFile").onchange=async e=>{const f=e.target.files[0]; if(!f)return;
+  if(!confirm("Import «"+f.name+"»? Поточні ключі, пресети й правила з такими самими назвами буде замінено (копії лишаться як *.before_import)."))return;
+  const fd=new FormData();fd.append("file",f);
+  try{const r=await fetch(API+"/api/setup/import",{method:"POST",body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||"import failed");
+    setStatus("⬆ Відновлено: "+(d.restored.join(", ")||"нічого")+(d.restart?". Перезапусти Assembler, щоб ключі підхопились.":"."),"ok");
+    if(typeof loadSettings==="function")loadSettings();}catch(err){setStatus("Import setup: "+err.message,"err");}
+  e.target.value="";};
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;

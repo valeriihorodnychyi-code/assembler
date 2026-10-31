@@ -1,5 +1,5 @@
 {
-  "version": "1.9.91",
+  "version": "1.9.92",
   "channel": "main",
-  "notes": "Faster hook render: trim + captions + titles in ONE encode (was two), and baked hooks are cached — the same hook in several creatives is rendered once; editing one hook re-bakes only that hook."
+  "notes": "Settings → Move to a new Mac: ⬇ Export my setup (keys, library path, custom style presets, caption rules in one zip) and ⬆ Import setup (replaced files are kept as *.before_import)."
 }

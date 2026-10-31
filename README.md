@@ -51,12 +51,16 @@ python3 -m server.app
 
 Поза репозиторієм також живуть: **проекти й сесії** `~/.assembler/sessions/` (автозбереження кожні 20 с; незбережені сесії старші за 7 днів і видалені проекти старші за 14 днів прибираються самі), пресети стилів `~/.assembler/styles/`, власні правила титрів, кеш боді `~/.assembler/cache/`, бібліотека (шлях задається в Settings).
 
+## Переїзд на інший Mac
+
+⚙ Settings → **Move to a new Mac** → ⬇ Export my setup: один zip з ключами, шляхом до бібліотеки, пресетами й правилами титрів. На новому Mac: клонувати репо (або поставити `.app`) → ⬆ Import setup → перезапуск. Окремо скопіювати: бібліотеку (якщо вона не на Drive) і, для збірки `.app`, `packaging/preconfig.json`.
+
 ## Тести
 
 ```bash
 python3 tests/test_jira.py        python3 tests/test_cut.py
 python3 tests/test_revoice.py     python3 tests/test_hookmusic.py
-python3 tests/test_bodydetect.py
+python3 tests/test_bodydetect.py  python3 tests/test_render_onepass.py
 node tests/test_remap.js          node tests/test_revoice_select.js
 ```
 

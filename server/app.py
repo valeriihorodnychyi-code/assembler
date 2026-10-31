@@ -1201,6 +1201,81 @@ def project_delete(req: ProjectDeleteReq):
     return {"ok": True}
 
 
+# ---------- ⇄ setup export / import: move Assembler to a new Mac with one file ----------
+# What a designer would otherwise lose: keys + library path (config.json), custom style presets,
+# custom caption rules. NOT the cache, models or sessions (they rebuild / re-download / are big).
+_SETUP_ENTRIES = ("config.json", "caption_rules.json", "styles/")
+
+
+def _rules_file():
+    return os.environ.get("CS_CAPTION_RULES") or os.path.join(ROOT, "caption_rules.json")
+
+
+@app.get("/api/setup/export")
+def setup_export():
+    import io, zipfile, json as _json, time as _t
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        if os.path.exists(_PCFG):
+            z.write(_PCFG, "config.json")
+        rf = _rules_file()
+        if os.path.exists(rf):
+            z.write(rf, "caption_rules.json")
+        sd = _custom_styles_dir()
+        n = 0
+        if os.path.isdir(sd):
+            for f in sorted(os.listdir(sd)):
+                if f.endswith(".json"):
+                    z.write(os.path.join(sd, f), "styles/" + f)
+                    n += 1
+        z.writestr("manifest.json", _json.dumps({"app": "Assembler", "version": app_version(),
+                                                 "created": _t.strftime("%Y-%m-%d %H:%M"), "styles": n,
+                                                 "library_dir": os.environ.get("CS_LIBRARY_DIR", "")},
+                                                ensure_ascii=False, indent=2))
+    fn = "Assembler_setup_" + __import__("time").strftime("%Y%m%d") + ".zip"
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{fn}"'})
+
+
+@app.post("/api/setup/import")
+async def setup_import(file: UploadFile = File(...)):
+    """Restore a setup zip. Every file it replaces is kept first as <name>.before_import."""
+    import io, zipfile, json as _json
+    data = await file.read()
+    try:
+        z = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        raise HTTPException(400, "Це не zip-файл налаштувань Assembler")
+    names = z.namelist()
+    if "manifest.json" not in names:
+        raise HTTPException(400, "У zip немає manifest.json — це не експорт налаштувань Assembler")
+    done = []
+
+    def put(dst, blob):
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        if os.path.exists(dst):
+            shutil.copy2(dst, dst + ".before_import")
+        with open(dst, "wb") as f:
+            f.write(blob)
+
+    for n in names:
+        if n.endswith("/") or ".." in n or n.startswith("/"):
+            continue
+        if n == "config.json":
+            try:
+                _json.loads(z.read(n))
+            except Exception:
+                raise HTTPException(400, "config.json у zip пошкоджений")
+            put(_PCFG, z.read(n)); done.append("ключі й налаштування")
+        elif n == "caption_rules.json":
+            put(_rules_file(), z.read(n)); done.append("правила титрів")
+        elif n.startswith("styles/") and n.endswith(".json") and "/" not in n[len("styles/"):]:
+            put(os.path.join(_custom_styles_dir(), n[len("styles/"):]), z.read(n))
+            if "пресети стилів" not in done:
+                done.append("пресети стилів")
+    return {"ok": True, "restored": done, "restart": "config.json" in names}
+
+
 class LipsyncReq(BaseModel):
     file_id: str
     clip: str = "source.mp4"
