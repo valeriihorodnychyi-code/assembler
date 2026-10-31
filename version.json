@@ -1,5 +1,5 @@
 {
-  "version": "1.9.93",
+  "version": "1.9.94",
   "channel": "main",
-  "notes": "Trim is a frame everywhere: only the trim zone (+1 s) is transcribed, words / sentences outside it are dimmed, a warning appears when the trim is widened past what was transcribed. ✂ Apply trim removed (Cut segment keeps the new-file mechanism)."
+  "notes": "The BODY ▸ boundary now drives the hook: Hook music is analysed and laid only from trim In to the body (fade-out there), and the Hook / Body caption styles switch exactly at the boundary. FIX: the hook/body style split used to change only the preview — render, Export and SRT ignored it; it is now part of the regions every path uses (board hooks carry them too)."
 }

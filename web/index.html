@@ -613,6 +613,7 @@
         <div class="row"><label>Different style for body</label><label class="switch"><input type="checkbox" id="splitOn"><span class="slider"></span></label></div>
         <div id="splitControls" style="display:none">
           <div class="row"><label>Split at (seconds)</label><input type="number" id="splitTime" value="3" min="0" step="0.1"></div>
+          <div class="hint" id="splitFollow" style="margin-top:-2px">Якщо в кліпу є межа <b style="color:#38bdf8">BODY ▸</b>, стиль перемикається саме на ній.</div>
           <div class="slot-tabs"><button id="slotA" class="active">Editing: Hook</button><button id="slotB">Editing: Body</button></div>
         </div>
         <div class="hint">When on, the timeline before the split uses the Hook style, after it the Body style — both rendered in one ffmpeg pass.</div>
@@ -1474,7 +1475,7 @@ function styleAt(t){
   // returns the UI control object that applies at time t
   let base;
   if(!splitOn) base=readControls();
-  else{ const cur=readControls(); const split=+$("splitTime").value;
+  else{ const cur=readControls(); const split=splitAt()!=null?splitAt():+$("splitTime").value;
     base=(editingSlot==="A") ? (t<split?cur:(styleB||cur)) : (t<split?(window._styleA||cur):cur); }
   // #10 per-phrase override wins for its own time range
   const ov=curPhraseStyles();
@@ -1499,13 +1500,30 @@ function presetToCtrl(name){ const base=readControls();
   if(PRESETS[name]) return {...base,...PRESETS[name]};
   return base; }
 // engine regions from the per-phrase overrides (partition timeline; base style fills the gaps)
-function buildStyleRegions(baseEngine, ovArr){
+// Hook | Body style split: the boundary is the clip's BODY ▸ marker when it has one (else the
+// "Split at" seconds). Until 1.9.93 the split only changed the PREVIEW — the render, export and
+// SRT ignored it (preview ≠ render). Now it is part of the regions every path uses.
+function splitAt(){
+  if(!splitOn)return null;
+  const o=(typeof cutHolder==="function")?cutHolder():null;
+  if(o&&o.body!=null)return +o.body;
+  const s=+$("splitTime").value; return s>0?s:null;
+}
+function styleAB(){const cur=readControls();
+  return editingSlot==="A"?[cur,styleB||cur]:[window._styleA||cur,cur];}
+function buildStyleRegions(baseEngine, ovArr, split){
   const ov=(ovArr||[]).slice().sort((a,b)=>a.start-b.start);
-  if(!ov.length) return null;
-  const regions=[]; let cur=0;
-  for(const o of ov){ if(o.start>cur+0.001)regions.push({start:cur,end:o.start,style:baseEngine});
-    regions.push({start:o.start,end:o.end,style:toEngineStyle(o.ctrl)}); cur=o.end; }
-  regions.push({start:cur,end:null,style:baseEngine});
+  if(split===undefined)split=splitAt();
+  if(!ov.length&&split==null) return null;
+  let A=baseEngine,B=baseEngine;
+  if(split!=null){const ab=styleAB();A=toEngineStyle(ab[0]);B=toEngineStyle(ab[1]);}
+  const pts=[...new Set([0,...(split!=null?[split]:[]),...ov.flatMap(o=>[o.start,o.end])].map(x=>+(+x).toFixed(3)))].sort((a,b)=>a-b);
+  const regions=[];
+  pts.forEach((s,k)=>{const e=k+1<pts.length?pts[k+1]:null; const mid=e==null?s+0.001:(s+e)/2;
+    const o=ov.find(x=>mid>=x.start&&mid<x.end);
+    const style=o?toEngineStyle(o.ctrl):(split!=null&&s>=split-1e-6?B:A);
+    const last=regions[regions.length-1];
+    if(last&&last.style===style&&!o)last.end=e; else regions.push({start:s,end:e,style});});
   return regions;
 }
 function renderPhraseList(){
@@ -1883,6 +1901,8 @@ function saveActiveHook(){
   const h=editPack[activeHook];
   try{const rw=parseBreaksToWords($("transcript").value,h.words);if(rw)h.words=rw;}catch(e){}
   h.ctrl=readControls();h.style=toEngineStyle(h.ctrl);   // h is a board hook → board stays current
+  if(splitOn){const ab=styleAB();h.ctrl=ab[0];h.style=toEngineStyle(ab[0]);}   // base = the HOOK style; the body style lives in the regions
+  {const v=variants[activeVar];const rg=buildStyleRegions(h.style,(v&&v.phraseStyles)||[],splitOn?(h.body!=null?+h.body:splitAt()):null);h.regions=rg||null;}
   h.titles=cloneTitles();h.titlesOn=titlesOn();          // titles belong to THIS clip
   h.trim=(variants.en&&variants.en.trim)||h.trim||null;   // and so does the trim
 }
@@ -1981,7 +2001,7 @@ function sendPack(target){
   if(!editPack.length)return;
   saveActiveHook();let added=0;
   editPack.forEach(h=>{if(hooks.some(x=>x.clip===h.clip))return;
-    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.words,style:toEngineStyle(h.ctrl),src:"edit",
+    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.words,style:toEngineStyle(h.ctrl),src:"edit",regions:h.regions||null,
                 titles:(h.titles!=null?JSON.parse(JSON.stringify(h.titles)):null),titlesOn:(h.titlesOn!==false)});added++;});
   renderHookTiles();setMode(target==="asm"?"asm":"loc");
   setStatus("Пак ("+editPack.length+") → "+(target==="asm"?"Assemble":"LOC")+".","ok");
@@ -3512,6 +3532,11 @@ function hmTop(o){const s=o._rvFrom;return (s&&s.length&&s[s.length-1].kind==="m
 function hmRefreshUndo(){const any=hmHooks().some(o=>hmTop(o));
   if($("hmUndo"))$("hmUndo").style.display=any?"":"none";}
 const hmClean=o=>{const t=hmTop(o);return t?t.clip:o.clip;};   // the hook BEFORE any music we laid
+// where the music goes: the HOOK — trim In … the BODY ▸ boundary (the body already has its music),
+// or trim Out when there's no boundary. null = the whole clip.
+function hmZone(o){const tr=o.trim||null, b=(o.body!=null)?+o.body:null;
+  const a=tr?+tr[0]:0, e=Math.min(tr?+tr[1]:Infinity, b!=null?b:Infinity);
+  return (a>0||isFinite(e))?[a,isFinite(e)?e:1e9]:null;}
 // Every Generate is a new TAKE (the model never gives the same thing twice): keep them all per
 // hook, flip ◀ ▶ between them, ↻ re-rolls one hook only. Apply uses the take you're on.
 // any generated track can go under any hook: a hook's pick is either one of its own takes or a
@@ -3522,7 +3547,7 @@ async function hmGenerate(only){
   if(!fileId){setStatus("Hook music: спершу завантаж хук у сесію (Transcribe або пак).","err");return;}
   const all=hmHooks(), list=only?[only]:all; if(!list.length){setStatus("Hook music: немає хуків.","err");return;}
   const fromVideo=$("hmFromVideo")?$("hmFromVideo").checked:true;
-  const hooksReq=list.map(o=>({clip:hmClean(o),trim:o.trim||null}));
+  const hooksReq=list.map(o=>({clip:hmClean(o),trim:hmZone(o)}));
   busyStart("♪ "+(fromVideo?"Аналізую відео і пишу":"Генерую")+" музику для "+list.length+" хук(ів) ("+(HM_LABELS[_hm.preset]||"custom")+")…");$("hmGen").disabled=true;
   try{const r=await fetch(API+"/api/hookmusic/generate",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",hooks:hooksReq,from_video:fromVideo,add_sfx:!!(fromVideo&&$("hmSfx")&&$("hmSfx").checked)})});
@@ -3598,7 +3623,7 @@ async function hmApply(list){
     try{
       setStatus("♪ Хук "+(i+1)+"/"+list.length+"…","",true);
       const r=await fetch(API+"/api/hookmusic/apply",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:before.clip,track:trk.name,volume:vol,duck,strip_original:strip,trim:o.trim||null,
+        body:JSON.stringify({file_id:fileId,clip:before.clip,track:trk.name,volume:vol,duck,strip_original:strip,trim:hmZone(o),
           sfx:trk.sfx||"",sfx_volume:(+(($("hmSfxVol")||{}).value||80))/100})});
       const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"apply failed"));
       hmTargets(o).forEach(x=>{const s=(x._rvFrom=x._rvFrom||[]);if(top&&s.length&&s[s.length-1]===top)s.pop();   // re-apply = replace OUR music, never stack beds

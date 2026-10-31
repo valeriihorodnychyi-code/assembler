@@ -1018,6 +1018,7 @@ def hookmusic_generate(req: HookMusicGenReq):
         tr = hk.get("trim") or None
         dur = music11.duration(src)
         s, e = (float(tr[0]), float(tr[1])) if tr and len(tr) == 2 else (0.0, dur)
+        s, e = max(0.0, min(s, dur)), min(e, dur)        # the zone may be "to the end" (1e9) — clamp to the clip
         stem = os.path.splitext(name)[0]
         k = 1
         while os.path.exists(os.path.join(sdir, f"hookmusic_{stem}_{k}.mp3")):
