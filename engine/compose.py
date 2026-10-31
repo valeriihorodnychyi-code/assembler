@@ -57,8 +57,11 @@ def build_timeline(words, regions, lang="en", cuts=None):
 
 def render_format(video_path, tagged_events, fmt, output_path, work_dir,
                   body_path=None, scale_factors=None, bitrates=None, smart_trim=False,
-                  hold_last=False, headline=None):
-    """Render a single aspect ratio to output_path."""
+                  hold_last=False, headline=None, src_trim=None):
+    """Render a single aspect ratio to output_path.
+
+    src_trim=(in, out): read only that part of the source (input-seek, frame-accurate because we
+    re-encode anyway). Lets the assemble do trim + captions in ONE encode instead of two."""
     scale_factors = scale_factors or st.DEFAULT_SCALE_FACTORS
     bitrates = bitrates or {"temp_hook": "35M", "final_export": "8M"}
     TARGET_W, TARGET_H = ff.DIMS[fmt]
@@ -67,6 +70,10 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
     input_w, input_h = ff.get_video_size(video_path)
     is_wide = input_w > input_h
     duration = ff.get_video_duration(video_path)
+    src_ss = 0.0
+    if src_trim:
+        src_ss = max(0.0, float(src_trim[0]))
+        duration = max(0.1, min(duration, float(src_trim[1])) - src_ss)
 
     # Smart trim (originals only): cut just after the last spoken word.
     render_duration = duration
@@ -117,7 +124,7 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
     temp_shadow = os.path.join(work_dir, "temp_shadow.png")
     sub_dir = tempfile.mkdtemp(dir=work_dir)
 
-    cmd = ["ffmpeg", "-t", f"{render_duration}", "-i", video_path]
+    cmd = ["ffmpeg"] + (["-ss", f"{src_ss:.6f}"] if src_ss > 0 else []) + ["-t", f"{render_duration}", "-i", video_path]
 
     # Background composition (letterbox + blurred bg + drop shadow for vertical-in-wide).
     if fmt in ("16:9", "1:1") and not is_wide:
@@ -742,7 +749,7 @@ def clip_caption_window(tagged, cap_in=None, cap_out=None):
     return out
 
 
-def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None, cuts=None, regions=None, headline=None):
+def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=None, cap_out=None, cuts=None, regions=None, headline=None, src_trim=None):
     """Bake captions onto a single clip (no body). Used by the non-destructive
     assemble so a hook's captions are burned only at final assembly time.
 
@@ -762,7 +769,7 @@ def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=Non
     import time as _tc
     _c0 = _tc.time()
     render_format(clip_path, [(dict(e), s) for e, s in tagged], fmt, output_path,
-                  work_dir, body_path=None, headline=headline)
+                  work_dir, body_path=None, headline=headline, src_trim=src_trim)
     OP_TIMES["captions_bake"] += _tc.time() - _c0   # the only true pixel render in the batch
     return output_path
 
@@ -827,6 +834,32 @@ def mix_music(video_path, music_path, output_path, volume=0.25, start=0.0, duck=
     return output_path
 
 
+def _bake_key(seg, fmt):
+    """Content signature of a baked hook: the source file (path + size + mtime, so a re-voiced /
+    cut file is a different hook) and every setting that changes its pixels or timing."""
+    import hashlib
+    import json as _json
+    p = seg.get("clip") or ""
+    try:
+        s = os.stat(p)
+        src = [os.path.abspath(p), s.st_size, int(s.st_mtime)]
+    except OSError:
+        src = [p]
+    def _ov(o):
+        o = dict(o)
+        try:
+            q = o.get("path") or o.get("name") or ""
+            o["_m"] = int(os.stat(q).st_mtime) if q and os.path.exists(q) else 0
+        except OSError:
+            pass
+        return o
+    sig = {"v": 1, "src": src, "fmt": fmt, "trim": seg.get("trim"), "words": seg.get("words"),
+           "style": seg.get("style"), "regions": seg.get("regions"), "headline": seg.get("headline"),
+           "cap": [seg.get("cap_in"), seg.get("cap_out")], "cuts": seg.get("cuts"),
+           "ov": [_ov(o) for o in (seg.get("overlays") or [])]}
+    return hashlib.sha1(_json.dumps(sig, sort_keys=True, default=str).encode()).hexdigest()[:20]
+
+
 def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, music=None):
     """Non-destructive assemble. Each segment is a dict:
         {"clip": path}                              -> used as-is (already final)
@@ -842,16 +875,31 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
             path = seg["clip"]
             words = seg.get("words")
             trim = seg.get("trim")
-            if trim:  # cut the clip and re-base caption timecodes onto the cut
+            bake = bool((words and seg.get("style")) or seg.get("headline"))
+            # A baked hook is cached by EVERYTHING that shapes its pixels (source file, trim,
+            # words, style, titles, stickers, format): the same hook going into 5 creatives is
+            # rendered once, and a re-render after a one-comma fix re-bakes only that hook.
+            key = _bake_key(seg, fmt) if (bake or seg.get("overlays")) else None
+            hit = os.path.join(_cache_dir(), f"hook_{key}.mp4") if key else None
+            if hit and os.path.exists(hit) and os.path.getsize(hit) > 0:
+                OP_TIMES["cache_hits"] += 1
+                try:
+                    os.utime(hit, None)
+                except OSError:
+                    pass
+                clips.append((hit, seg.get("fade_in")))
+                continue
+            if trim and words:
+                words = shift_words(words, float(trim[0]), float(trim[1]))
+            if trim and not bake:   # nothing to burn in → the cut is the only encode
                 tp = os.path.join(work_dir, f"trim_{i}.mp4")
                 trim_clip(path, trim[0], trim[1], tp)
                 path = tp
-                if words:
-                    words = shift_words(words, float(trim[0]), float(trim[1]))
             # A segment gets a pixel pass when it has captions to bake OR a title to burn in.
             # Titles alone must still be baked (a clip can carry a headline without captions —
             # e.g. Merge hooks with caption baking off, or a clip that was never transcribed).
-            if (words and seg.get("style")) or seg.get("headline"):
+            # With a trim, the cut happens INSIDE this pass (one encode instead of two).
+            if bake:
                 seg_cuts = seg.get("cuts")
                 if seg_cuts and trim:   # re-base scene cuts to the trimmed clip, like words
                     lo, hi = float(trim[0]), float(trim[1])
@@ -860,12 +908,19 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
                 caption_clip(path, words or [], seg.get("style") or {}, fmt, cap, work_dir,
                              seg.get("cap_in"), seg.get("cap_out"), cuts=seg_cuts,
                              regions=(seg.get("regions") if words else None),
-                             headline=seg.get("headline"))
+                             headline=seg.get("headline"),
+                             src_trim=((float(trim[0]), float(trim[1])) if trim else None))
                 path = cap
             if seg.get("overlays"):  # PNG / alpha-.mov stickers on top (reaction style)
                 ovp = os.path.join(work_dir, f"ov_{i}.mp4")
                 apply_overlays(path, seg["overlays"], fmt, ovp)
                 path = ovp
+            if hit and path != seg["clip"]:
+                try:
+                    shutil.copyfile(path, hit + ".part")
+                    os.replace(hit + ".part", hit)
+                except OSError:
+                    pass
             clips.append((path, seg.get("fade_in")))
 
         # Split into a hard-concat head + any trailing fade-in overlays (packshots).

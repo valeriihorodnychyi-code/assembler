@@ -1,5 +1,5 @@
 {
-  "version": "1.9.90",
+  "version": "1.9.91",
   "channel": "main",
-  "notes": "📁 Projects: save / open / autosave (every 20 s + on closing the tab). Sessions moved from the system temp folder to ~/.assembler/sessions; unsaved sessions older than 7 days and deleted projects older than 14 days are cleaned up on start."
+  "notes": "Faster hook render: trim + captions + titles in ONE encode (was two), and baked hooks are cached — the same hook in several creatives is rendered once; editing one hook re-bakes only that hook."
 }
