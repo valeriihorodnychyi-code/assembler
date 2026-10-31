@@ -423,6 +423,7 @@
     </div>
     <button class="primary" id="loadBtn" data-i18n="loadVideo" style="margin-left:4px">LOAD VIDEO</button>
     <button id="jiraBtn" title="Вставити таски з Джири (ключі, лінки або імена файлів) — відео підтягнуться з ADAM прямо в сесію" style="margin-left:4px;font-weight:700">⇩ JIRA</button>
+    <button id="projBtn" title="Projects — зберегти / відкрити (автозбереження кожні 20 с)" style="margin-left:4px">📁</button>
     <div class="badge" id="encBadge">encoder: …</div>
     </div>
     <div class="modeswitch">
@@ -472,7 +473,7 @@
         <div class="dropzone" id="dropzone">
           <div class="big">🎬</div>
           <div><b>Drop a video here</b><br>or click “Load video”</div>
-          <div style="margin-top:6px;font-size:12px">або <b id="dzJira" style="cursor:pointer;color:var(--accent2)">⇩ таски з Джири</b></div>
+          <div style="margin-top:6px;font-size:12px">або <b id="dzJira" style="cursor:pointer;color:var(--accent2)">⇩ таски з Джири</b> · <b id="dzProjects" style="cursor:pointer;color:var(--accent2)">📁 відкрити проект</b></div>
           <div class="hint">Design the style live, then Transcribe → Send to Compose → Render.</div>
         </div>
         <video id="video" playsinline hidden></video>
@@ -3732,6 +3733,112 @@ if($("tbBody"))$("tbBody").onclick=()=>toolPop($("tbBody"),[
     setStatus("◧ Body з "+tc(o.body)+" — на всіх "+editPack.length+" кліпах.","ok");}},
   {label:"✕ No body (whole clip is the hook)",on:()=>{setBody(null,true);}},
   "-",{label:"Auto-detect when a pack loads",check:AUTO.body,on:v=>{AUTO.body=v;_prefSet("cs_autoBody",v);renderToolBtns();}}]);
+// ---------- 📁 Projects: save / open / autosave — a closed tab no longer loses the pack ----------
+// State = plain data only. Blob URLs and history (↩ snapshots) are not saved: clips are re-served
+// from the session folder, and History starts fresh after opening a project.
+let _projName="", _projSavedKey="", _projTimer=null, _projBusy=false;
+const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_cutsDone","pick"]);
+function _projClean(o){return JSON.parse(JSON.stringify(o,(k,v)=>{
+  if(PROJ_SKIP.has(k))return undefined;
+  if(v instanceof Set||v instanceof Map)return undefined;
+  return v;}));}
+function projState(){
+  saveActiveHook&&saveActiveHook();
+  const pack=editPack.map(h=>_projClean(h));
+  // a board hook that IS a pack hook is saved as a reference, so after opening they are one object again
+  const board=hooks.map(h=>{const i=editPack.indexOf(h);return i>=0?{ref:i}:_projClean(h);});
+  const v=variants[activeVar];
+  return {pack,board,activeHook,packMode,ratio,currentMode,
+    single:(!editPack.length&&v&&v.clip)?_projClean(Object.assign({},v,{words:realWords||v.words})):null,
+    titles:_projClean(titles),bodyParts:_projClean(bodyParts),creativeNames:_projClean(creativeNames),
+    musicTracks:_projClean(musicTracks),
+    hookMusic:_hm&&_hm.tracks?_projClean(_hm.tracks):null,
+    style:readControls()};
+}
+function projDefaultName(){
+  const h=editPack[0]; if(h&&h.jira&&h.jira.key)return h.jira.key+(editPack.length>1?" +"+(editPack.length-1):"");
+  const c=(h&&h.clip)||(variants[activeVar]&&variants[activeVar].clip)||"Project";
+  return String(c).replace(/^\d+_/,"").replace(/\.[^.]+$/,"").slice(0,60)+(editPack.length>1?" +"+(editPack.length-1):"");
+}
+function projHasWork(){return !!fileId&&(editPack.length>0||!!(variants[activeVar]&&variants[activeVar].clip));}
+async function projSave(manual){
+  if(_projBusy)return; if(!projHasWork()){if(manual)setStatus("Немає що зберігати — спершу завантаж відео.","");return;}
+  const st=projState(), key=JSON.stringify(st);
+  if(!manual&&key===_projSavedKey)return;            // nothing changed since the last save
+  _projBusy=true;
+  try{const r=await fetch(API+"/api/project/save",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,name:_projName||projDefaultName(),state:st})});
+    if(!r.ok)throw new Error((await r.json()).detail||"save failed");
+    _projSavedKey=key; if(!_projName)_projName=projDefaultName();
+    const el=$("projBtn"); if(el)el.title="Projects · збережено "+new Date().toLocaleTimeString().slice(0,5);
+    if(manual)setStatus("📁 Проект «"+_projName+"» збережено.","ok");
+  }catch(e){if(manual)setStatus("Save project: "+e.message,"err");}
+  _projBusy=false;
+}
+_projTimer=setInterval(()=>projSave(false),20000);   // autosave every 20 s when something changed
+window.addEventListener("beforeunload",()=>{try{if(projHasWork()){const st=projState();if(JSON.stringify(st)!==_projSavedKey)
+  navigator.sendBeacon(API+"/api/project/save",new Blob([JSON.stringify({file_id:fileId,name:_projName||projDefaultName(),state:st})],{type:"application/json"}));}}catch(_){}});
+async function projOpen(fid){
+  const r=await fetch(API+"/api/project/"+encodeURIComponent(fid)); const d=await r.json();
+  if(!r.ok){setStatus("Open project: "+(d.detail||"failed"),"err");return;}
+  const st=d.state||{}, url=c=>API+"/clip/"+fid+"/"+encodeURIComponent(c);
+  fileId=fid; _projName=d.name||""; videoFile=null;
+  if(st.style)try{writeControls(st.style);}catch(_){}
+  if(st.ratio&&typeof setRatio==="function")setRatio(st.ratio);
+  titles=st.titles||[];
+  editPack=(st.pack||[]).map(h=>Object.assign(h,{videoUrl:url(h.clip)}));
+  hooks=(st.board||[]).map(b=>b&&b.ref!=null?editPack[b.ref]:Object.assign(b,{videoUrl:url(b.clip)})).filter(Boolean);
+  bodyParts=st.bodyParts||[""]; creativeNames=st.creativeNames||{}; musicTracks=st.musicTracks||[];
+  if(st.hookMusic&&typeof _hm!=="undefined"){_hm.tracks=st.hookMusic;_hm.track=true;}
+  packMode=st.packMode||"orig";
+  _projSavedKey="";
+  if(editPack.length){
+    activeHook=-1; finishPack(editPack.length,Math.max(0,st.activeHook||0));
+  }else if(st.single){
+    const v=Object.assign({},st.single,{videoUrl:url(st.single.clip)}); variants={en:v}; activeVar="en";
+    $("dropzone").style.display="none";video.hidden=false;canvas.hidden=false;
+    video.src=v.videoUrl; video.onloadedmetadata=()=>{videoLoaded=true;if(typeof syncTrim==="function")syncTrim();updateEditButtons();};
+    realWords=v.words||null; if(realWords){$("transcript").value=wordsToText(realWords);}
+    if(typeof buildVarTabs==="function")buildVarTabs();
+  }
+  if(typeof renderHookTiles==="function")renderHookTiles();
+  if(typeof hmRenderList==="function")hmRenderList();
+  if(st.currentMode&&st.currentMode!=="edit")setMode(st.currentMode);
+  closeProjModal(); setStatus("📁 Відкрито «"+(_projName||fid)+"». (History ↩ починається заново.)","ok");
+}
+async function projDelete(fid,name){
+  if(!confirm("Delete project «"+name+"»? Його файли підуть у кошик Ассемблера і зникнуть через 14 днів."))return;
+  await fetch(API+"/api/project/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fid})});
+  if(fid===fileId)_projSavedKey="__deleted__";
+  openProjModal();
+}
+function closeProjModal(){const m=$("projModal");if(m)m.remove();}
+async function openProjModal(){
+  closeProjModal();
+  const m=document.createElement("div");m.id="projModal";m.className="modal-bg show";
+  m.innerHTML="<div class='modal' style='width:560px'><div style='display:flex;align-items:center;margin-bottom:12px'><b style='font-size:15px'>📁 Projects</b>"
+    +"<span id='projX' style='margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px'>✕</span></div>"
+    +(projHasWork()?"<div style='display:flex;gap:6px;margin-bottom:12px'><input id='projName' value=\""+String(_projName||projDefaultName()).replace(/"/g,"&quot;")+"\" style='flex:1' placeholder='Project name'>"
+      +"<button class='primary' id='projSaveBtn'>💾 Save</button></div>":"")
+    +"<div class='hint' style='margin:0 0 8px'>Проекти зберігаються самі кожні 20 с. Тут — останні, найновіші зверху.</div>"
+    +"<div id='projList' style='max-height:50vh;overflow:auto;font-size:12px'>…</div></div>";
+  document.body.appendChild(m);
+  m.onclick=e=>{if(e.target===m)closeProjModal();};
+  $("projX").onclick=closeProjModal;
+  if($("projSaveBtn"))$("projSaveBtn").onclick=async()=>{_projName=$("projName").value.trim()||projDefaultName();await projSave(true);openProjModal();};
+  try{const d=await (await fetch(API+"/api/projects")).json(); const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+    const rows=(d.projects||[]).map(p=>"<div style='display:flex;gap:8px;align-items:center;padding:7px 4px;border-bottom:1px solid var(--line)'>"
+      +"<div style='flex:1;min-width:0'><b style='color:var(--txt)'>"+esc(p.name)+"</b>"+(p.file_id===fileId?" <span style='color:var(--ok)'>· open</span>":"")
+      +"<div style='color:var(--muted);font-size:11px'>"+new Date((p.saved_at||0)*1000).toLocaleString()+" · "+p.clips+" кліп(ів) · "+p.mb+" MB</div></div>"
+      +"<button class='tmini' data-popen='"+esc(p.file_id)+"'>Open</button>"
+      +"<button class='tmini ticon' data-pdel='"+esc(p.file_id)+"' data-pname='"+esc(p.name)+"' title='Delete'>🗑</button></div>").join("");
+    $("projList").innerHTML=rows||"<div style='color:var(--muted)'>Ще немає збережених проектів.</div>";
+    $("projList").querySelectorAll("[data-popen]").forEach(b=>b.onclick=()=>projOpen(b.dataset.popen));
+    $("projList").querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>projDelete(b.dataset.pdel,b.dataset.pname));
+  }catch(e){$("projList").textContent="Не вдалося прочитати список: "+e.message;}
+}
+if($("projBtn"))$("projBtn").onclick=openProjModal;
+if($("dzProjects"))$("dzProjects").onclick=e=>{e.stopPropagation();openProjModal();};
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;

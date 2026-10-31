@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-10-31** — 📁 Projects: save / open / autosave; persistent sessions in ~/.assembler/sessions + housekeeping (1.9.90)
 - **2026-10-29** — Build: .app version in Get Info = version.json (was always 1.0.0)
 - **2026-10-23** — Body detection tolerant to noisy frames; "same body for all"; auto-cuts off by default (1.9.88)
 - **2026-10-23** — Auto scene cuts + Hook | Body boundary by comparing the pack (1.9.87)

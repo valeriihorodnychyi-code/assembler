@@ -1,5 +1,5 @@
 {
-  "version": "1.9.89",
+  "version": "1.9.90",
   "channel": "main",
-  "notes": "Cleanup: dead endpoints and functions removed, old UI backups / game-sprite tool / design mockups moved to Assembler_архів, session ids validated, README rewritten, release history moved to CHANGELOG.md."
+  "notes": "📁 Projects: save / open / autosave (every 20 s + on closing the tab). Sessions moved from the system temp folder to ~/.assembler/sessions; unsaved sessions older than 7 days and deleted projects older than 14 days are cleaned up on start."
 }

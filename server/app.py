@@ -42,8 +42,45 @@ def app_version():
             return __j.load(__f).get("version", "dev")
     except Exception:
         return "dev"
-WORK_ROOT = os.path.join(tempfile.gettempdir(), "captions_studio_work")
+
+
+# Sessions live in the persistent per-machine home, NOT the system temp dir: macOS wipes
+# /var/folders on its own, and a closed tab used to mean the pack was gone. A session = one
+# folder of clips (+ project.json once the pack has been saved / autosaved).
+WORK_ROOT = os.environ.get("CS_WORK_ROOT") or os.path.join(os.path.expanduser("~"), ".assembler", "sessions")
 os.makedirs(WORK_ROOT, exist_ok=True)
+TRASH_PREFIX = ".trash_"
+UNSAVED_DAYS = float(os.environ.get("CS_UNSAVED_DAYS", "7"))    # a session that never became a project
+TRASH_DAYS = float(os.environ.get("CS_TRASH_DAYS", "14"))       # a deleted project, before it really goes
+
+
+def prune_sessions():
+    """Housekeeping on start: drop sessions that never became a project (older than UNSAVED_DAYS)
+    and deleted projects older than TRASH_DAYS. Saved projects are never touched."""
+    import time as _t
+    now, freed, n = _t.time(), 0, 0
+    try:
+        for d in os.listdir(WORK_ROOT):
+            p = os.path.join(WORK_ROOT, d)
+            if not os.path.isdir(p):
+                continue
+            age = (now - os.path.getmtime(p)) / 86400
+            trash = d.startswith(TRASH_PREFIX)
+            if (trash and age > TRASH_DAYS) or (not trash and age > UNSAVED_DAYS
+                                                 and not os.path.exists(os.path.join(p, "project.json"))):
+                for root, _, fs in os.walk(p):
+                    for f in fs:
+                        try:
+                            freed += os.path.getsize(os.path.join(root, f))
+                        except OSError:
+                            pass
+                shutil.rmtree(p, ignore_errors=True)
+                n += 1
+    except Exception as e:
+        print(f"[sessions] prune skipped ({type(e).__name__}: {e})", flush=True)
+        return
+    if n:
+        print(f"[sessions] pruned {n} old session(s), freed {freed/1e6:.0f} MB", flush=True)
 
 # STYLES come in two tiers:
 #   • OFFICIAL — curated presets shipped with the code (ROOT/styles), versioned & read-only.
@@ -286,6 +323,7 @@ try:      # keep the normalized-clip cache from growing forever (entries are reb
     compose.prune_cache()
 except Exception:
     pass
+prune_sessions()          # unsaved sessions > 7 days, deleted projects > 14 days
 
 
 # --- delivery: drop finished creatives into the team "Finished Work" Drive folder ----
@@ -1086,6 +1124,81 @@ def hookmusic_apply(req: HookMusicApplyReq):
     _log_timing("hookmusic_apply", secs, name)
     return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "stripped": bool(voice),
             "seconds": round(secs, 1)}
+
+
+# ---------- 📁 projects: the pack survives a closed tab / a restart ----------
+class ProjectSaveReq(BaseModel):
+    file_id: str
+    name: str = ""
+    state: dict = {}
+
+
+def _dir_size(p):
+    t = 0
+    for root, _, fs in os.walk(p):
+        for f in fs:
+            try:
+                t += os.path.getsize(os.path.join(root, f))
+            except OSError:
+                pass
+    return t
+
+
+@app.post("/api/project/save")
+def project_save(req: ProjectSaveReq):
+    import time as _t, json as _json
+    sdir = _session_dir(req.file_id)
+    doc = {"name": (req.name or "").strip()[:120] or "Untitled", "saved_at": _t.time(),
+           "version": app_version(), "state": req.state}
+    tmp = os.path.join(sdir, "project.json.part")
+    with open(tmp, "w", encoding="utf-8") as f:
+        _json.dump(doc, f, ensure_ascii=False)
+    os.replace(tmp, os.path.join(sdir, "project.json"))      # never a half-written project
+    return {"ok": True, "saved_at": doc["saved_at"]}
+
+
+@app.get("/api/projects")
+def projects_list():
+    import json as _json
+    out = []
+    for d in os.listdir(WORK_ROOT):
+        pj = os.path.join(WORK_ROOT, d, "project.json")
+        if d.startswith(TRASH_PREFIX) or not os.path.exists(pj):
+            continue
+        try:
+            with open(pj, encoding="utf-8") as f:
+                doc = _json.load(f)
+        except Exception:
+            continue
+        st_ = doc.get("state") or {}
+        out.append({"file_id": d, "name": doc.get("name"), "saved_at": doc.get("saved_at"),
+                    "clips": len(st_.get("pack") or []) or (1 if st_.get("variants") else 0),
+                    "mb": round(_dir_size(os.path.join(WORK_ROOT, d)) / 1e6, 1)})
+    out.sort(key=lambda x: -(x.get("saved_at") or 0))
+    return {"projects": out}
+
+
+@app.get("/api/project/{fid}")
+def project_open(fid: str):
+    import json as _json
+    sdir = _session_dir(fid)
+    pj = os.path.join(sdir, "project.json")
+    if not os.path.exists(pj):
+        raise HTTPException(404, "No saved project in this session")
+    with open(pj, encoding="utf-8") as f:
+        return _json.load(f)
+
+
+class ProjectDeleteReq(BaseModel):
+    file_id: str
+
+
+@app.post("/api/project/delete")
+def project_delete(req: ProjectDeleteReq):
+    """Not deleted on the spot: moved to a trash folder that is cleared after TRASH_DAYS."""
+    sdir = _session_dir(req.file_id)
+    os.replace(sdir, os.path.join(WORK_ROOT, TRASH_PREFIX + req.file_id))
+    return {"ok": True}
 
 
 class LipsyncReq(BaseModel):
