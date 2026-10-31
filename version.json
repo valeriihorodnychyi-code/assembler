@@ -1,5 +1,5 @@
 {
-  "version": "1.9.92",
+  "version": "1.9.93",
   "channel": "main",
-  "notes": "Settings → Move to a new Mac: ⬇ Export my setup (keys, library path, custom style presets, caption rules in one zip) and ⬆ Import setup (replaced files are kept as *.before_import)."
+  "notes": "Trim is a frame everywhere: only the trim zone (+1 s) is transcribed, words / sentences outside it are dimmed, a warning appears when the trim is widened past what was transcribed. ✂ Apply trim removed (Cut segment keeps the new-file mechanism)."
 }

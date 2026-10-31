@@ -1400,6 +1400,10 @@ class TranscribeClipReq(BaseModel):
     model_size: str = "small"
     language: str = ""
     script: str = ""     # voice-over text from the Jira task, when the clip came from Jira
+    trim: Optional[List[float]] = None   # transcribe only the kept part (+1 s each side), not a 6-min master
+
+
+TX_MARGIN = 1.0
 
 
 @app.post("/api/transcribe_clip")
@@ -1411,14 +1415,36 @@ def api_transcribe_clip(req: TranscribeClipReq):
     src = os.path.join(sdir, clip)
     if not os.path.exists(src):
         raise HTTPException(404, f"Clip '{clip}' not found in session")
+    dur = ffmpeg_utils.get_video_duration(src)
+    cover = [0.0, dur]
+    audio_src, off = src, 0.0
+    tr = req.trim if (req.trim and len(req.trim) == 2) else None
+    if tr and (float(tr[0]) > TX_MARGIN or float(tr[1]) < dur - TX_MARGIN):
+        # only the trim zone (+ a margin so a word on the edge isn't cut): a 6-min master with a
+        # trimmed-off body no longer spends minutes of Whisper / Scribe credits on the tail
+        cover = [max(0.0, float(tr[0]) - TX_MARGIN), min(dur, float(tr[1]) + TX_MARGIN)]
+        audio_src = os.path.join(sdir, f"_tx_{os.path.splitext(clip)[0]}.wav")
+        ffmpeg_utils.run(["ffmpeg", "-y", "-ss", f"{cover[0]:.3f}", "-t", f"{cover[1] - cover[0]:.3f}", "-i", src,
+                          "-vn", "-ac", "1", "-ar", "16000", audio_src])
+        off = cover[0]
     try:
         result = transcribe.transcribe(
-            src, engine=req.engine, model_size=req.model_size,
+            audio_src, engine=req.engine, model_size=req.model_size,
             language=req.language or None,
             api_key=os.environ.get("ELEVENLABS_API_KEY"),
         )
     except Exception as e:
         raise HTTPException(500, f"Transcription failed: {e}")
+    finally:
+        if audio_src != src:
+            try:
+                os.remove(audio_src)
+            except OSError:
+                pass
+    if off:
+        for w in result["words"]:
+            w["start"] = round(float(w["start"]) + off, 3)
+            w["end"] = round(float(w["end"]) + off, 3)
     words, fixes = result["words"], []
     if req.script:
         # The recogniser knows WHEN, the task text knows WHAT. Fix only one-for-one
@@ -1427,7 +1453,7 @@ def api_transcribe_clip(req: TranscribeClipReq):
         words, fixes = jira.align_to_script(words, req.script)
     return {"language": result["language"],
             "words": _clean_transcript(words, result.get("language")),
-            "script_fixes": fixes}
+            "script_fixes": fixes, "cover": [round(cover[0], 3), round(cover[1], 3)]}
 
 
 class PreviewFrameReq(BaseModel):

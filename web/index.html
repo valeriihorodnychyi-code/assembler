@@ -240,6 +240,8 @@
   .twords .w.rvhl{background:rgba(255,90,44,.30);color:#fff}   /* hovering a 🎙 row lights up its words */
   .twords .w.sel{outline:1.5px solid var(--accent2);outline-offset:1px;color:#fff}   /* the word the [ / ] tools act on */
   .twords .w.man{border-bottom:2px dotted var(--accent2)}
+  .twords .w.otrim{opacity:.28;text-decoration:line-through;text-decoration-color:rgba(255,255,255,.25)}
+  .srow.otrim{opacity:.35}
   .twords .w.rng{color:#fff;background:rgba(120,110,255,.45);box-shadow:0 0 0 1px rgba(150,140,255,.7)}   /* Shift-click / double-click range — re-voiced as one phrase */
   .tsents{display:flex;flex-direction:column;gap:4px;max-height:420px;overflow-y:auto;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
   .srow{border:1px solid transparent;border-radius:8px;padding:6px 6px 6px 4px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 6px;align-items:start}
@@ -519,7 +521,7 @@
         <span class="tmid"><span id="trimDurLbl"></span>
           <span id="trimAll" class="tlink" title="Застосувати цей трім до всіх кліпів паку (локалізації тайм-align до оригіналу)" style="display:none">⧉ All clips</span>
           <span id="trimReset" class="tlink" title="Прибрати трім">reset</span>
-          <button id="trimApply" class="tmini" style="display:none" title="Відрізати непотрібне НАЗАВЖДИ: новий файл лише з залишеною частиною. Далі детект сцен, музика, переозвучка працюють тільки з ним. ↩ в History повертає.">✂ Apply trim</button></span>
+</span>
         <span class="tgrp" style="justify-content:flex-end">
           <button id="trimPlayOut" class="tmini ticon" title="Подивитись хвіст: 1.5 с до Out">▶</button>
           <span class="tval"><b id="trimOutLbl">0.000s</b></span>
@@ -1854,8 +1856,9 @@ async function transcribePack(){
       batchHint("Хук "+(i+1)+" / "+todo.length+" 🎬<br>"+TL("розпізнаю текст…","recognizing text…"));
       const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({file_id:fileId,clip:h.clip,engine:eng,model_size:ms,language:"",   // "" = auto-detect
-                             script:(h.jira&&h.jira.script)||""})});   // Jira text fixes misheard words, timings untouched
+                             script:(h.jira&&h.jira.script)||"",trim:h.trim||null})});   // Jira text fixes misheard words; only the trim zone is transcribed
       const d=await r.json();if(!r.ok)throw new Error(d.detail||"transcribe failed");
+      h.txCover=d.cover||null;
       h.words=d.words; h.origWords=JSON.parse(JSON.stringify(d.words)); if(d.language)h.lang=d.language;   // origWords = the recogniser's own timings, the rescue for ↺
       h.scriptFixes=(d.script_fixes||[]);fixedTotal+=h.scriptFixes.length;
     ok++;}catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
@@ -2113,6 +2116,9 @@ function writeTrim(){
   const t=(i>0.05||o<dur-0.05)?[i,o]:null;
   if(variants[activeVar])variants[activeVar].trim=t;
   const h=openHookRef();if(h)h.trim=t;      // stick the trim to the CLIP → survives switching clips + goes to the board
+  clearTimeout(writeTrim._t);writeTrim._t=setTimeout(()=>{   // words outside the new zone get dimmed
+    const box=$("transcriptWords"); if(txtView==="words"&&box&&document.activeElement!==box)renderWordsView();
+    if(txtView==="sents"&&typeof renderSentsView==="function")renderSentsView();},150);
 }
 let trimArmed="in";     // which handle ← / → nudges (click a handle or its ⟨ ⟩ to arm it)
 function armTrim(which){
@@ -2140,7 +2146,10 @@ function drawTrimBar(){
   const cut=(i>0.0005||o<dur-0.0005);
   $("trimDurLbl").innerHTML=(cut?"Kept ":"Length ")+"<b style='color:var(--txt)'>"+tc(o-i)+"</b>";
   $("trimDurLbl").title=(o-i).toFixed(3)+" с · "+(frameOf(o)-frameOf(i))+" кадрів · "+Math.round(fps())+" fps"+(cut?" · відрізано "+tc(dur-(o-i)):"");
-  if($("trimApply"))$("trimApply").style.display=cut?"":"none";
+  // the transcript covers only the zone it was made for: widening the trim past it needs a re-transcribe
+  {const ho=(typeof openHookRef==="function"&&openHookRef())||variants[activeVar], cv=ho&&ho.txCover, w=$("tbStatus");
+   if(w&&cv&&(i<cv[0]-0.05||o>cv[1]+0.05))w.textContent="⚠ транскрипт лише "+tc(cv[0])+"–"+tc(cv[1])+" — ↻ Transcribe ще раз";
+   else if(w&&/^⚠ транскрипт/.test(w.textContent))w.textContent="";}
 }
 function xToTime(clientX){const r=$("trimBar").getBoundingClientRect();const f=Math.min(1,Math.max(0,(clientX-r.left)/r.width));return f*(video.duration||0);}
 // Set a handle to an exact time: quantized to the frame grid, magnet-snapped to scene cuts,
@@ -2912,7 +2921,8 @@ $("txtViewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
 function renderWordsView(){
   const box=$("transcriptWords"); if(!box)return; box.innerHTML="";
   (realWords||[]).forEach((w,i)=>{
-    const sp=document.createElement("span");sp.className="w"+(i===_wSel?" sel":"")+(w.manual?" man":"")+(_wRng&&i>=_wRng[0]&&i<_wRng[1]?" rng":"");sp.dataset.start=w.start;sp.dataset.i=i;
+    const _tr=(variants[activeVar]||{}).trim, _out=!!(_tr&&(+w.end<=_tr[0]||+w.start>=_tr[1]));   // outside the trim = not in the creative
+    const sp=document.createElement("span");sp.className="w"+(i===_wSel?" sel":"")+(w.manual?" man":"")+(_wRng&&i>=_wRng[0]&&i<_wRng[1]?" rng":"")+(_out?" otrim":"");sp.dataset.start=w.start;sp.dataset.i=i;
     sp.textContent=(w.word||w.text||""); sp.title=_fmtCut(+w.start);
     box.appendChild(sp); box.appendChild(document.createTextNode(" "));
     if(w.brk==="soft") box.appendChild(document.createElement("br"));
@@ -3277,26 +3287,6 @@ function cutApplyTimes(targets,spans,oldDur,newWords){
 function cutLoadVideo(url){const t=video.currentTime||0;video.src=url;
   video.onloadedmetadata=()=>{videoLoaded=true;try{video.currentTime=Math.min(t,(video.duration||t));}catch(_){}
     if(typeof syncTrim==="function")syncTrim(); if(typeof updateCutsLabel==="function")updateCutsLabel(); drawCutMark();};}
-// ✂ Apply trim: the trim becomes REAL — a new file with only the kept part, so scene detection,
-// music, SFX and re-voice stop working on footage that never goes into the creative.
-function applyTrim(){
-  const dur=video.duration||0, i=pf($("trimIn").value,0), o=pf($("trimOut").value,dur)||dur;
-  const spans=[]; if(i>0.0005)spans.push([0,i]); if(o<dur-0.0005)spans.push([o,dur]);
-  if(!spans.length){setStatus("Трім не встановлено — нічого відрізати.","");return;}
-  doCut(spans,false,{label:"✂ Trim applied · "+tc(o-i),clearTrim:true});
-}
-// a freshly dropped clip isn't on the server yet — put it there (once) so it can be cut
-async function ensureSessionClip(){
-  const v=variants[activeVar]||(variants[activeVar]={clip:null,words:null,style:readControls(),trim:null});
-  if(fileId&&v.clip)return true;
-  if(!videoFile)return false;
-  setStatus("Завантажую кліп у сесію…","",true);
-  const fd=new FormData();fd.append("file",videoFile);fd.append("file_id",fileId||"");
-  const r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});const d=await r.json();
-  if(!r.ok)throw new Error(d.detail||"upload failed");
-  fileId=d.file_id;v.clip=d.name;if(!v.videoUrl)v.videoUrl=video.src;
-  return true;
-}
 async function doCut(spans,speech,opts){
   opts=opts||{};
   try{await ensureSessionClip();}catch(e){setStatus("Cut: "+e.message,"err");return;}
@@ -3328,7 +3318,6 @@ async function doCut(spans,speech,opts){
   }catch(e){busyStop();setStatus("Cut: "+e.message,"err");}
   drawCutMark();
 }
-if($("trimApply"))$("trimApply").onclick=applyTrim;
 if($("cutFrom"))$("cutFrom").onclick=()=>cutMarkFromPlayhead("a");
 if($("cutTo"))$("cutTo").onclick=()=>cutMarkFromPlayhead("b");
 if($("cutClear"))$("cutClear").onclick=()=>{_cut={a:null,b:null};drawCutMark();};
@@ -3402,7 +3391,8 @@ function renderSentsView(force){
   if(!ranges.length){box.innerHTML="<div style='color:var(--muted);font-size:12px;padding:8px'>Спершу ① Transcribe — тут з'являться речення.</div>";renderSentBar(false);return;}
   box.innerHTML=ranges.map((r,k)=>{const inf=sentInfo(k), meta=sentMetaHTML(k,esc), sig="sent:"+r[0]+":"+r[1], more=_sentMore.has(k);
     const pick=_sentPick&&k>=_sentPick[0]&&k<_sentPick[1];
-    return "<div class='srow"+(pick?" pick":"")+"' data-k='"+k+"'>"
+    const _tr=(variants[activeVar]||{}).trim, _out=!!(_tr&&(inf.end<=_tr[0]||inf.start>=_tr[1]));
+    return "<div class='srow"+(pick?" pick":"")+(_out?" otrim":"")+"' data-k='"+k+"' "+(_out?"title='Поза трімом — у креатив не потрапить'":"")+">"
       +"<button type='button' class='stime' data-sk='"+k+"' title='Клік — програти речення · Shift+клік — виділити кілька речень, щоб озвучити однією фразою'>"+_fmtT(inf.start)+" <span>▶</span></button>"
       +"<div class='stext' contenteditable='true' spellcheck='false' data-k='"+k+"'>"+esc(inf.text)+"</div>"
       +"<div class='sacts'><button type='button' data-svoice='"+k+"' "+((!canVoice||_rvBusy)?"disabled":"")+" title='"+(canVoice?"Переозвучити це речення тим самим голосом":"Потрібен транскрибований кліп у сесії")+"'>🎙</button>"
@@ -3921,7 +3911,9 @@ $("transcribeBtn").onclick=async()=>{
   setStatus("Transcribing… (first Whisper run loads the model)","",true);busyStart("Транскрибую…");$("transcribeBtn").disabled=true;
   try{
     let d;
-    if(videoFile&&!(fileId&&curClip)){   // fresh single clip → upload + transcribe (once in the session, re-transcribe THAT clip — it may be cut or re-voiced)
+    if(videoFile&&!(fileId&&curClip)&&variants.en&&variants.en.trim){await ensureSessionClip();}
+    const _cc=(variants.en&&variants.en.clip)||curClip;
+    if(videoFile&&!(fileId&&_cc)){   // fresh single clip → upload + transcribe (once in the session, re-transcribe THAT clip — it may be cut or re-voiced)
       const fd=new FormData();fd.append("file",videoFile);fd.append("engine",$("engine").value);fd.append("model_size",$("modelSize").value);fd.append("language",$("language").value);
       const r=await fetch(API+"/api/transcribe",{method:"POST",body:fd});d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
       fileId=d.file_id;
@@ -3931,10 +3923,12 @@ $("transcribeBtn").onclick=async()=>{
       if($("language"))$("language").value=d.language||"";
     }else{           // re-transcribe a clip already in the session (a pack hook / localized hook)
       const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:curClip,engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value,
-                             script:((activeHook>=0&&editPack[activeHook]&&editPack[activeHook].jira&&editPack[activeHook].jira.script)||"")})});
+        body:JSON.stringify({file_id:fileId,clip:_cc,engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value,
+                             script:((activeHook>=0&&editPack[activeHook]&&editPack[activeHook].jira&&editPack[activeHook].jira.script)||""),
+                             trim:(variants.en&&variants.en.trim)||null})});
       d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
       const _ow=()=>JSON.parse(JSON.stringify(d.words));
+      if(variants.en)variants.en.txCover=d.cover||null; if(activeHook>=0&&editPack[activeHook])editPack[activeHook].txCover=d.cover||null;
       if(variants.en){variants.en.words=d.words;variants.en.origWords=_ow();}
       if(activeHook>=0&&editPack[activeHook]){editPack[activeHook].words=d.words;editPack[activeHook].origWords=_ow();}
       if(editingHook){editingHook.words=d.words;editingHook.origWords=_ow();}

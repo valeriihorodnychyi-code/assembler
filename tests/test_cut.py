@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 
+os.environ.setdefault("CS_WORK_ROOT", tempfile.mkdtemp(prefix="cut_sessions_"))   # never into the real ~/.assembler/sessions
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi.testclient import TestClient  # noqa: E402
 import server.app as A  # noqa: E402
