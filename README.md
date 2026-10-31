@@ -1,70 +1,68 @@
-# Captions Studio
+# Assembler
 
-An internal tool for the WF motion team: design subtitle styles live in the browser,
-then render fast with the ffmpeg engine. One unified pipeline (the successor to
-`magic_en.py` + `magic_loc.py`), wrapped in a UI so no one touches the terminal.
+Внутрішній інструмент motion-команди WF. Робить готові креативи з чистих відео (`_nSub`): титри, тайтли, стікери, трім і виріз, переозвучка, музика під хук, локалізація, а потім збирає хук, боді й пекшот у фінальні ролики пачкою.
 
-## What's inside
+Працює локально: сервер FastAPI плюс один HTML-інтерфейс, відео обробляє ffmpeg. Команда отримує `Assembler.app`, який при кожному запуску сам тягне свіжий код з цього репозиторію (healthcheck, автоматичний відкат). Історія змін лежить у [`CHANGELOG.md`](CHANGELOG.md).
+
+## Що всередині
 
 ```
-captions_studio/
-├─ engine/                 # the unified render pipeline (no UI)
-│  ├─ ffmpeg_utils.py       # ffprobe + platform-aware codec (videotoolbox on Mac)
-│  ├─ styles.py             # style schema, load/save, defaults
-│  ├─ subtitles.py          # karaoke event building + Pillow PNG rendering
-│  ├─ transcribe.py         # Whisper (local) + ElevenLabs Scribe (cloud)
-│  └─ compose.py            # subtitles → hook → body concat, multi-format
-├─ server/app.py           # FastAPI local server (transcribe / render / styles)
-├─ web/index.html          # the browser UI (live preview + design editor)
-├─ styles/                 # *.json style presets (editor-compatible)
-├─ fonts/                  # drop your .ttf/.otf here
-├─ requirements.txt
-└─ run.command             # double-click launcher (macOS)
+engine/
+  subtitles.py    титри: розкладка на рядки, karaoke-події, рендер PNG (Pillow)
+  compose.py      рендер і збірка: титри → хук → боді → пекшот, трім, виріз посередині, кеш боді
+  styles.py       схема стилю титрів, пресети
+  textrules.py    правила тексту (числа, одиниці, «не розривати»)
+  transcribe.py   Whisper (локально) + ElevenLabs Scribe
+  ffmpeg_utils.py ffprobe, кодек під платформу, детект катів
+  library.py      бібліотека боді / пекшотів / музики
+  dub.py, heygen.py, synclab.py, localize.py   локалізація: дубляж і ліпсинк
+  revoice.py      переозвучка зміненого тексту тим самим голосом (ElevenLabs, розпізнавання мовців)
+  music11.py      Hook music + SFX (ElevenLabs Video-to-Music / Compose, Audio Isolation)
+  bodydetect.py   межа Hook | Body порівнянням кліпів паку
+  jira.py         імпорт тасок з Jira + локалізації з ADAM (тільки читання)
+server/app.py     HTTP API для інтерфейсу
+web/index.html    увесь інтерфейс (Edit · LOC · Assemble)
+packaging/        збірка Assembler.app, автооновлення, лаунчер
+tests/            офлайн-тести на справжньому відео й звуці (без мережі й кредитів)
+tools/            healthcheck для автооновлення, бенчмарк
+styles/ fonts/    стилі титрів і шрифти за замовчуванням
+caption_rules.json правила титрів за замовчуванням
 ```
 
-## Run it (dev / first version)
+## Запуск (розробка)
 
-Requires **Python 3.9+** and **ffmpeg** on PATH (`brew install ffmpeg`).
+Потрібні macOS, Python 3.9+ і ffmpeg (`brew install ffmpeg`).
 
-Easiest: double-click **`run.command`** in Finder. First launch creates a virtual
-environment and installs dependencies (one-time), then opens the browser.
+Найпростіше: двічі клікнути `run.command`. Перший запуск створить `venv` і поставить залежності. Відкриється `http://127.0.0.1:8765`.
 
-Manual:
+Вручну:
 ```bash
-cd captions_studio
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-python3 -m server.app          # opens http://127.0.0.1:8765
+python3 -m server.app
 ```
 
-### ElevenLabs Scribe (optional, fast transcription)
+## Ключі і налаштування
+
+Ключі **ніколи** не лежать у репозиторії (він публічний). Кожен дизайнер вводить свої в ⚙ Settings, і вони зберігаються в `~/.assembler/config.json` на його Mac:
+- **ElevenLabs:** транскрипція, дубляж, переозвучка, музика. Потрібні дозволи ключа: Speech to Text, Text to Speech, Voices (Write), Dubbing (Write), Music Generation, Audio Isolation.
+- **HeyGen / Sync Lab:** ліпсинк.
+- **Jira:** особистий email і API token (починається з `ATATT`).
+
+Поза репозиторієм також живуть: пресети стилів `~/.assembler/styles/`, власні правила титрів, кеш боді `~/.assembler/cache/`, бібліотека (шлях задається в Settings).
+
+## Тести
+
 ```bash
-export ELEVENLABS_API_KEY="sk_..."   # then start the app
+python3 tests/test_jira.py        python3 tests/test_cut.py
+python3 tests/test_revoice.py     python3 tests/test_hookmusic.py
+python3 tests/test_bodydetect.py
+node tests/test_remap.js          node tests/test_revoice_select.js
 ```
-Without a key the app still works fully on local Whisper. **Do not hardcode the key
-in source** — the old `dubber.py` had it inline; here it comes from the environment.
 
-## How it works
+## Збірка Assembler.app
 
-- **Design** happens in the browser canvas (instant, no render).
-- **Transcribe** uploads the video to the local server → Whisper or Scribe returns
-  word-level timecodes → the preview switches to real timing.
-- **Render** sends the style JSON + timecodes to the engine, which generates the
-  subtitle PNGs (Pillow) and burns them with **ffmpeg**. On Apple Silicon it uses
-  `h264_videotoolbox` (hardware) — the same "renders in seconds" path you had.
-  On non-Mac it falls back to `libx264` automatically.
-
-The browser preview and the engine read the **same style JSON**, so what you see is
-what you export. The exported JSON is drop-in compatible with `styles/*.json`.
-
-## Hook / body different styles
-Toggle **"Different style for body"**, set a split time, and edit the Hook and Body
-styles separately. Both are rendered in a single ffmpeg pass (no cut-and-stitch).
-
-## Notes / next steps
-- Body clips: enable **"Append body clip"** and place `body.mp4` (or per-format
-  `body_9x16.mp4`, `body_1x1.mp4`, `body_16x9.mp4`) next to the app or in the
-  session temp dir.
-- Packaging into a single double-click `.app` (PyInstaller/py2app, bundling ffmpeg)
-  is the planned final step so teammates install nothing.
-- Cloud/VPS deployment later reuses this exact server with a different codec + auth.
+```bash
+bash packaging/build_app.sh
+```
+Результат: `dist/Assembler.zip`. Деталі в [`packaging/README_BUILD.md`](packaging/README_BUILD.md). Спільні ключі для `.app` лежать у `packaging/preconfig.json` (ігнорується git).

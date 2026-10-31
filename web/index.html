@@ -1342,19 +1342,6 @@ function openKtInput(){
   box.insertBefore(row, box.lastChild);   // just before the "＋ add" chip
   inp.focus();
 }
-function toggleKeepExpand(){const ta=$("keepTogether"),b=$("keepExpandBtn");if(!ta)return;const big=(+ta.rows||2)<=2;ta.rows=big?9:2;if(b)b.textContent=big?"⤡":"⤢";}
-async function saveKeepTogether(){
-  const ta=$("keepTogether");if(!ta)return;
-  const list=ta.value.split("\n").map(s=>s.trim()).filter(Boolean);
-  CAPTION_RULES=CAPTION_RULES||{};CAPTION_RULES.keep_together=list;
-  const b=$("saveRulesBtn"),old=b?b.textContent:"";if(b){b.textContent="…";b.disabled=true;}
-  try{await fetch(API+"/api/caption_rules",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(CAPTION_RULES)});
-      if(b)b.textContent="✓ Saved";}
-  catch(e){if(b)b.textContent="✕ Error";}
-  setTimeout(()=>{if(b){b.textContent=old||"💾 Save phrases";b.disabled=false;}},1200);
-  if(typeof scheduleExact==="function")scheduleExact();
-  try{render(video.currentTime||0,video.duration||0);}catch(e){}
-}
 function buildGroups(words,lang,pauseGap){
   const n=words.length; if(n<=1)return words.length?[words.slice()]:[];
   const R=CAPTION_RULES||{}, glue=R.glue||{};
@@ -3832,7 +3819,7 @@ $("transcribeBtn").onclick=async()=>{
     realWords=d.words;$("transcript").value=wordsToText(realWords);autoGrow();
     if(typeof setLangSticker==="function")setLangSticker(d.language);
     setStatus("Транскрибовано "+realWords.length+" слів ("+(d.language||"")+").","ok");busyDone("Транскрибовано");
-    $("renderBtn").disabled=false;if($("renderBtn2"))$("renderBtn2").disabled=false;if($("localizeBtn"))$("localizeBtn").disabled=false;
+    $("renderBtn").disabled=false;if($("localizeBtn"))$("localizeBtn").disabled=false;
   }catch(e){setStatus("Transcription error: "+e.message,"err");busyStop();}
   $("transcribeBtn").disabled=false;
   updateEditButtons();   // words exist now → the Transcribe CTA stops pulsing
@@ -4820,27 +4807,6 @@ async function localizePack(){
     // never fail silently: without this, a provider error looked like "nothing happened"
     setStatus(failed.length?("Локалізація не вдалась — "+failed.join(" | ")):"Локалізація нічого не повернула (перевір ключ провайдера в ⚙ Settings).","err");}
   if(failed.length)console.warn("[loc] failures:",failed);
-}
-function renderLocResults(){
-  const box=$("locResults");if(!box)return;
-  const locs=hooks.filter(h=>h.src==="loc");
-  if(!locs.length){box.innerHTML="";return;}
-  box.innerHTML='<div style="font-weight:700;margin:14px 0 4px">Готові локалізації</div>'
-    +'<div style="color:var(--muted);font-size:12px;margin-bottom:10px">Клікни ✎ на версії, щоб поправити її титри в EDIT.</div>'
-    +'<div id="locResGrid" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px"></div>'
-    +'<button class="primary" onclick="setMode(\'asm\')">▦ До Assemble →</button>';
-  const grid=$("locResGrid");
-  locs.forEach((h,i)=>{
-    const card=document.createElement("div");card.className="fcard";card.style.position="relative";card.title=h.name||h.clip;
-    const cv=document.createElement("canvas");cv.width=74;cv.height=132;card.appendChild(cv);
-    const badge=document.createElement("div");badge.className="fb";badge.textContent=(h.lang||"").toUpperCase();
-    if(typeof langColor==="function")badge.style.background=langColor(h.lang);card.appendChild(badge);
-    const ed=document.createElement("button");ed.textContent="✎";ed.title="Поправити титри";
-    ed.style.cssText="position:absolute;top:4px;right:4px;border:0;border-radius:7px;background:rgba(0,0,0,.62);color:#fff;cursor:pointer;font-size:13px;padding:3px 7px";
-    ed.onclick=(e)=>{e.stopPropagation();editLocHook(h);};
-    card.appendChild(ed);grid.appendChild(card);
-    try{drawThumb(cv,{videoUrl:API+"/clip/"+fileId+"/"+h.clip,words:h.words,style:h.ctrl},"locres"+i);}catch(e){}
-  });
 }
 // open ANY board hook (e.g. a localized version) in the full EDIT editor to fix its captions
 function editLocHook(h){

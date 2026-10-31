@@ -101,12 +101,3 @@ def localize_clip(video_path, target_langs, style, formats, output_dir,
         results["_errors"] = errors
     return results
 
-
-def batch_localize(video_paths, target_langs, style, formats, output_root, **kwargs):
-    """Localize many clips. Returns {clip_name: {lang: [paths]}}."""
-    out = {}
-    for vp in video_paths:
-        name = os.path.splitext(os.path.basename(vp))[0]
-        out[name] = localize_clip(vp, target_langs, style, formats,
-                                  os.path.join(output_root, name), **kwargs)
-    return out

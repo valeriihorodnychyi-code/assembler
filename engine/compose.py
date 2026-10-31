@@ -17,14 +17,6 @@ from .subtitles import build_events, render_subtitle_png, generate_shadow_asset,
 from . import subtitles as subtitles_mod   # compose_anim_frame (Pop / Rise in the render)
 
 
-def _region_for(t, regions):
-    for r in regions:
-        end = r.get("end")
-        if t >= r["start"] and (end is None or t < end):
-            return r
-    return regions[-1]
-
-
 def build_timeline(words, regions, lang="en", cuts=None):
     """Return events sorted by time, each tagged with the style that applies to it.
 

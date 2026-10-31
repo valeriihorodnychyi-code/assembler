@@ -15,6 +15,7 @@ Endpoints:
     GET  /download/{fid}/{name}  -> fetch a rendered file
 """
 import os
+import re
 import sys
 import uuid
 import shutil
@@ -290,6 +291,8 @@ except Exception:
 # --- delivery: drop finished creatives into the team "Finished Work" Drive folder ----
 # Local method: the file is copied into the Google-Drive-synced folder; Drive uploads it.
 # No rclone / OAuth needed on a Mac that already syncs Drive (that's the headless-VPS path).
+
+
 def _detect_drive_folder(folder_name):
     import glob as _g
     home = os.path.expanduser("~")
@@ -380,7 +383,17 @@ async def no_cache_html(request, call_next):
     return resp
 
 
+_FID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _fid_ok(fid) -> bool:
+    """A session id is a short token we generated — never a path ("../", "/")."""
+    return bool(fid) and bool(_FID.match(str(fid)))
+
+
 def _session_dir(fid: str) -> str:
+    if not _fid_ok(fid):
+        raise HTTPException(400, "Bad session id")
     d = os.path.join(WORK_ROOT, fid)
     if not os.path.isdir(d):
         raise HTTPException(404, "Unknown file_id (session expired?)")
@@ -427,12 +440,6 @@ def info():
 def _looks_like_url(p):
     import re as _re
     return bool(_re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", (p or "").strip()))
-
-
-def valid_lib_dir(p):
-    """A usable library folder = a real LOCAL directory. A drive.google.com link is not one."""
-    p = (p or "").strip()
-    return bool(p) and not _looks_like_url(p) and os.path.isdir(os.path.expanduser(p))
 
 
 @app.get("/api/drive_roots")
@@ -591,11 +598,6 @@ def post_settings(body: KeysReq):
             "library_exists": os.path.isdir(os.environ.get("CS_LIBRARY_DIR", ""))}
 
 
-@app.get("/api/fonts")
-def get_fonts():
-    return {"fonts": list_fonts()}
-
-
 @app.post("/api/shutdown")
 def shutdown():
     """Cleanly stop the local server (the Quit button) instead of force-killing the terminal."""
@@ -708,6 +710,8 @@ def api_detect_body(req: DetectBodyReq):
 
 
 # ---------- Jira → session: paste task keys / links / asset names, get the videos ----------
+
+
 class JiraReq(BaseModel):
     text: str
     file_id: str = ""
@@ -732,15 +736,6 @@ def api_jira_status(check: bool = False):
     return out
 
 
-@app.post("/api/jira/resolve")
-def api_jira_resolve(req: JiraReq):
-    """Metadata only — nothing downloaded. Fast enough to run on 50 tasks at once."""
-    try:
-        return jira.resolve(req.text)
-    except jira.JiraError as e:
-        raise HTTPException(400, str(e))
-
-
 @app.post("/api/jira/import")
 def api_jira_import(req: JiraReq):
     """Resolve the pasted tasks and pull each clean master straight into the session.
@@ -754,7 +749,7 @@ def api_jira_import(req: JiraReq):
         res = jira.resolve(req.text)
     except jira.JiraError as e:
         raise HTTPException(400, str(e))
-    fid = req.file_id if (req.file_id and os.path.isdir(os.path.join(WORK_ROOT, req.file_id))) \
+    fid = req.file_id if (_fid_ok(req.file_id) and os.path.isdir(os.path.join(WORK_ROOT, req.file_id))) \
         else uuid.uuid4().hex[:12]
     sdir = os.path.join(WORK_ROOT, fid)
     os.makedirs(os.path.join(sdir, "output"), exist_ok=True)
@@ -811,6 +806,8 @@ def api_jira_import(req: JiraReq):
 
 
 # ---------- 🎙 re-voice: a changed word/phrase back into the clip's AUDIO, same voice ----------
+
+
 class RevoiceReq(BaseModel):
     file_id: str
     clip: str
@@ -854,6 +851,8 @@ def api_revoice(req: RevoiceReq):
 
 
 # ---------- ✂ cut a segment out of the MIDDLE of a clip (video + audio together) ----------
+
+
 class CutReq(BaseModel):
     file_id: str
     clip: str
@@ -942,6 +941,8 @@ def api_cut(req: CutReq):
 
 
 # ---------- ♪ Hook music (ElevenLabs): ONE bed under the hook instead of one per shot ----------
+
+
 class HookMusicGenReq(BaseModel):
     file_id: str
     preset: str = "drama"
@@ -1802,6 +1803,8 @@ def api_dub(req: DubReq):
 
 
 # ----- Library (reusable body parts) -----
+
+
 @app.get("/api/library")
 def api_library(format: str = "", lang: str = ""):
     ok = library.dir_ok()
@@ -1858,39 +1861,13 @@ def library_file(name: str):
 
 
 # ----- Assemble (hook render + library body) -----
-class AssembleReq(BaseModel):
-    file_id: str
-    hook_name: str   # a rendered clip in the session output/ dir (the hook)
-    body_id: str     # a library item id
-    format: str = "9:16"
-
-
-@app.post("/api/assemble")
-def api_assemble(req: AssembleReq):
-    sdir = _session_dir(req.file_id)
-    hook = os.path.join(sdir, "output", os.path.basename(req.hook_name))
-    if not os.path.exists(hook):
-        raise HTTPException(404, "Hook render not found in session")
-    body = library.item_path(req.body_id)
-    if not body:
-        raise HTTPException(404, "Library body not found")
-    out_dir = os.path.join(sdir, "output")
-    os.makedirs(out_dir, exist_ok=True)
-    hook_stem = os.path.splitext(os.path.basename(req.hook_name))[0]
-    out = os.path.join(out_dir, f"assembled_{hook_stem}.mp4")
-    try:
-        compose.assemble(hook, body, req.format, out)
-    except Exception as e:
-        raise HTTPException(500, f"Assemble failed: {e}")
-    return {"output": {"url": f"/download/{req.file_id}/{os.path.basename(out)}",
-                       "name": os.path.basename(out), "format": req.format}}
 
 
 @app.post("/api/upload_clip")
 async def upload_clip(file: UploadFile = File(...), file_id: str = Form("")):
     """Upload a ready clip (e.g. an external hook) into a session for the batch board.
     Creates a session on the fly if none is given, so batch works without transcribing."""
-    if not file_id or not os.path.isdir(os.path.join(WORK_ROOT, file_id)):
+    if not _fid_ok(file_id) or not os.path.isdir(os.path.join(WORK_ROOT, file_id)):
         file_id = uuid.uuid4().hex[:12]
     sdir = os.path.join(WORK_ROOT, file_id)
     os.makedirs(os.path.join(sdir, "output"), exist_ok=True)
@@ -1898,22 +1875,6 @@ async def upload_clip(file: UploadFile = File(...), file_id: str = Form("")):
     with open(os.path.join(sdir, name), "wb") as out:
         shutil.copyfileobj(file.file, out)
     return {"file_id": file_id, "name": name}
-
-
-@app.get("/api/download_all/{file_id}")
-def download_all(file_id: str):
-    """Zip every finished creative in the session (the batch finals) → one download."""
-    sdir = _session_dir(file_id)
-    out = os.path.join(sdir, "output")
-    import glob as _glob, zipfile as _zip
-    files = sorted(_glob.glob(os.path.join(out, "batch_*.mp4"))) or sorted(_glob.glob(os.path.join(out, "*.mp4")))
-    if not files:
-        raise HTTPException(404, "No finished videos yet")
-    zpath = os.path.join(sdir, "assembler_finals.zip")
-    with _zip.ZipFile(zpath, "w", _zip.ZIP_STORED) as z:
-        for f in files:
-            z.write(f, os.path.basename(f))
-    return FileResponse(zpath, filename="assembler_finals.zip", media_type="application/zip")
 
 
 @app.get("/api/download_locs/{file_id}")
@@ -1960,22 +1921,6 @@ def _render_poster(out_dir, fname, t):
         except Exception:
             pass
     return png if os.path.exists(png) else None
-
-
-@app.post("/api/posters")
-def posters(req: PosterReq):
-    """Zip of poster frames for every final video."""
-    sdir = _session_dir(req.file_id)
-    out = os.path.join(sdir, "output")
-    import zipfile as _zip
-    made = [p for s in req.shots if (p := _render_poster(out, s.get("file", ""), s.get("t", 1.0)))]
-    if not made:
-        raise HTTPException(404, "No frames to capture (render first)")
-    zpath = os.path.join(sdir, "assembler_posters.zip")
-    with _zip.ZipFile(zpath, "w", _zip.ZIP_STORED) as z:
-        for p in made:
-            z.write(p, os.path.basename(p))
-    return FileResponse(zpath, filename="assembler_posters.zip", media_type="application/zip")
 
 
 def _safe_name(name, fallback="creative"):
