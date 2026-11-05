@@ -1,5 +1,5 @@
 {
-  "version": "1.9.100",
+  "version": "1.9.101",
   "channel": "main",
-  "notes": "⧉ New part: set In–Out on the timeline → ⧉ New part (next to Cuts / Body) → that zone becomes its own clip, a sub-project under the project in Projects (P1, P2…). Frame-exact from the clean clip, with the project's words in that zone and its style; its own trim, sound lanes, re-voice and export. The project's trim resets, so the next zone can be marked at once. A single clip becomes a one-project pack. Parts never join Apply to: Project / Pack."
+  "notes": "⚙ Settings: WaveSpeed API key field (for Seedance 2.5 part regeneration). Stored only in ~/.assembler/config.json; Settings shows ✓ and the balance in USD, or why the key doesn't work."
 }

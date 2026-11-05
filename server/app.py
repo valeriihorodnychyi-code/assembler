@@ -223,6 +223,8 @@ if os.path.exists(_PCFG):
             os.environ.setdefault("SYNCLAB_API_KEY", _pc["synclab_api_key"])
         if _pc.get("gemini_api_key"):
             os.environ.setdefault("GEMINI_API_KEY", _pc["gemini_api_key"])
+        if _pc.get("wavespeed_api_key"):
+            os.environ.setdefault("WAVESPEED_API_KEY", _pc["wavespeed_api_key"])
         # persist the chosen library folder across restarts — but ignore a stored web link
         # (an older build accepted URLs and pointed the whole library at a bogus folder)
         _lib = (_pc.get("library_dir") or "").strip()
@@ -274,7 +276,7 @@ def license_ok():
         return True
 
 
-def save_keys(eleven, heygen, synclab="", gemini=""):
+def save_keys(eleven, heygen, synclab="", gemini="", wavespeed=""):
     os.makedirs(os.path.dirname(_PCFG), exist_ok=True)
     cur = {}
     if os.path.exists(_PCFG):
@@ -294,6 +296,9 @@ def save_keys(eleven, heygen, synclab="", gemini=""):
     if gemini:
         cur["gemini_api_key"] = gemini
         os.environ["GEMINI_API_KEY"] = gemini
+    if wavespeed:
+        cur["wavespeed_api_key"] = wavespeed
+        os.environ["WAVESPEED_API_KEY"] = wavespeed
     _json.dump(cur, open(_PCFG, "w", encoding="utf-8"), indent=2)
 
 
@@ -572,6 +577,7 @@ class KeysReq(BaseModel):
     heygen_api_key: Optional[str] = None
     synclab_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    wavespeed_api_key: Optional[str] = None
     jira_email: Optional[str] = None
     jira_api_token: Optional[str] = None
     jira_site: Optional[str] = None
@@ -586,6 +592,7 @@ def get_settings():
             "heygen_key_present": bool(os.environ.get("HEYGEN_API_KEY")),
             "synclab_key_present": bool(os.environ.get("SYNCLAB_API_KEY")),
             "gemini_key_present": bool(os.environ.get("GEMINI_API_KEY")),
+            "wavespeed_key_present": bool(os.environ.get("WAVESPEED_API_KEY")),
             "jira_configured": jira.configured(),
             "jira_email": jira.load_creds()[1],
             "library_dir": os.environ.get("CS_LIBRARY_DIR", ""),
@@ -620,7 +627,8 @@ def save_jira(email="", token="", site=""):
 def post_settings(body: KeysReq):
     save_jira(body.jira_email or "", body.jira_api_token or "", body.jira_site or "")
     save_keys((body.elevenlabs_api_key or "").strip(), (body.heygen_api_key or "").strip(),
-              (body.synclab_api_key or "").strip(), (body.gemini_api_key or "").strip())
+              (body.synclab_api_key or "").strip(), (body.gemini_api_key or "").strip(),
+              (body.wavespeed_api_key or "").strip())
     if body.library_dir is not None and body.library_dir.strip():
         save_library_dir(body.library_dir)
     if body.finished_dir is not None:
@@ -630,10 +638,26 @@ def post_settings(body: KeysReq):
             "heygen_key_present": bool(os.environ.get("HEYGEN_API_KEY")),
             "synclab_key_present": bool(os.environ.get("SYNCLAB_API_KEY")),
             "gemini_key_present": bool(os.environ.get("GEMINI_API_KEY")),
+            "wavespeed_key_present": bool(os.environ.get("WAVESPEED_API_KEY")),
             "jira_configured": jira.configured(),
             "jira_email": jira.load_creds()[1],
             "library_dir": os.environ.get("CS_LIBRARY_DIR", ""),
             "library_exists": os.path.isdir(os.environ.get("CS_LIBRARY_DIR", ""))}
+
+
+@app.get("/api/wavespeed/status")
+def wavespeed_status():
+    """Key check for ⚙ Settings: the balance in USD, or why the key doesn't work."""
+    import requests as _rq
+    from engine import wavespeed
+    if not os.environ.get("WAVESPEED_API_KEY"):
+        return {"ok": False, "error": "not set"}
+    try:
+        return {"ok": True, "balance": wavespeed.balance(_rq)}
+    except wavespeed.WaveSpeedError as e:
+        return {"ok": False, "error": str(e)}
+    except Exception as e:  # noqa: BLE001  (network)
+        return {"ok": False, "error": f"WaveSpeed недоступний: {e}"}
 
 
 @app.post("/api/shutdown")

@@ -47,6 +47,7 @@ python3 -m server.app
 Ключі **ніколи** не лежать у репозиторії (він публічний). Кожен дизайнер вводить свої в ⚙ Settings, і вони зберігаються в `~/.assembler/config.json` на його Mac:
 - **ElevenLabs:** транскрипція, дубляж, переозвучка, музика. Потрібні дозволи ключа: Speech to Text, Text to Speech, Voices (Write), Dubbing (Write), Music Generation, Audio Isolation, Sound Effects.
 - **HeyGen / Sync Lab:** ліпсинк.
+- **WaveSpeed:** Seedance 2.5, перегенерація частин (⧉ parts).
 - **Jira:** особистий email і API token (починається з `ATATT`).
 
 Поза репозиторієм також живуть: **проекти й сесії** `~/.assembler/sessions/` (автозбереження кожні 20 с; незбережені сесії старші за 7 днів і видалені проекти старші за 14 днів прибираються самі), пресети стилів `~/.assembler/styles/`, власні правила титрів, кеш боді `~/.assembler/cache/`, бібліотека (шлях задається в Settings).

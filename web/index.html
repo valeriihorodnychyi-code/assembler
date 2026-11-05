@@ -1023,6 +1023,8 @@
     <input type="password" id="keyHeygen" placeholder="sk_…  (порожнє = лишити поточний)">
     <div class="mlbl">Sync Lab API key (sync.so — dub + lip-sync)</div>
     <input type="password" id="keySynclab" placeholder="sk-…  (порожнє = лишити поточний)">
+    <div class="mlbl">WaveSpeed API key (Seedance 2.5 — перегенерація частин)</div>
+    <input type="password" id="keyWavespeed" placeholder="ключ з wavespeed.ai → API Keys  (порожнє = лишити поточний)">
     <div class="mlbl">Jira — твій email і API token (⇩ JIRA)</div>
     <div style="display:flex;gap:6px"><input type="text" id="jiraEmail" placeholder="name@welltech.com" style="flex:1">
       <input type="password" id="jiraToken" placeholder="API token  (порожнє = лишити поточний)" style="flex:1.3"></div>
@@ -1153,7 +1155,7 @@ function busyStop(){clearInterval(_busyTick);$("busyBar").classList.remove("show
 async function loadSettings(){
   try{const d=await(await fetch(API+"/api/settings")).json();
     $("machineId").textContent=d.machine_id;$("lockMid").textContent=d.machine_id;
-    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");
+    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; WaveSpeed: <span id='wsStat'>"+(d.wavespeed_key_present?"перевіряю…":"— not set")+"</span> &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");if(d.wavespeed_key_present)wsCheck();
     jiraReady=!!d.jira_configured;if($("jiraEmail")&&d.jira_email)$("jiraEmail").placeholder=d.jira_email;
     if($("jiraWarn"))$("jiraWarn").style.display=jiraReady?"none":"block";
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
@@ -1266,14 +1268,14 @@ $("settingsSave").onclick=async()=>{
   if(_jt&&!/^ATATT/.test(_jt)&&!confirm("Це не схоже на Jira API token (вони починаються з «ATATT»). Може, це ключ іншого сервісу (ADAM, ElevenLabs)? Зберегти все одно?"))return;
   try{const r=await fetch(API+"/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({elevenlabs_api_key:$("keyEleven").value,heygen_api_key:$("keyHeygen").value,
-        synclab_api_key:($("keySynclab")?$("keySynclab").value:""),
+        synclab_api_key:($("keySynclab")?$("keySynclab").value:""),wavespeed_api_key:($("keyWavespeed")?$("keyWavespeed").value.trim():""),
         jira_email:($("jiraEmail")?$("jiraEmail").value.trim():""),jira_api_token:($("jiraToken")?$("jiraToken").value.trim():""),
         library_dir:_ld})});
     const d=await r.json();
     if(!r.ok)throw new Error(d.detail||"failed");
-    $("keyEleven").value="";$("keyHeygen").value="";if($("keySynclab"))$("keySynclab").value="";
+    $("keyEleven").value="";$("keyHeygen").value="";if($("keySynclab"))$("keySynclab").value="";if($("keyWavespeed"))$("keyWavespeed").value="";
     if($("jiraEmail"))$("jiraEmail").value="";if($("jiraToken"))$("jiraToken").value="";
-    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");
+    $("keysStatus").innerHTML="ElevenLabs: "+(d.scribe_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; HeyGen: "+(d.heygen_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; Sync Lab: "+(d.synclab_key_present?"✓ set":"— not set")+" &nbsp;·&nbsp; WaveSpeed: <span id='wsStat'>"+(d.wavespeed_key_present?"перевіряю…":"— not set")+"</span> &nbsp;·&nbsp; Jira: "+(d.jira_configured?("✓ "+(d.jira_email||"set")):"— not set");if(d.wavespeed_key_present)wsCheck();
     jiraReady=!!d.jira_configured;if($("jiraEmail")&&d.jira_email)$("jiraEmail").placeholder=d.jira_email;
     if($("jiraWarn"))$("jiraWarn").style.display=jiraReady?"none":"block";
     if($("libDir")){$("libDir").value="";$("libDir").placeholder=d.library_dir||"(not set)";
@@ -1839,6 +1841,11 @@ async function batchOriginals(files){
 }
 // ONE hook shape for every way a clip enters the pack (dropped files, Jira). Everything
 // downstream — transcribe, captions, titles, trim, the board — sees no difference.
+// WaveSpeed key check in ⚙ Settings: balance in USD (a top-up is needed before the API works)
+async function wsCheck(){const el=()=>$("wsStat");
+  try{const r=await fetch(API+"/api/wavespeed/status");const d=await r.json();if(!el())return;
+    el().innerHTML=d.ok?("✓ $"+(d.balance!=null?(+d.balance).toFixed(2):"?")):("<span style='color:#ff8a7a' title='"+String(d.error||"").replace(/'/g,"&#39;")+"'>✕ "+String(d.error||"error").slice(0,60)+"</span>");
+  }catch(_){if(el())el().textContent="?";}}
 function makePackHook(clip,videoUrl,lang){
   return {name:clip,clip:clip,lang:lang||"",                 // tile colour only, best-effort
           videoUrl:videoUrl,words:null,ctrl:JSON.parse(JSON.stringify(sharedCtrl||readControls())),

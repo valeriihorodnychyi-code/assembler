@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-05** — Settings: WaveSpeed API key with a live balance check (1.9.101)
 - **2026-11-05** — ⧉ New part: an In–Out zone becomes a sub-project under its project (1.9.100)
 - **2026-11-05** — Timeline with audio lanes (Picture · Clip audio · Music · SFX); music and SFX as non-baked layers with mute / volume / move / delete; Auto SFX removed (1.9.99)
 - **2026-11-05** — SFX only: add sound effects on top of existing music (text at playhead or auto from picture), undo in History (1.9.98)
