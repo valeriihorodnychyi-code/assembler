@@ -83,10 +83,13 @@
   #trimBar .tdim{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,rgba(0,0,0,.55) 0 6px,rgba(0,0,0,.38) 6px 12px);pointer-events:none}
   #trimDimL{left:0;border-radius:8px 0 0 8px}#trimDimR{right:0;border-radius:0 8px 8px 0}
   #trimSel{position:absolute;top:0;bottom:0;border-top:2px solid rgba(255,255,255,.55);border-bottom:2px solid rgba(255,255,255,.55);pointer-events:none}
-  .thandle{position:absolute;top:-3px;bottom:-3px;width:18px;margin-left:-9px;cursor:ew-resize;z-index:3;display:flex;align-items:center;justify-content:center}
-  .thandle i{display:block;width:8px;height:100%;border:2px solid #e9e9ee;background:rgba(255,255,255,.08)}
-  .thandle.tin i{border-right:0;border-radius:4px 0 0 4px;margin-left:8px}
-  .thandle.tout i{border-left:0;border-radius:0 4px 4px 0;margin-right:8px}
+  .thandle{position:absolute;top:-4px;bottom:-4px;width:26px;margin-left:-13px;cursor:ew-resize;z-index:5;display:flex;align-items:center;justify-content:center}
+  .thandle i{display:block;width:10px;height:100%;border:3px solid #e9e9ee;background:rgba(255,255,255,.12)}
+  #phGhost{position:absolute;top:2px;bottom:2px;width:12px;margin-left:-6px;display:none;z-index:4;cursor:pointer}
+  #phGhost::after{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;border-radius:1px;background:repeating-linear-gradient(180deg,rgba(255,255,255,.75) 0 3px,transparent 3px 6px)}
+  #phGhost:hover::after{background:#fff}
+  .thandle.tin i{border-right:0;border-radius:4px 0 0 4px;margin-left:10px}
+  .thandle.tout i{border-left:0;border-radius:0 4px 4px 0;margin-right:10px}
   .thandle:hover i,.thandle.armed i{border-color:var(--accent2);background:rgba(124,92,255,.18)}
   #trimPlayhead{position:absolute;top:-6px;bottom:-6px;left:0;width:2px;margin-left:-1px;background:#fff;pointer-events:none;z-index:6;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
   /* the knob is a real GRAB handle now (it was decoration): drag it, or click / drag anywhere on the bar — cut marks included */
@@ -173,6 +176,12 @@
   .tchip .tdot{width:7px;height:7px;border-radius:50%;background:#ffd400}
   .tchip.body .tdot{background:#38bdf8}
   .tchip.part .tdot{background:#a78bfa}
+  .capsRow{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);font-size:12.5px}
+  .capsRow .cname{font-weight:700;color:var(--txt)}
+  .capsRow .cnote{flex:1;color:var(--muted);font-size:11px}
+  .capsRow.off{border-color:#7a3036;background:#2a1719}
+  .capsRow.off .cnote{color:#ffb3a8}
+  body.capsoff #grpTranscribe,body.capsoff #grpBaseText,body.capsoff #grpSmart{opacity:.45}
   .tpop{position:fixed;z-index:220;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;min-width:220px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12px}
   .tpop button{display:block;width:100%;text-align:left;background:transparent;border:0;padding:7px 9px;border-radius:6px;font-size:12px}
   .tpop button:hover{background:#2a2d36}
@@ -567,6 +576,7 @@
         <div id="trimCuts" style="position:absolute;inset:0;pointer-events:none"></div>
         <div id="trimHIn" class="thandle tin" title="In — тягни (або клік і Alt+← / →)"><i></i></div>
         <div id="trimHOut" class="thandle tout" title="Out — тягни (або клік і Alt+← / →)"><i></i></div>
+        <div id="phGhost"></div>
         <div id="trimPlayhead"><b></b></div>
       </div></div></div>
       <div class="lane" id="laneOrig"><div class="lhead"><button type="button" class="lmute" data-lm="orig" title="Вимкнути / увімкнути звук кліпу">🔊</button><span class="lname" id="laneOrigName">Clip audio</span></div><div class="lbody" data-lane="orig"><canvas id="waveOrig"></canvas></div></div>
@@ -623,6 +633,8 @@
     <div class="panel-content" id="panelContent">
 
     <section class="sec active" data-sec="text">
+    <div id="capsRow" class="capsRow"><span class="cname">Our captions</span><span id="capsNote" class="cnote">будуть у рендері</span>
+      <label class="switch" title="OFF — кліп уже з титрами (або вони не потрібні): ми нічого не малюємо ні в прев'ю, ні в Export / Assemble. Transcribe тоді не потрібен — кати, музика, SFX, частини працюють і без нього."><input type="checkbox" id="capsOn" checked><span class="slider"></span></label></div>
     <details class="grp" open id="grpTranscribe">
       <summary><span data-i18n="grpTranscription">Transcription</span> <span class="chev">›</span></summary>
       <div class="body">
@@ -1642,6 +1654,7 @@ function render(t,dur){
   const[W,H]=DIMS[ratio];if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}else{ctx.clearRect(0,0,W,H);}   // only resize the backing store on format change; otherwise just clear (no per-frame reflow/churn)
   {const _cd=$("capDrag");if(_cd)_cd.style.display="none";}   // #3 drag-band hidden unless a caption is actually on screen (set below)
   if(!videoLoaded){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,"#3a2b4d");g.addColorStop(1,"#1a2740");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
+  if(capsOffNow())return;          // 🚫 our captions OFF for this clip
   const s=styleAt(t);
   const cw=(typeof capWin==="function")?capWin():{in:null,out:null};   // hide captions outside the in/out window
   if((cw.in!=null&&t<cw.in)||(cw.out!=null&&t>=cw.out))return;
@@ -1794,7 +1807,7 @@ function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="or
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();updateEditButtons();
     if(typeof AUTO!=="undefined"&&AUTO.cuts&&!editPack.length)setTimeout(()=>autoAnalyze(),400);};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
-  variants={en:{clip:null,videoUrl:url,words:null,style:readControls(),trim:null}};activeVar="en";$("varTabs").style.display="none";$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
+  variants={en:{clip:null,videoUrl:url,words:null,style:readControls(),trim:null}};activeVar="en";$("varTabs").style.display="none";if(typeof renderCaps==="function")renderCaps();$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
   if(typeof invalidateLayout==="function")invalidateLayout();
   setStatus("Video loaded. Transcribe for captions, or just trim & Send to Compose as-is.","");}
 $("loadBtn").onclick=()=>$("videoInput").click();
@@ -1846,6 +1859,15 @@ async function wsCheck(){const el=()=>$("wsStat");
   try{const r=await fetch(API+"/api/wavespeed/status");const d=await r.json();if(!el())return;
     el().innerHTML=d.ok?("✓ $"+(d.balance!=null?(+d.balance).toFixed(2):"?")):("<span style='color:#ff8a7a' title='"+String(d.error||"").replace(/'/g,"&#39;")+"'>✕ "+String(d.error||"error").slice(0,60)+"</span>");
   }catch(_){if(el())el().textContent="?";}}
+// 🚫 Our captions OFF: per clip. Nothing drawn in the preview, nothing baked in Export / Assemble
+// (words go out as []). Words stay in the data — re-voice, Cut sentence, turning it back ON all work.
+function capsOffNow(){const h=(typeof openHookRef==="function")?openHookRef():null, v=variants&&variants[activeVar];return !!((h&&h.capsOff)||(!h&&v&&v.capsOff));}
+function renderCaps(){const off=capsOffNow(), r=$("capsRow"); if(!r)return;
+  r.classList.toggle("off",off); if($("capsOn"))$("capsOn").checked=!off; document.body.classList.toggle("capsoff",off);
+  if($("capsNote"))$("capsNote").textContent=off?"вимкнено — цей кліп іде без наших титрів, Transcribe не потрібен":"будуть у рендері";}
+if($("capsOn"))$("capsOn").onchange=e=>{const off=!e.target.checked, h=openHookRef(), v=variants[activeVar];
+  if(h)h.capsOff=off; if(v)v.capsOff=off; renderCaps(); if(typeof scheduleExact==="function")scheduleExact(); if(typeof renderHookStrip==="function")renderHookStrip();
+  setStatus(off?"🚫 Наші титри вимкнено для цього кліпу — ні в прев'ю, ні в рендері. Кати, музика, SFX і частини працюють і без Transcribe.":"Титри знову увімкнено.","ok");};
 function makePackHook(clip,videoUrl,lang){
   return {name:clip,clip:clip,lang:lang||"",                 // tile colour only, best-effort
           videoUrl:videoUrl,words:null,ctrl:JSON.parse(JSON.stringify(sharedCtrl||readControls())),
@@ -1990,7 +2012,9 @@ function selectHook(i){
   saveActiveHook();
   const h=editPack[i];activeHook=i;_wSel=-1;_wRng=null;
   if(h.jira&&h.jira.burned_in)setTimeout(()=>setStatus("⚠ "+h.jira.key+": у файлі вже вшиті титри (чистого _nSub у таски нема). Свої титри зверху дадуть подвійні.","err"),0);
-  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,origWords:h.origWords||null,style:h.ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null}};activeVar="en";
+  if(h.capsOff===undefined&&h.jira&&h.jira.burned_in)h.capsOff=true;   // the file already has captions burned in
+  variants={en:{clip:h.clip,videoUrl:h.videoUrl,words:h.words,origWords:h.origWords||null,style:h.ctrl,language:h.lang,cuts:h.cuts||null,trim:h.trim||null,capsOff:!!h.capsOff}};activeVar="en";
+  if(typeof renderCaps==="function")renderCaps();
   if(typeof updateCutsLabel==="function")updateCutsLabel();
   videoFile=null;                                  // in-session clip — re-transcribe targets it, no session fork
   if($("language"))$("language").value=h.lang||""; // force the hook's language on re-transcribe
@@ -2059,7 +2083,7 @@ function mkHookCard(i,mini,nLoc){
   x.title=nLoc?"Close this project with its "+nLoc+" localizations / parts":"Close (прибрати з паку; файли в сесії лишаються)";
   x.onclick=e=>{e.stopPropagation();closeProject(i);};card.appendChild(x);
   card.onclick=()=>selectHook(i);
-  drawThumb(cv,{videoUrl:h.videoUrl,words:h.words,style:h.ctrl},"hook"+i);
+  drawThumb(cv,{videoUrl:h.videoUrl,words:h.capsOff?null:h.words,style:h.ctrl},"hook"+i);
   return card;
 }
 // ✕ on a project card: take a clip loaded by mistake OUT of the pack (files stay in the session).
@@ -2084,7 +2108,7 @@ function sendPack(target){
   if(!editPack.length)return;
   saveActiveHook();let added=0;
   editPack.forEach(h=>{if(hooks.some(x=>x.clip===h.clip))return;
-    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.words,style:toEngineStyle(h.ctrl),src:"edit",regions:h.regions||null,
+    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.capsOff?[]:h.words,style:toEngineStyle(h.ctrl),src:"edit",regions:h.capsOff?null:(h.regions||null),
                 titles:(h.titles!=null?JSON.parse(JSON.stringify(h.titles)):null),titlesOn:(h.titlesOn!==false)});added++;});
   renderHookTiles();setMode(target==="asm"?"asm":"loc");
   setStatus("Пак ("+editPack.length+") → "+(target==="asm"?"Assemble":"LOC")+".","ok");
@@ -2249,6 +2273,7 @@ function drawTrimBar(){
   if(typeof drawCutMark==="function")drawCutMark();
   if(typeof drawBodyMark==="function")drawBodyMark();
   if(typeof drawLanes==="function")drawLanes();
+  drawGhost();
   // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
   $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
   $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
@@ -2280,26 +2305,44 @@ function nudgeTrim(which,frames){
   const cur=(which==="in")?pf($("trimIn").value,0):(pf($("trimOut").value,dur)||dur);
   setTrimEdge(which,(frameOf(cur)+frames)/fps(),{noMagnet:true});   // manual nudge must not be pulled back by the magnet
 }
+// Dragging an edge SHOWS its frame while you drag, and on release the playhead goes back to where
+// it was — moving In / Out never loses your place in the clip.
 function trimDrag(which){return e=>{
-  e.preventDefault();armTrim(which);
+  e.preventDefault();e.stopPropagation();armTrim(which);
+  const t0=video.currentTime||0, x0=e.clientX; let moved=false;
   const move=ev=>{
     const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
+    if(!moved&&Math.abs(cx-x0)<2)return; moved=true;
     setTrimEdge(which,xToTime(cx));
   };
-  const up=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up);};
+  const up=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up);
+    if(moved&&videoLoaded){try{video.currentTime=t0;}catch(_){}}};
   document.addEventListener("pointermove",move);document.addEventListener("pointerup",up);
 };}
+// ↶ where you were: a click on the bar that jumps the playhead leaves a ghost mark — click it to go back
+let _phBack=null;
+function drawGhost(){const g=$("phGhost"),dur=video.duration||0; if(!g)return;
+  if(_phBack==null||!dur){g.style.display="none";return;}
+  g.style.display="block"; g.style.left=Math.max(0,Math.min(100,_phBack/dur*100))+"%"; g.title="↶ Повернутись сюди ("+tc(_phBack)+")";}
 $("trimHIn").addEventListener("pointerdown",trimDrag("in"));
 // the bar itself is the SCRUBBER: click / drag anywhere that isn't a handle = move the playhead
 $("trimBar").addEventListener("pointerdown",e=>{
   if(!videoLoaded||(e.target.closest&&e.target.closest(".thandle")))return;
+  if(e.target.closest&&e.target.closest("#phGhost")){e.preventDefault();const b=_phBack;_phBack=null;drawGhost();video.currentTime=b;return;}
+  // near an edge = grab the edge, never jump the playhead (the ears are thin; 14 px of grace)
+  {const r=$("trimBar").getBoundingClientRect(), dur=video.duration||0;
+   const xi=r.left+pf($("trimIn").value,0)/dur*r.width, xo=r.left+(pf($("trimOut").value,dur)||dur)/dur*r.width;
+   const di=Math.abs(e.clientX-xi), dO=Math.abs(e.clientX-xo);
+   if(Math.min(di,dO)<=14&&!(e.target.closest&&e.target.closest("#trimPlayhead"))){trimDrag(di<=dO?"in":"out")(e);return;}}
+  const _was=video.currentTime||0;
   e.preventDefault();
   const go=ev=>{const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
     const t=(Math.floor(xToTime(cx)*fps())+0.5)/fps();video.currentTime=Math.min(t,Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
     if(!video.paused){video.pause();$("playBtn").textContent="▶";}
     if(typeof scheduleExact==="function")scheduleExact();};
   go(e);
-  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);};
+  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);
+    if(Math.abs((video.currentTime||0)-_was)>0.25){_phBack=_was;drawGhost();}};
   document.addEventListener("pointermove",go);document.addEventListener("pointerup",up);
 });
 $("trimHOut").addEventListener("pointerdown",trimDrag("out"));
@@ -2383,9 +2426,10 @@ async function fetchExact(){
   if($("batchStage").style.display==="block")return;
   if(!videoLoaded||!video.paused)return;   // a settled frame in any format (9:16 / 1:1 / 16:9)
   const v=variants[activeVar];
-  if(!v||((!v.words||!v.words.length)&&!(typeof titlesCfg==="function"&&titlesCfg(tLang()).length)))return;
+  const _cw=capsOffNow()?[]:v&&v.words;
+  if(!v||((!_cw||!_cw.length)&&!(typeof titlesCfg==="function"&&titlesCfg(tLang()).length))){if(typeof hideExact==="function")hideExact();return;}
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({style:toEngineStyle(readControls()),words:v.words,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(tLang())})});
+      body:JSON.stringify({style:toEngineStyle(readControls()),words:_cw,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(tLang())})});
     if(r.status===204){hideExact();return;}
     if(!r.ok)return;
     const url=URL.createObjectURL(await r.blob());const img=$("exactImg");
@@ -3480,7 +3524,7 @@ async function newPart(){
   try{await ensureSessionClip();}catch(e){setStatus("Part: "+e.message,"err");return;}
   if(!editPack.length){   // a single clip → a pack of one project, so parts have somewhere to live
     const v=variants[activeVar]; const hk=makePackHook(v.clip,v.videoUrl,v.language||"");
-    Object.assign(hk,{words:realWords||v.words||null,origWords:v.origWords||null,trim:v.trim||null,cuts:v.cuts||null,body:v.body!=null?v.body:null,
+    Object.assign(hk,{words:realWords||v.words||null,origWords:v.origWords||null,trim:v.trim||null,cuts:v.cuts||null,body:v.body!=null?v.body:null,capsOff:!!v.capsOff,
       ctrl:readControls(),style:toEngineStyle(readControls()),titles:cloneTitles(),titlesOn:titlesOn()});
     if(v.mix)hk.mix=v.mix; if(v._rvFrom)hk._rvFrom=v._rvFrom;
     editPack=[hk]; activeHook=-1; editingHook=null; selectHook(0);
@@ -3498,7 +3542,7 @@ async function newPart(){
     const hk=makePackHook(d.clip,API+d.url,par.lang||"");
     Object.assign(hk,{words:d.words&&d.words.length?d.words:null,origWords:d.orig_words&&d.orig_words.length?d.orig_words:null,
       ctrl:JSON.parse(JSON.stringify(par.ctrl||readControls())),style:par.style||toEngineStyle(readControls()),titles:null,titlesOn:false,
-      jira:par.jira?Object.assign({},par.jira):undefined,part:{of:root.uid,n,range:[d.a,d.b],from:src}});
+      jira:par.jira?Object.assign({},par.jira):undefined,part:{of:root.uid,n,range:[d.a,d.b],from:src},capsOff:!!par.capsOff});
     if(!hk.jira)delete hk.jira;
     if(par.cuts)hk.cuts=par.cuts.filter(t=>t>d.a&&t<d.b).map(t=>+(t-d.a).toFixed(3));
     // after the project's last sub-item, so the Projects column keeps the order
@@ -3752,7 +3796,8 @@ function hmZone(o){const tr=o.trim||null, b=(o.body!=null)?+o.body:null;
 function hmPool(){const out=[];hmHooks().forEach((o,hi)=>{const s=(_hm.tracks||{})[hmClean(o)];if(s)s.takes.forEach((t,ti)=>out.push({t,label:"Hook "+(hi+1)+" · take "+(ti+1)+" · "+t.preset+" · "+tc(t.length)}));});return out;}
 function hmCur(o){const s=(_hm.tracks||{})[hmClean(o)];if(!s)return null;if(s.pick)return s.pick;return s.takes&&s.takes.length?s.takes[s.i]:null;}
 async function hmGenerate(only){
-  if(!fileId){setStatus("Hook music: спершу завантаж хук у сесію (Transcribe або пак).","err");return;}
+  if(!editPack.length){try{await ensureSessionClip();}catch(e){setStatus("Hook music: "+e.message,"err");return;}}   // no Transcribe needed
+  if(!fileId){setStatus("Hook music: спершу завантаж відео.","err");return;}
   const all=hmHooks(), list=only?[only]:all; if(!list.length){setStatus("Hook music: немає хуків.","err");return;}
   const fromVideo=$("hmFromVideo")?$("hmFromVideo").checked:true;
   const hooksReq=list.map(o=>({clip:hmClean(o),trim:hmZone(o)}));
@@ -4414,8 +4459,8 @@ async function sendToCompose(target){
   langs.forEach(l=>{const v=variants[l];if(!v||!v.clip||hooks.some(h=>h.clip===v.clip))return;
     const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,trim:v.trim||null,src:"edit",videoUrl:v.videoUrl||null};
     if(v.overlays&&v.overlays.length)hook.overlays=v.overlays.map(o=>({name:o.name,x:o.x,y:o.y,w:o.w,angle:o.angle||0,in:(o.in!=null?o.in:null),out:(o.out!=null?o.out:null)}));
-    if(v.words&&v.words.length){hook.words=v.words;hook.ctrl=v.style||null;if(v.style)hook.style=toEngineStyle(v.style);}  // carry words + ctrl so LOC shows a real thumbnail
-    if(v.words&&v.words.length&&v.style&&v.phraseStyles&&v.phraseStyles.length){const _reg=buildStyleRegions(toEngineStyle(v.style),v.phraseStyles);if(_reg)hook.regions=_reg;}  // #10 per-phrase overrides travel to the bake
+    if(v.words&&v.words.length&&!v.capsOff){hook.words=v.words;hook.ctrl=v.style||null;if(v.style)hook.style=toEngineStyle(v.style);}  // carry words + ctrl so LOC shows a real thumbnail
+    if(v.words&&v.words.length&&!v.capsOff&&v.style&&v.phraseStyles&&v.phraseStyles.length){const _reg=buildStyleRegions(toEngineStyle(v.style),v.phraseStyles);if(_reg)hook.regions=_reg;}  // #10 per-phrase overrides travel to the bake
     if(v.capIn!=null)hook.cap_in=v.capIn;if(v.capOut!=null)hook.cap_out=v.capOut;   // caption in/out window
     if(v.cuts&&v.cuts.length)hook.cuts=v.cuts;   // scene cuts travel with the hook
     if(titles.length){hook.titles=cloneTitles();hook.titlesOn=titlesOn();}   // this clip's own titles travel with it
@@ -4436,7 +4481,7 @@ async function doExport(){
   }
   const baseEng=toEngineStyle(readControls());
   const regions=buildStyleRegions(baseEng,(v.phraseStyles||[]))||[{start:0,end:null,style:baseEng}];
-  const words=(v.words&&v.words.length)?v.words:null;   // same single source as the preview/layout (incl. Words-tab edits + breaks) → render matches
+  const words=capsOffNow()?[]:((v.words&&v.words.length)?v.words:null);   // [] = no captions at all (OFF); same single source as the preview/layout (incl. Words-tab edits + breaks) → render matches
   const eb=$("exportBtn"); if(eb)eb.disabled=true;
   setStatus("Exporting "+ratio+" … (ffmpeg)","",true);busyStart("Експортую відео…");
   try{const r=await fetch(API+"/api/render",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -5468,7 +5513,7 @@ function buildStudioLayout(){
   if(ez&&$("copyAllBtn")){$("copyAllBtn").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("copyAllBtn"),ez.children[1]||null);}  // Style→all — same compact pill shape as Save preset
   if(ez&&$("saveStyleBtn2")){$("saveStyleBtn2").textContent="＋ Save preset";$("saveStyleBtn2").style.cssText="align-self:center;width:auto;margin:0 0 8px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px";ez.insertBefore($("saveStyleBtn2"),ez.children[1]||null);}  // #9 Save preset — compact green pill by the presets
   const qp=$("quickPanel");
-  [$("grpTranscribe"),$("grpBaseText"),$("grpSmart")].forEach(el=>{if(el)qp.appendChild(el);});
+  [$("capsRow"),$("grpTranscribe"),$("grpBaseText"),$("grpSmart")].forEach(el=>{if(el)qp.appendChild(el);});
   const tb=$("transcribeBtn"),mr=$("modelRow");
   if(tb&&mr){tb.style.width="100%";tb.style.margin="6px 0 0";tb.className="primary";mr.insertAdjacentElement("afterend",tb);}   // Transcribe sits with the settings (above the text field)
   const ptb=$("packTranscribeBtn");

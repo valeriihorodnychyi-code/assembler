@@ -1,5 +1,5 @@
 {
-  "version": "1.9.101",
+  "version": "1.9.102",
   "channel": "main",
-  "notes": "⚙ Settings: WaveSpeed API key field (for Seedance 2.5 part regeneration). Stored only in ~/.assembler/config.json; Settings shows ✓ and the balance in USD, or why the key doesn't work."
+  "notes": "🚫 Our captions OFF (switch at the top of the right panel, per clip): nothing drawn in the preview, nothing baked in Export / Assemble — for files that already have captions. Hook music, SFX, Detect cuts and parts work without Transcribe. Clips with burned-in captions from Jira start with it OFF. Timeline: a click within 14 px of In / Out grabs the edge (bigger ears); after dragging an edge the playhead returns to where it was; a click that jumps the playhead leaves a dotted ↶ mark — click it to go back."
 }
