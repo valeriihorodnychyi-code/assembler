@@ -1,5 +1,5 @@
 {
-  "version": "1.9.99",
+  "version": "1.9.100",
   "channel": "main",
-  "notes": "🎚 Timeline with audio lanes: a full-width timeline under the editor — Picture · Clip audio (waveform) · ♪ Music · 🔊 SFX. Every lane has 🔇; click a block for volume / duck / remove old music / ✕. Music and SFX are layers, never baked: every change re-mixes from the clean clip, so a sound can always be muted, moved or deleted. Generated music lands on the Music lane at once (no Apply); pick another take in Hook music. SFX: double-click the SFX lane (or ＋) → describe one sound → Generate; drag to move, Delete to remove, ↻ Another version. Auto SFX from picture and the Add SFX switch are gone. Cut and re-voice work on the clean clip, SFX move with a cut."
+  "notes": "⧉ New part: set In–Out on the timeline → ⧉ New part (next to Cuts / Body) → that zone becomes its own clip, a sub-project under the project in Projects (P1, P2…). Frame-exact from the clean clip, with the project's words in that zone and its style; its own trim, sound lanes, re-voice and export. The project's trim resets, so the next zone can be marked at once. A single clip becomes a one-project pack. Parts never join Apply to: Project / Pack."
 }

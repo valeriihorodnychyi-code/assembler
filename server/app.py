@@ -978,6 +978,63 @@ def api_cut(req: CutReq):
             "orig_words": compose.shift_words_cut(req.orig_words, spans, fps=fps)}
 
 
+# ---------- ⧉ parts: a zone of a clip becomes its own (sub-)project ----------
+class PartReq(BaseModel):
+    file_id: str
+    clip: str
+    a: float
+    b: float
+    words: List[dict] = []
+    orig_words: List[dict] = []
+
+
+def _words_in(words, a, b):
+    out = []
+    for w in words or []:
+        try:
+            s, e = float(w["start"]), float(w["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if e <= a + 1e-3 or s >= b - 1e-3:
+            continue
+        nw = dict(w)
+        nw["start"], nw["end"] = round(max(0.0, s - a), 4), round(min(b, e) - a, 4)
+        out.append(nw)
+    return out
+
+
+@app.post("/api/part")
+def api_part(req: PartReq):
+    """[a, b] of a clip → a NEW clip "<name>_partN" (frame-exact), with its words re-timed."""
+    import re as _re, time as _t
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip «{name}» not found in the session")
+    dur = revoice.duration(src)
+    p = compose._stream_params(src) or (None,) * 8
+    fps = float(p[2] or 30.0)
+    a = round(max(0.0, min(float(req.a), float(req.b))) * fps) / fps
+    b = round(min(dur, max(float(req.a), float(req.b))) * fps) / fps
+    if b - a < 0.3:
+        raise HTTPException(400, "Частина закоротка: постав In і Out ширше.")
+    stem, ext = os.path.splitext(name)
+    stem = _re.sub(r"(_mix_[0-9a-f]{10}|_part\d+)+$", "", stem)
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"{stem}_part{k}{ext}")):
+        k += 1
+    out_name = f"{stem}_part{k}{ext}"
+    t0 = _t.time()
+    try:
+        compose.trim_clip(src, a, b, os.path.join(sdir, out_name))
+    except Exception as e:
+        raise HTTPException(500, f"Part failed: {e}")
+    _log_timing("part", _t.time() - t0, f"{b - a:.2f}s")
+    return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "a": round(a, 4), "b": round(b, 4),
+            "n": k, "words": _words_in(req.words, a, b), "orig_words": _words_in(req.orig_words, a, b)}
+
+
 # ---------- ♪ Hook music (ElevenLabs): ONE bed under the hook instead of one per shot ----------
 
 

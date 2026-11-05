@@ -172,6 +172,7 @@
   .tchip.off{opacity:.55}
   .tchip .tdot{width:7px;height:7px;border-radius:50%;background:#ffd400}
   .tchip.body .tdot{background:#38bdf8}
+  .tchip.part .tdot{background:#a78bfa}
   .tpop{position:fixed;z-index:220;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;min-width:220px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12px}
   .tpop button{display:block;width:100%;text-align:left;background:transparent;border:0;padding:7px 9px;border-radius:6px;font-size:12px}
   .tpop button:hover{background:#2a2d36}
@@ -596,6 +597,7 @@
       <div class="toolRow">
         <button type="button" id="tbCuts" class="tchip" title="Scene cuts: автоматично для кожного кліпу; подвійний клік по жовтій рисці — прибрати кат"><span class="tdot"></span><span id="tbCutsLbl">Cuts</span> ▾</button>
         <button type="button" id="tbBody" class="tchip body" title="Межа Hook | Body: знаходиться порівнянням кліпів паку"><span class="tdot"></span><span id="tbBodyLbl">Body</span> ▾</button>
+        <button type="button" id="tbPart" class="tchip part" title="Зона In–Out стає окремою частиною — під-проектом під цим проектом (свої титри, звук, експорт)"><span class="tdot"></span>⧉ New part</button>
         <span id="applyScope" class="seg scopeSeg" style="display:none" title="На що діють трім і ✂ Cut segment">
           <span style="font-size:10.5px;color:var(--muted);padding:0 6px 0 4px;align-self:center">Apply to</span>
           <button type="button" data-sc="clip" class="active">This clip</button><button type="button" data-sc="project">Project</button><button type="button" data-sc="pack">Pack</button></span>
@@ -2019,10 +2021,11 @@ function renderHookStrip(){
 }
 // [{idx:[parent, ...localizations]}] — a localization joins the project with the same Jira key
 function packGroups(){
-  const out=[], byKey={};
+  const out=[], byKey={}, byUid={};
   editPack.forEach((h,i)=>{const j=h.jira, isLoc=!!(j&&j.loc);
-    if(!isLoc){const g={idx:[i]};out.push(g);if(j&&j.key)byKey[j.key]=byKey[j.key]||g;}});
-  editPack.forEach((h,i)=>{const j=h.jira; if(!(j&&j.loc))return;
+    if(!isLoc&&!h.part){const g={idx:[i]};out.push(g);if(j&&j.key)byKey[j.key]=byKey[j.key]||g;if(h.uid)byUid[h.uid]=g;}});
+  editPack.forEach((h,i)=>{if(!h.part)return; const g=byUid[h.part.of]; if(g)g.idx.push(i); else out.push({idx:[i]});});   // ⧉ a part lives under its project
+  editPack.forEach((h,i)=>{const j=h.jira; if(!(j&&j.loc)||h.part)return;
     const g=byKey[j.key]; if(g)g.idx.push(i); else out.push({idx:[i]});});   // a language without its EN in the pack stands alone
   return out;
 }
@@ -2035,14 +2038,18 @@ function mkHookCard(i,mini,nLoc){
     tb.textContent="T"+(h.titles.length>1?h.titles.length:"");tb.title=h.titles.length+" тайтл(и) на цьому кліпі";
     tb.style.cssText="position:absolute;top:4px;right:4px;font:700 9px/1 system-ui;padding:3px 4px;border-radius:5px;background:var(--accent2);color:#08120c";
     card.appendChild(tb);}
-  if(h.jira){const jb=document.createElement("div");
+  if(h.jira&&!h.part){const jb=document.createElement("div");
     jb.textContent=mini?((h.jira.burned_in?"⚠ ":"")+(h.jira.loc||"")):((h.jira.burned_in?"⚠ ":"")+h.jira.key+(nLoc?" · 🌍"+nLoc:""));
     jb.title=h.jira.key+(h.jira.loc?" · "+h.jira.loc:"")+" · "+(h.jira.asset||"")+(h.jira.warn?("\n"+h.jira.warn):"")+(nLoc?"\n🌍 "+nLoc+" локалізац. — клікни, щоб розгорнути":"");
     jb.style.cssText="position:absolute;left:3px;right:3px;bottom:3px;font:700 8px/1.2 system-ui;padding:2px 3px;border-radius:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
       +(h.jira.burned_in?"background:var(--accent);color:#fff":"background:rgba(0,0,0,.7);color:#cfe3ff");
     card.appendChild(jb);card.title=jb.title;}
+  if(h.part){const pb=document.createElement("div");pb.textContent="⧉ P"+h.part.n;
+    pb.title="Частина "+h.part.n+" · "+tc(h.part.range[0])+"–"+tc(h.part.range[1])+" з проекту";
+    pb.style.cssText="position:absolute;left:3px;right:3px;bottom:3px;font:700 8px/1.2 system-ui;padding:2px 3px;border-radius:4px;text-align:center;background:#a78bfa;color:#140b2e";
+    card.appendChild(pb);card.title=pb.title;}
   const x=document.createElement("button");x.type="button";x.className="fclose";x.textContent="✕";
-  x.title=nLoc?"Close this project with its "+nLoc+" localizations":"Close (прибрати з паку; файли в сесії лишаються)";
+  x.title=nLoc?"Close this project with its "+nLoc+" localizations / parts":"Close (прибрати з паку; файли в сесії лишаються)";
   x.onclick=e=>{e.stopPropagation();closeProject(i);};card.appendChild(x);
   card.onclick=()=>selectHook(i);
   drawThumb(cv,{videoUrl:h.videoUrl,words:h.words,style:h.ctrl},"hook"+i);
@@ -3455,25 +3462,73 @@ async function _cutOtherHook(o,spans){
   if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
   return d.removed;
 }
+// ---------- ⧉ New part: the In–Out zone becomes a sub-project under the open project ----------
+// A part is a real clip of its own ("<name>_partN", frame-exact from the CLEAN clip — no music or
+// SFX of the parent), with the parent's words in that zone, the parent's style, and its own
+// trim / cuts / sound / export. It sits under the project in Projects, like a localization.
+// A single clip becomes a one-project pack first. The parent's trim resets so the next zone can be marked.
+async function newPart(){
+  const dur=video.duration||0, a=pf($("trimIn").value,0), b=pf($("trimOut").value,dur)||dur;
+  if(!dur||(a<0.05&&b>dur-0.05)){setStatus("⧉ Спершу постав In і Out — зону нової частини.","err");return;}
+  try{await ensureSessionClip();}catch(e){setStatus("Part: "+e.message,"err");return;}
+  if(!editPack.length){   // a single clip → a pack of one project, so parts have somewhere to live
+    const v=variants[activeVar]; const hk=makePackHook(v.clip,v.videoUrl,v.language||"");
+    Object.assign(hk,{words:realWords||v.words||null,origWords:v.origWords||null,trim:v.trim||null,cuts:v.cuts||null,body:v.body!=null?v.body:null,
+      ctrl:readControls(),style:toEngineStyle(readControls()),titles:cloneTitles(),titlesOn:titlesOn()});
+    if(v.mix)hk.mix=v.mix; if(v._rvFrom)hk._rvFrom=v._rvFrom;
+    editPack=[hk]; activeHook=-1; editingHook=null; selectHook(0);
+  }
+  saveActiveHook();
+  const par=editPack[activeHook]; if(!par){setStatus("Part: не знайшов відкритий проект.","err");return;}
+  const root=par.part?(editPack.find(x=>x.uid===par.part.of)||par):par;   // a part of a part goes under the same project
+  root.uid=root.uid||("p"+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
+  const src=(par.mix&&par.mix.base)||par.clip;
+  busyStart("⧉ Роблю частину "+tc(a)+"–"+tc(b)+"…");
+  try{const r=await fetch(API+"/api/part",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:src,a,b,words:par.words||realWords||[],orig_words:par.origWords||par.words||[]})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"part failed"));
+    const n=editPack.filter(x=>x.part&&x.part.of===root.uid).length+1;
+    const hk=makePackHook(d.clip,API+d.url,par.lang||"");
+    Object.assign(hk,{words:d.words&&d.words.length?d.words:null,origWords:d.orig_words&&d.orig_words.length?d.orig_words:null,
+      ctrl:JSON.parse(JSON.stringify(par.ctrl||readControls())),style:par.style||toEngineStyle(readControls()),titles:null,titlesOn:false,
+      jira:par.jira?Object.assign({},par.jira):undefined,part:{of:root.uid,n,range:[d.a,d.b],from:src}});
+    if(!hk.jira)delete hk.jira;
+    if(par.cuts)hk.cuts=par.cuts.filter(t=>t>d.a&&t<d.b).map(t=>+(t-d.a).toFixed(3));
+    // after the project's last sub-item, so the Projects column keeps the order
+    const g=packGroups().find(x=>x.idx.includes(editPack.indexOf(root))); const at=g?Math.max(...g.idx)+1:editPack.length;
+    const curClip=par.clip; editPack.splice(at,0,hk); activeHook=editPack.findIndex(x=>x.clip===curClip);
+    if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
+    $("trimIn").value=0;$("trimOut").value=+dur.toFixed(3);writeTrim();drawTrimBar();   // ready for the next zone
+    renderHookStrip(); updateEditButtons(); if(typeof hmRenderList==="function")hmRenderList();
+    busyDone("Частина "+n+" готова");
+    setStatus("⧉ Частина "+n+" ("+tc(d.a)+"–"+tc(d.b)+", "+tc(d.b-d.a)+") — під проектом у Projects. Познач наступну зону In–Out і ще раз ⧉ New part.","ok");
+  }catch(e){busyStop();setStatus("Part: "+e.message,"err");}
+}
+if($("tbPart"))$("tbPart").onclick=newPart;
 // ---------- Apply to: This clip · Project · Whole pack ----------
 // Time-based edits (trim, ✂ Cut segment) can go to every clip of the open project (EN + its
 // localizations — time-aligned) or of the whole pack. Text-based ones (Re-voice, Cut sentence)
 // stay per clip: every language says its sentence at a different time.
 let applyScope="clip";
+// ⧉ parts are NOT time-aligned with their project (another stretch of it) — never in a batch trim / cut
+function scopeGroup(){const cur=editPack[activeHook]; if(!cur||cur.part)return null;
+  const g=(typeof packGroups==="function"?packGroups():[]).find(x=>x.idx.includes(activeHook));
+  return g?{idx:g.idx.filter(i=>!editPack[i].part)}:null;}
 function scopeHooks(){
   if(!editPack.length||applyScope==="clip")return [];
-  if(applyScope==="pack")return editPack.filter((_,i)=>i!==activeHook);
-  const g=(typeof packGroups==="function"?packGroups():[]).find(x=>x.idx.includes(activeHook));
+  const cur=editPack[activeHook]; if(cur&&cur.part)return [];
+  if(applyScope==="pack")return editPack.filter((x,i)=>i!==activeHook&&!x.part);
+  const g=scopeGroup();
   return g?g.idx.filter(i=>i!==activeHook).map(i=>editPack[i]):[];
 }
 function renderScope(){
   const el=$("applyScope"); if(!el)return;
-  const g=(typeof packGroups==="function"&&editPack.length)?packGroups().find(x=>x.idx.includes(activeHook)):null;
-  el.style.display=editPack.length>1?"inline-flex":"none";
+  const g=editPack.length?scopeGroup():null, np=editPack.filter(x=>!x.part).length;
+  el.style.display=np>1||(g&&g.idx.length>1)?"inline-flex":"none";
   if(applyScope==="project"&&!(g&&g.idx.length>1))applyScope="clip";
   el.querySelectorAll("button").forEach(b=>{b.classList.toggle("active",b.dataset.sc===applyScope);
     if(b.dataset.sc==="project"){b.disabled=!(g&&g.idx.length>1);b.textContent="Project"+(g&&g.idx.length>1?" · "+g.idx.length:"");}
-    if(b.dataset.sc==="pack")b.textContent="Pack · "+editPack.length;});
+    if(b.dataset.sc==="pack")b.textContent="Pack · "+np;});
 }
 if($("applyScope"))$("applyScope").querySelectorAll("button").forEach(b=>b.onclick=()=>{if(b.disabled)return;applyScope=b.dataset.sc;renderScope();
   setStatus(applyScope==="clip"?"Дії шкали — тільки для цього кліпу.":"Трім і ✂ Cut segment тепер діють на "+(scopeHooks().length+1)+" кліп(и). Переозвучка й Cut sentence — завжди на один кліп.","");});

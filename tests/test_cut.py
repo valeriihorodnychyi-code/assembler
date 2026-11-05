@@ -76,6 +76,22 @@ def test_cutting_almost_everything_is_refused():
     assert r.status_code == 400
 
 
+
+def test_part_is_a_new_clip_of_the_zone_with_its_own_words():
+    """⧉ New part: [2.0, 4.0] → a clip 2 s long; only the words in the zone, re-timed from 0."""
+    fid, name = _clip()
+    r = C.post("/api/part", json={"file_id": fid, "clip": name, "a": 2.0, "b": 4.0, "words": WORDS, "orig_words": WORDS})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["clip"].endswith("_part1.mp4")
+    dur = RV.duration(os.path.join(A.WORK_ROOT, fid, d["clip"]))
+    assert abs(dur - 2.0) < 0.1, dur
+    ws = d["words"]
+    assert ws and ws[0]["start"] >= 0 and ws[-1]["end"] <= 2.0 + 1e-6
+    assert [w["word"] for w in ws] == [w["word"] for w in WORDS if w["end"] > 2.0 and w["start"] < 4.0]
+    r2 = C.post("/api/part", json={"file_id": fid, "clip": name, "a": 1.0, "b": 1.1})
+    assert r2.status_code == 400
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     failed = 0
