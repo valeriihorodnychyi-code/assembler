@@ -111,6 +111,8 @@
   .cutRow #cutLbl{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}   /* flex-basis 0: the label never widens the centre column (it is auto-sized) */
   .tmini.tcut:not(:disabled){background:#ff5a44;border-color:#ff5a44;color:#fff;font-weight:600}
   .tmini:disabled{opacity:.45;cursor:default}
+  #sfxFold input,#sfxFold select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 7px}
+  #trimBar .sfxTick{position:absolute;bottom:2px;height:5px;border-radius:2px;background:#fb923c;opacity:.9;pointer-events:none;z-index:2}
   details.subfold{margin:8px 0 2px;border:1px solid var(--line);border-radius:8px;padding:0 8px}
   details.subfold>summary{cursor:pointer;list-style:none;padding:7px 0;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
   details.subfold>summary::-webkit-details-marker{display:none}
@@ -859,7 +861,21 @@
           </div>
           <button class="ghost" id="hmUndo" style="width:100%;margin-top:6px;display:none">↩ Undo music</button>
         </div>
-        <div class="hint">Потрібні дозволи ключа ElevenLabs: <b>Music Generation</b> і <b>Audio Isolation</b>.</div>
+        <details class="subfold" id="sfxFold"><summary>🔊 SFX only — the music stays <span class="sfn" id="sfxCount">0</span></summary>
+          <div class="hint" style="margin-top:0">Додати звуки, яких бракує, не чіпаючи музику, що вже стоїть.</div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input id="sfxPrompt" placeholder="door slam · whoosh · heartbeat · crowd gasp…" style="flex:1;font-size:12px">
+            <select id="sfxDur" style="flex:0 0 74px;font-size:11px" title="Довжина ефекту"><option value="">auto</option><option>0.5</option><option>1</option><option>2</option><option>3</option><option>5</option><option>10</option></select>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button id="sfxAdd" class="primary" style="flex:1;font-size:11px" title="Згенерувати ефект за описом і поставити його в точку плейхеда">＋ SFX at playhead</button>
+            <button id="sfxAuto" style="flex:1;font-size:11px" title="ElevenLabs дивиться на картинку хука і пише SFX під дії на екрані; нова музика НЕ генерується — береться тільки SFX-доріжка">✨ Auto SFX from picture</button>
+          </div>
+          <div id="sfxList" style="display:flex;flex-direction:column;gap:4px;margin-top:8px"></div>
+          <button id="sfxApply" class="go" style="width:100%;margin-top:6px;display:none">Apply SFX to this hook</button>
+          <audio id="sfxAudio" preload="none" style="display:none"></audio>
+        </details>
+        <div class="hint">Потрібні дозволи ключа ElevenLabs: <b>Music Generation</b>, <b>Audio Isolation</b>, <b>Sound Effects</b>.</div>
       </div>
     </details>
 
@@ -2190,6 +2206,7 @@ function drawTrimBar(){
   $("trimHIn").style.left=li+"%";$("trimHOut").style.left=lo+"%";
   if(typeof drawCutMark==="function")drawCutMark();
   if(typeof drawBodyMark==="function")drawBodyMark();
+  if(typeof drawSfxTicks==="function")drawSfxTicks();
   // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
   $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
   $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
@@ -3435,7 +3452,7 @@ if($("cutGo"))$("cutGo").onclick=async()=>{if(_cut.a==null||_cut.b==null)return;
 if($("cutUndo"))$("cutUndo").onclick=()=>undoRevoice();
 // History of THIS clip's versions: Original → ✂ Cut → 🎙 Re-voice → ♪ Music. One ↩, and it says
 // exactly which step it takes back (it used to be a nameless "↩ Повернути звук" that could undo a cut).
-const HIST_NAME={cut:"cut",revoice:"re-voice",music:"music"};
+const HIST_NAME={cut:"cut",revoice:"re-voice",music:"music",sfx:"sfx"};
 function renderHistory(){
   const el=$("histRow"); if(!el)return;
   const st=rvUndoStack()||[];
@@ -3973,6 +3990,72 @@ function fitVideo(){
 }
 if(window.ResizeObserver){const ro=new ResizeObserver(()=>fitVideo());["transport","trimRow","status"].forEach(id=>{if($(id))ro.observe($(id));});}
 window.addEventListener("resize",fitVideo);
+// ---------- 🔊 SFX only: effects on top of the music that is already right ----------
+function sfxHolder(){return openHookRef()||variants[activeVar]||null;}
+function drawSfxTicks(){
+  const bar=$("trimBar"),o=sfxHolder(),dur=video.duration||0; if(!bar)return;
+  bar.querySelectorAll(".sfxTick").forEach(e=>e.remove());
+  if(!o||!o.sfx||!dur)return;
+  o.sfx.forEach(s=>{const d=document.createElement("div");d.className="sfxTick";d.title="🔊 "+s.label+" @ "+tc(s.at);
+    d.style.left=Math.max(0,Math.min(100,s.at/dur*100))+"%";d.style.width=Math.max(0.6,Math.min(100,(s.length||0.5)/dur*100))+"%";bar.appendChild(d);});
+}
+function sfxRender(){
+  const o=sfxHolder(), list=(o&&o.sfx)||[], box=$("sfxList"); if(!box)return;
+  if($("sfxCount"))$("sfxCount").textContent=list.length;
+  box.innerHTML=list.map((s,i)=>"<div class='hmrow' style='display:flex;gap:6px;align-items:center'>"
+    +"<button type='button' class='tmini ticon' data-sfxplay='"+i+"' title='Прослухати ефект'>▶</button>"
+    +"<span style='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'><b style='color:var(--txt)'>"+tc(s.at)+"</b> · "+String(s.label).replace(/</g,"&lt;")+"</span>"
+    +"<input type='range' min='0' max='150' value='"+Math.round((s.volume??0.9)*100)+"' data-sfxvol='"+i+"' style='width:70px' title='Гучність'>"
+    +"<button type='button' class='tmini ticon' data-sfxdel='"+i+"' title='Прибрати'>✕</button></div>").join("");
+  if($("sfxApply")){$("sfxApply").style.display=list.length?"":"none";$("sfxApply").textContent="Apply "+list.length+" SFX to this hook";}
+  drawSfxTicks();
+}
+async function sfxGenerate(auto){
+  const o=sfxHolder(); if(!o){setStatus("SFX: спершу відкрий кліп.","err");return;}
+  try{await ensureSessionClip();}catch(e){setStatus("SFX: "+e.message,"err");return;}
+  const btn=$(auto?"sfxAuto":"sfxAdd"); btn.disabled=true;
+  busyStart(auto?"🔊 Дивлюсь на картинку і пишу SFX…":"🔊 Генерую ефект…");
+  try{let d;
+    if(auto){const r=await fetch(API+"/api/sfx/auto",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:o.clip,zone:(typeof hmZone==="function"?hmZone(o):null),prompt:$("sfxPrompt").value||""})});
+      d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"auto sfx failed")); d.label="Auto (from picture)";}
+    else{const pr=$("sfxPrompt").value.trim(); if(!pr)throw new Error("опиши звук, наприклад «door slam»");
+      const r=await fetch(API+"/api/sfx/generate",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,prompt:pr,duration:$("sfxDur").value?+$("sfxDur").value:null})});
+      d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"sfx failed")); d.label=pr; d.at=curFrame()/fps();}
+    (o.sfx=o.sfx||[]).push({name:d.name,url:d.url,at:+(+d.at).toFixed(3),length:d.length,label:d.label,volume:0.9});
+    const v=variants[activeVar]; if(v&&v!==o)v.sfx=o.sfx;
+    busyDone("SFX готовий"); setStatus("🔊 «"+d.label+"» @ "+tc(d.at)+". Послухай і тисни Apply.","ok");
+  }catch(e){busyStop();setStatus("SFX: "+e.message,"err");}
+  btn.disabled=false; sfxRender();
+}
+async function sfxApply(){
+  const o=sfxHolder(); if(!o||!o.sfx||!o.sfx.length)return;
+  const v=variants[activeVar], targets=(typeof hmTargets==="function")?hmTargets(o):[o];
+  busyStart("🔊 Кладу "+o.sfx.length+" SFX поверх звуку…");
+  try{const r=await fetch(API+"/api/sfx/apply",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:o.clip,items:o.sfx.map(s=>({name:s.name,at:s.at,volume:s.volume??0.9}))})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"apply failed"));
+    const before={kind:"sfx",label:"🔊 SFX · "+o.sfx.length,clip:o.clip,videoUrl:o.videoUrl,
+      words:(o.words||realWords||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
+    targets.forEach(x=>{(x._rvFrom=x._rvFrom||[]).push(before);x.clip=d.clip;x.videoUrl=API+d.url;x.sfx=[];});
+    if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
+    rvLoadVideo(API+d.url);
+    busyDone("SFX додано"); setStatus("🔊 SFX у звуці, музика та голос — як були. ↩ Undo sfx — у History.","ok");
+  }catch(e){busyStop();setStatus("SFX: "+e.message,"err");}
+  sfxRender(); if(typeof renderHistory==="function")renderHistory(); if(typeof renderHookStrip==="function")renderHookStrip();
+}
+(function wireSfx(){
+  const box=$("sfxList"); if(!box)return;
+  box.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("button"); if(!b)return; const o=sfxHolder(); if(!o||!o.sfx)return;
+    if(b.dataset.sfxdel!=null){o.sfx.splice(+b.dataset.sfxdel,1);sfxRender();}
+    if(b.dataset.sfxplay!=null){const s=o.sfx[+b.dataset.sfxplay],a=$("sfxAudio");a.src=API+s.url;a.volume=Math.min(1,s.volume??0.9);a.play().catch(()=>{});}});
+  box.addEventListener("input",e=>{const r=e.target.closest&&e.target.closest("[data-sfxvol]"); const o=sfxHolder(); if(!r||!o||!o.sfx)return; o.sfx[+r.dataset.sfxvol].volume=(+r.value)/100;});
+  if($("sfxAdd"))$("sfxAdd").onclick=()=>sfxGenerate(false);
+  if($("sfxAuto"))$("sfxAuto").onclick=()=>sfxGenerate(true);
+  if($("sfxApply"))$("sfxApply").onclick=sfxApply;
+  if($("sfxPrompt"))$("sfxPrompt").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sfxGenerate(false);}});
+})();
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;

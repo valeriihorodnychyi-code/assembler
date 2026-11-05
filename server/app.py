@@ -1202,6 +1202,104 @@ def project_delete(req: ProjectDeleteReq):
     return {"ok": True}
 
 
+# ---------- SFX only: add effects to a hook whose music is already right ----------
+class SfxGenReq(BaseModel):
+    file_id: str
+    prompt: str
+    duration: Optional[float] = None
+    loop: bool = False
+
+
+@app.post("/api/sfx/generate")
+def sfx_generate(req: SfxGenReq):
+    import requests as _rq
+    sdir = _session_dir(req.file_id)
+    try:
+        mp3 = music11.sound_effect(req.prompt, _rq, duration=req.duration, loop=req.loop)
+    except music11.MusicError as e:
+        raise HTTPException(400, str(e))
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"sfx_{k}.mp3")):
+        k += 1
+    name = f"sfx_{k}.mp3"
+    with open(os.path.join(sdir, name), "wb") as f:
+        f.write(mp3)
+    return {"name": name, "url": f"/clip/{req.file_id}/{name}", "length": round(music11.duration(os.path.join(sdir, name)), 2)}
+
+
+class SfxAutoReq(BaseModel):
+    file_id: str
+    clip: str
+    zone: Optional[List[float]] = None
+    prompt: str = ""
+
+
+@app.post("/api/sfx/auto")
+def sfx_auto(req: SfxAutoReq):
+    """SFX scored to the picture, WITHOUT new music: Video-to-Music with separate tracks, and only
+    the SFX stem is kept."""
+    import requests as _rq
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    dur = music11.duration(src)
+    z = req.zone if (req.zone and len(req.zone) == 2) else [0.0, dur]
+    s, e = max(0.0, float(z[0])), min(dur, float(z[1]))
+    seg = os.path.join(sdir, f"_sfx_{os.path.splitext(name)[0]}.mp4")
+    try:
+        music11.video_segment(src, seg, s, e)
+        _music, fx = music11.video_to_music(seg, (req.prompt or "Realistic sound effects for the actions on screen.")
+                                            + " Focus on sound effects.", ["sfx", "foley", "realistic"], _rq, sfx=True)
+    except music11.MusicError as ex:
+        raise HTTPException(400, str(ex))
+    finally:
+        try:
+            os.remove(seg)
+        except OSError:
+            pass
+    if not fx:
+        raise HTTPException(400, "ElevenLabs не повернув окрему SFX-доріжку для цього відео.")
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"sfx_auto_{k}.mp3")):
+        k += 1
+    out = f"sfx_auto_{k}.mp3"
+    with open(os.path.join(sdir, out), "wb") as f:
+        f.write(fx)
+    return {"name": out, "url": f"/clip/{req.file_id}/{out}", "at": round(s, 3),
+            "length": round(music11.duration(os.path.join(sdir, out)), 2)}
+
+
+class SfxApplyReq(BaseModel):
+    file_id: str
+    clip: str
+    items: List[dict] = []     # [{name, at, volume}]
+
+
+@app.post("/api/sfx/apply")
+def sfx_apply(req: SfxApplyReq):
+    import re as _re
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    items = [{"path": os.path.join(sdir, os.path.basename(it.get("name", ""))), "at": float(it.get("at", 0)),
+              "volume": float(it.get("volume", 0.9))} for it in req.items]
+    stem, ext = os.path.splitext(name)
+    base = _re.sub(r"_fx\d+$", "", stem)
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"{base}_fx{k}{ext}")):
+        k += 1
+    out = f"{base}_fx{k}{ext}"
+    try:
+        music11.mix_sfx(src, items, os.path.join(sdir, out))
+    except music11.MusicError as e:
+        raise HTTPException(400, str(e))
+    return {"clip": out, "url": f"/clip/{req.file_id}/{out}"}
+
+
 # ---------- ⇄ setup export / import: move Assembler to a new Mac with one file ----------
 # What a designer would otherwise lose: keys + library path (config.json), custom style presets,
 # custom caption rules. NOT the cache, models or sessions (they rebuild / re-download / are big).

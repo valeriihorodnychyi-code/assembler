@@ -1,5 +1,5 @@
 {
-  "version": "1.9.97",
+  "version": "1.9.98",
   "channel": "main",
-  "notes": "UI: Keep together, Text swaps and the Scene cuts list in Smart captions are folded (with a count) — they no longer push the panel down. The video never scrolls away: its size now follows the real height of the controls under it. Playhead: the white knob is a real grab handle (bigger hit area), and clicking / dragging anywhere on the bar — on a cut mark too — moves the playhead."
+  "notes": "🔊 SFX only — the music stays: add sound effects to a hook that already has its music, without regenerating it. Type a sound and drop it at the playhead (ElevenLabs Sound Effects v2), or ✨ Auto SFX from picture (only the SFX stem of Video-to-Music is kept). Preview, volume, remove; Apply lays them on top of the current audio; ↩ Undo sfx in History. Needs the Sound Effects permission on the ElevenLabs key."
 }

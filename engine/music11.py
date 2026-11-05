@@ -254,3 +254,62 @@ def mix(clip_path, music_path, out_path, volume=0.35, duck=True, voice_path=None
             "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-t", f"{dur:.3f}", out_path]
     _run(cmd)
     return out_path
+
+
+# ---------------------------------------------------------------- SFX only (the music stays)
+# Two ways to add sound effects to a hook that already has the music you like:
+#   • text → one effect at the playhead (ElevenLabs Sound Effects, eleven_text_to_sound_v2,
+#     0.5–30 s, optional seamless loop) — "door slam", "whoosh", "heartbeat";
+#   • auto from the picture: Video-to-Music with SFX as a separate track — we keep ONLY the SFX
+#     stem and throw the music away, so the bed you already chose is not touched.
+SFX_MODEL = os.environ.get("CS_SFX_MODEL", "eleven_text_to_sound_v2")
+
+
+def sound_effect(prompt, requests, duration=None, loop=False, influence=0.4, api_key=None):
+    """→ mp3 bytes of one sound effect."""
+    body = {"text": (prompt or "").strip()[:450], "model_id": SFX_MODEL, "prompt_influence": float(influence)}
+    if not body["text"]:
+        raise MusicError("Опиши звук, наприклад «door slam» або «whoosh».")
+    if duration:
+        body["duration_seconds"] = max(0.5, min(30.0, float(duration)))
+    if loop:
+        body["loop"] = True
+    r = requests.post(f"{API}/v1/sound-generation", headers={"xi-api-key": _key(api_key), "Content-Type": "application/json"},
+                      json=body, params={"output_format": "mp3_44100_128"}, timeout=120)
+    if r.status_code != 200:
+        raise MusicError(_auth(r, "Sound Effects"))
+    if not r.content or len(r.content) < 500:
+        raise MusicError("ElevenLabs не повернув звук.")
+    return r.content
+
+
+def mix_sfx(clip_path, items, out_path):
+    """Lay effects ON TOP of the clip's current audio (voice + music stay as they are).
+    items: [{"path", "at" (s in the clip), "volume" 0..2}] — not ducked: an effect belongs to
+    the picture. Video copied, length kept."""
+    dur = duration(clip_path)
+    if dur <= 0:
+        raise MusicError("Не вдалося прочитати довжину кліпу.")
+    items = [it for it in items if it.get("path") and os.path.exists(it["path"]) and 0 <= float(it.get("at", 0)) < dur]
+    if not items:
+        raise MusicError("Немає SFX, які можна покласти в межах кліпу.")
+    cmd = ["ffmpeg", "-y", "-i", clip_path]
+    fc, labels = [], []
+    base_in = 0
+    if not has_audio(clip_path):
+        cmd += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=44100:cl=stereo"]
+        base_in = 1
+    fc.append(f"[{base_in}:a]aformat=sample_rates=44100:channel_layouts=stereo,apad,atrim=0:{dur:.3f}[b]")
+    first = base_in + 1
+    for k, it in enumerate(items):
+        cmd += ["-i", it["path"]]
+        d_ms = int(round(float(it["at"]) * 1000))
+        v = max(0.0, min(2.0, float(it.get("volume", 0.9))))
+        fc.append(f"[{first + k}:a]aformat=sample_rates=44100:channel_layouts=stereo,volume={v:.3f},"
+                  f"afade=t=in:d=0.01,adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[s{k}]")
+        labels.append(f"[s{k}]")
+    fc.append("[b]" + "".join(labels) + f"amix=inputs={len(labels) + 1}:duration=first:normalize=0[aout]")
+    cmd += ["-filter_complex", "; ".join(fc), "-map", "0:v?", "-map", "[aout]", "-c:v", "copy",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-t", f"{dur:.3f}", out_path]
+    _run(cmd)
+    return out_path

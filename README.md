@@ -45,7 +45,7 @@ python3 -m server.app
 ## Ключі і налаштування
 
 Ключі **ніколи** не лежать у репозиторії (він публічний). Кожен дизайнер вводить свої в ⚙ Settings, і вони зберігаються в `~/.assembler/config.json` на його Mac:
-- **ElevenLabs:** транскрипція, дубляж, переозвучка, музика. Потрібні дозволи ключа: Speech to Text, Text to Speech, Voices (Write), Dubbing (Write), Music Generation, Audio Isolation.
+- **ElevenLabs:** транскрипція, дубляж, переозвучка, музика. Потрібні дозволи ключа: Speech to Text, Text to Speech, Voices (Write), Dubbing (Write), Music Generation, Audio Isolation, Sound Effects.
 - **HeyGen / Sync Lab:** ліпсинк.
 - **Jira:** особистий email і API token (починається з `ATATT`).
 

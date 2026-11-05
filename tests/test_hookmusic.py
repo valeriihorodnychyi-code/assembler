@@ -84,6 +84,10 @@ class Fake11:
                     z.writestr("sfx.mp3", tone_mp3(1200, 3.0, os.path.join(TMP, "v2m_fx.mp3")))
                 return _R(200, buf.getvalue())
             return _R(200, tone_mp3(880, 3.0, os.path.join(TMP, "v2m.mp3")))
+        if url.endswith("/v1/sound-generation"):
+            assert json["model_id"] and json["text"]
+            self.sfx = json
+            return _R(200, tone_mp3(1200, json.get("duration_seconds", 1.0), os.path.join(TMP, "fx.mp3")))
         if url.endswith("/v1/audio-isolation"):
             return _R(200, tone_mp3(300, 4.0, os.path.join(TMP, "voice.mp3")))
         return _R(404)
@@ -188,6 +192,32 @@ def test_missing_permission_names_the_switch_to_turn_on():
         assert "Audio Isolation" in str(e)
     else:
         raise AssertionError("must fail")
+
+
+
+def test_sound_effect_sends_text_and_clamps_duration():
+    f = Fake11()
+    mp3 = M.sound_effect("door slam", f, duration=99, api_key="test-key")
+    assert len(mp3) > 500 and f.sfx["duration_seconds"] == 30.0 and "loop" not in f.sfx
+    try:
+        M.sound_effect("x", Fake11(deny="sound-generation"), api_key="test-key")
+    except M.MusicError as e:
+        assert "Sound Effects" in str(e)
+    else:
+        raise AssertionError("must fail")
+
+
+def test_mix_sfx_keeps_music_and_adds_effect_only_at_its_time():
+    hook = os.path.join(TMP, "hook_fx.mp4")
+    make_hook(hook)
+    fx = os.path.join(TMP, "fx1.mp3")
+    tone_mp3(1200, 0.8, fx)
+    out = M.mix_sfx(hook, [{"path": fx, "at": 2.0, "volume": 1.0}], os.path.join(TMP, "hook_fx_out.mp4"))
+    assert abs(M.duration(out) - M.duration(hook)) < 0.1
+    wav = os.path.join(TMP, "fx_out.wav")
+    sh("ffmpeg", "-y", "-i", out, "-ac", "1", "-ar", "44100", wav)
+    assert level(wav, 300, 0.5) > 0 and level(wav, 300, 2.3) > 0, "original audio must stay"
+    assert level(wav, 1200, 2.3) > 20 * max(level(wav, 1200, 0.5), 1e-9), "effect at 2.0 s only"
 
 
 if __name__ == "__main__":
