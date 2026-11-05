@@ -1,5 +1,5 @@
 {
-  "version": "1.9.102",
+  "version": "1.9.103",
   "channel": "main",
-  "notes": "🚫 Our captions OFF (switch at the top of the right panel, per clip): nothing drawn in the preview, nothing baked in Export / Assemble — for files that already have captions. Hook music, SFX, Detect cuts and parts work without Transcribe. Clips with burned-in captions from Jira start with it OFF. Timeline: a click within 14 px of In / Out grabs the edge (bigger ears); after dragging an edge the playhead returns to where it was; a click that jumps the playhead leaves a dotted ↶ mark — click it to go back."
+  "notes": "✨ Seedance 2.5 (WaveSpeed): ✨ Seedance on the timeline → describe the change (+ From In–Out s for a stretch), 480/720/1080p, Keep original audio, live price and balance → Regenerate. Runs in the background (~5–7 min), you keep working; the result replaces that clip in place (same size, fps, length, original audio), music / SFX lanes re-mix on top, ↩ Undo regen in History. Clips longer than 30 s: make a ⧉ New part first."
 }

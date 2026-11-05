@@ -176,6 +176,9 @@
   .tchip .tdot{width:7px;height:7px;border-radius:50%;background:#ffd400}
   .tchip.body .tdot{background:#38bdf8}
   .tchip.part .tdot{background:#a78bfa}
+  .tchip.regen .tdot{background:#f472b6}
+  .tchip.regen.busy{border-color:#f472b6}
+  .laneEdit textarea{flex:1 1 100%;min-height:44px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:12px;resize:vertical;font-family:inherit}
   .capsRow{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);font-size:12.5px}
   .capsRow .cname{font-weight:700;color:var(--txt)}
   .capsRow .cnote{flex:1;color:var(--muted);font-size:11px}
@@ -607,6 +610,7 @@
       <div class="toolRow">
         <button type="button" id="tbCuts" class="tchip" title="Scene cuts: автоматично для кожного кліпу; подвійний клік по жовтій рисці — прибрати кат"><span class="tdot"></span><span id="tbCutsLbl">Cuts</span> ▾</button>
         <button type="button" id="tbBody" class="tchip body" title="Межа Hook | Body: знаходиться порівнянням кліпів паку"><span class="tdot"></span><span id="tbBodyLbl">Body</span> ▾</button>
+        <button type="button" id="tbRegen" class="tchip regen" title="Seedance 2.5 (WaveSpeed): переписати кадр за промптом — рух і композиція лишаються, звук свій. До 30 с; довше — спершу ⧉ New part"><span class="tdot"></span><span id="tbRegenLbl">✨ Seedance</span></button>
         <button type="button" id="tbPart" class="tchip part" title="Зона In–Out стає окремою частиною — під-проектом під цим проектом (свої титри, звук, експорт)"><span class="tdot"></span>⧉ New part</button>
         <span id="applyScope" class="seg scopeSeg" style="display:none" title="На що діють трім і ✂ Cut segment">
           <span style="font-size:10.5px;color:var(--muted);padding:0 6px 0 4px;align-self:center">Apply to</span>
@@ -3372,9 +3376,9 @@ function undoRevoice(){
   }else rvLoadVideo(prev.videoUrl);
   commitWords(prev.words.map(w=>({...w})));
   if(typeof renderHookStrip==="function")renderHookStrip();
-  setStatus(prev.kind==="cut"?"↩ Вирізаний шматок повернуто — відео, звук, титри, трім і тайтли як були.":"↩ Звук і текст повернуто як було до переозвучки. Файл переозвучки лишився в сесії.","ok");
+  setStatus(prev.kind==="cut"?"↩ Вирізаний шматок повернуто — відео, звук, титри, трім і тайтли як були.":prev.kind==="regen"?"↩ Кліп до Seedance повернуто. Файл генерації лишився в сесії.":"↩ Звук і текст повернуто як було до переозвучки. Файл переозвучки лишився в сесії.","ok");
   if(typeof drawCutMark==="function")drawCutMark();
-  {const mo=mixHolder(); if(mo&&mo.mix&&(prev.kind==="cut"||prev.kind==="revoice"))mixRebase(mo);}
+  {const mo=mixHolder(); if(mo&&mo.mix&&(prev.kind==="cut"||prev.kind==="revoice"||prev.kind==="regen"))mixRebase(mo);}
 }
 // ---------- ✂ Cut segment: remove a piece from the MIDDLE of the clip ----------
 // A cut makes a NEW file (server: "<name>_cutN"), swapped in place like a re-voice, so preview,
@@ -3513,6 +3517,77 @@ async function _cutOtherHook(o,spans){
   if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
   return d.removed;
 }
+// ---------- ✨ Seedance 2.5 via WaveSpeed: regenerate the open clip from a prompt ----------
+// Takes minutes, so it runs as a job on the server; you keep working (even on other clips). The
+// result replaces THAT clip in place (same size, fps, length; the original audio by default), with
+// ↩ in History. Sound lanes (music / SFX) stay and are re-mixed on top.
+const RG_RATES={"480p":0.11,"720p":0.22,"1080p":0.55};
+const rgCost=(d,res)=>+(2*Math.max(4,Math.min(30,d||0))*(RG_RATES[res]||0.22)).toFixed(2);
+let _rgJobs=[], _rgTimer=null, _rgBal=null;
+function rgOpen(){if(!videoLoaded){setStatus("Спершу відкрий кліп.","err");return;}
+  laneSelect({kind:"regen",text:(_laneSel&&_laneSel.kind==="regen"&&_laneSel.text)||"",res:"720p",keep:true});
+  fetch(API+"/api/wavespeed/status").then(r=>r.json()).then(d=>{_rgBal=d;if(_laneSel&&_laneSel.kind==="regen"){const b=$("rgBal");if(b)b.textContent=d.ok?("баланс $"+(+d.balance).toFixed(2)):("⚠ "+(d.error==="not set"?"немає ключа WaveSpeed (⚙ Settings)":d.error));}}).catch(()=>{});}
+function rgRender(ed,s){
+  const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  const dur=video.duration||0, a=pf($("trimIn").value,0), b=pf($("trimOut").value,dur)||dur, zone=(a>0.05||b<dur-0.05);
+  const cost=rgCost(dur,s.res), long=dur>30.05;
+  ed.innerHTML="<b>✨ Seedance 2.5</b> · увесь кліп "+tc(dur)+(long?" <span style='color:#ff8a7a'>— довше 30 с: спершу ⧉ New part</span>":"")
+    +"<textarea id='rgTxt' placeholder='Replace the red car with a black motorcycle. Keep everything else exactly the same.'>"+esc(s.text)+"</textarea>"
+    +(zone?"<button type='button' class='tmini' id='rgZone' title='Обмежити зміну зоною In–Out (Seedance розуміє таймкоди в промпті)'>+ From "+a.toFixed(1)+"–"+b.toFixed(1)+"s</button>":"")
+    +"<select id='rgRes' title='Роздільність генерації (результат все одно підганяється під розмір кліпу)'>"+["480p","720p","1080p"].map(r=>"<option"+(r===s.res?" selected":"")+">"+r+"</option>").join("")+"</select>"
+    +"<label title='ON — звук кліпу лишається рівно як був (голос, тайминги, титри валідні). OFF — Seedance пише свій звук'><input type='checkbox' id='rgKeep'"+(s.keep?" checked":"")+">Keep original audio</label>"
+    +"<span>≈ <b>$"+cost.toFixed(2)+"</b> · <span id='rgBal'>"+(_rgBal?(_rgBal.ok?"баланс $"+(+_rgBal.balance).toFixed(2):"⚠ "+_rgBal.error):"")+"</span></span>"
+    +"<button type='button' class='primary' id='rgGo' style='font-size:11px;padding:5px 12px'"+(long?" disabled":"")+">✨ Regenerate</button><button type='button' class='ghost' id='rgX' style='font-size:11px'>✕</button>"
+    +"<span class='lhint'>Що змінити і що лишити: «Change only the sunglasses to eyeglasses, keep everything else exactly the same». Шматок часу — «From 2–4s, …». Займає ~5–7 хв, можна працювати далі; результат замінить цей кліп, ↩ — у History. Ціна: (вхід + вихід) × "+(RG_RATES[s.res]||0.22)+" $/с, мінімум 4 с.</span>";
+  ed.style.display="flex";
+  $("rgTxt").oninput=e=>{s.text=e.target.value;};
+  $("rgRes").onchange=e=>{s.res=e.target.value;rgRender(ed,s);};
+  $("rgKeep").onchange=e=>{s.keep=e.target.checked;};
+  if($("rgZone"))$("rgZone").onclick=()=>{s.text="From "+a.toFixed(1)+"–"+b.toFixed(1)+"s, "+(s.text||"");rgRender(ed,s);};
+  $("rgX").onclick=()=>{_laneSel=null;drawLanes();};
+  $("rgGo").onclick=()=>rgStart(s);
+}
+async function rgStart(s){
+  const txt=(s.text||"").trim(); if(!txt){setStatus("✨ Опиши, що змінити в кадрі.","err");return;}
+  try{await ensureSessionClip();}catch(e){setStatus("Seedance: "+e.message,"err");return;}
+  const o=mixHolder(); if(!o)return;
+  const src=(o.mix&&o.mix.base)||o.clip, cost=rgCost(video.duration||0,s.res);
+  if(!confirm("Seedance 2.5 · "+s.res+" · ≈ $"+cost.toFixed(2)+" з балансу WaveSpeed.\n\n«"+txt+"»\n\nЗапустити?"))return;
+  try{const r=await fetch(API+"/api/regen/start",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:src,prompt:txt,resolution:s.res,keep_audio:!!s.keep})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"seedance failed"));
+    _rgJobs.push({job:d.job,o,src,prompt:txt,cost:d.cost});
+    _laneSel=null; drawLanes(); rgPoll();
+    setStatus("✨ Seedance запущено (≈ $"+d.cost.toFixed(2)+"). Це кілька хвилин — працюй далі, результат сам стане на місце цього кліпу.","ok");
+  }catch(e){setStatus("Seedance: "+e.message,"err");}
+}
+function rgLabel(){const el=$("tbRegenLbl"), b=$("tbRegen"); if(!el)return;
+  const j=_rgJobs[0]; b.classList.toggle("busy",!!j);
+  el.textContent=j?("✨ "+(_rgJobs.length>1?_rgJobs.length+" · ":"")+(j.elapsed!=null?Math.floor(j.elapsed/60)+":"+String(j.elapsed%60).padStart(2,"0"):"…")+" · "+(j.state||"…")):"✨ Seedance";}
+function rgPoll(){clearInterval(_rgTimer); if(!_rgJobs.length){rgLabel();return;}
+  _rgTimer=setInterval(async()=>{
+    for(const j of _rgJobs.slice()){
+      try{const r=await fetch(API+"/api/regen/"+j.job);const d=await r.json();
+        if(!r.ok)throw new Error(d.detail||"job lost");
+        j.state=d.state; j.elapsed=d.elapsed;
+        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); rgApply(j,d);}
+        else if(d.state==="error"){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus("✨ Seedance: "+d.error,"err");}
+      }catch(e){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus("✨ Seedance: "+e.message,"err");}
+    }
+    rgLabel(); if(!_rgJobs.length)clearInterval(_rgTimer);
+  },5000); rgLabel();}
+function rgApply(j,d){
+  const o=j.o, mm=mixUnwrap(o), isOpen=(o===mixHolder());
+  const before={kind:"regen",label:"✨ Seedance «"+j.prompt.slice(0,34)+"»",clip:o.clip,videoUrl:o.videoUrl,
+    words:((isOpen?realWords:o.words)||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
+  hmTargets(o).forEach(x=>{(x._rvFrom=x._rvFrom||[]).push(before);x.clip=d.clip;x.videoUrl=API+d.url;});
+  if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
+  if(mm)mixRebase(o); else if(isOpen)rvLoadVideo(API+d.url);
+  if(typeof renderHookStrip==="function")renderHookStrip(); if(typeof renderHistory==="function")renderHistory();
+  if(typeof chime==="function")try{chime("localize");}catch(_){}
+  setStatus("✨ Seedance готово за "+Math.round((d.seconds||0)/60)+" хв: «"+j.prompt.slice(0,50)+"» — "+(isOpen?"на екрані":"у своєму кліпі")+". Не те — ↩ Undo regen у History.","ok");
+}
+if($("tbRegen"))$("tbRegen").onclick=()=>{if(_laneSel&&_laneSel.kind==="regen"){_laneSel=null;drawLanes();}else rgOpen();};
 // ---------- ⧉ New part: the In–Out zone becomes a sub-project under the open project ----------
 // A part is a real clip of its own ("<name>_partN", frame-exact from the CLEAN clip — no music or
 // SFX of the parent), with the parent's words in that zone, the parent's style, and its own
@@ -3597,7 +3672,7 @@ if($("cutGo"))$("cutGo").onclick=async()=>{if(_cut.a==null||_cut.b==null)return;
 if($("cutUndo"))$("cutUndo").onclick=()=>undoRevoice();
 // History of THIS clip's versions: Original → ✂ Cut → 🎙 Re-voice → ♪ Music. One ↩, and it says
 // exactly which step it takes back (it used to be a nameless "↩ Повернути звук" that could undo a cut).
-const HIST_NAME={cut:"cut",revoice:"re-voice",music:"music",sfx:"sfx"};
+const HIST_NAME={cut:"cut",revoice:"re-voice",music:"music",sfx:"sfx",regen:"regen"};
 function renderHistory(){
   const el=$("histRow"); if(!el)return;
   const st=rvUndoStack()||[];
@@ -4197,8 +4272,9 @@ async function drawWave(o){
 }
 function renderLaneEdit(){
   const ed=$("laneEdit"), o=mixHolder(), m=o&&o.mix; if(!ed)return;
-  const s=_laneSel; if(!s||(s.kind!=="add"&&s.kind!=="orig"&&!m)){ed.style.display="none";ed.innerHTML="";return;}
-  if(ed.contains(document.activeElement)&&document.activeElement.tagName==="INPUT"&&document.activeElement.type==="text")return;   // never re-render under the caret
+  const s=_laneSel; if(!s||(s.kind!=="add"&&s.kind!=="orig"&&s.kind!=="regen"&&!m)){ed.style.display="none";ed.innerHTML="";return;}
+  if(ed.contains(document.activeElement)&&((document.activeElement.tagName==="INPUT"&&document.activeElement.type==="text")||document.activeElement.tagName==="TEXTAREA"))return;   // never re-render under the caret
+  if(s.kind==="regen"){rgRender(ed,s);return;}
   const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
   let h="";
   if(s.kind==="add"){

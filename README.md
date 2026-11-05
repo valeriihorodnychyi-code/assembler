@@ -20,6 +20,7 @@ engine/
   music11.py      Hook music + SFX (ElevenLabs Video-to-Music / Compose, Audio Isolation)
   bodydetect.py   межа Hook | Body порівнянням кліпів паку
   jira.py         імпорт тасок з Jira + локалізації з ADAM (тільки читання)
+  wavespeed.py    Seedance 2.5 video-edit через WaveSpeed (перегенерація кліпу / частини)
 server/app.py     HTTP API для інтерфейсу
 web/index.html    увесь інтерфейс (Edit · LOC · Assemble)
 packaging/        збірка Assembler.app, автооновлення, лаунчер
@@ -64,6 +65,7 @@ python3 tests/test_revoice.py     python3 tests/test_hookmusic.py
 python3 tests/test_bodydetect.py  python3 tests/test_render_onepass.py
 node tests/test_remap.js          node tests/test_revoice_select.js
 node tests/test_ui_refs.js        python3 tests/test_transcribe_trim.py
+python3 tests/test_wavespeed.py
 ```
 
 ## Збірка Assembler.app

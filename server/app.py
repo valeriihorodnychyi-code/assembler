@@ -1059,6 +1059,111 @@ def api_part(req: PartReq):
             "n": k, "words": _words_in(req.words, a, b), "orig_words": _words_in(req.orig_words, a, b)}
 
 
+# ---------- ✨ Seedance 2.5 (WaveSpeed): regenerate a clip / part from a prompt ----------
+# Runs in a background thread (a job takes minutes); the UI polls /api/regen/{job}. The result
+# is conformed to the source — same size, fps and length — and by default keeps the source audio
+# track exactly (voice, timings and captions stay valid).
+_REGEN = {}
+
+
+class RegenReq(BaseModel):
+    file_id: str
+    clip: str
+    prompt: str
+    resolution: str = "720p"
+    keep_audio: bool = True
+
+
+def _conform(gen, src, out, keep_audio):
+    p = compose._stream_params(src) or (None,) * 8
+    w, h, fps = int(p[0] or 1080), int(p[1] or 1920), float(p[2] or 30.0)
+    dur = revoice.duration(src)
+    vf = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps:g},setsar=1"
+    cmd = ["ffmpeg", "-y", "-i", gen, "-i", src, "-map", "0:v:0"]
+    cmd += (["-map", "1:a:0?"] if keep_audio else ["-map", "0:a:0?"])
+    cmd += ["-vf", vf, "-t", f"{dur:.3f}"] + ffmpeg_utils.encoder_quality_args("12M")
+    cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", out]
+    ffmpeg_utils.run(cmd)
+    return out
+
+
+def _regen_run(job, sdir, src, req):
+    import re as _re, requests as _rq, time as _t
+    from engine import wavespeed as ws
+    J = _REGEN[job]
+    try:
+        J["state"] = "uploading"
+        url = ws.upload(src, _rq)
+        J["state"] = "queued"
+        pid = ws.submit_edit(url, req.prompt, _rq, resolution=req.resolution, keep_audio=req.keep_audio)
+        J["prediction"] = pid
+        t0 = _t.time()
+        while True:
+            _t.sleep(5)
+            r = ws.result(pid, _rq)
+            J["state"] = r["status"] or "processing"
+            if r["status"] == "completed":
+                if not r["outputs"]:
+                    raise ws.WaveSpeedError("Seedance завершив, але без відео.")
+                break
+            if r["status"] in ("failed", "cancelled", "timeout", "deleted"):
+                raise ws.WaveSpeedError("Seedance: " + (r["error"] or r["status"]))
+            if _t.time() - t0 > 40 * 60:
+                raise ws.WaveSpeedError("Seedance не встиг за 40 хв — результат буде в історії WaveSpeed (id " + pid + ").")
+        J["state"] = "downloading"
+        stem, ext = os.path.splitext(os.path.basename(src))
+        stem = _re.sub(r"(_mix_[0-9a-f]{10}|_sd\d+)+$", "", stem)
+        raw = os.path.join(sdir, f"_seedance_{pid}.mp4")
+        g = _rq.get(r["outputs"][0], timeout=600)
+        if g.status_code != 200 or len(g.content) < 1000:
+            raise ws.WaveSpeedError(f"Не вдалося скачати результат (HTTP {g.status_code}).")
+        with open(raw, "wb") as f:
+            f.write(g.content)
+        k = 1
+        while os.path.exists(os.path.join(sdir, f"{stem}_sd{k}{ext}")):
+            k += 1
+        out = f"{stem}_sd{k}{ext}"
+        J["state"] = "conforming"
+        _conform(raw, src, os.path.join(sdir, out), req.keep_audio)
+        J.update(state="done", clip=out, url=f"/clip/{req.file_id}/{out}", seconds=round(_t.time() - J["started"]))
+        _log_timing("seedance", _t.time() - J["started"], req.resolution)
+    except Exception as e:  # noqa: BLE001
+        J.update(state="error", error=str(e))
+
+
+@app.post("/api/regen/start")
+def regen_start(req: RegenReq):
+    import threading, time as _t, uuid
+    from engine import wavespeed as ws
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    if not os.environ.get("WAVESPEED_API_KEY"):
+        raise HTTPException(400, "Немає ключа WaveSpeed — додай його в ⚙ Settings.")
+    if req.resolution not in ws.RATES:
+        raise HTTPException(400, "resolution: 480p / 720p / 1080p")
+    dur = revoice.duration(src)
+    if dur > 30.05:
+        raise HTTPException(400, f"Кліп {dur:.1f} с, а Seedance бере до 30 с — зроби з потрібного шматка ⧉ New part.")
+    if not (req.prompt or "").strip():
+        raise HTTPException(400, "Опиши, що змінити в кадрі.")
+    cost, billed = ws.estimate(dur, req.resolution)
+    job = uuid.uuid4().hex[:12]
+    _REGEN[job] = {"state": "starting", "started": _t.time(), "cost": cost, "billed": billed, "clip": None, "error": ""}
+    threading.Thread(target=_regen_run, args=(job, sdir, src, req), daemon=True).start()
+    return {"job": job, "cost": cost, "billed": billed}
+
+
+@app.get("/api/regen/{job}")
+def regen_status(job: str):
+    import time as _t
+    J = _REGEN.get(job)
+    if not J:
+        raise HTTPException(404, "Unknown job (the app was restarted?)")
+    return dict(J, elapsed=round(_t.time() - J["started"]))
+
+
 # ---------- ♪ Hook music (ElevenLabs): ONE bed under the hook instead of one per shot ----------
 
 

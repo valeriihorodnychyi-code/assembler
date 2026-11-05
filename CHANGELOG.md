@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-05** — ✨ Seedance 2.5 via WaveSpeed: regenerate a clip / part from a prompt, background job, undo in History (1.9.103)
 - **2026-11-05** — Our captions OFF switch; music without Transcribe; trim edges grab first, playhead returns after an edge drag, ↶ back mark (1.9.102)
 - **2026-11-05** — Settings: WaveSpeed API key with a live balance check (1.9.101)
 - **2026-11-05** — ⧉ New part: an In–Out zone becomes a sub-project under its project (1.9.100)
