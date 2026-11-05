@@ -147,6 +147,34 @@
   .laneEdit input[type=range]{width:110px}
   .laneEdit label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
   .laneEdit .lhint{flex-basis:100%;font-size:10.5px;color:#6b7080}
+  .dockBar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 0;font-size:11.5px;color:var(--muted)}
+  .dockBar .dgrp{display:flex;align-items:center;gap:5px;padding:0 12px;border-left:1px solid #2c2f39;min-height:30px}
+  .dockBar .dgrp:first-child{border-left:0;padding-left:0}
+  .dockBar .dlbl{font-size:9.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:#6b7080;margin-right:3px}
+  .dockBar .tval{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dockBar .tval b{color:var(--txt);font-weight:600}
+  .dockBar .dsep2{opacity:.5}
+  .dockBar #trimDurLbl{margin-left:6px;white-space:nowrap}
+  .dockBar #trimReset{cursor:pointer;color:var(--muted);text-decoration:underline dotted;text-underline-offset:3px}
+  .dockBar #trimInLbl:hover,.dockBar #trimOutLbl:hover{color:var(--accent2)}
+  .dockBar #cutLbl{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .dockBar #timeLbl{min-width:124px;font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap;margin-left:4px}
+  .dockBar #timeLbl b{color:var(--txt);font-weight:600}
+  .dockBar #seek{display:none}
+  .dockBar .tbtn{padding:4px 10px;min-width:30px;font-size:13px}
+  .dockBar .tbtn.tplay{padding:4px 14px;min-width:42px}
+  .dockBar .scopeSeg{margin:0}
+  .dockTop{padding-bottom:8px;border-bottom:1px solid #23262f}
+  .dockBot{padding-top:8px;border-top:1px solid #23262f;justify-content:space-between}
+  .dockBot .dhist{flex:1 1 300px;justify-content:flex-end;border-left:0}
+  .dockBot .histRow{border-top:0;padding-top:0;justify-content:flex-end}
+  .dockBot #tbStatus{margin-left:4px}
+  .transport.slim{max-width:none;justify-content:center}
+  .lane.lruler{min-height:16px}
+  .lane.lruler .lbody{height:16px;background:none;border:0;cursor:default;overflow:visible}
+  #tlRuler i{position:absolute;bottom:0;height:6px;width:1px;background:#4a4e5a}
+  #tlRuler u{position:absolute;bottom:0;height:3px;width:1px;background:#353844}
+  #tlRuler b{position:absolute;bottom:6px;font:600 9.5px/1 system-ui;color:#6b7080;transform:translateX(3px);white-space:nowrap}
   .dockFoot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 22px;margin-left:var(--lh)}
   .dockFoot .trimInfo .tmid{order:0;width:auto}
   .dockFoot .cutRow,.dockFoot .histRow{border-top:0;padding-top:0}
@@ -2277,7 +2305,7 @@ function drawTrimBar(){
   if(typeof drawCutMark==="function")drawCutMark();
   if(typeof drawBodyMark==="function")drawBodyMark();
   if(typeof drawLanes==="function")drawLanes();
-  drawGhost();
+  drawGhost(); if(typeof drawRuler==="function")drawRuler();
   // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
   $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
   $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
@@ -3395,8 +3423,9 @@ function drawCutMark(){
   else{const e=(b!=null)?b:Math.max(a,video.currentTime||a);
     el.style.display="block";el.classList.toggle("open",b==null);
     el.style.left=(a/dur*100)+"%";el.style.width=Math.max(0.3,(e-a)/dur*100)+"%";}
-  if($("cutLbl"))$("cutLbl").innerHTML=(a==null)?"<span style='opacity:.7'>playhead → From → To</span>"
-    :("<b>"+tc(a)+"</b> → "+(b!=null?"<b>"+tc(b)+"</b> · "+tc(b-a):"…"));
+  if($("cutLbl")){const L=$("cutLbl");
+    L.innerHTML=(a==null)?"<span style='opacity:.6'>mark From · To</span>":(b!=null?"<b>"+tc(b-a)+"</b>":"<b>"+tc(a)+"</b> → …");
+    L.title=(a==null)?"Постав плейхед на початок шматка → [ From, на кінець → To ], потім ✂ Cut":(tc(a)+" → "+(b!=null?tc(b):"…"));}
   if($("cutGo"))$("cutGo").disabled=!(a!=null&&b!=null&&b>a);
   if($("cutClear"))$("cutClear").style.display=(a!=null)?"":"none";
   if($("cutUndo"))$("cutUndo").style.display="none";   // one named ↩ lives in the History row now
@@ -3651,6 +3680,7 @@ function renderScope(){
   const el=$("applyScope"); if(!el)return;
   const g=editPack.length?scopeGroup():null, np=editPack.filter(x=>!x.part).length;
   el.style.display=np>1||(g&&g.idx.length>1)?"inline-flex":"none";
+  if(el.parentElement&&el.parentElement.classList.contains("dgrp"))el.parentElement.style.display=(el.style.display==="none")?"none":"flex";
   if(applyScope==="project"&&!(g&&g.idx.length>1))applyScope="clip";
   el.querySelectorAll("button").forEach(b=>{b.classList.toggle("active",b.dataset.sc===applyScope);
     if(b.dataset.sc==="project"){b.disabled=!(g&&g.idx.length>1);b.textContent="Project"+(g&&g.idx.length>1?" · "+g.idx.length:"");}
@@ -5573,6 +5603,57 @@ function answerQuiz(i,btn){
 }
 function stopQuiz(){clearTimeout(quizTimer);const box=$("locQuiz");if(box){box.style.display="none";box.innerHTML="";}}
 // Relocate the most-used controls around the preview (studio layout). IDs/handlers stay intact.
+// 🎚 The dock, regrouped like an editor: TOP bar = time (play · trim · cut · apply to),
+// then the ruler and the lanes, the context panel of what you clicked, and a BOTTOM bar = clip
+// tools (scene cuts, body, part, Seedance) on the left and History on the right. Elements are
+// MOVED (ids and handlers stay), the old rows are emptied.
+function buildDock(){
+  const D=$("trimRow"); if(!D||$("dockTop"))return;
+  const mk=(tag,cls,html)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e;};
+  const grp=(label,ids,cls)=>{const g=mk("div","dgrp"+(cls?" "+cls:""));if(label)g.appendChild(mk("span","dlbl",label));ids.forEach(id=>{const e=typeof id==="string"?$(id):id;if(e)g.appendChild(e);});return g;};
+  const top=mk("div","dockBar dockTop"); top.id="dockTop";
+  // play
+  top.appendChild(grp(null,["frameBack","playBtn","frameFwd","timeLbl","seek"],"dplay"));
+  // trim
+  const tIn=mk("span","tval"), tOut=mk("span","tval"); tIn.appendChild($("trimInLbl")); tOut.appendChild($("trimOutLbl"));
+  if($("trimSetIn"))$("trimSetIn").textContent="⇤ In"; if($("trimSetOut"))$("trimSetOut").textContent="Out ⇥";
+  const dash=mk("span","dsep2","–");
+  top.appendChild(grp("Trim",["trimSetIn",tIn,dash,tOut,"trimSetOut","trimDurLbl","trimReset"],"dtrim"));
+  // cut
+  if($("cutGo"))$("cutGo").textContent="✂ Cut";
+  top.appendChild(grp("Cut",["cutFrom","cutTo","cutLbl","cutClear","cutGo"],"dcut"));
+  // apply to
+  const sc=$("applyScope"); if(sc){const l=sc.querySelector("span");if(l)l.remove();}
+  D.insertBefore(top,D.firstChild);
+  // ruler (above the Picture lane)
+  const L=$("lanes"); const ru=mk("div","lane lruler","<div class='lhead'></div><div class='lbody' id='tlRuler'></div>"); L.insertBefore(ru,L.firstChild);
+  // bottom bar: clip tools | history
+  const bot=mk("div","dockBar dockBot"); bot.id="dockBot";
+  bot.appendChild(grp("Clip",["tbCuts","tbBody","tbPart","tbRegen","tbStatus"],"dtools"));
+  bot.appendChild(grp("Trim · cut apply to",["applyScope"],"dscope"));
+  const hg=grp(null,["histRow"],"dhist"); bot.appendChild(hg);
+  D.appendChild(bot);
+  // hidden leftovers (kept for their handlers)
+  ["trimPlayIn","trimPlayOut","trimAll","cutUndo"].forEach(id=>{const e=$(id);if(e){e.style.display="none";D.appendChild(e);}});
+  document.querySelectorAll("#trimRow .dockFoot").forEach(e=>e.style.display="none");
+  const tr=$("transport"); if(tr)tr.classList.add("slim");
+  wireDockJumps();
+}
+function wireDockJumps(){
+  [["trimInLbl",()=>pf($("trimIn").value,0)],["trimOutLbl",()=>Math.max(0,(pf($("trimOut").value,video.duration||0)||0)-1/fps())]].forEach(([id,f])=>{const e=$(id);
+    if(e&&!e._j){e._j=1;e.style.cursor="pointer";e.addEventListener("click",()=>{if(videoLoaded){const was=video.currentTime;video.currentTime=f()+0.5/fps();_phBack=was;drawGhost();}});}});
+  const tip=(id,t)=>{const e=$(id);if(e)e.title=t;};
+  tip("trimSetIn","In = кадр плейхеда (клавіша I)"); tip("trimSetOut","Out = кадр плейхеда (клавіша O)");
+  tip("cutFrom","Початок шматка = кадр плейхеда"); tip("cutTo","Кінець шматка = кадр плейхеда"); tip("cutGo","Вирізати позначений шматок (відео + звук, титри зсуваються)");
+}
+function drawRuler(){
+  const R=$("tlRuler"), dur=video.duration||0; if(!R||!dur)return;
+  const w=R.clientWidth||1, k=dur+"|"+w; if(R._k===k)return; R._k=k;
+  const steps=[0.5,1,2,5,10,15,30,60], minPx=70; const step=steps.find(s=>s/dur*w>=minPx)||120;
+  let h=""; for(let t=0;t<=dur+1e-6;t+=step){const x=t/dur*100;h+="<i style='left:"+x+"%'></i><b style='left:"+x+"%'>"+(dur>=60?Math.floor(t/60)+":"+String(Math.round(t%60)).padStart(2,"0"):(+t.toFixed(1))+"s")+"</b>";}
+  for(let t=step/2;t<dur;t+=step)h+="<u style='left:"+(t/dur*100)+"%'></u>";
+  R.innerHTML=h;
+}
 function buildStudioLayout(){
   const presets=$("presets"), ph=presets?presets.parentElement:null;
   if(presets)$("presetRail").appendChild(presets);
@@ -5582,6 +5663,7 @@ function buildStudioLayout(){
   const pc=$("previewCol");
   [$("viewport"),$("transport")].forEach(el=>{if(el)pc.appendChild(el);});
   if($("trimRow")&&$("editStage"))$("editStage").insertAdjacentElement("afterend",$("trimRow"));   // 🎚 full-width timeline dock
+  buildDock();
   // the original row is empty now (only whitespace text left, so :empty never matches); as a
   // 0-px flex child it still cost the stage a 12-px gap
   const _pr=document.querySelector(".preview-row");if(_pr&&!_pr.children.length)_pr.style.display="none";

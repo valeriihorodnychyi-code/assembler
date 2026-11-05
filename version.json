@@ -1,5 +1,5 @@
 {
-  "version": "1.9.103",
+  "version": "1.9.104",
   "channel": "main",
-  "notes": "✨ Seedance 2.5 (WaveSpeed): ✨ Seedance on the timeline → describe the change (+ From In–Out s for a stretch), 480/720/1080p, Keep original audio, live price and balance → Regenerate. Runs in the background (~5–7 min), you keep working; the result replaces that clip in place (same size, fps, length, original audio), music / SFX lanes re-mix on top, ↩ Undo regen in History. Clips longer than 30 s: make a ⧉ New part first."
+  "notes": "🎚 Timeline regrouped like an editor. TOP bar = time: ⟨ ▶ ⟩ + timecode · TRIM ⇤ In / Out ⇥ with the values (click a value = jump there) and Kept · CUT [ From / To ] ✂ Cut. A time ruler over the lanes. BOTTOM bar = clip tools (Cuts, Body, ⧉ New part, ✨ Seedance), Trim · cut apply to, History. Play controls moved from under the video into the timeline, so the video gets more room."
 }
