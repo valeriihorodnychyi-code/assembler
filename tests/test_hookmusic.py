@@ -220,6 +220,29 @@ def test_mix_sfx_keeps_music_and_adds_effect_only_at_its_time():
     assert level(wav, 1200, 2.3) > 20 * max(level(wav, 1200, 0.5), 1e-9), "effect at 2.0 s only"
 
 
+
+def test_lanes_mix_mutes_the_clip_audio_and_keeps_only_layers():
+    """🎚 Clip audio muted on its lane: the voice is gone, the SFX still sounds at its time."""
+    hook = os.path.join(TMP, "hook_lanes.mp4")
+    make_hook(hook)
+    fx = os.path.join(TMP, "fx_l.mp3")
+    tone_mp3(1200, 0.8, fx)
+    out = M.mix_layers(hook, os.path.join(TMP, "hook_lanes_out.mp4"), base_volume=0.0,
+                       sfx=[{"path": fx, "at": 1.0, "volume": 1.0}])
+    wav = os.path.join(TMP, "lanes_out.wav")
+    sh("ffmpeg", "-y", "-i", out, "-ac", "1", "-ar", "44100", wav)
+    assert level(wav, 300, 2.5) < 1e-3 * max(level(wav, 1200, 1.3), 1e-9), "muted clip audio must be silent"
+    assert level(wav, 1200, 1.3) > 0
+    assert abs(M.duration(out) - M.duration(hook)) < 0.1
+
+
+def test_peaks_for_the_waveform_lane():
+    hook = os.path.join(TMP, "hook_pk.mp4")
+    make_hook(hook)
+    pk = M.peaks(hook, 100)
+    assert 90 <= len(pk) <= 100 and max(pk) == 1.0 and min(pk) >= 0
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     failed = 0

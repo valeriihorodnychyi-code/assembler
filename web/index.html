@@ -111,8 +111,43 @@
   .cutRow #cutLbl{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}   /* flex-basis 0: the label never widens the centre column (it is auto-sized) */
   .tmini.tcut:not(:disabled){background:#ff5a44;border-color:#ff5a44;color:#fff;font-weight:600}
   .tmini:disabled{opacity:.45;cursor:default}
-  #sfxFold input,#sfxFold select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 7px}
-  #trimBar .sfxTick{position:absolute;bottom:2px;height:5px;border-radius:2px;background:#fb923c;opacity:.9;pointer-events:none;z-index:2}
+  /* 🎚 the timeline dock: full width under the editor, one row (lane) per layer */
+  .tlDock{--lh:128px;width:100%;max-width:none;margin:0;flex-direction:column;gap:8px;background:#15171d;border:1px solid var(--line);border-radius:12px;padding:12px 14px 10px;flex:0 0 auto}
+  .lanes{position:relative;display:flex;flex-direction:column;gap:5px}
+  .lane{display:grid;grid-template-columns:var(--lh) 1fr;align-items:stretch;min-height:30px}
+  .lane .lhead{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);padding-right:10px;min-width:0}
+  .lane .lname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt);font-weight:600}
+  .lane .lmute{font-size:12px;padding:2px 5px;background:#23262f;border:1px solid var(--line);border-radius:6px;line-height:1}
+  .lane .lmute.off{background:#3a1f22;border-color:#7a3036}
+  .lane .ladd{font-size:13px;padding:1px 8px;background:#2a2d36;border:1px solid var(--line);border-radius:6px;font-weight:700}
+  .lane .lbody{position:relative;height:30px;border-radius:7px;background:#1d2028;border:1px solid #2a2d36;cursor:pointer;overflow:hidden}
+  .lane.lvid .lbody{height:auto;overflow:visible;background:none;border:0;cursor:default}
+  .lane.lvid #trimBar{height:40px}
+  .lane.off .lbody{opacity:.35}
+  #waveOrig{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .lblk{position:absolute;top:3px;bottom:3px;border-radius:5px;font-size:10.5px;line-height:22px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0d0f14;font-weight:600;cursor:pointer;box-sizing:border-box}
+  .lblk.music{background:linear-gradient(90deg,#a78bfa,#7c5cff);color:#fff}
+  .lblk.sfx{background:#fb923c;cursor:grab;min-width:8px}
+  .lblk.sfx:active{cursor:grabbing}
+  .lblk.sel{outline:2px solid #fff;outline-offset:0}
+  .lblk .lx{position:absolute;right:2px;top:2px;width:16px;height:16px;line-height:15px;text-align:center;border-radius:4px;background:rgba(0,0,0,.35);color:#fff;font-size:10px;display:none}
+  .lblk:hover .lx{display:block}
+  .lempty{position:absolute;inset:0;display:flex;align-items:center;padding-left:10px;font-size:11px;color:#6b7080;pointer-events:none}
+  .lempty b{color:#a9a3ff;font-weight:600;pointer-events:auto;cursor:pointer}
+  .lane .lbody.sel{border-color:#8a8fa0}
+  #laneHead{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:rgba(255,255,255,.85);pointer-events:none;z-index:7;left:var(--lh)}
+  #laneBusy{position:absolute;right:0;top:-18px;font-size:10.5px;color:#a9a3ff;display:none}
+  .laneEdit{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-left:var(--lh);padding:7px 10px;border:1px solid #3a3e4a;border-radius:8px;background:#1b1d24}
+  .laneEdit b{color:var(--txt)}
+  .laneEdit input[type=text]{flex:1;min-width:200px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:5px 8px;font-size:12px}
+  .laneEdit select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px 6px;font-size:11px}
+  .laneEdit input[type=range]{width:110px}
+  .laneEdit label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+  .laneEdit .lhint{flex-basis:100%;font-size:10.5px;color:#6b7080}
+  .dockFoot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 22px;margin-left:var(--lh)}
+  .dockFoot .trimInfo .tmid{order:0;width:auto}
+  .dockFoot .cutRow,.dockFoot .histRow{border-top:0;padding-top:0}
+  @media (max-width:1100px){.dockFoot{grid-template-columns:1fr}}
   details.subfold{margin:8px 0 2px;border:1px solid var(--line);border-radius:8px;padding:0 8px}
   details.subfold>summary{cursor:pointer;list-style:none;padding:7px 0;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
   details.subfold>summary::-webkit-details-marker{display:none}
@@ -326,14 +361,16 @@
   @media (max-width:1299px){
     .editstage{grid-template-columns:108px auto auto 330px;gap:14px}
     .editstage.wide{grid-template-columns:108px auto minmax(0,1fr) 330px}}                                            /* 16:9 — preview fills the centre (bounded) */
-  .editzone{display:flex;flex-direction:column}
-  .groupcol{display:flex;flex-direction:column;gap:8px;max-height:74vh;overflow-y:auto;align-items:stretch}
+  .editzone{display:flex;flex-direction:column;max-height:var(--edh);min-height:0}
+  :root{--edh:calc(100vh - 128px - var(--dockh,0px))}   /* the editor row never pushes the timeline dock below the window */
+  .editzone .presetrail{flex:1 1 auto;min-height:0;max-height:none}
+  .groupcol{display:flex;flex-direction:column;gap:8px;max-height:min(74vh,var(--edh));overflow-y:auto;align-items:stretch}
   .railhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;text-align:center;margin-bottom:8px}
   .presetrail{display:flex;flex-direction:column;gap:6px;max-height:64vh;overflow-y:auto;padding:2px}
   #presetRail .presets{grid-template-columns:1fr;gap:6px;margin-top:0}
   .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0}
   /* only the right tools column sits under the fixed tutorial stickers, so only it steps down */
-  .qpanel{display:flex;flex-direction:column;gap:8px;margin-top:46px;max-height:calc(100vh - 168px);overflow-y:auto;padding:0 2px}   /* header 58 + stage padding 36 + sticker strip 46 + status line 28 */
+  .qpanel{display:flex;flex-direction:column;gap:8px;margin-top:46px;max-height:calc(100vh - 168px - var(--dockh,0px));overflow-y:auto;padding:0 2px}   /* header 58 + stage padding 36 + sticker strip 46 + status line 28 */
   #quickPanel .grp{background:transparent;border:0;margin:0 0 4px;flex-shrink:0}   /* the panel SCROLLS — a shrinking group (overflow:hidden) silently clipped the 🎙 box */
   #quickPanel .grp>summary{background:transparent;border-left:0;padding:8px 4px;font-size:12px;color:var(--muted)}
   #quickPanel .grp>summary:hover{background:transparent}
@@ -517,7 +554,9 @@
       <span class="vtools" style="display:inline-flex;gap:8px;flex:0 0 auto;margin-left:auto"><button id="exactToggle" title="Show the exact final render for this frame" style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">✓ exact</button>
       <button id="safeToggle" title="Safe zones for social (TikTok / Reels / Shorts) — keeps captions clear of the platform UI. Guide only, not exported." style="font-size:11px;padding:5px 10px;border:1px solid var(--line);border-radius:7px">⧉ Safe</button></span>
     </div>
-    <div id="trimRow" style="display:none;max-width:520px;width:100%;margin:8px auto 0;flex-direction:column;gap:6px">
+    <div id="trimRow" class="tlDock" style="display:none">
+     <div class="lanes" id="lanes">
+      <div class="lane lvid"><div class="lhead"><span class="lname">🎬 Picture</span></div><div class="lbody">
       <div id="trimBar" title="Клік або тягни — плейхед. Тягни [ ] — трім.">
         <div id="trimDimL" class="tdim"></div><div id="trimDimR" class="tdim"></div>
         <div id="trimSel"></div>
@@ -528,7 +567,16 @@
         <div id="trimHIn" class="thandle tin" title="In — тягни (або клік і Alt+← / →)"><i></i></div>
         <div id="trimHOut" class="thandle tout" title="Out — тягни (або клік і Alt+← / →)"><i></i></div>
         <div id="trimPlayhead"><b></b></div>
-      </div>
+      </div></div></div>
+      <div class="lane" id="laneOrig"><div class="lhead"><button type="button" class="lmute" data-lm="orig" title="Вимкнути / увімкнути звук кліпу">🔊</button><span class="lname" id="laneOrigName">Clip audio</span></div><div class="lbody" data-lane="orig"><canvas id="waveOrig"></canvas></div></div>
+      <div class="lane" id="laneMusic"><div class="lhead"><button type="button" class="lmute" data-lm="music" title="Вимкнути / увімкнути музику">🔊</button><span class="lname">♪ Music</span></div><div class="lbody" data-lane="music" id="laneMusicBody"></div></div>
+      <div class="lane" id="laneSfx"><div class="lhead"><button type="button" class="lmute" data-lm="sfx" title="Вимкнути / увімкнути всі SFX">🔊</button><span class="lname">🔊 SFX</span><button type="button" class="ladd" id="sfxAddBtn" title="Новий звук у точці плейхеда (або подвійний клік по доріжці)">＋</button></div><div class="lbody" data-lane="sfx" id="laneSfxBody"></div></div>
+      <div id="laneHead"></div>
+      <div id="laneBusy"></div>
+     </div>
+     <div id="laneEdit" class="laneEdit" style="display:none"></div>
+     <audio id="sfxAudio" preload="none" style="display:none"></audio>
+     <div class="dockFoot">
       <div class="trimInfo">
         <span class="tgrp">
           <button id="trimSetIn" class="tmini" title="In = кадр плейхеда (клавіша I)">⇤ Set In</button>
@@ -563,6 +611,7 @@
         <button id="cutGo" class="tmini tcut" disabled title="Вирізати позначений шматок">✂ Cut segment</button>
       </div>
       <div id="histRow" class="histRow" style="display:none"></div>
+     </div>
       <input type="hidden" id="trimIn" value="0"><input type="hidden" id="trimOut" value="0">
     </div>
     <div class="status" id="status"></div>
@@ -842,39 +891,17 @@
     <details class="grp" id="grpHookMusic">
       <summary><span>Hook music · ElevenLabs</span> <span class="chev">›</span></summary>
       <div class="body">
-        <div class="hint" style="margin-top:0">ONE music bed under the whole hook instead of a different one per shot — scored to the hook's own picture (cuts, pace, emotion). Only the trimmed part counts. Bodies stay as they are.</div>
+        <div class="hint" style="margin-top:0">Пише ОДНУ музику під весь хук — під його картинку (кати, темп, емоцію). Згенерована музика одразу лягає на доріжку <b>♪ Music</b> на таймлайні: там гучність, 🔇, ✕ і заміна. Боді не чіпаємо.</div>
         <div class="chips" id="hmPresets" style="flex-wrap:wrap;margin:6px 0"></div>
         <textarea id="hmPrompt" rows="3" style="width:100%;font-size:12px;resize:vertical" placeholder="Describe the vibe (English works best)…"></textarea>
         <div class="row" style="margin-top:6px"><label title="ElevenLabs Video-to-Music: музика пишеться під картинку хука. Вимкни — тоді тільки з промпту.">Score to the video</label><label class="switch"><input type="checkbox" id="hmFromVideo" checked><span class="slider"></span></label></div>
-        <div class="row"><label title="Звуки за подіями на відео (кроки, двері, удари, свуші) — окремою доріжкою від музики. Тільки разом зі Score to the video. Повертає SFX, які прибирає Remove original music.">Add SFX</label><label class="switch"><input type="checkbox" id="hmSfx"><span class="slider"></span></label></div>
         <button class="primary" id="hmGen" style="width:100%;margin-top:6px">♪ Generate music</button>
         <div id="hmTrack" style="display:none;margin-top:8px">
-          <div id="hmList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px"></div>
+          <div style="font-size:10.5px;color:var(--muted);margin-bottom:4px">ВЕРСІЇ · вибери, яка стоїть на таймлайні</div>
+          <div id="hmList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:4px"></div>
           <audio id="hmAudio" preload="none" style="display:none"></audio>
-          <div class="row"><label>Volume</label><input type="range" id="hmVol" min="0" max="100" value="35"><span class="val" id="hmVolLbl">35</span></div>
-          <div class="row" id="hmSfxVolRow" style="display:none"><label>SFX volume</label><input type="range" id="hmSfxVol" min="0" max="150" value="80"><span class="val" id="hmSfxVolLbl">80</span></div>
-          <div class="row"><label title="Музика тихшає, коли звучить голос">Duck under voice</label><label class="switch"><input type="checkbox" id="hmDuck" checked><span class="slider"></span></label></div>
-          <div class="row"><label title="Прибрати стару музику з хука (ElevenLabs Audio Isolation): лишається тільки голос. Разом зі старою музикою йдуть і старі SFX / атмосфера.">Remove original music</label><label class="switch"><input type="checkbox" id="hmStrip" checked><span class="slider"></span></label></div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <button class="go" id="hmApplyAll" style="flex:1">Apply to all hooks</button>
-            <button id="hmApplyOne" style="flex:1">Apply to this hook</button>
-          </div>
-          <button class="ghost" id="hmUndo" style="width:100%;margin-top:6px;display:none">↩ Undo music</button>
         </div>
-        <details class="subfold" id="sfxFold"><summary>🔊 SFX only — the music stays <span class="sfn" id="sfxCount">0</span></summary>
-          <div class="hint" style="margin-top:0">Додати звуки, яких бракує, не чіпаючи музику, що вже стоїть.</div>
-          <div style="display:flex;gap:6px;margin-top:6px">
-            <input id="sfxPrompt" placeholder="door slam · whoosh · heartbeat · crowd gasp…" style="flex:1;font-size:12px">
-            <select id="sfxDur" style="flex:0 0 74px;font-size:11px" title="Довжина ефекту"><option value="">auto</option><option>0.5</option><option>1</option><option>2</option><option>3</option><option>5</option><option>10</option></select>
-          </div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <button id="sfxAdd" class="primary" style="flex:1;font-size:11px" title="Згенерувати ефект за описом і поставити його в точку плейхеда">＋ SFX at playhead</button>
-            <button id="sfxAuto" style="flex:1;font-size:11px" title="ElevenLabs дивиться на картинку хука і пише SFX під дії на екрані; нова музика НЕ генерується — береться тільки SFX-доріжка">✨ Auto SFX from picture</button>
-          </div>
-          <div id="sfxList" style="display:flex;flex-direction:column;gap:4px;margin-top:8px"></div>
-          <button id="sfxApply" class="go" style="width:100%;margin-top:6px;display:none">Apply SFX to this hook</button>
-          <audio id="sfxAudio" preload="none" style="display:none"></audio>
-        </details>
+        <div class="hint">Звукові ефекти — на доріжці <b>🔊 SFX</b> таймлайну: подвійний клік у потрібному місці або ＋.</div>
         <div class="hint">Потрібні дозволи ключа ElevenLabs: <b>Music Generation</b>, <b>Audio Isolation</b>, <b>Sound Effects</b>.</div>
       </div>
     </details>
@@ -1716,7 +1743,8 @@ const video=$("video");let videoLoaded=false,demoT=0,lastTs=0;
 function loop(ts){let t,dur;
   if(videoLoaded){t=video.currentTime;dur=video.duration||4;$("seek").value=(t/dur)*100;{const _tl=$("timeLbl"),_k=frameOf(t)+"/"+frameOf(dur);if(_tl._k!==_k){_tl._k=_k;_tl.innerHTML="<b>"+tc(t)+"</b> / "+tc(dur);_tl.title=t.toFixed(3)+" с · кадр "+frameOf(t);}}
     const _onTl=$("trimRow").style.display!=="none";$("transport").classList.toggle("tl",_onTl);
-    if(_onTl&&$("trimPlayhead"))$("trimPlayhead").style.left=Math.max(0,Math.min(100,(t/dur)*100))+"%";}
+    if(_onTl&&$("trimPlayhead"))$("trimPlayhead").style.left=Math.max(0,Math.min(100,(t/dur)*100))+"%";
+    if(_onTl&&$("laneHead"))$("laneHead").style.left="calc(var(--lh) + (100% - var(--lh)) * "+Math.max(0,Math.min(1,t/dur)).toFixed(5)+")";}
   else{const dt=(ts-lastTs)/1000||0;demoT=(demoT+dt)%4;t=demoT;dur=4;}
   lastTs=ts;render(t,dur);
   // headline sits on top of the captions and only inside its own [in,out] window
@@ -1914,7 +1942,7 @@ async function transcribePack(){
       setStatus("Транскрайб "+(i+1)+"/"+todo.length+"…","",true);
       batchHint("Хук "+(i+1)+" / "+todo.length+" 🎬<br>"+TL("розпізнаю текст…","recognizing text…"));
       const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:h.clip,engine:eng,model_size:ms,language:"",   // "" = auto-detect
+        body:JSON.stringify({file_id:fileId,clip:(h.mix&&h.mix.base)||h.clip,engine:eng,model_size:ms,language:"",   // "" = auto-detect
                              script:(h.jira&&h.jira.script)||"",trim:h.trim||null})});   // Jira text fixes misheard words; only the trim zone is transcribed
       const d=await r.json();if(!r.ok)throw new Error(d.detail||"transcribe failed");
       h.txCover=d.cover||null;
@@ -2206,7 +2234,7 @@ function drawTrimBar(){
   $("trimHIn").style.left=li+"%";$("trimHOut").style.left=lo+"%";
   if(typeof drawCutMark==="function")drawCutMark();
   if(typeof drawBodyMark==="function")drawBodyMark();
-  if(typeof drawSfxTicks==="function")drawSfxTicks();
+  if(typeof drawLanes==="function")drawLanes();
   // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
   $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
   $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
@@ -3235,6 +3263,7 @@ async function doRevoice(list){
   const spans=list.map(s=>({a:s.a,b:s.b,lo:s.lo,hi:s.hi,text:s.text,say:String(_rvSay[s.sig]!=null?_rvSay[s.sig]:s.text).trim()||s.text,
                             prev_text:s.prevText,next_text:s.nextText}));
   _rvBusy=true;renderRevoiceBox();
+  const _mo=mixHolder(), _mm=mixUnwrap(_mo);   // 🎚 work on the clean clip, re-mix after
   busyStart("🎙 Переозвучка: клоную голос з кліпу і генерую "+(list.length>1?list.length+" фрагменти":"«"+spans[0].say+"»")+"…");
   try{
     const r=await fetch(API+"/api/revoice",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -3269,6 +3298,7 @@ async function doRevoice(list){
     const tight=/скороти текст/.test(e.message||"");
     setStatus("Переозвучка: "+e.message+(tight?" Або візьми ширше: Shift+клік по сусідніх словах чи подвійний клік (усе речення) — у фрази більше місця, і темп розподілиться рівно.":""),"err");}
   _rvBusy=false;renderRevoiceBox();if(typeof renderHistory==="function")renderHistory();
+  if(_mm)mixRebase(_mo);
 }
 function undoRevoice(){
   const st=rvUndoStack();if(!st||!st.length)return;
@@ -3286,6 +3316,7 @@ function undoRevoice(){
   if(typeof renderHookStrip==="function")renderHookStrip();
   setStatus(prev.kind==="cut"?"↩ Вирізаний шматок повернуто — відео, звук, титри, трім і тайтли як були.":"↩ Звук і текст повернуто як було до переозвучки. Файл переозвучки лишився в сесії.","ok");
   if(typeof drawCutMark==="function")drawCutMark();
+  {const mo=mixHolder(); if(mo&&mo.mix&&(prev.kind==="cut"||prev.kind==="revoice"))mixRebase(mo);}
 }
 // ---------- ✂ Cut segment: remove a piece from the MIDDLE of the clip ----------
 // A cut makes a NEW file (server: "<name>_cutN"), swapped in place like a re-voice, so preview,
@@ -3321,13 +3352,14 @@ function cutMarkFromPlayhead(which){
 const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out","body"];
 function cutSnapshot(v,h){
   const J=x=>x==null?x:JSON.parse(JSON.stringify(x)), per=new Map();
-  rvTargets(v.clip).forEach(o=>{const s={};CUT_FIELDS.forEach(k=>{if(k in o)s[k]=J(o[k]);});per.set(o,s);});
+  rvTargets(v.clip).forEach(o=>{const s={};CUT_FIELDS.forEach(k=>{if(k in o)s[k]=J(o[k]);});if(o.mix)s._sfxAt=o.mix.sfx.map(x=>x.at);per.set(o,s);});
   return {kind:"cut",clip:v.clip,videoUrl:v.videoUrl,words:(realWords||[]).map(w=>({...w})),origWords:(origWordsNow()||[]).map(w=>({...w})),
     titles:J(titles),per};
 }
 function cutRestore(prev){
   if(!prev.per)return;
-  prev.per.forEach((s,o)=>{Object.keys(s).forEach(k=>{o[k]=(s[k]==null)?s[k]:JSON.parse(JSON.stringify(s[k]));});});
+  prev.per.forEach((s,o)=>{Object.keys(s).forEach(k=>{if(k==="_sfxAt"){if(o.mix)o.mix.sfx.forEach((x,i)=>{if(s._sfxAt[i]!=null)x.at=s._sfxAt[i];});return;}
+    o[k]=(s[k]==null)?s[k]:JSON.parse(JSON.stringify(s[k]));});});
   titles=prev.titles?JSON.parse(JSON.stringify(prev.titles)):[];
   const v=variants[activeVar];if(v&&v.cuts)_syncCuts(v.cuts);
 }
@@ -3345,6 +3377,7 @@ function cutApplyTimes(targets,spans,oldDur,newWords,notActive){
     if(o.overlays)o.overlays=once(o.overlays,l=>{l.forEach(x=>{x.in=R(x.in);x.out=R(x.out);});return l;});
     if(o.titles)o.titles=once(o.titles,rtTitles);
     ["capIn","capOut","cap_in","cap_out","body"].forEach(k=>{if(o[k]!=null)o[k]=R(o[k]);});
+    if(o.mix&&o.mix.sfx)once(o.mix.sfx,l=>{l.forEach(s=>{s.at=R(s.at);});return l;});   // 🎚 sounds stay on their picture
     if(o!==v&&o!==h&&newWords&&("words" in o))o.words=newWords.map(w=>({...w}));   // board / LOC copies get the re-timed captions too
   });
   if(notActive)return;          // another clip of the pack: the editor's own titles / caption window are not its
@@ -3375,6 +3408,7 @@ async function doCut(spans,speech,opts){
   const v=variants[activeVar], h=openHookRef();
   if(!v||!v.clip||!fileId){setStatus("Cut працює з кліпом у сесії — спершу завантаж відео.","err");return;}
   const oldDur=video.duration||0;
+  const _mo=mixHolder(), _mm=mixUnwrap(_mo);   // 🎚 cut the clean clip; SFX move with the cut, then re-mix
   busyStart("✂ Вирізаю шматок…");
   try{
     const r=await fetch(API+"/api/cut",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -3398,10 +3432,15 @@ async function doCut(spans,speech,opts){
     setStatus("✂ Вирізано "+tc(d.removed)+" ("+d.removed.toFixed(2)+" с) за "+d.seconds+" с"+(moved?" · межі зсунуто в паузу, щоб не різати слово":"")+". ↩ Undo cut — повернути."
       +(other.length?" ⚠ Локалізації ("+other.join(", ").toUpperCase()+") зроблені з НЕвирізаного кліпу — перезроби їх у LOC.":""),other.length?"err":"ok");
   }catch(e){busyStop();setStatus("Cut: "+e.message,"err");}
+  if(_mm)mixRebase(_mo);
   drawCutMark();
 }
 // the same time-based cut on a clip that is NOT open (batch scope): own words, own history
 async function cutOtherHook(o,spans){
+  const _mm=mixUnwrap(o);
+  try{return await _cutOtherHook(o,spans);}finally{if(_mm)mixRebase(o);}
+}
+async function _cutOtherHook(o,spans){
   const targets=hmTargets(o);
   const r=await fetch(API+"/api/cut",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({file_id:fileId,clip:o.clip,spans,speech:false,words:o.words||[],orig_words:o.origWords||o.words||[]})});
@@ -3638,7 +3677,7 @@ function hmTargets(o){   // every object holding this hook's clip
 function hmTop(o){const s=o._rvFrom;return (s&&s.length&&s[s.length-1].kind==="music")?s[s.length-1]:null;}
 function hmRefreshUndo(){const any=hmHooks().some(o=>hmTop(o));
   if($("hmUndo"))$("hmUndo").style.display=any?"":"none";}
-const hmClean=o=>{const t=hmTop(o);return t?t.clip:o.clip;};   // the hook BEFORE any music we laid
+const hmClean=o=>{if(o.mix&&o.mix.base)return o.mix.base;const t=hmTop(o);return t?t.clip:o.clip;};   // the hook BEFORE any music we laid
 // where the music goes: the HOOK — trim In … the BODY ▸ boundary (the body already has its music),
 // or trim Out when there's no boundary. null = the whole clip.
 function hmZone(o){const tr=o.trim||null, b=(o.body!=null)?+o.body:null;
@@ -3657,110 +3696,62 @@ async function hmGenerate(only){
   const hooksReq=list.map(o=>({clip:hmClean(o),trim:hmZone(o)}));
   busyStart("♪ "+(fromVideo?"Аналізую відео і пишу":"Генерую")+" музику для "+list.length+" хук(ів) ("+(HM_LABELS[_hm.preset]||"custom")+")…");$("hmGen").disabled=true;
   try{const r=await fetch(API+"/api/hookmusic/generate",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",hooks:hooksReq,from_video:fromVideo,add_sfx:!!(fromVideo&&$("hmSfx")&&$("hmSfx").checked)})});
+      body:JSON.stringify({file_id:fileId,preset:_hm.preset,prompt:$("hmPrompt").value||"",hooks:hooksReq,from_video:fromVideo,add_sfx:false})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"music failed"));
     _hm.tracks=_hm.tracks||{}; const errs=[], notes=new Set();
     (d.items||[]).forEach(it=>{if(it.error){errs.push(it.clip+": "+it.error);return;}
       it.preset=HM_LABELS[_hm.preset]||"custom"; if(it.note)notes.add(it.note);
       const slot=(_hm.tracks[it.clip]=_hm.tracks[it.clip]||{takes:[],i:0}); slot.takes.push(it); slot.i=slot.takes.length-1; slot.pick=null;});   // a fresh take for THIS hook becomes its pick
     _hm.track=true; hmRenderList();
-    busyDone("Музика готова");
-    setStatus("♪ Нова версія для "+(d.items.length-errs.length)+"/"+d.items.length+" хук(ів) за "+d.seconds+" с."+(notes.size?" "+[...notes].join(" · "):"")+(errs.length?" Помилки: "+errs.join(" · "):" ◀ ▶ — попередні версії, ↻ — ще раз для одного хука."),errs.length?"err":"ok");
+    // a fresh take goes straight onto the ♪ Music lane of its hook (no separate Apply step)
+    busyStart("♪ Кладу на таймлайн…");
+    for(const o of list){const t=hmCur(o); if(t&&!errs.some(e=>e.startsWith(hmClean(o)+":"))){mixSetMusic(o,t);await mixRun(o);}}
+    hmRenderList();
+    busyDone("Музика на таймлайні");
+    setStatus("♪ Музика на доріжці ♪ Music ("+(d.items.length-errs.length)+"/"+d.items.length+" хук(ів), "+d.seconds+" с)."+(notes.size?" "+[...notes].join(" · "):"")+(errs.length?" Помилки: "+errs.join(" · "):" Гучність, 🔇 і ✕ — на таймлайні; інша версія — у списку зліва."),errs.length?"err":"ok");
   }catch(e){busyStop();setStatus("Hook music: "+e.message,"err");}
   $("hmGen").disabled=false; $("hmGen").textContent=Object.keys(_hm.tracks||{}).length?"↻ Regenerate for all hooks":"♪ Generate music";
 }
-// Compact rows (the native players were huge): ▶ Music / ▶ SFX on ONE shared hidden <audio>, a thin
-// progress line, take ◀ n/N ▶ and ↻. One delegated click handler, wired once — buttons survive re-renders.
+// Rows per hook: which take is ON THE TIMELINE (select), ▶ hear the track alone, ↻ one more take.
+// Picking another take swaps the ♪ Music lane at once — no Apply.
 let _hmPlaying=null;   // {url, row}
+function hmTakeLabel(o,t){const s=(_hm.tracks||{})[hmClean(o)];const k=s?s.takes.indexOf(t):-1;return (t.preset||"Music")+(k>=0?" · take "+(k+1):"");}
 function hmRenderList(){
   const box=$("hmList"); if(!box)return;
-  const list=hmHooks();
-  box.innerHTML=list.map((o,i)=>{const slot=(_hm.tracks||{})[hmClean(o)], t=hmCur(o), n=slot?slot.takes.length:0;
-    const pool=hmPool();
-    const take=pool.length>1?"<select data-hmsel='"+i+"' class='hmsel' title='Який трек покласти під цей хук — його власна версія або трек іншого хука'>"
-      +pool.map((p,k)=>"<option value='"+k+"'"+(t&&p.t===t?" selected":"")+">"+p.label+"</option>").join("")+"</select>":"";
-    const playing=_hmPlaying&&t&&(_hmPlaying.url===t.url||_hmPlaying.url===t.sfx_url);
-    return "<div class='hmrow' data-hmrow='"+i+"'><div class='hmtop'><span class='hmname'><b>Hook "+(i+1)+"</b>"
-      +(t?"":" · no track yet")+"</span>"
+  const list=hmHooks(), pool=hmPool();
+  box.innerHTML=list.map((o,i)=>{const t=hmCur(o), on=!!(o.mix&&o.mix.music);
+    const playing=_hmPlaying&&t&&_hmPlaying.url===t.url&&!$("hmAudio").paused;
+    const sel=pool.length?"<select data-hmsel='"+i+"' class='hmsel' title='Який трек стоїть на таймлайні цього хука'>"
+      +(t?"":"<option value=''>—</option>")+pool.map((p,k)=>"<option value='"+k+"'"+(t&&p.t===t?" selected":"")+">"+p.label+"</option>").join("")+"</select>":"";
+    return "<div class='hmrow' data-hmrow='"+i+"'><div class='hmtop'><span class='hmname'><b>Hook "+(i+1)+"</b>"+(on?" · on timeline":(t?"":" · no track yet"))+"</span>"
+      +(t?"<button type='button' class='tmini ticon' data-hmplay='"+i+"' title='Послухати трек окремо'>"+(playing?"❚❚":"▶")+"</button>":"")
       +"<button type='button' class='tmini ticon' data-hmre='"+i+"' title='Ще одна версія лише для цього хука'>↻</button></div>"
-      +(take?"<div style='margin-top:4px'>"+take+"</div>":"")
-      +(t&&o.trim&&(t.length+0.05)<(o.trim[1]-o.trim[0])?"<div style='color:#ffb38f;margin-top:3px'>⚠ трек коротший за хук ("+tc(t.length)+" < "+tc(o.trim[1]-o.trim[0])+") — кінець буде без музики</div>":"")
-      +(t?"<div class='hmplay'><button type='button' data-hmplay='"+i+":m' class='"+(playing&&_hmPlaying.url===t.url?"on":"")+"'>"+(playing&&_hmPlaying.url===t.url&&!$("hmAudio").paused?"❚❚":"▶")+" Music</button>"
-        +(t.sfx_url?"<button type='button' data-hmplay='"+i+":s' class='"+(playing&&_hmPlaying.url===t.sfx_url?"on":"")+"'>"+(playing&&_hmPlaying.url===t.sfx_url&&!$("hmAudio").paused?"❚❚":"▶")+" SFX</button>":"")
-        +"<span class='hmbar'><i id='hmBar"+i+"'></i></span></div>":"")+"</div>";}).join("");
+      +(sel?"<div style='margin-top:4px'>"+sel+"</div>":"")+"</div>";}).join("");
   $("hmTrack").style.display=Object.keys(_hm.tracks||{}).length?"block":"none";
-  if($("hmSfxVolRow"))$("hmSfxVolRow").style.display=list.some(o=>{const t=hmCur(o);return t&&t.sfx;})?"":"none";
 }
-function hmPlay(i,kind){
+function hmPlay(i){
   const a=$("hmAudio"), o=hmHooks()[i], t=o&&hmCur(o); if(!a||!t)return;
-  const url=kind==="s"?t.sfx_url:t.url; if(!url)return;
-  if(_hmPlaying&&_hmPlaying.url===url&&!a.paused){a.pause();hmRenderList();return;}
-  if(!_hmPlaying||_hmPlaying.url!==url){a.src=API+url;}
-  a.volume=Math.min(1,((+(($(kind==="s"?"hmSfxVol":"hmVol")||{}).value||50))/100)*(kind==="s"?1:2));
-  _hmPlaying={url,row:i}; a.play().catch(()=>{}); hmRenderList();
+  if(_hmPlaying&&_hmPlaying.url===t.url&&!a.paused){a.pause();hmRenderList();return;}
+  if(!_hmPlaying||_hmPlaying.url!==t.url)a.src=API+t.url;
+  a.volume=0.8; _hmPlaying={url:t.url,row:i}; a.play().catch(()=>{}); hmRenderList();
 }
 (function wireHm(){
   const box=$("hmList"), a=$("hmAudio"); if(!box)return;
-  box.addEventListener("change",e=>{const s=e.target.closest&&e.target.closest("[data-hmsel]"); if(!s)return;
+  box.addEventListener("change",async e=>{const s=e.target.closest&&e.target.closest("[data-hmsel]"); if(!s||s.value==="")return;
     const i=+s.dataset.hmsel, o=hmHooks()[i], p=hmPool()[+s.value]; if(!o||!p)return;
     const slot=(_hm.tracks[hmClean(o)]=_hm.tracks[hmClean(o)]||{takes:[],i:0}); slot.pick=p.t;
-    if(a&&!a.paused)a.pause(); _hmPlaying=null; hmRenderList();
-    setStatus("♪ Hook "+(i+1)+" ← "+p.label+". Apply, щоб покласти.","");});
+    if(a&&!a.paused)a.pause(); _hmPlaying=null;
+    mixSetMusic(o,p.t); hmRenderList(); await mixRun(o);
+    setStatus("♪ Hook "+(i+1)+" ← "+p.label+" — уже на таймлайні.","ok");});
   box.addEventListener("click",e=>{
     const t=e.target.closest&&e.target.closest("button"); if(!t)return;
-    if(t.dataset.hmplay){const [i,k]=t.dataset.hmplay.split(":");hmPlay(+i,k);return;}
-    if(t.dataset.hmflip){const [i,d]=t.dataset.hmflip.split(":").map(Number), o=hmHooks()[i], s=o&&_hm.tracks[hmClean(o)];
-      if(s&&s.takes.length){s.i=(s.i+d+s.takes.length)%s.takes.length; if(a&&!a.paused){a.pause();} _hmPlaying=null; hmRenderList();
-        setStatus("♪ Hook "+(i+1)+": take "+(s.i+1)+"/"+s.takes.length+" — Apply, щоб покласти саме її.","");}
-      return;}
-    if(t.dataset.hmre){hmGenerate(hmHooks()[+t.dataset.hmre]);return;}
+    if(t.dataset.hmplay!=null){hmPlay(+t.dataset.hmplay);return;}
+    if(t.dataset.hmre!=null){hmGenerate(hmHooks()[+t.dataset.hmre]);return;}
   });
-  if(a){a.addEventListener("timeupdate",()=>{if(!_hmPlaying)return;const el=$("hmBar"+_hmPlaying.row);if(el&&a.duration)el.style.width=(a.currentTime/a.duration*100)+"%";});
-    a.addEventListener("ended",()=>{_hmPlaying=null;hmRenderList();});}
+  if(a){a.addEventListener("ended",()=>{_hmPlaying=null;hmRenderList();});
+    a.addEventListener("play",()=>{if(!video.paused)video.pause();});}
 })();
-async function hmApply(list){
-  if(!_hm.tracks||!Object.keys(_hm.tracks).length){setStatus("Спершу ♪ Generate music.","err");return;}
-  const vol=(+$("hmVol").value||0)/100, duck=$("hmDuck").checked, strip=$("hmStrip").checked;
-  const v=variants[activeVar]; let ok=0, fail=[];
-  busyStart("♪ Кладу музику під "+list.length+" хук(и)"+(strip?" · прибираю стару музику":"")+"…");
-  for(let i=0;i<list.length;i++){
-    const o=list[i], top=hmTop(o), isActive=!!(v&&o.clip===v.clip), trk=hmCur(o);
-    if(!trk){fail.push((i+1)+": немає треку — Generate");continue;}
-    const before=top||{kind:"music",label:"♪ Music · "+(trk.preset||HM_LABELS[_hm.preset]||"custom"),clip:o.clip,videoUrl:o.videoUrl,words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
-    try{
-      setStatus("♪ Хук "+(i+1)+"/"+list.length+"…","",true);
-      const r=await fetch(API+"/api/hookmusic/apply",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:before.clip,track:trk.name,volume:vol,duck,strip_original:strip,trim:hmZone(o),
-          sfx:trk.sfx||"",sfx_volume:(+(($("hmSfxVol")||{}).value||80))/100})});
-      const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"apply failed"));
-      hmTargets(o).forEach(x=>{const s=(x._rvFrom=x._rvFrom||[]);if(top&&s.length&&s[s.length-1]===top)s.pop();   // re-apply = replace OUR music, never stack beds
-        s.push(before);x.clip=d.clip;x.videoUrl=API+d.url;});
-      if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
-      if(isActive)rvLoadVideo(API+d.url);
-      ok++;
-    }catch(e){fail.push((i+1)+": "+e.message);if(/дозволу|Немає ключа/.test(e.message))break;}
-  }
-  if(typeof renderHookStrip==="function")renderHookStrip();
-  if(fail.length){busyStop();setStatus("♪ Готово "+ok+"/"+list.length+". Помилки — "+fail.join(" · "),"err");}
-  else{busyDone("Музику додано");setStatus("♪ Музика під "+ok+" хук(ами)"+(strip?", стару музику прибрано":"")+". ↩ Undo music — повернути.","ok");}
-  hmRefreshUndo();if(typeof renderHistory==="function")renderHistory();
-}
-function hmUndoAll(){
-  const v=variants[activeVar]; let n=0;
-  hmHooks().forEach(o=>{const top=hmTop(o); if(!top)return;
-    hmTargets(o).forEach(x=>{const s=x._rvFrom; if(s&&s.length&&s[s.length-1]===top)s.pop(); x.clip=top.clip; x.videoUrl=top.videoUrl;});
-    if(v&&v.clip===top.clip)rvLoadVideo(top.videoUrl);   // it was the open clip
-    n++;});
-  if(typeof renderHookStrip==="function")renderHookStrip();
-  setStatus("↩ Музику прибрано з "+n+" хук(ів) — звук як був.","ok"); hmRefreshUndo(); if(typeof renderHistory==="function")renderHistory();
-}
 if($("hmGen"))$("hmGen").onclick=()=>hmGenerate();
-if($("hmApplyAll"))$("hmApplyAll").onclick=()=>hmApply(hmHooks());
-if($("hmApplyOne"))$("hmApplyOne").onclick=()=>{const h=openHookRef(),v=variants[activeVar];hmApply([h||v].filter(Boolean));};
-if($("hmUndo"))$("hmUndo").onclick=hmUndoAll;
-if($("hmVol"))$("hmVol").oninput=e=>{$("hmVolLbl").textContent=e.target.value;};
-if($("hmSfxVol"))$("hmSfxVol").oninput=e=>{$("hmSfxVolLbl").textContent=e.target.value;};
-if($("hmFromVideo"))$("hmFromVideo").onchange=e=>{if($("hmSfx")){$("hmSfx").disabled=!e.target.checked;if(!e.target.checked)$("hmSfx").checked=false;}};
 hmInit();
 // ---------- Auto: scene cuts + the Hook | Body boundary ----------
 // Cuts are detected for every clip as soon as it lands in the session (a cheap decode of a
@@ -3987,74 +3978,231 @@ function fitVideo(){
   const strip=$("filmstrip"), extra=58+36+30+(document.querySelector(".tut-wrap")?0:0);   // header + stage padding + breathing room
   const v=Math.round(ctl+extra);
   if(Math.abs((fitVideo._v||0)-v)>2){fitVideo._v=v;document.documentElement.style.setProperty("--ctlh",v+"px");}
+  const dk=$("trimRow"), dh=(dk&&dk.offsetParent!==null)?Math.round(dk.getBoundingClientRect().height+12):0;
+  if(Math.abs((fitVideo._d||0)-dh)>2){fitVideo._d=dh;document.documentElement.style.setProperty("--dockh",dh+"px");}
 }
 if(window.ResizeObserver){const ro=new ResizeObserver(()=>fitVideo());["transport","trimRow","status"].forEach(id=>{if($(id))ro.observe($(id));});}
 window.addEventListener("resize",fitVideo);
-// ---------- 🔊 SFX only: effects on top of the music that is already right ----------
-function sfxHolder(){return openHookRef()||variants[activeVar]||null;}
-function drawSfxTicks(){
-  const bar=$("trimBar"),o=sfxHolder(),dur=video.duration||0; if(!bar)return;
-  bar.querySelectorAll(".sfxTick").forEach(e=>e.remove());
-  if(!o||!o.sfx||!dur)return;
-  o.sfx.forEach(s=>{const d=document.createElement("div");d.className="sfxTick";d.title="🔊 "+s.label+" @ "+tc(s.at);
-    d.style.left=Math.max(0,Math.min(100,s.at/dur*100))+"%";d.style.width=Math.max(0.6,Math.min(100,(s.length||0.5)/dur*100))+"%";bar.appendChild(d);});
+// ---------- 🎚 Audio lanes: Clip audio · Music · SFX as LAYERS, never baked ----------
+// The hook keeps its clean clip (mix.base: picture + voice) and a list of layers. Every change on
+// a lane (mute, volume, move, delete, another take) rebuilds the playback clip on the server from
+// base + layers (/api/audio/mix, same inputs → same cached file), so what you hear is what Export
+// gets, and nothing is ever stuck in the sound. Cut / re-voice work on the base, then re-mix.
+const LANE_DEF=(()=>{try{return JSON.parse(localStorage.getItem("cs_laneDef")||"{}")||{};}catch(_){return {};}})();
+function laneDefSave(){try{localStorage.setItem("cs_laneDef",JSON.stringify(LANE_DEF));}catch(_){}}
+function mixHolder(){return openHookRef()||variants[activeVar]||null;}
+function mixOf(o,create){
+  if(!o)return null;
+  if(!o.mix&&create){
+    let base=o.clip, url=o.videoUrl;
+    const top=(typeof hmTop==="function")?hmTop(o):null;   // music baked the OLD way → start from the clip before it
+    if(top){base=top.clip;url=top.videoUrl;hmTargets(o).forEach(x=>{const s=x._rvFrom;if(s&&s.length&&s[s.length-1]===top)s.pop();});}
+    o.mix={base,baseUrl:url,orig:{vol:1,mute:false},music:null,sfx:[],sfxMute:false,out:null};
+  }
+  return o.mix||null;
 }
-function sfxRender(){
-  const o=sfxHolder(), list=(o&&o.sfx)||[], box=$("sfxList"); if(!box)return;
-  if($("sfxCount"))$("sfxCount").textContent=list.length;
-  box.innerHTML=list.map((s,i)=>"<div class='hmrow' style='display:flex;gap:6px;align-items:center'>"
-    +"<button type='button' class='tmini ticon' data-sfxplay='"+i+"' title='Прослухати ефект'>▶</button>"
-    +"<span style='flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'><b style='color:var(--txt)'>"+tc(s.at)+"</b> · "+String(s.label).replace(/</g,"&lt;")+"</span>"
-    +"<input type='range' min='0' max='150' value='"+Math.round((s.volume??0.9)*100)+"' data-sfxvol='"+i+"' style='width:70px' title='Гучність'>"
-    +"<button type='button' class='tmini ticon' data-sfxdel='"+i+"' title='Прибрати'>✕</button></div>").join("");
-  if($("sfxApply")){$("sfxApply").style.display=list.length?"":"none";$("sfxApply").textContent="Apply "+list.length+" SFX to this hook";}
-  drawSfxTicks();
+function mixActive(m){return !!m&&(!!(m.music&&!m.music.mute)||(!m.sfxMute&&m.sfx.some(s=>!s.mute))||!!m.orig.mute||Math.abs((m.orig.vol??1)-1)>0.001);}
+function mixSetMusic(o,t){
+  const m=mixOf(o,true), p=m.music;
+  m.music={name:t.name,url:t.url,length:t.length,label:hmTakeLabel(o,t),sfx:t.sfx||"",
+    volume:p?p.volume:(LANE_DEF.mVol??0.35),duck:p?p.duck:(LANE_DEF.duck??true),strip:p?p.strip:(LANE_DEF.strip??true),mute:false};
 }
-async function sfxGenerate(auto){
-  const o=sfxHolder(); if(!o){setStatus("SFX: спершу відкрий кліп.","err");return;}
+const _mixSeq=new WeakMap(), _mixT=new WeakMap();
+function mixSoon(o,ms){if(!o||!o.mix)return;clearTimeout(_mixT.get(o));_mixT.set(o,setTimeout(()=>mixRun(o),ms==null?350:ms));}
+function mixLoadVideo(url){
+  if(!url||video.src===url||video.src.endsWith(url.replace(API,"")))return;
+  const t=video.currentTime||0, playing=!video.paused;
+  video.src=url;
+  video.onloadedmetadata=()=>{videoLoaded=true;try{video.currentTime=Math.min(t,video.duration||t);}catch(_){}if(playing)video.play().catch(()=>{});};
+}
+async function mixRun(o){
+  const m=o&&o.mix; if(!m||!fileId)return;
+  const seq=(_mixSeq.get(o)||0)+1; _mixSeq.set(o,seq);
+  let clip=m.base, url=mixBaseUrl(m);
+  if(mixActive(m)){
+    laneBusy(true);
+    try{
+      const r=await fetch(API+"/api/audio/mix",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+        file_id:fileId,base:m.base,zone:hmZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
+        music:(m.music&&!m.music.mute)?{name:m.music.name,volume:m.music.volume,duck:m.music.duck,strip:m.music.strip,sfx:m.music.sfx||""}:null,
+        sfx:m.sfxMute?[]:m.sfx.filter(s=>!s.mute).map(s=>({name:s.name,at:s.at,volume:s.volume}))})});
+      const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"mix failed"));
+      clip=d.clip; url=API+d.url;
+    }catch(e){if(_mixSeq.get(o)===seq){laneBusy(false);setStatus("🎚 Звук: "+e.message,"err");}return;}
+    if(_mixSeq.get(o)!==seq)return;   // a newer change is already on its way
+    laneBusy(false);
+  }
+  m.out=(clip===m.base)?null:clip;
+  hmTargets(o).forEach(x=>{x.clip=clip;x.videoUrl=url;});
+  if(typeof exportedNames!=="undefined")exportedNames.add(clip);
+  if(o===mixHolder())mixLoadVideo(url);
+  if(typeof renderHookStrip==="function")renderHookStrip();
+}
+// cut / re-voice must work on the CLEAN clip (voice + picture), not on the mix
+const mixBaseUrl=m=>m.baseUrl||(API+"/clip/"+fileId+"/"+m.base);
+function mixUnwrap(o){const m=o&&o.mix; if(m&&o.clip!==m.base){const T=hmTargets(o);T.forEach(x=>{x.clip=m.base;x.videoUrl=mixBaseUrl(m);});} return m;}
+function mixRebase(o){const m=o&&o.mix; if(!m)return; m.base=o.clip; m.baseUrl=o.videoUrl; mixRun(o);}
+function mixBaseClip(clip){const all=[mixHolder()].concat(editPack||[]).filter(Boolean);const o=all.find(x=>x.clip===clip&&x.mix);return o?o.mix.base:clip;}
+function laneBusy(on){const el=$("laneBusy");if(el){el.style.display=on?"block":"none";el.textContent="🎚 зводжу звук…";}}
+
+// ---- drawing ----
+let _laneSel=null;   // {kind:"orig"|"music"|"sfx"|"add", i, at}
+const _peaks=new Map(), _zoneKey=new WeakMap();
+function laneT(e,body){const r=body.getBoundingClientRect(),dur=video.duration||0;return Math.max(0,Math.min(dur,(e.clientX-r.left)/r.width*dur));}
+function drawLanes(){
+  const o=mixHolder(), m=o&&o.mix, dur=video.duration||0; if(!$("lanes")||!dur)return;
+  const pct=t=>Math.max(0,Math.min(100,t/dur*100));
+  const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  // mute buttons + lane state
+  const setMute=(k,off)=>{const b=document.querySelector(".lmute[data-lm='"+k+"']");if(b){b.textContent=off?"🔇":"🔊";b.classList.toggle("off",!!off);}};
+  setMute("orig",m&&m.orig.mute); setMute("music",m&&m.music&&m.music.mute); setMute("sfx",m&&m.sfxMute);
+  $("laneOrig").classList.toggle("off",!!(m&&m.orig.mute)); $("laneMusic").classList.toggle("off",!!(m&&m.music&&m.music.mute)); $("laneSfx").classList.toggle("off",!!(m&&m.sfxMute));
+  $("laneOrigName").textContent=(m&&m.music&&m.music.strip&&!m.music.mute)?"Voice only":"Clip audio";
+  $("laneOrigName").title=(m&&m.music&&m.music.strip&&!m.music.mute)?"Стару музику прибрано (ElevenLabs Audio Isolation) — чути тільки голос":"Звук самого кліпу: голос + те, що в ньому вже було";
+  document.querySelectorAll(".lbody[data-lane]").forEach(b=>b.classList.toggle("sel",!!(_laneSel&&_laneSel.kind===b.dataset.lane&&_laneSel.kind!=="sfx")));
+  // ♪ music: one block over its zone
+  const mb=$("laneMusicBody");
+  if(m&&m.music){const z=hmZone(o)||[0,dur], a=z[0], e=Math.min(dur,z[1]);
+    mb.innerHTML="<div class='lblk music"+(_laneSel&&_laneSel.kind==="music"?" sel":"")+"' data-blk='music' style='left:"+pct(a)+"%;width:"+Math.max(0.5,pct(e)-pct(a))+"%' title='Клік — налаштування музики'>♪ "+esc(m.music.label)+"<span class='lx' data-x='music' title='Прибрати музику'>✕</span></div>";}
+  else mb.innerHTML="<div class='lempty'>Немає музики · <b data-go='music'>♪ Generate</b>&nbsp;у Hook music зліва — вона ляже сюди</div>";
+  // 🔊 sfx blocks
+  const sb=$("laneSfxBody"), list=(m&&m.sfx)||[];
+  sb.innerHTML=list.length?list.map((s,i)=>"<div class='lblk sfx"+(_laneSel&&_laneSel.kind==="sfx"&&_laneSel.i===i?" sel":"")+"' data-blk='sfx' data-i='"+i+"' style='left:"+pct(s.at)+"%;width:"+Math.max(0.8,pct(s.at+(s.length||0.5))-pct(s.at))+"%"+(s.mute?";opacity:.35":"")+"' title='«"+esc(s.label)+"» @ "+tc(s.at)+" · тягни, щоб пересунути · клік — налаштування'>"+esc(s.label)+"<span class='lx' data-x='sfx' data-i='"+i+"' title='Видалити'>✕</span></div>").join("")
+    +(_laneSel&&_laneSel.kind==="add"?"<div class='lblk sfx' style='left:"+pct(_laneSel.at)+"%;width:6px;opacity:.6;pointer-events:none'></div>":"")
+    :"<div class='lempty'>Подвійний клік — новий звук у цьому місці · або ＋</div>";
+  drawWave(o);
+  renderLaneEdit();
+  // the music follows the trim / body: when its zone moves, re-mix (debounced)
+  if(m&&m.music&&!m.music.mute){const k=JSON.stringify(hmZone(o));const was=_zoneKey.get(m);_zoneKey.set(m,k);if(was!=null&&was!==k)mixSoon(o,700);}
+}
+async function drawWave(o){
+  const cv=$("waveOrig"); if(!cv||!o||!fileId)return;
+  const clip=(o.mix&&o.mix.base)||o.clip; if(!clip)return;
+  const w=Math.max(100,Math.round(cv.clientWidth)), hh=Math.max(10,cv.clientHeight), dpr=window.devicePixelRatio||1, n=Math.round(w/2);
+  const key=clip+"|"+n;
+  if(!_peaks.has(key)){_peaks.set(key,null);
+    try{const r=await fetch(API+"/api/waveform?file_id="+encodeURIComponent(fileId)+"&clip="+encodeURIComponent(clip)+"&n="+n);const d=await r.json();_peaks.set(key,r.ok?d.peaks:[]);}catch(_){_peaks.set(key,[]);}
+    return drawWave(o);}
+  const pk=_peaks.get(key); if(!pk)return;
+  cv.width=w*dpr; cv.height=hh*dpr; const c=cv.getContext("2d"); c.scale(dpr,dpr); c.clearRect(0,0,w,hh);
+  c.fillStyle="#5eead4"; const bw=w/pk.length;
+  pk.forEach((v,i)=>{const y=Math.max(1,v*(hh-6));c.fillRect(i*bw,(hh-y)/2,Math.max(1,bw-0.6),y);});
+}
+function renderLaneEdit(){
+  const ed=$("laneEdit"), o=mixHolder(), m=o&&o.mix; if(!ed)return;
+  const s=_laneSel; if(!s||(s.kind!=="add"&&s.kind!=="orig"&&!m)){ed.style.display="none";ed.innerHTML="";return;}
+  if(ed.contains(document.activeElement)&&document.activeElement.tagName==="INPUT"&&document.activeElement.type==="text")return;   // never re-render under the caret
+  const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  let h="";
+  if(s.kind==="add"){
+    h="🔊 Новий звук у <b>"+tc(s.at)+"</b>: <input type='text' id='leTxt' placeholder='wooden door slam · fast whoosh · single heartbeat · glass shatter' value='"+esc(s.text||"")+"'>"
+      +"<select id='leDur' title='Довжина'><option value=''>auto</option><option>0.5</option><option>1</option><option>2</option><option>3</option><option>5</option></select>"
+      +"<button type='button' class='primary' id='leGo' style='font-size:11px;padding:5px 12px'>Generate</button><button type='button' class='ghost' id='leX' style='font-size:11px'>✕</button>"
+      +"<span class='lhint'>Коротко і конкретно — один звук: «single wooden door slam», а не «sounds for a scene». Не сподобалось — ↻ Another version.</span>";
+  }else if(s.kind==="orig"){
+    const v=m?Math.round((m.orig.vol??1)*100):100;
+    h="<b>"+$("laneOrigName").textContent+"</b> · Volume <input type='range' id='leVol' min='0' max='150' value='"+v+"'><span id='leVolL'>"+v+"%</span>"
+      +"<span class='lhint'>"+(m&&m.music&&m.music.strip?"Стара музика з кліпу прибрана (Audio Isolation) — тут лише голос. Повернути стару: у музики зніми «Remove old music».":"Звук самого кліпу: голос і все, що в ньому вже було.")+"</span>";
+  }else if(s.kind==="music"&&m.music){
+    const v=Math.round(m.music.volume*100);
+    h="<b>♪ "+esc(m.music.label)+"</b> · Volume <input type='range' id='leVol' min='0' max='100' value='"+v+"'><span id='leVolL'>"+v+"</span>"
+      +"<label title='Музика тихшає, коли звучить голос'><input type='checkbox' id='leDuck'"+(m.music.duck?" checked":"")+">Duck under voice</label>"
+      +"<label title='Прибрати стару музику з кліпу (ElevenLabs Audio Isolation), лишити тільки голос'><input type='checkbox' id='leStrip'"+(m.music.strip?" checked":"")+">Remove old music</label>"
+      +"<button type='button' class='tmini' id='lePlay'>▶ Track alone</button><button type='button' class='tmini' id='leDel'>✕ Remove music</button>";
+  }else if(s.kind==="sfx"&&m.sfx[s.i]){
+    const x=m.sfx[s.i], v=Math.round((x.volume??0.9)*100);
+    h="<b>🔊 «"+esc(x.label)+"»</b> @ "+tc(x.at)+" · Volume <input type='range' id='leVol' min='0' max='150' value='"+v+"'><span id='leVolL'>"+v+"%</span>"
+      +"<button type='button' class='tmini' id='lePlay'>▶ Solo</button><button type='button' class='tmini' id='leAgain' title='Той самий опис — нова версія звуку'>↻ Another version</button>"
+      +"<button type='button' class='tmini' id='leDel'>✕ Delete</button><span class='lhint'>Тягни блок по доріжці, щоб пересунути. Delete — видалити.</span>";
+  }else{ed.style.display="none";return;}
+  ed.innerHTML=h; ed.style.display="flex";
+  const on=(id,ev,fn)=>{const e=$(id);if(e)e[ev]=fn;};
+  on("leX","onclick",()=>{_laneSel=null;drawLanes();});
+  on("leGo","onclick",()=>laneAddSfx());
+  if($("leTxt")){$("leTxt").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();laneAddSfx();}if(e.key==="Escape"){_laneSel=null;drawLanes();}};$("leTxt").oninput=e=>{s.text=e.target.value;};setTimeout(()=>{try{$("leTxt").focus();}catch(_){}} ,0);}
+  on("leVol","oninput",e=>{const v=+e.target.value;$("leVolL").textContent=v+(s.kind==="music"?"":"%");
+    if(s.kind==="orig"){mixOf(o,true).orig.vol=v/100;} else if(s.kind==="music")m.music.volume=v/100; else m.sfx[s.i].volume=v/100;
+    if(s.kind==="music")LANE_DEF.mVol=v/100,laneDefSave();});
+  on("leVol","onchange",()=>mixSoon(o,50));
+  on("leDuck","onchange",e=>{m.music.duck=e.target.checked;LANE_DEF.duck=m.music.duck;laneDefSave();mixSoon(o,50);});
+  on("leStrip","onchange",e=>{m.music.strip=e.target.checked;LANE_DEF.strip=m.music.strip;laneDefSave();mixSoon(o,50);drawLanes();});
+  on("lePlay","onclick",()=>{const a=$("sfxAudio"),src=s.kind==="music"?m.music.url:m.sfx[s.i].url;video.pause();a.src=API+src;a.volume=Math.min(1,s.kind==="music"?0.8:(m.sfx[s.i].volume??0.9));a.play().catch(()=>{});});
+  on("leAgain","onclick",()=>laneAgain(s.i));
+  on("leDel","onclick",()=>laneDelete(s));
+}
+// ---- actions ----
+function laneSelect(sel){_laneSel=sel;drawLanes();}
+function laneDelete(s){
+  const o=mixHolder(), m=o&&o.mix; if(!m||!s)return;
+  if(s.kind==="music"){m.music=null;setStatus("♪ Музику прибрано з хука — звук як був. Повернути: вибери версію зліва в Hook music.","ok");if(typeof hmRenderList==="function")hmRenderList();}
+  else if(s.kind==="sfx"){const x=m.sfx.splice(s.i,1)[0];setStatus("🔊 «"+(x&&x.label)+"» видалено.","ok");}
+  _laneSel=null; drawLanes(); mixSoon(o,30);
+}
+async function laneAddSfx(){
+  const s=_laneSel; if(!s||s.kind!=="add")return;
+  const txt=(($("leTxt")||{}).value||s.text||"").trim(); if(!txt){setStatus("Опиши звук, наприклад «single wooden door slam».","err");return;}
   try{await ensureSessionClip();}catch(e){setStatus("SFX: "+e.message,"err");return;}
-  const btn=$(auto?"sfxAuto":"sfxAdd"); btn.disabled=true;
-  busyStart(auto?"🔊 Дивлюсь на картинку і пишу SFX…":"🔊 Генерую ефект…");
-  try{let d;
-    if(auto){const r=await fetch(API+"/api/sfx/auto",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:o.clip,zone:(typeof hmZone==="function"?hmZone(o):null),prompt:$("sfxPrompt").value||""})});
-      d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"auto sfx failed")); d.label="Auto (from picture)";}
-    else{const pr=$("sfxPrompt").value.trim(); if(!pr)throw new Error("опиши звук, наприклад «door slam»");
-      const r=await fetch(API+"/api/sfx/generate",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,prompt:pr,duration:$("sfxDur").value?+$("sfxDur").value:null})});
-      d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"sfx failed")); d.label=pr; d.at=curFrame()/fps();}
-    (o.sfx=o.sfx||[]).push({name:d.name,url:d.url,at:+(+d.at).toFixed(3),length:d.length,label:d.label,volume:0.9});
-    const v=variants[activeVar]; if(v&&v!==o)v.sfx=o.sfx;
-    busyDone("SFX готовий"); setStatus("🔊 «"+d.label+"» @ "+tc(d.at)+". Послухай і тисни Apply.","ok");
+  const o=mixHolder(); if(!o)return; const dur=$("leDur")&&$("leDur").value?+$("leDur").value:null;
+  busyStart("🔊 Генерую «"+txt+"»…");
+  try{const r=await fetch(API+"/api/sfx/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,prompt:txt,duration:dur})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"sfx failed"));
+    const m=mixOf(o,true); m.sfx.push({name:d.name,url:d.url,at:+(+s.at).toFixed(3),length:d.length,label:txt,prompt:txt,dur,volume:0.9});
+    m.sfx.sort((a,b)=>a.at-b.at); _laneSel={kind:"sfx",i:m.sfx.findIndex(x=>x.name===d.name)};
+    busyDone("Звук на таймлайні"); setStatus("🔊 «"+txt+"» @ "+tc(s.at)+" — на доріжці SFX. Не те? ↻ Another version або ✕.","ok");
+    drawLanes(); await mixRun(o);
   }catch(e){busyStop();setStatus("SFX: "+e.message,"err");}
-  btn.disabled=false; sfxRender();
 }
-async function sfxApply(){
-  const o=sfxHolder(); if(!o||!o.sfx||!o.sfx.length)return;
-  const v=variants[activeVar], targets=(typeof hmTargets==="function")?hmTargets(o):[o];
-  busyStart("🔊 Кладу "+o.sfx.length+" SFX поверх звуку…");
-  try{const r=await fetch(API+"/api/sfx/apply",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,clip:o.clip,items:o.sfx.map(s=>({name:s.name,at:s.at,volume:s.volume??0.9}))})});
-    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"apply failed"));
-    const before={kind:"sfx",label:"🔊 SFX · "+o.sfx.length,clip:o.clip,videoUrl:o.videoUrl,
-      words:(o.words||realWords||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
-    targets.forEach(x=>{(x._rvFrom=x._rvFrom||[]).push(before);x.clip=d.clip;x.videoUrl=API+d.url;x.sfx=[];});
-    if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
-    rvLoadVideo(API+d.url);
-    busyDone("SFX додано"); setStatus("🔊 SFX у звуці, музика та голос — як були. ↩ Undo sfx — у History.","ok");
+async function laneAgain(i){
+  const o=mixHolder(), m=o&&o.mix, x=m&&m.sfx[i]; if(!x)return;
+  busyStart("🔊 Ще одна версія «"+x.label+"»…");
+  try{const r=await fetch(API+"/api/sfx/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,prompt:x.prompt||x.label,duration:x.dur||null})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"sfx failed"));
+    x.name=d.name;x.url=d.url;x.length=d.length; busyDone("Нова версія"); drawLanes(); await mixRun(o);
+    const a=$("sfxAudio"); video.pause(); a.src=API+x.url; a.volume=Math.min(1,x.volume??0.9); a.play().catch(()=>{});
   }catch(e){busyStop();setStatus("SFX: "+e.message,"err");}
-  sfxRender(); if(typeof renderHistory==="function")renderHistory(); if(typeof renderHookStrip==="function")renderHookStrip();
 }
-(function wireSfx(){
-  const box=$("sfxList"); if(!box)return;
-  box.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("button"); if(!b)return; const o=sfxHolder(); if(!o||!o.sfx)return;
-    if(b.dataset.sfxdel!=null){o.sfx.splice(+b.dataset.sfxdel,1);sfxRender();}
-    if(b.dataset.sfxplay!=null){const s=o.sfx[+b.dataset.sfxplay],a=$("sfxAudio");a.src=API+s.url;a.volume=Math.min(1,s.volume??0.9);a.play().catch(()=>{});}});
-  box.addEventListener("input",e=>{const r=e.target.closest&&e.target.closest("[data-sfxvol]"); const o=sfxHolder(); if(!r||!o||!o.sfx)return; o.sfx[+r.dataset.sfxvol].volume=(+r.value)/100;});
-  if($("sfxAdd"))$("sfxAdd").onclick=()=>sfxGenerate(false);
-  if($("sfxAuto"))$("sfxAuto").onclick=()=>sfxGenerate(true);
-  if($("sfxApply"))$("sfxApply").onclick=sfxApply;
-  if($("sfxPrompt"))$("sfxPrompt").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();sfxGenerate(false);}});
+function laneMute(k){
+  const o=mixHolder(); if(!o)return; const m=mixOf(o,true);
+  if(k==="orig")m.orig.mute=!m.orig.mute;
+  else if(k==="music"){if(!m.music){setStatus("На доріжці ♪ Music поки нічого немає.","");return;} m.music.mute=!m.music.mute;}
+  else m.sfxMute=!m.sfxMute;
+  drawLanes(); mixSoon(o,30);
+}
+(function wireLanes(){
+  const L=$("lanes"); if(!L)return;
+  L.querySelectorAll(".lmute").forEach(b=>b.onclick=()=>laneMute(b.dataset.lm));
+  if($("sfxAddBtn"))$("sfxAddBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
+  let drag=null;
+  L.addEventListener("mousedown",e=>{
+    const body=e.target.closest&&e.target.closest(".lbody[data-lane]"); if(!body)return;
+    const go=e.target.closest("[data-go]"); if(go){e.preventDefault();const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}return;}
+    const x=e.target.closest("[data-x]"); if(x){e.preventDefault();e.stopPropagation();laneDelete({kind:x.dataset.x,i:+x.dataset.i});return;}
+    const blk=e.target.closest(".lblk[data-blk]");
+    if(blk&&blk.dataset.blk==="sfx"){const i=+blk.dataset.i, m=mixHolder().mix;
+      drag={i,x0:e.clientX,at0:m.sfx[i].at,body,moved:false}; e.preventDefault(); return;}
+    if(blk&&blk.dataset.blk==="music"){laneSelect({kind:"music"});return;}
+    // empty lane: scrub the playhead (and select the lane)
+    if(videoLoaded){video.currentTime=laneT(e,body);}
+    if(body.dataset.lane==="orig")laneSelect({kind:"orig"});
+    const mv=ev=>{if(videoLoaded)video.currentTime=laneT(ev,body);}, up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};
+    window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
+  });
+  window.addEventListener("mousemove",e=>{if(!drag)return; const r=drag.body.getBoundingClientRect(), dur=video.duration||1;
+    const dt=(e.clientX-drag.x0)/r.width*dur; if(Math.abs(e.clientX-drag.x0)>3)drag.moved=true; if(!drag.moved)return;
+    const m=mixHolder().mix, x=m.sfx[drag.i]; x.at=Math.max(0,Math.min(dur-0.05,+(drag.at0+dt).toFixed(3)));
+    const el=drag.body.querySelector(".lblk[data-i='"+drag.i+"']"); if(el)el.style.left=(x.at/dur*100)+"%";});
+  window.addEventListener("mouseup",()=>{if(!drag)return; const d=drag; drag=null; const o=mixHolder();
+    if(d.moved){const m=o.mix, x=m.sfx[d.i]; m.sfx.sort((a,b)=>a.at-b.at); _laneSel={kind:"sfx",i:m.sfx.indexOf(x)}; drawLanes(); mixSoon(o,30);}
+    else laneSelect({kind:"sfx",i:d.i});});
+  L.addEventListener("dblclick",e=>{const body=e.target.closest&&e.target.closest(".lbody[data-lane='sfx']"); if(!body||e.target.closest(".lblk"))return;
+    laneSelect({kind:"add",at:laneT(e,body)});});
+  document.addEventListener("keydown",e=>{if(!_laneSel||_laneSel.kind!=="sfx")return; const ae=document.activeElement;
+    if(ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable))return;
+    if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();laneDelete(_laneSel);}});
+  // one sound at a time: the video and the previews never play over each other
+  const sa=$("sfxAudio"); if(sa)sa.addEventListener("play",()=>{if(!video.paused)video.pause();});
+  video.addEventListener("play",()=>{["sfxAudio","hmAudio"].forEach(id=>{const a=$(id);if(a&&!a.paused)a.pause();});});
+  window.addEventListener("resize",()=>{clearTimeout(wireLanes._r);wireLanes._r=setTimeout(drawLanes,150);});
 })();
 function updateWordHighlight(){
   if(txtView!=="words")return;
@@ -4134,7 +4282,7 @@ $("transcribeBtn").onclick=async()=>{
       if($("language"))$("language").value=d.language||"";
     }else{           // re-transcribe a clip already in the session (a pack hook / localized hook)
       const r=await fetch(API+"/api/transcribe_clip",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:_cc,engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value,
+        body:JSON.stringify({file_id:fileId,clip:mixBaseClip(_cc),engine:$("engine").value,model_size:$("modelSize").value,language:$("language").value,
                              script:((activeHook>=0&&editPack[activeHook]&&editPack[activeHook].jira&&editPack[activeHook].jira.script)||""),
                              trim:(variants.en&&variants.en.trim)||null})});
       d=await r.json();if(!r.ok)throw new Error(d.detail||"failed");
@@ -5249,7 +5397,8 @@ function buildStudioLayout(){
   const gcol=$("groupCol");if(gcol&&$("filmstrip"))gcol.appendChild($("filmstrip"));
   if(typeof renderHookStrip==="function")renderHookStrip();   // hide the empty Projects header from the start   // hook/project strip lives in its own vertical column
   const pc=$("previewCol");
-  [$("viewport"),$("transport"),$("trimRow")].forEach(el=>{if(el)pc.appendChild(el);});
+  [$("viewport"),$("transport")].forEach(el=>{if(el)pc.appendChild(el);});
+  if($("trimRow")&&$("editStage"))$("editStage").insertAdjacentElement("afterend",$("trimRow"));   // 🎚 full-width timeline dock
   // the original row is empty now (only whitespace text left, so :empty never matches); as a
   // 0-px flex child it still cost the stage a 12-px gap
   const _pr=document.querySelector(".preview-row");if(_pr&&!_pr.children.length)_pr.style.display="none";

@@ -209,51 +209,103 @@ def has_audio(path):
 
 def mix(clip_path, music_path, out_path, volume=0.35, duck=True, voice_path=None, offset=0.0,
         start_at=0.0, end_at=None, sfx_path=None, sfx_volume=0.8):
-    """Lay `music_path` under the hook. Base = isolated voice (voice_path) or the clip's own audio.
-    Music covers [start_at, end_at] of the clip (= the trim: what is cut off gets no music, and the
-    fade-out lands where the hook really ends), from `offset` s into the track, ducked under voice."""
+    """Lay `music_path` under the hook (kept for the old ♪ Apply path and the tests)."""
+    return mix_layers(clip_path, out_path, voice_path=voice_path,
+                      music={"path": music_path, "volume": volume, "duck": duck, "offset": offset,
+                             "start": start_at, "end": end_at, "sfx_path": sfx_path, "sfx_volume": sfx_volume})
+
+
+def mix_layers(clip_path, out_path, base_volume=1.0, voice_path=None, music=None, sfx=None):
+    """THE audio mix — one ffmpeg pass, rebuilt from scratch every time a lane changes, so nothing
+    is ever baked for good: the clip's own audio (or the isolated voice) × base_volume, + the music
+    over its zone (ducked under the voice, faded at the zone ends), + every SFX at its time.
+      music: {path, volume, duck, offset, start, end, sfx_path?, sfx_volume?} or None
+      sfx:   [{path, at, volume}]
+    Video copied, length kept."""
     dur = duration(clip_path)
     if dur <= 0:
         raise MusicError("Не вдалося прочитати довжину кліпу.")
-    s_at = max(0.0, min(dur, float(start_at or 0.0)))
-    e_at = dur if end_at is None else max(s_at + 0.5, min(dur, float(end_at)))
-    span = e_at - s_at
-    fo = max(0.0, span - FADE_OUT)
-    d_ms = int(round(s_at * 1000))
-    vol = max(0.0, min(1.5, float(volume)))
+    sfx = [it for it in (sfx or []) if it.get("path") and os.path.exists(it["path"]) and 0 <= float(it.get("at", 0)) < dur]
     cmd = ["ffmpeg", "-y", "-i", clip_path]
+    n_in = 1
     if voice_path:
         cmd += ["-i", voice_path]
-    elif not has_audio(clip_path):          # a silent hook: the music is the only sound
+        base = f"[{n_in}:a]"
+        n_in += 1
+    elif not has_audio(clip_path):          # a silent hook
         cmd += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=44100:cl=stereo"]
-    base = "[1:a]" if (voice_path or not has_audio(clip_path)) else "[0:a]"
-    mi = 2 if base == "[1:a]" else 1
-    cmd += ["-ss", f"{max(0.0, float(offset)):.3f}", "-i", music_path]
-    fc = [f"{base}aformat=sample_rates=44100:channel_layouts=stereo,apad,atrim=0:{dur:.3f}[v]",
-          f"[{mi}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:{span:.3f},asetpts=PTS-STARTPTS,"
-          f"volume={vol:.3f},afade=t=in:d={FADE_IN},afade=t=out:st={fo:.3f}:d={FADE_OUT},"
-          f"adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[m]"]
-    layers = "[mz]" if duck else "[m]"
-    if duck:
-        fc.append("[v]asplit=2[v1][v2]")
-        fc.append("[m][v2]sidechaincompress=threshold=0.04:ratio=6:attack=25:release=450[mz]")
-    n = 2
-    if sfx_path:
-        # SFX belong to the PICTURE: same window and clock as the music, never ducked (a door
-        # slam under a line is still a door slam), only a short fade at the trim edges
-        si = mi + 1
-        cmd += ["-i", sfx_path]
-        sv = max(0.0, min(2.0, float(sfx_volume)))
-        fc.append(f"[{si}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:{span:.3f},asetpts=PTS-STARTPTS,"
-                  f"volume={sv:.3f},afade=t=in:d=0.03,afade=t=out:st={max(0.0, span - 0.15):.3f}:d=0.15,"
-                  f"adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[fx]")
-        layers += "[fx]"
-        n = 3
-    fc.append(("[v1]" if duck else "[v]") + layers + f"amix=inputs={n}:duration=first:normalize=0[aout]")
+        base = f"[{n_in}:a]"
+        n_in += 1
+    else:
+        base = "[0:a]"
+    bv = max(0.0, min(2.0, float(base_volume)))
+    fc = [f"{base}aformat=sample_rates=44100:channel_layouts=stereo,volume={bv:.3f},apad,atrim=0:{dur:.3f}[v]"]
+    layers, voice_lbl = [], "[v]"
+    if music and music.get("path"):
+        s_at = max(0.0, min(dur, float(music.get("start") or 0.0)))
+        e = music.get("end")
+        e_at = dur if e is None else max(s_at + 0.5, min(dur, float(e)))
+        span = e_at - s_at
+        fo = max(0.0, span - FADE_OUT)
+        d_ms = int(round(s_at * 1000))
+        vol = max(0.0, min(1.5, float(music.get("volume", 0.35))))
+        cmd += ["-ss", f"{max(0.0, float(music.get('offset') or 0)):.3f}", "-i", music["path"]]
+        mi = n_in
+        n_in += 1
+        fc.append(f"[{mi}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:{span:.3f},asetpts=PTS-STARTPTS,"
+                  f"volume={vol:.3f},afade=t=in:d={FADE_IN},afade=t=out:st={fo:.3f}:d={FADE_OUT},"
+                  f"adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[m]")
+        if music.get("duck", True) and bv > 0:
+            fc.append("[v]asplit=2[v1][v2]")
+            fc.append("[m][v2]sidechaincompress=threshold=0.04:ratio=6:attack=25:release=450[mz]")
+            voice_lbl = "[v1]"
+            layers.append("[mz]")
+        else:
+            layers.append("[m]")
+        if music.get("sfx_path"):
+            # the SFX stem that came WITH a Video-to-Music take: same window, never ducked
+            cmd += ["-i", music["sfx_path"]]
+            si = n_in
+            n_in += 1
+            sv = max(0.0, min(2.0, float(music.get("sfx_volume", 0.8))))
+            fc.append(f"[{si}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:{span:.3f},asetpts=PTS-STARTPTS,"
+                      f"volume={sv:.3f},afade=t=in:d=0.03,afade=t=out:st={max(0.0, span - 0.15):.3f}:d=0.15,"
+                      f"adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[fx]")
+            layers.append("[fx]")
+    for k, it in enumerate(sfx):
+        cmd += ["-i", it["path"]]
+        d_ms = int(round(float(it["at"]) * 1000))
+        v = max(0.0, min(2.0, float(it.get("volume", 0.9))))
+        fc.append(f"[{n_in}:a]aformat=sample_rates=44100:channel_layouts=stereo,volume={v:.3f},"
+                  f"afade=t=in:d=0.01,adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[s{k}]")
+        n_in += 1
+        layers.append(f"[s{k}]")
+    if layers:
+        fc.append(voice_lbl + "".join(layers) + f"amix=inputs={len(layers) + 1}:duration=first:normalize=0[aout]")
+    else:
+        fc[-1] = fc[-1][:-3] + "[aout]"
     cmd += ["-filter_complex", "; ".join(fc), "-map", "0:v?", "-map", "[aout]", "-c:v", "copy",
             "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-t", f"{dur:.3f}", out_path]
     _run(cmd)
     return out_path
+
+
+def peaks(path, n=800):
+    """Waveform for the timeline lanes: n values 0..1 (max |sample| per bucket)."""
+    import array
+    p = subprocess.run(["ffmpeg", "-v", "quiet", "-i", path, "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
+                       capture_output=True)
+    a = array.array("h")
+    a.frombytes(p.stdout[: len(p.stdout) // 2 * 2])
+    if not a:
+        return [0.0] * n
+    step = max(1, len(a) // n)
+    out = []
+    for i in range(0, len(a), step):
+        chunk = a[i:i + step]
+        out.append(max(abs(min(chunk)), abs(max(chunk))) / 32768.0)
+    top = max(out) or 1.0
+    return [round(x / top, 3) for x in out[:n]]
 
 
 # ---------------------------------------------------------------- SFX only (the music stays)
@@ -284,32 +336,8 @@ def sound_effect(prompt, requests, duration=None, loop=False, influence=0.4, api
 
 
 def mix_sfx(clip_path, items, out_path):
-    """Lay effects ON TOP of the clip's current audio (voice + music stay as they are).
-    items: [{"path", "at" (s in the clip), "volume" 0..2}] — not ducked: an effect belongs to
-    the picture. Video copied, length kept."""
-    dur = duration(clip_path)
-    if dur <= 0:
-        raise MusicError("Не вдалося прочитати довжину кліпу.")
-    items = [it for it in items if it.get("path") and os.path.exists(it["path"]) and 0 <= float(it.get("at", 0)) < dur]
-    if not items:
+    """Lay effects ON TOP of the clip's current audio (voice + music stay as they are)."""
+    ok = [it for it in items if it.get("path") and os.path.exists(it["path"])]
+    if not ok:
         raise MusicError("Немає SFX, які можна покласти в межах кліпу.")
-    cmd = ["ffmpeg", "-y", "-i", clip_path]
-    fc, labels = [], []
-    base_in = 0
-    if not has_audio(clip_path):
-        cmd += ["-f", "lavfi", "-t", f"{dur:.3f}", "-i", "anullsrc=r=44100:cl=stereo"]
-        base_in = 1
-    fc.append(f"[{base_in}:a]aformat=sample_rates=44100:channel_layouts=stereo,apad,atrim=0:{dur:.3f}[b]")
-    first = base_in + 1
-    for k, it in enumerate(items):
-        cmd += ["-i", it["path"]]
-        d_ms = int(round(float(it["at"]) * 1000))
-        v = max(0.0, min(2.0, float(it.get("volume", 0.9))))
-        fc.append(f"[{first + k}:a]aformat=sample_rates=44100:channel_layouts=stereo,volume={v:.3f},"
-                  f"afade=t=in:d=0.01,adelay={d_ms}|{d_ms},apad,atrim=0:{dur:.3f}[s{k}]")
-        labels.append(f"[s{k}]")
-    fc.append("[b]" + "".join(labels) + f"amix=inputs={len(labels) + 1}:duration=first:normalize=0[aout]")
-    cmd += ["-filter_complex", "; ".join(fc), "-map", "0:v?", "-map", "[aout]", "-c:v", "copy",
-            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-t", f"{dur:.3f}", out_path]
-    _run(cmd)
-    return out_path
+    return mix_layers(clip_path, out_path, sfx=ok)

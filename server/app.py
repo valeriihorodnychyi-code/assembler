@@ -1070,63 +1070,6 @@ def hookmusic_generate(req: HookMusicGenReq):
     return {"items": items, "prompt": prompt, "seconds": round(secs, 1)}
 
 
-class HookMusicApplyReq(BaseModel):
-    file_id: str
-    clip: str
-    track: str
-    volume: float = 0.35
-    duck: bool = True
-    strip_original: bool = True   # remove the old per-shot music (voice isolation)
-    offset: float = 0.0
-    trim: Optional[List[float]] = None   # music only over the kept part; fade-out at the trim out
-    sfx: str = ""                        # the SFX track that came with this music (optional)
-    sfx_volume: float = 0.8
-
-
-@app.post("/api/hookmusic/apply")
-def hookmusic_apply(req: HookMusicApplyReq):
-    """Lay the track under ONE hook → a NEW file "<name>_musN" (original kept for ↩)."""
-    import re as _re, requests as _rq, time as _t
-    sdir = _session_dir(req.file_id)
-    name = os.path.basename(req.clip)
-    src = os.path.join(sdir, name)
-    trk = os.path.join(sdir, os.path.basename(req.track))
-    if not os.path.exists(src):
-        raise HTTPException(404, f"Clip «{name}» not found in the session")
-    if not os.path.exists(trk):
-        raise HTTPException(404, "Track not found — generate it first")
-    stem, ext = os.path.splitext(name)
-    base_stem = _re.sub(r"_mus\d+$", "", stem)
-    # re-applying music to a hook that already HAS our music must start from the clean source,
-    # or the beds stack up — the client sends the pre-music clip, this is just a safety net
-    k = 1
-    while os.path.exists(os.path.join(sdir, f"{base_stem}_mus{k}{ext}")):
-        k += 1
-    out_name = f"{base_stem}_mus{k}{ext}"
-    t0 = _t.time()
-    voice = None
-    try:
-        tr = req.trim if (req.trim and len(req.trim) == 2) else None
-        if req.strip_original and music11.has_audio(src):
-            tag = f"_{tr[0]:.2f}_{tr[1]:.2f}" if tr else ""
-            voice = os.path.join(sdir, f"_voice_{stem}{tag}.wav")   # cached: isolation is paid once per clip + trim
-            if not os.path.exists(voice):
-                music11.isolate_voice(src, voice, _rq, start=(float(tr[0]) if tr else 0.0),
-                                      end=(float(tr[1]) if tr else None))
-        music11.mix(src, trk, os.path.join(sdir, out_name), volume=req.volume, duck=req.duck,
-                    voice_path=voice, offset=req.offset,
-                    start_at=(float(tr[0]) if tr else 0.0), end_at=(float(tr[1]) if tr else None),
-                    sfx_path=(os.path.join(sdir, os.path.basename(req.sfx))
-                              if req.sfx and os.path.exists(os.path.join(sdir, os.path.basename(req.sfx))) else None),
-                    sfx_volume=req.sfx_volume)
-    except music11.MusicError as e:
-        raise HTTPException(400, str(e))
-    secs = _t.time() - t0
-    _log_timing("hookmusic_apply", secs, name)
-    return {"clip": out_name, "url": f"/clip/{req.file_id}/{out_name}", "stripped": bool(voice),
-            "seconds": round(secs, 1)}
-
-
 # ---------- 📁 projects: the pack survives a closed tab / a restart ----------
 class ProjectSaveReq(BaseModel):
     file_id: str
@@ -1227,77 +1170,74 @@ def sfx_generate(req: SfxGenReq):
     return {"name": name, "url": f"/clip/{req.file_id}/{name}", "length": round(music11.duration(os.path.join(sdir, name)), 2)}
 
 
-class SfxAutoReq(BaseModel):
+class AudioMixReq(BaseModel):
     file_id: str
-    clip: str
-    zone: Optional[List[float]] = None
-    prompt: str = ""
+    base: str                              # the clip BEFORE any audio layer (voice + picture)
+    zone: Optional[List[float]] = None     # where the music goes (trim In … body)
+    base_volume: float = 1.0
+    music: Optional[dict] = None           # {name, volume, duck, strip, offset, sfx, sfx_volume}
+    sfx: List[dict] = []                   # [{name, at, volume}]
 
 
-@app.post("/api/sfx/auto")
-def sfx_auto(req: SfxAutoReq):
-    """SFX scored to the picture, WITHOUT new music: Video-to-Music with separate tracks, and only
-    the SFX stem is kept."""
-    import requests as _rq
+@app.post("/api/audio/mix")
+def audio_mix(req: AudioMixReq):
+    """Audio lanes → the playback clip. Rebuilt from base + layers on every lane change (mute,
+    volume, move, delete), so the timeline is the truth and nothing is baked until Export.
+    Same inputs → same file name → instant."""
+    import hashlib, json as _json, requests as _rq, time as _t
     sdir = _session_dir(req.file_id)
-    name = os.path.basename(req.clip)
+    name = os.path.basename(req.base)
     src = os.path.join(sdir, name)
     if not os.path.exists(src):
-        raise HTTPException(404, "Clip not found in the session")
-    dur = music11.duration(src)
-    z = req.zone if (req.zone and len(req.zone) == 2) else [0.0, dur]
-    s, e = max(0.0, float(z[0])), min(dur, float(z[1]))
-    seg = os.path.join(sdir, f"_sfx_{os.path.splitext(name)[0]}.mp4")
-    try:
-        music11.video_segment(src, seg, s, e)
-        _music, fx = music11.video_to_music(seg, (req.prompt or "Realistic sound effects for the actions on screen.")
-                                            + " Focus on sound effects.", ["sfx", "foley", "realistic"], _rq, sfx=True)
-    except music11.MusicError as ex:
-        raise HTTPException(400, str(ex))
-    finally:
-        try:
-            os.remove(seg)
-        except OSError:
-            pass
-    if not fx:
-        raise HTTPException(400, "ElevenLabs не повернув окрему SFX-доріжку для цього відео.")
-    k = 1
-    while os.path.exists(os.path.join(sdir, f"sfx_auto_{k}.mp3")):
-        k += 1
-    out = f"sfx_auto_{k}.mp3"
-    with open(os.path.join(sdir, out), "wb") as f:
-        f.write(fx)
-    return {"name": out, "url": f"/clip/{req.file_id}/{out}", "at": round(s, 3),
-            "length": round(music11.duration(os.path.join(sdir, out)), 2)}
-
-
-class SfxApplyReq(BaseModel):
-    file_id: str
-    clip: str
-    items: List[dict] = []     # [{name, at, volume}]
-
-
-@app.post("/api/sfx/apply")
-def sfx_apply(req: SfxApplyReq):
-    import re as _re
-    sdir = _session_dir(req.file_id)
-    name = os.path.basename(req.clip)
-    src = os.path.join(sdir, name)
-    if not os.path.exists(src):
-        raise HTTPException(404, "Clip not found in the session")
-    items = [{"path": os.path.join(sdir, os.path.basename(it.get("name", ""))), "at": float(it.get("at", 0)),
-              "volume": float(it.get("volume", 0.9))} for it in req.items]
+        raise HTTPException(404, f"Clip «{name}» not found in the session")
+    J = lambda n: os.path.join(sdir, os.path.basename(n or ""))
+    m = req.music if (req.music and req.music.get("name") and os.path.exists(J(req.music["name"]))) else None
+    fx = [{"path": J(it.get("name")), "at": float(it.get("at", 0)), "volume": float(it.get("volume", 0.9))}
+          for it in (req.sfx or []) if it.get("name") and os.path.exists(J(it.get("name")))]
+    zone = req.zone if (req.zone and len(req.zone) == 2) else None
+    key = _json.dumps([name, zone, round(req.base_volume, 3), m, [[os.path.basename(f["path"]), round(f["at"], 3), round(f["volume"], 3)] for f in fx]],
+                      sort_keys=True, default=str)
     stem, ext = os.path.splitext(name)
-    base = _re.sub(r"_fx\d+$", "", stem)
-    k = 1
-    while os.path.exists(os.path.join(sdir, f"{base}_fx{k}{ext}")):
-        k += 1
-    out = f"{base}_fx{k}{ext}"
+    out = f"{stem}_mix_{hashlib.sha1(key.encode()).hexdigest()[:10]}{ext}"
+    if os.path.exists(os.path.join(sdir, out)):
+        return {"clip": out, "url": f"/clip/{req.file_id}/{out}", "cached": True}
+    t0 = _t.time()
     try:
-        music11.mix_sfx(src, items, os.path.join(sdir, out))
+        voice = None
+        if m and m.get("strip") and music11.has_audio(src):
+            tag = f"_{zone[0]:.2f}_{zone[1]:.2f}" if zone else ""
+            voice = os.path.join(sdir, f"_voice_{stem}{tag}.wav")   # isolation is paid once per clip + zone
+            if not os.path.exists(voice):
+                music11.isolate_voice(src, voice, _rq, start=(float(zone[0]) if zone else 0.0),
+                                      end=(float(zone[1]) if zone else None))
+        music = None
+        if m:
+            music = {"path": J(m["name"]), "volume": float(m.get("volume", 0.35)), "duck": bool(m.get("duck", True)),
+                     "offset": float(m.get("offset", 0) or 0),
+                     "start": float(zone[0]) if zone else 0.0, "end": float(zone[1]) if zone else None,
+                     "sfx_path": J(m["sfx"]) if m.get("sfx") and os.path.exists(J(m["sfx"])) else None,
+                     "sfx_volume": float(m.get("sfx_volume", 0.8))}
+        music11.mix_layers(src, os.path.join(sdir, out), base_volume=req.base_volume, voice_path=voice,
+                           music=music, sfx=fx)
     except music11.MusicError as e:
         raise HTTPException(400, str(e))
-    return {"clip": out, "url": f"/clip/{req.file_id}/{out}"}
+    _log_timing("audio_mix", _t.time() - t0, name)
+    return {"clip": out, "url": f"/clip/{req.file_id}/{out}", "seconds": round(_t.time() - t0, 1)}
+
+
+_PEAKS = {}
+
+
+@app.get("/api/waveform")
+def waveform(file_id: str, clip: str, n: int = 800):
+    sdir = _session_dir(file_id)
+    p = os.path.join(sdir, os.path.basename(clip))
+    if not os.path.exists(p):
+        raise HTTPException(404, "not found")
+    k = (p, os.path.getmtime(p), n)
+    if k not in _PEAKS:
+        _PEAKS[k] = music11.peaks(p, max(50, min(4000, n)))
+    return {"peaks": _PEAKS[k]}
 
 
 # ---------- ⇄ setup export / import: move Assembler to a new Mac with one file ----------

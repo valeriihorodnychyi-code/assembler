@@ -1,5 +1,5 @@
 {
-  "version": "1.9.98",
+  "version": "1.9.99",
   "channel": "main",
-  "notes": "🔊 SFX only — the music stays: add sound effects to a hook that already has its music, without regenerating it. Type a sound and drop it at the playhead (ElevenLabs Sound Effects v2), or ✨ Auto SFX from picture (only the SFX stem of Video-to-Music is kept). Preview, volume, remove; Apply lays them on top of the current audio; ↩ Undo sfx in History. Needs the Sound Effects permission on the ElevenLabs key."
+  "notes": "🎚 Timeline with audio lanes: a full-width timeline under the editor — Picture · Clip audio (waveform) · ♪ Music · 🔊 SFX. Every lane has 🔇; click a block for volume / duck / remove old music / ✕. Music and SFX are layers, never baked: every change re-mixes from the clean clip, so a sound can always be muted, moved or deleted. Generated music lands on the Music lane at once (no Apply); pick another take in Hook music. SFX: double-click the SFX lane (or ＋) → describe one sound → Generate; drag to move, Delete to remove, ↻ Another version. Auto SFX from picture and the Add SFX switch are gone. Cut and re-voice work on the clean clip, SFX move with a cut."
 }

@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-05** — Timeline with audio lanes (Picture · Clip audio · Music · SFX); music and SFX as non-baked layers with mute / volume / move / delete; Auto SFX removed (1.9.99)
 - **2026-11-05** — SFX only: add sound effects on top of existing music (text at playhead or auto from picture), undo in History (1.9.98)
 - **2026-11-05** — UI: folded Smart-captions lists, video never scrolls away, draggable playhead knob (1.9.97)
 - **2026-11-05** — Fix: scene cuts of an opened project shown on the timeline again (1.9.96)
