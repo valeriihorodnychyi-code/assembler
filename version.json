@@ -1,5 +1,5 @@
 {
-  "version": "1.9.96",
+  "version": "1.9.97",
   "channel": "main",
-  "notes": "FIX: scene cuts in an opened project (or after switching hooks) were in the data but had no yellow marks on the timeline — the marks were drawn before the video knew its length. Now drawn once it does."
+  "notes": "UI: Keep together, Text swaps and the Scene cuts list in Smart captions are folded (with a count) — they no longer push the panel down. The video never scrolls away: its size now follows the real height of the controls under it. Playhead: the white knob is a real grab handle (bigger hit area), and clicking / dragging anywhere on the bar — on a cut mark too — moves the playhead."
 }

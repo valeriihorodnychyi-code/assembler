@@ -47,12 +47,12 @@
   .viewport{position:relative;border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);background:#000;max-width:100%}
   /* a loaded clip also shows the trim bar under it, so it budgets for header + transport + trim
      + status (≈ 300 px); the empty drop zone has no trim bar and keeps the 248 px budget below */
-  .viewport video{display:block;max-height:min(72vh,calc(100vh - 300px));max-width:100%}
+  .viewport video{display:block;max-height:min(72vh,calc(100vh - var(--ctlh,300px)));max-width:100%}   /* --ctlh = real height of everything under the video (set by fitVideo) → the column never overflows, the video never scrolls away */
   .viewport video[hidden]{display:none}   /* author display:block beats the hidden attribute — the "hidden" video sat as a 300×150 black box under the drop zone */
   /* 9:16 / 1:1: the preview's HEIGHT follows its width (canvas aspect-ratio), so cap the width by
      what the window can show under it (header + transport + status ≈ 248 px) — the centre
      column then fits a 13" screen at 100 % without scrolling */
-  .editstage:not(.wide) .viewport{max-width:min(100%,calc((100vh - 256px) * 0.5625))}  /* bounded to its grid column — can never overlap the side panels */
+  .editstage:not(.wide) .viewport{max-width:min(100%,calc((100vh - var(--ctlh,256px)) * 0.5625))}  /* bounded to its grid column — can never overlap the side panels */
   .viewport canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   /* #3 — drag the caption up/down right on the preview (vertical only → Bottom margin) */
   #capDrag{position:absolute;left:0;width:100%;display:none;cursor:ns-resize;z-index:5;touch-action:none}
@@ -88,8 +88,11 @@
   .thandle.tin i{border-right:0;border-radius:4px 0 0 4px;margin-left:8px}
   .thandle.tout i{border-left:0;border-radius:0 4px 4px 0;margin-right:8px}
   .thandle:hover i,.thandle.armed i{border-color:var(--accent2);background:rgba(124,92,255,.18)}
-  #trimPlayhead{position:absolute;top:-6px;bottom:-6px;left:0;width:2px;margin-left:-1px;background:#fff;pointer-events:none;z-index:4;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
-  #trimPlayhead b{position:absolute;top:-4px;left:-5px;width:12px;height:8px;background:#fff;border-radius:2px 2px 6px 6px}
+  #trimPlayhead{position:absolute;top:-6px;bottom:-6px;left:0;width:2px;margin-left:-1px;background:#fff;pointer-events:none;z-index:6;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+  /* the knob is a real GRAB handle now (it was decoration): drag it, or click / drag anywhere on the bar — cut marks included */
+  #trimPlayhead b{position:absolute;top:-9px;left:-8px;width:18px;height:12px;background:#fff;border-radius:3px 3px 8px 8px;pointer-events:auto;cursor:grab;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+  #trimPlayhead b:active{cursor:grabbing}
+  #trimPlayhead b::after{content:"";position:absolute;left:-6px;right:-6px;top:-6px;bottom:-4px}   /* bigger invisible hit area */
   .trimInfo{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 6px;font-size:11.5px;color:var(--muted)}
   .trimInfo .tmid{order:3;width:100%;justify-content:center}   /* own line: in a pack (narrow centre + "All clips") it overlapped the In/Out buttons */
   .trimInfo .tgrp{display:flex;align-items:center;gap:5px;min-width:0}
@@ -108,6 +111,14 @@
   .cutRow #cutLbl{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}   /* flex-basis 0: the label never widens the centre column (it is auto-sized) */
   .tmini.tcut:not(:disabled){background:#ff5a44;border-color:#ff5a44;color:#fff;font-weight:600}
   .tmini:disabled{opacity:.45;cursor:default}
+  details.subfold{margin:8px 0 2px;border:1px solid var(--line);border-radius:8px;padding:0 8px}
+  details.subfold>summary{cursor:pointer;list-style:none;padding:7px 0;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+  details.subfold>summary::-webkit-details-marker{display:none}
+  details.subfold>summary::before{content:"›";display:inline-block;transition:transform .15s;color:var(--muted)}
+  details.subfold[open]>summary::before{transform:rotate(90deg)}
+  details.subfold[open]>summary{color:var(--txt)}
+  details.subfold .sfn{margin-left:auto;font-size:10.5px;padding:1px 7px;border-radius:9px;background:#2a2d36;color:var(--muted)}
+  details.subfold[open]{padding-bottom:8px}
   #trimBar .cutTick{position:absolute;top:0;bottom:0;width:9px;margin-left:-4.5px;z-index:3;cursor:pointer}
   #trimBar .cutTick::after{content:"";position:absolute;left:3.5px;top:3px;bottom:3px;width:2px;border-radius:1px;background:#ffd400;opacity:.85}
   #trimBar .cutTick:hover::after{background:#fff;opacity:1}
@@ -668,12 +679,15 @@
     <details class="grp" id="grpSmart" style="border-color:#34c759">
       <summary style="color:#34c759"><span>Smart captions</span> <span class="chev">›</span></summary>
       <div class="body">
-        <div class="row" style="align-items:center"><label title="Фрази, які НІКОЛИ не розриваються між рядками/титрами. Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together</label></div>
+        <!-- long lists, rarely edited → folded by default (they used to push the whole panel down) -->
+        <details class="subfold"><summary title="Фрази, які НІКОЛИ не розриваються між рядками/титрами. Числа+одиниці, валюта й дати тримаються разом автоматично.">Keep together <span class="sfn" id="ktCount"></span></summary>
         <div id="ktChips" class="kt-chips"></div>
         <div class="hint">Ці фрази ніколи не розриваються. Тисни «＋ add», введи й Enter. Зберігається автоматично й переживає апдейти.</div>
-        <div class="row" style="align-items:center;margin-top:11px"><label title="Автозаміни в транскрипті: числа словами вже стають цифрами, а тут можна додати свої (percent → %, dollars → $, workouts → wo). Застосовується і до Whisper, і до Scribe.">Text swaps</label></div>
+        </details>
+        <details class="subfold"><summary title="Автозаміни в транскрипті: числа словами вже стають цифрами, а тут можна додати свої (percent → %, dollars → $, workouts → wo). Застосовується і до Whisper, і до Scribe.">Text swaps <span class="sfn" id="trCount"></span></summary>
         <div id="trChips" class="kt-chips"></div>
         <div class="hint">Застосовується одразу після транскрайбу (обидва рушії). Числа словами → цифри вже вбудовано.</div>
+        </details>
         <div class="row" style="margin-top:10px"><label title="ON: останній титр тримається до кінця кліпа (коли хук закінчується кадром, де текст має лишитись). OFF (типово): короткий хвіст — титр не наїжджає на пекшот чи наступну сцену. Зберігається в пресеті.">Hold last caption to end</label><label class="switch"><input type="checkbox" id="holdLast"><span class="slider"></span></label></div>
         <div class="row" style="margin-top:10px"><label data-i18n="lblCaptions" title="Показувати титри лише в цьому проміжку часу (порожнє = весь кліп)">Captions in / out</label>
           <div style="display:flex;gap:6px;flex:1.3">
@@ -697,7 +711,9 @@
             <input type="range" id="cutSens" min="0.1" max="0.6" step="0.05" value="0.3" style="flex:1" oninput="if($('cutSensV'))$('cutSensV').textContent=(+this.value).toFixed(2)">
             <span id="cutSensV" class="val" style="min-width:30px;text-align:right">0.30</span>
           </div></div>
+        <details class="subfold"><summary>Scene cuts list <span class="sfn" id="ccCount"></span></summary>
         <div id="cutChips" class="cut-chips"></div>
+        </details>
       </div>
     </details>
 
@@ -1296,6 +1312,7 @@ async function ktSave(){
 function renderKtChips(){
   const box=$("ktChips"); if(!box)return; box.innerHTML="";
   const list=(CAPTION_RULES&&CAPTION_RULES.keep_together)||[];
+  if($("ktCount"))$("ktCount").textContent=list.length;
   list.forEach((ph,i)=>{
     const c=document.createElement("span");c.className="kt-chip";c.textContent=ph;
     const x=document.createElement("button");x.type="button";x.title="Remove";x.textContent="✕";
@@ -1317,6 +1334,7 @@ function trMap(){
 function renderTrChips(){
   const box=$("trChips"); if(!box)return; box.innerHTML="";
   const m=trMap();
+  if($("trCount"))$("trCount").textContent=Object.keys(m).length;
   Object.keys(m).forEach(k=>{
     const c=document.createElement("span");c.className="kt-chip";c.textContent=k+" → "+m[k];
     const x=document.createElement("button");x.type="button";x.title="Remove";x.textContent="✕";
@@ -3942,6 +3960,19 @@ if($("setupFile"))$("setupFile").onchange=async e=>{const f=e.target.files[0]; i
     setStatus("⬆ Відновлено: "+(d.restored.join(", ")||"нічого")+(d.restart?". Перезапусти Assembler, щоб ключі підхопились.":"."),"ok");
     if(typeof loadSettings==="function")loadSettings();}catch(err){setStatus("Import setup: "+err.message,"err");}
   e.target.value="";};
+// Keep the video ON SCREEN: the controls under it (transport, timeline, Cuts/Body, Apply to, Cut,
+// History, status) grew over time and pushed the preview column past the window — the whole
+// centre scrolled and the video slid away. Measure them and give the video exactly what's left.
+function fitVideo(){
+  const col=$("previewCol"), vp=$("viewport"); if(!col||!vp)return;
+  let ctl=0;
+  ["transport","trimRow","status","varTabs"].forEach(id=>{const e=$(id); if(e&&e.offsetParent!==null){const r=e.getBoundingClientRect(); ctl+=r.height+12;}});
+  const strip=$("filmstrip"), extra=58+36+30+(document.querySelector(".tut-wrap")?0:0);   // header + stage padding + breathing room
+  const v=Math.round(ctl+extra);
+  if(Math.abs((fitVideo._v||0)-v)>2){fitVideo._v=v;document.documentElement.style.setProperty("--ctlh",v+"px");}
+}
+if(window.ResizeObserver){const ro=new ResizeObserver(()=>fitVideo());["transport","trimRow","status"].forEach(id=>{if($(id))ro.observe($(id));});}
+window.addEventListener("resize",fitVideo);
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
@@ -4925,6 +4956,7 @@ function _fmtCut(s){const m=Math.floor(s/60),r=s-m*60;return m>0?(m+":"+(r<10?"0
 function renderCutChips(){
   const box=$("cutChips"); if(!box)return; box.innerHTML="";
   const v=variants[activeVar]; const cuts=(v&&v.cuts)?v.cuts.slice().sort((a,b)=>a-b):[];
+  if($("ccCount"))$("ccCount").textContent=cuts.length;
   cuts.forEach(function(c){
     const chip=document.createElement("span");chip.className="cut-chip";
     const t=document.createElement("span");t.textContent="🎬 "+_fmtCut(c);chip.appendChild(t);
