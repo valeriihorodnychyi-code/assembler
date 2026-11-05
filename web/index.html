@@ -2133,6 +2133,9 @@ function syncTrim(){
   if(typeof renderScope==="function")renderScope();
   if(typeof loadClipFps==="function")loadClipFps();   // real fps for the frame grid (probed once per clip)
   drawTrimBar();
+  // cut ticks need the clip duration: drawn here, once the video knows it — an opened project
+  // (or a switched hook) had its cuts in the data but no yellow marks on the bar
+  if(typeof updateCutsLabel==="function")updateCutsLabel();
 }
 // the clip currently open in the editor (a pack hook or a single hook opened with ✎)
 function openHookRef(){

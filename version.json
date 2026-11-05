@@ -1,5 +1,5 @@
 {
-  "version": "1.9.95",
+  "version": "1.9.96",
   "channel": "main",
-  "notes": "Apply to: This clip · Project (EN + its localizations) · Pack — trim and ✂ Cut segment go to every clip of the scope (Re-voice and Cut sentence stay per clip). FIX (regression in 1.9.93): Cut segment, Transcribe with a trim and auto-detect failed with 'ensureSessionClip is not defined'. New test tests/test_ui_refs.js catches any called-but-undefined UI function."
+  "notes": "FIX: scene cuts in an opened project (or after switching hooks) were in the data but had no yellow marks on the timeline — the marks were drawn before the video knew its length. Now drawn once it does."
 }
