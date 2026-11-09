@@ -57,6 +57,35 @@ def get_video_duration(path: str) -> float:
     return float(subprocess.check_output(cmd).decode("utf-8").strip())
 
 
+def video_stream_duration(path: str) -> float:
+    """Length of the PICTURE (not the container): generators often ship audio a few frames
+    longer than the video, and the container duration is the longer of the two — building on
+    it is what left a black / frozen frame at the end of exports."""
+    try:
+        out = subprocess.check_output([FFPROBE, "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                       "stream=duration,nb_frames,r_frame_rate", "-of", "json", path]).decode()
+        import json as _j
+        st = (_j.loads(out).get("streams") or [{}])[0]
+        d = float(st.get("duration") or 0)
+        if d > 0:
+            return d
+        num, den = (st.get("r_frame_rate", "30/1").split("/") + ["1"])[:2]
+        n = int(st.get("nb_frames") or 0)
+        if n and float(num) > 0:
+            return n * float(den or 1) / float(num)
+    except Exception:
+        pass
+    return get_video_duration(path)
+
+
+FPS_OUT = 30
+
+
+def frames_out(seconds: float) -> int:
+    """Whole frames at the output rate — every render is N frames long, the audio N/30 s."""
+    return max(1, int(round(float(seconds) * FPS_OUT)))
+
+
 def has_audio_stream(path: str) -> bool:
     cmd = [FFPROBE, "-v", "error", "-select_streams", "a",
            "-show_entries", "stream=index", "-of", "csv=p=0", path]

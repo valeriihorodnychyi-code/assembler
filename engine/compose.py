@@ -69,7 +69,7 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
 
     input_w, input_h = ff.get_video_size(video_path)
     is_wide = input_w > input_h
-    duration = ff.get_video_duration(video_path)
+    duration = ff.video_stream_duration(video_path)   # the PICTURE, not a longer audio tail
     src_ss = 0.0
     if src_trim:
         src_ss = max(0.0, float(src_trim[0]))
@@ -281,7 +281,13 @@ def render_format(video_path, tagged_events, fmt, output_path, work_dir,
     has_body = bool(body_path and os.path.exists(body_path))
     hook_bitrate = bitrates["temp_hook"] if has_body else bitrates["final_export"]
 
-    cmd += ["-filter_complex", fc.strip().strip(";"), "-map", last_v, "-map", "0:a?"]
+    # frame-exact: N whole frames at 30 fps (the last one cloned if the source is a hair short)
+    # and the audio padded / cut to exactly N/30 — no extra black or frozen frame at the end
+    _N = ff.frames_out(render_duration)
+    fc = fc.strip().strip(";") + f"; {last_v}tpad=stop_mode=clone:stop_duration=0.2[vexact]"
+    cmd += ["-filter_complex", fc, "-map", "[vexact]", "-map", "0:a?", "-frames:v", str(_N)]
+    if ff.has_audio_stream(video_path):
+        cmd += ["-af", f"apad,atrim=0:{_N / ff.FPS_OUT:.6f}"]
     cmd += ff.encoder_quality_args(hook_bitrate)
     # Force the AUDIO to the concat target too (44.1k stereo AAC). Video was already conformant,
     # but audio kept the source's rate/channels — so a 48 kHz or mono hook came out of the bake
@@ -309,6 +315,10 @@ def _concat_body(hook, body, fmt, output_path, work_dir, bitrates):
     TARGET_W, TARGET_H = ff.DIMS[fmt]
     body_w, body_h = ff.get_video_size(body)
     inputs = ["-i", hook, "-i", body]
+    Nh, Nb = ff.frames_out(ff.video_stream_duration(hook)), ff.frames_out(ff.video_stream_duration(body))
+    ex = lambda N: f",tpad=stop_mode=clone:stop_duration=0.2,trim=end_frame={N},setpts=PTS-STARTPTS"
+    ax = lambda i, N: (f"[{i}:a]aformat=sample_rates=44100:channel_layouts=stereo,apad,atrim=0:{N / ff.FPS_OUT:.6f},"
+                       f"asetpts=PTS-STARTPTS[a{i}]; ")
     temp_shadow = os.path.join(work_dir, "temp_shadow_body.png")
 
     if fmt in ("16:9", "1:1") and not (body_w >= body_h):
@@ -316,17 +326,19 @@ def _concat_body(hook, body, fmt, output_path, work_dir, bitrates):
         x_off = int((TARGET_W - vid_w) / 2)
         generate_shadow_asset(vid_w, TARGET_H, TARGET_W, TARGET_H, temp_shadow)
         inputs += ["-i", temp_shadow]
-        fc = (f"[0:v]setsar=1,fps=30[v0]; "
+        fc = (f"[0:v]setsar=1,fps=30{ex(Nh)}[v0]; "
               f"[1:v]scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=increase,"
               f"crop={TARGET_W}:{TARGET_H},boxblur=40,colorchannelmixer=rr=0.4:gg=0.4:bb=0.4[bbg]; "
               f"[2:v]scale={TARGET_W}:{TARGET_H}[bsh]; [bbg][bsh]overlay=x=0:y=0[bbs]; "
-              f"[1:v]scale={vid_w}:{TARGET_H}[bfg]; [bbs][bfg]overlay={x_off}:0,setsar=1,fps=30[v1]; "
-              f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]")  # keep source loudness — no loudnorm (it boosted audio the user had already cleaned/quieted)
+              f"[1:v]scale={vid_w}:{TARGET_H}[bfg]; [bbs][bfg]overlay={x_off}:0,setsar=1,fps=30{ex(Nb)}[v1]; "
+              + ax(0, Nh) + ax(1, Nb) +
+              f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]")  # keep source loudness — no loudnorm (it boosted audio the user had already cleaned/quieted)
     else:
-        fc = (f"[0:v]setsar=1,fps=30[v0]; "
+        fc = (f"[0:v]setsar=1,fps=30{ex(Nh)}[v0]; "
               f"[1:v]scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=increase,"
-              f"crop={TARGET_W}:{TARGET_H},setsar=1,fps=30[v1]; "
-              f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]")  # keep source loudness — no loudnorm (it boosted audio the user had already cleaned/quieted)
+              f"crop={TARGET_W}:{TARGET_H},setsar=1,fps=30{ex(Nb)}[v1]; "
+              + ax(0, Nh) + ax(1, Nb) +
+              f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]")  # keep source loudness — no loudnorm (it boosted audio the user had already cleaned/quieted)
 
     cmd = ["ffmpeg", *inputs, "-filter_complex", fc, "-map", "[outv]", "-map", "[outa]"]
     cmd += ff.encoder_quality_args(bitrates["final_export"])
@@ -461,23 +473,28 @@ def normalize_clip(path, fmt, bitrates=None):
         stt = os.stat(path)
     except OSError:
         return path
-    sig = f"{os.path.abspath(path)}|{stt.st_size}|{int(stt.st_mtime)}|{fmt}|{bitrates.get('final_export')}|{ff.video_encoder()}|v1"
+    sig = f"{os.path.abspath(path)}|{stt.st_size}|{int(stt.st_mtime)}|{fmt}|{bitrates.get('final_export')}|{ff.video_encoder()}|v2-exact"
     key = hashlib.sha1(sig.encode()).hexdigest()[:16]
     out = os.path.join(_cache_dir(), f"norm_{key}.mp4")
     if os.path.exists(out) and os.path.getsize(out) > 1000:
         OP_TIMES["cache_hits"] += 1        # served from cache → this clip cost nothing this run
         return out
     TW, TH = ff.DIMS[fmt]
-    dur = ff.get_video_duration(path) or 0
+    dur = ff.video_stream_duration(path) or 0
+    N = ff.frames_out(dur)
+    T = N / ff.FPS_OUT
     has_a = ff.has_audio_stream(path)
     inputs = ["-i", path]
     if not has_a:
-        inputs += ["-f", "lavfi", "-t", f"{max(dur, 0.1)}", "-i", "anullsrc=r=44100:cl=stereo"]
+        inputs += ["-f", "lavfi", "-t", f"{T:.6f}", "-i", "anullsrc=r=44100:cl=stereo"]
     tmp = out + ".part.mp4"
+    # exactly N frames and N/30 s of audio: a 24-fps clip whose audio ran 0.1 s longer used to
+    # leave a 0.1 s hole between joined clips and a black / frozen tail at the end
     cmd = ([ff.FFMPEG, *inputs, "-filter_complex",
             f"[0:v]scale={TW}:{TH}:force_original_aspect_ratio=increase,"
-            f"crop={TW}:{TH},setsar=1,fps=30[v]",
-            "-map", "[v]", "-map", ("0:a" if has_a else "1:a"),
+            f"crop={TW}:{TH},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=0.2[v]; "
+            f"[{0 if has_a else 1}:a]aformat=sample_rates=44100:channel_layouts=stereo,apad,atrim=0:{T:.6f}[a]",
+            "-map", "[v]", "-map", "[a]", "-frames:v", str(N),
             "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-pix_fmt", "yuv420p"]
            + ff.encoder_quality_args(bitrates["final_export"]) + [tmp, "-y"])
     import time as _t
@@ -544,15 +561,18 @@ def assemble_segments(clips, fmt, output_path, bitrates=None, fast=True):
         inputs += ["-i", c]
     sidx = len(clips)  # silent anullsrc inputs are appended after the clip inputs
     for i, c in enumerate(clips):
+        N = ff.frames_out(ff.video_stream_duration(c))
+        T = N / ff.FPS_OUT
         vfilters.append(
             f"[{i}:v]scale={TW}:{TH}:force_original_aspect_ratio=increase,"
-            f"crop={TW}:{TH},setsar=1,fps=30[v{i}]"
+            f"crop={TW}:{TH},setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=0.2,"
+            f"trim=end_frame={N},setpts=PTS-STARTPTS[v{i}]"
         )
         if ff.has_audio_stream(c):
-            concat_inputs.append(f"[v{i}][{i}:a]")
+            vfilters.append(f"[{i}:a]aformat=sample_rates=44100:channel_layouts=stereo,apad,atrim=0:{T:.6f},asetpts=PTS-STARTPTS[a{i}]")
+            concat_inputs.append(f"[v{i}][a{i}]")
         else:
-            dur = ff.get_video_duration(c)
-            silent_inputs += ["-f", "lavfi", "-t", f"{dur}", "-i", "anullsrc=r=44100:cl=stereo"]
+            silent_inputs += ["-f", "lavfi", "-t", f"{T:.6f}", "-i", "anullsrc=r=44100:cl=stereo"]
             concat_inputs.append(f"[v{i}][{sidx}:a]")
             sidx += 1
 

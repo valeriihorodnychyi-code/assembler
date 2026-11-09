@@ -1,5 +1,5 @@
 {
-  "version": "1.9.104",
+  "version": "1.9.105",
   "channel": "main",
-  "notes": "🎚 Timeline regrouped like an editor. TOP bar = time: ⟨ ▶ ⟩ + timecode · TRIM ⇤ In / Out ⇥ with the values (click a value = jump there) and Kept · CUT [ From / To ] ✂ Cut. A time ruler over the lanes. BOTTOM bar = clip tools (Cuts, Body, ⧉ New part, ✨ Seedance), Trim · cut apply to, History. Play controls moved from under the video into the timeline, so the video gets more room."
+  "notes": "Frame-exact 30 fps: every render / normalized clip is now exactly N whole frames, with the audio cut or padded to exactly N/30 s. Clips from generators (24/25 fps, audio a few frames longer than the picture) used to leave a 0.1 s hole between joined parts and a black / frozen frame at the end. Length is taken from the picture, not the container. Body cache rebuilds once."
 }
