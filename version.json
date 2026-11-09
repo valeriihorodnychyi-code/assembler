@@ -1,5 +1,5 @@
 {
-  "version": "1.9.106",
+  "version": "1.9.107",
   "channel": "main",
-  "notes": "Captions (was «Our captions»). ⬇ Track and ⬇ Stems on the music block (and SFX): the generated track as is, or voice · music · SFX as separate WAVs, full clip length from 0 — for sound design in After Effects. ✨ Seedance: ＋ Reference image (up to 30) → @Image 1, @Image 2… in the prompt (click the label to insert); the panel keeps your prompt and references between opens."
+  "notes": "␣ Space = play / pause everywhere in Edit, except while typing (a focused button no longer gets clicked). 🔊 Auto SFX for a piece: drag along the SFX lane (or ✨ in its head) → optional hint («door opens, sits on a sofa, curtains») → Generate: HunyuanVideo-Foley on WaveSpeed (~$0.05) watches that part and writes the sounds synced to the action as one block — volume, ✕, ↻ another version. One sound at a point: double-click / ＋ as before."
 }

@@ -1161,6 +1161,88 @@ def regen_start(req: RegenReq):
     return {"job": job, "cost": cost, "billed": billed}
 
 
+# ---------- 🔊 Auto SFX for a zone: the picture of that piece → synced foley (WaveSpeed) ----------
+class FoleyReq(BaseModel):
+    file_id: str
+    clip: str
+    zone: List[float]
+    prompt: str = ""
+
+
+def _foley_run(job, sdir, src, req):
+    import requests as _rq, time as _t
+    from engine import wavespeed as ws
+    J = _REGEN[job]
+    a, b = float(req.zone[0]), float(req.zone[1])
+    seg = os.path.join(sdir, f"_foley_{job}.mp4")
+    try:
+        J["state"] = "uploading"
+        music11.video_segment(src, seg, a, b)
+        url = ws.upload(seg, _rq)
+        J["state"] = "queued"
+        prompt = (req.prompt or "").strip()
+        prompt = (prompt + ". " if prompt else "") + "Realistic foley and sound effects synced to the action, no music, no speech."
+        pid = ws.submit_foley(url, prompt, _rq)
+        J["prediction"] = pid
+        t0 = _t.time()
+        while True:
+            _t.sleep(3)
+            r = ws.result(pid, _rq)
+            J["state"] = r["status"] or "processing"
+            if r["status"] == "completed" and r["outputs"]:
+                break
+            if r["status"] in ("failed", "cancelled", "timeout", "deleted"):
+                raise ws.WaveSpeedError("Foley: " + (r["error"] or r["status"]))
+            if _t.time() - t0 > 15 * 60:
+                raise ws.WaveSpeedError("Foley не встиг за 15 хв.")
+        J["state"] = "downloading"
+        out0 = r["outputs"][0]
+        g = _rq.get(out0 if isinstance(out0, str) else out0.get("url", ""), timeout=300)
+        if g.status_code != 200 or len(g.content) < 500:
+            raise ws.WaveSpeedError(f"Не вдалося скачати звук (HTTP {g.status_code}).")
+        raw = os.path.join(sdir, f"_foley_{job}_raw")
+        with open(raw, "wb") as f:
+            f.write(g.content)
+        k = 1
+        while os.path.exists(os.path.join(sdir, f"sfx_auto_{k}.mp3")):
+            k += 1
+        name = f"sfx_auto_{k}.mp3"
+        ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-vn", "-ac", "2", "-ar", "44100", "-t", f"{b - a:.3f}",
+                          "-b:a", "192k", os.path.join(sdir, name)])
+        for pth in (raw, seg):
+            try:
+                os.remove(pth)
+            except OSError:
+                pass
+        J.update(state="done", name=name, url=f"/clip/{req.file_id}/{name}", at=round(a, 3),
+                 length=round(music11.duration(os.path.join(sdir, name)), 2), seconds=round(_t.time() - J["started"]))
+    except Exception as e:  # noqa: BLE001
+        J.update(state="error", error=str(e))
+        try:
+            os.remove(seg)
+        except OSError:
+            pass
+
+
+@app.post("/api/sfx/foley/start")
+def foley_start(req: FoleyReq):
+    import threading, time as _t, uuid
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    if not os.environ.get("WAVESPEED_API_KEY"):
+        raise HTTPException(400, "Немає ключа WaveSpeed — додай його в ⚙ Settings.")
+    if not req.zone or len(req.zone) != 2 or float(req.zone[1]) - float(req.zone[0]) < 0.5:
+        raise HTTPException(400, "Познач шматок від 0.5 с — потягни по доріжці SFX.")
+    if float(req.zone[1]) - float(req.zone[0]) > 30.5:
+        raise HTTPException(400, "До 30 с за раз — познач коротший шматок.")
+    job = uuid.uuid4().hex[:12]
+    _REGEN[job] = {"state": "starting", "started": _t.time(), "kind": "foley", "error": ""}
+    threading.Thread(target=_foley_run, args=(job, sdir, src, req), daemon=True).start()
+    return {"job": job}
+
+
 @app.get("/api/regen/{job}")
 def regen_status(job: str):
     import time as _t

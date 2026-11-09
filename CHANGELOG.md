@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-09** — Space = play; Auto SFX for a piece (drag on the SFX lane → synced foley via WaveSpeed) (1.9.107)
 - **2026-11-09** — Captions label; ⬇ music track and voice / music / SFX stems; Seedance reference images (1.9.106)
 - **2026-11-09** — Frame-exact 30 fps renders: no extra black / frozen frame at the end, no gaps between joined clips (1.9.105)
 - **2026-11-05** — Timeline regrouped: top bar time (play · trim · cut), ruler, bottom bar clip tools + apply to + history (1.9.104)

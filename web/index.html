@@ -612,7 +612,7 @@
       </div></div></div>
       <div class="lane" id="laneOrig"><div class="lhead"><button type="button" class="lmute" data-lm="orig" title="Вимкнути / увімкнути звук кліпу">🔊</button><span class="lname" id="laneOrigName">Clip audio</span></div><div class="lbody" data-lane="orig"><canvas id="waveOrig"></canvas></div></div>
       <div class="lane" id="laneMusic"><div class="lhead"><button type="button" class="lmute" data-lm="music" title="Вимкнути / увімкнути музику">🔊</button><span class="lname">♪ Music</span></div><div class="lbody" data-lane="music" id="laneMusicBody"></div></div>
-      <div class="lane" id="laneSfx"><div class="lhead"><button type="button" class="lmute" data-lm="sfx" title="Вимкнути / увімкнути всі SFX">🔊</button><span class="lname">🔊 SFX</span><button type="button" class="ladd" id="sfxAddBtn" title="Новий звук у точці плейхеда (або подвійний клік по доріжці)">＋</button></div><div class="lbody" data-lane="sfx" id="laneSfxBody"></div></div>
+      <div class="lane" id="laneSfx"><div class="lhead"><button type="button" class="lmute" data-lm="sfx" title="Вимкнути / увімкнути всі SFX">🔊</button><span class="lname">SFX</span><button type="button" class="ladd" id="sfxAddBtn" title="Один звук у точці плейхеда (або подвійний клік по доріжці)">＋</button><button type="button" class="ladd" id="sfxAutoBtn" title="Авто-звуки під картинку шматка (або потягни по доріжці SFX)">✨</button></div><div class="lbody" data-lane="sfx" id="laneSfxBody"></div></div>
       <div id="laneHead"></div>
       <div id="laneBusy"></div>
      </div>
@@ -2252,6 +2252,21 @@ document.addEventListener("keydown",(e)=>{
   }
 });
 $("seek").oninput=e=>{if(videoLoaded)video.currentTime=(e.target.value/100)*(video.duration||0);};
+// ␣ Space = play / pause, ALWAYS — unless you're typing. Caught before anything else (capture), so a
+// focused button / checkbox / slider never eats it (a focused button used to get "clicked" instead).
+(function spacePlay(){
+  const typing=t=>{if(!t)return false; if(t.isContentEditable)return true; const tag=t.tagName;
+    if(tag==="TEXTAREA"||tag==="SELECT")return true;
+    if(tag==="INPUT"){const ty=(t.type||"text").toLowerCase();return !["checkbox","radio","range","button","submit","reset","color","file"].includes(ty);}
+    return false;};
+  const isSpace=e=>(e.code==="Space"||e.key===" ")&&!e.metaKey&&!e.ctrlKey&&!e.altKey;
+  document.addEventListener("keydown",e=>{if(!isSpace(e)||typing(e.target))return;
+    if(currentMode!=="edit"||!videoLoaded)return;
+    e.preventDefault();e.stopPropagation(); if(e.repeat)return;
+    if(document.activeElement&&document.activeElement!==document.body&&document.activeElement.blur)document.activeElement.blur();
+    $("playBtn").onclick();},true);
+  document.addEventListener("keyup",e=>{if(isSpace(e)&&!typing(e.target)&&currentMode==="edit"&&videoLoaded){e.preventDefault();e.stopPropagation();}},true);
+})();
 
 // ---------- trim (per-clip in/out, baked at assemble) — visual handle bar ----------
 function pf(v,d){const n=parseFloat(String(v).replace(",","."));return isNaN(n)?d:n;}
@@ -3608,8 +3623,43 @@ async function rgStart(s){
     setStatus("✨ Seedance запущено (≈ $"+d.cost.toFixed(2)+"). Це кілька хвилин — працюй далі, результат сам стане на місце цього кліпу.","ok");
   }catch(e){setStatus("Seedance: "+e.message,"err");}
 }
+// 🔊 Auto SFX for a piece: HunyuanVideo-Foley (WaveSpeed) watches that part and writes the sounds
+// synced to the action (door, steps, sofa, curtains…) as ONE block on the SFX lane. ~$0.05.
+function fyRender(ed,s){
+  const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  const len=s.b-s.a, long=len>30.5;
+  ed.innerHTML="🔊 <b>Auto SFX</b> · "+tc(s.a)+"–"+tc(s.b)+" ("+len.toFixed(1)+" с)"+(long?" <span style='color:#ff8a7a'>— до 30 с за раз</span>":"")
+    +"<input type='text' id='fyTxt' placeholder='не обовʼязково: door opens, woman sits on a sofa, curtains slide open' value='"+esc(s.text||"")+"'>"
+    +"<span>≈ <b>$0.05</b></span><button type='button' class='primary' id='fyGo' style='font-size:11px;padding:5px 12px'"+(long?" disabled":"")+">✨ Generate</button><button type='button' class='ghost' id='fyX' style='font-size:11px'>✕</button>"
+    +"<span class='lhint'>Модель дивиться на картинку цього шматка і сама пише звуки під дії, синхронно. Підказка — щоб не пропустила важливе. Результат — один блок на SFX: гучність, ✕, ↻ інша версія. ~1–2 хв.</span>";
+  ed.style.display="flex";
+  $("fyTxt").oninput=e=>{s.text=e.target.value;};
+  $("fyTxt").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();fyStart(s);}if(e.key==="Escape"){_laneSel=null;drawLanes();}};
+  $("fyX").onclick=()=>{_laneSel=null;drawLanes();};
+  $("fyGo").onclick=()=>fyStart(s);
+}
+async function fyStart(s,replace){
+  try{await ensureSessionClip();}catch(e){setStatus("Auto SFX: "+e.message,"err");return;}
+  const o=mixHolder(); if(!o)return; const src=(o.mix&&o.mix.base)||o.clip;
+  try{const r=await fetch(API+"/api/sfx/foley/start",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:src,zone:[+s.a.toFixed(3),+s.b.toFixed(3)],prompt:s.text||""})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"foley failed"));
+    _rgJobs.push({job:d.job,kind:"foley",o,zone:[s.a,s.b],prompt:s.text||"",replace});
+    if(!replace){_laneSel=null;drawLanes();}
+    rgPoll(); setStatus("🔊 Пишу звуки під картинку "+tc(s.a)+"–"+tc(s.b)+"… (~1–2 хв, можна працювати далі)","",true);
+  }catch(e){setStatus("Auto SFX: "+e.message,"err");}
+}
+function fyApply(j,d){
+  const o=j.o, m=mixOf(o,true);
+  const item={name:d.name,url:d.url,at:d.at,length:d.length,label:"Auto · "+(j.prompt?j.prompt.slice(0,24):tc(j.zone[0])+"–"+tc(j.zone[1])),
+    prompt:j.prompt,foley:{a:j.zone[0],b:j.zone[1],prompt:j.prompt},volume:0.9};
+  if(j.replace&&m.sfx.includes(j.replace))Object.assign(j.replace,{name:item.name,url:item.url,length:item.length});
+  else{m.sfx.push(item);m.sfx.sort((a,b)=>a.at-b.at);}
+  drawLanes(); mixRun(o);
+  setStatus("🔊 Авто-звуки на доріжці SFX ("+tc(j.zone[0])+"–"+tc(j.zone[1])+"). Гучність / ✕ / ↻ — клік по блоку.","ok");
+}
 function rgLabel(){const el=$("tbRegenLbl"), b=$("tbRegen"); if(!el)return;
-  const j=_rgJobs[0]; b.classList.toggle("busy",!!j);
+  const j=_rgJobs.find(x=>x.kind!=="foley"); b.classList.toggle("busy",!!j);
   el.textContent=j?("✨ "+(_rgJobs.length>1?_rgJobs.length+" · ":"")+(j.elapsed!=null?Math.floor(j.elapsed/60)+":"+String(j.elapsed%60).padStart(2,"0"):"…")+" · "+(j.state||"…")):"✨ Seedance";}
 function rgPoll(){clearInterval(_rgTimer); if(!_rgJobs.length){rgLabel();return;}
   _rgTimer=setInterval(async()=>{
@@ -3617,8 +3667,8 @@ function rgPoll(){clearInterval(_rgTimer); if(!_rgJobs.length){rgLabel();return;
       try{const r=await fetch(API+"/api/regen/"+j.job);const d=await r.json();
         if(!r.ok)throw new Error(d.detail||"job lost");
         j.state=d.state; j.elapsed=d.elapsed;
-        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); rgApply(j,d);}
-        else if(d.state==="error"){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus("✨ Seedance: "+d.error,"err");}
+        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="foley")fyApply(j,d); else rgApply(j,d);}
+        else if(d.state==="error"){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus((j.kind==="foley"?"🔊 Auto SFX: ":"✨ Seedance: ")+d.error,"err");}
       }catch(e){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus("✨ Seedance: "+e.message,"err");}
     }
     rgLabel(); if(!_rgJobs.length)clearInterval(_rgTimer);
@@ -4299,7 +4349,8 @@ function drawLanes(){
   const sb=$("laneSfxBody"), list=(m&&m.sfx)||[];
   sb.innerHTML=list.length?list.map((s,i)=>"<div class='lblk sfx"+(_laneSel&&_laneSel.kind==="sfx"&&_laneSel.i===i?" sel":"")+"' data-blk='sfx' data-i='"+i+"' style='left:"+pct(s.at)+"%;width:"+Math.max(0.8,pct(s.at+(s.length||0.5))-pct(s.at))+"%"+(s.mute?";opacity:.35":"")+"' title='«"+esc(s.label)+"» @ "+tc(s.at)+" · тягни, щоб пересунути · клік — налаштування'>"+esc(s.label)+"<span class='lx' data-x='sfx' data-i='"+i+"' title='Видалити'>✕</span></div>").join("")
     +(_laneSel&&_laneSel.kind==="add"?"<div class='lblk sfx' style='left:"+pct(_laneSel.at)+"%;width:6px;opacity:.6;pointer-events:none'></div>":"")
-    :"<div class='lempty'>Подвійний клік — новий звук у цьому місці · або ＋</div>";
+    :"<div class='lempty'>Потягни по доріжці — авто-звуки під картинку шматка · подвійний клік — один звук</div>";
+  if(_laneSel&&_laneSel.kind==="foley")sb.innerHTML+="<div class='lblk' style='left:"+pct(_laneSel.a)+"%;width:"+Math.max(0.5,pct(_laneSel.b)-pct(_laneSel.a))+"%;background:rgba(251,146,60,.25);border:1px dashed #fb923c;pointer-events:none'></div>";
   drawWave(o);
   renderLaneEdit();
   // the music follows the trim / body: when its zone moves, re-mix (debounced)
@@ -4320,9 +4371,10 @@ async function drawWave(o){
 }
 function renderLaneEdit(){
   const ed=$("laneEdit"), o=mixHolder(), m=o&&o.mix; if(!ed)return;
-  const s=_laneSel; if(!s||(s.kind!=="add"&&s.kind!=="orig"&&s.kind!=="regen"&&!m)){ed.style.display="none";ed.innerHTML="";return;}
+  const s=_laneSel; if(!s||(s.kind!=="add"&&s.kind!=="orig"&&s.kind!=="regen"&&s.kind!=="foley"&&!m)){ed.style.display="none";ed.innerHTML="";return;}
   if(ed.contains(document.activeElement)&&((document.activeElement.tagName==="INPUT"&&document.activeElement.type==="text")||document.activeElement.tagName==="TEXTAREA"))return;   // never re-render under the caret
   if(s.kind==="regen"){rgRender(ed,s);return;}
+  if(s.kind==="foley"){fyRender(ed,s);return;}
   const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
   let h="";
   if(s.kind==="add"){
@@ -4402,6 +4454,7 @@ async function laneAddSfx(){
 }
 async function laneAgain(i){
   const o=mixHolder(), m=o&&o.mix, x=m&&m.sfx[i]; if(!x)return;
+  if(x.foley){fyStart({a:x.foley.a,b:x.foley.b,text:x.foley.prompt||""},x);return;}
   busyStart("🔊 Ще одна версія «"+x.label+"»…");
   try{const r=await fetch(API+"/api/sfx/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,prompt:x.prompt||x.label,duration:x.dur||null})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"sfx failed"));
@@ -4420,6 +4473,8 @@ function laneMute(k){
   const L=$("lanes"); if(!L)return;
   L.querySelectorAll(".lmute").forEach(b=>b.onclick=()=>laneMute(b.dataset.lm));
   if($("sfxAddBtn"))$("sfxAddBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
+  if($("sfxAutoBtn"))$("sfxAutoBtn").onclick=()=>{const o=mixHolder(), z=(o&&hmZone(o))||[0,video.duration||0];
+    laneSelect({kind:"foley",a:Math.max(0,z[0]),b:Math.min(video.duration||z[1],z[1]),text:""});};
   let drag=null;
   L.addEventListener("mousedown",e=>{
     const body=e.target.closest&&e.target.closest(".lbody[data-lane]"); if(!body)return;
@@ -4429,6 +4484,14 @@ function laneMute(k){
     if(blk&&blk.dataset.blk==="sfx"){const i=+blk.dataset.i, m=mixHolder().mix;
       drag={i,x0:e.clientX,at0:m.sfx[i].at,body,moved:false}; e.preventDefault(); return;}
     if(blk&&blk.dataset.blk==="music"){laneSelect({kind:"music"});return;}
+    // SFX lane: drag = pick a piece for auto sounds; a plain click still scrubs
+    if(body.dataset.lane==="sfx"){const x0=e.clientX, t0=laneT(e,body); let rng=false;
+      const mv=ev=>{if(!rng&&Math.abs(ev.clientX-x0)<6)return; rng=true; const t1=laneT(ev,body);
+        _laneSel={kind:"foley",a:Math.min(t0,t1),b:Math.max(t0,t1),text:(_laneSel&&_laneSel.text)||""}; drawLanes();};
+      const up=ev=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);
+        if(!rng){if(videoLoaded)video.currentTime=t0;return;}
+        if(_laneSel&&_laneSel.kind==="foley"&&_laneSel.b-_laneSel.a<0.5){_laneSel=null;drawLanes();setStatus("Шматок закороткий — потягни ширше (від 0.5 с).","");}};
+      window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up); e.preventDefault(); return;}
     // empty lane: scrub the playhead (and select the lane)
     if(videoLoaded){video.currentTime=laneT(e,body);}
     if(body.dataset.lane==="orig")laneSelect({kind:"orig"});

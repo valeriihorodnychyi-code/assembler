@@ -122,3 +122,24 @@ def result(pid, requests, api_key=None):
         raise WaveSpeedError(_err(r, "result"))
     d = _j(r)
     return {"status": d.get("status") or "", "outputs": d.get("outputs") or [], "error": d.get("error") or ""}
+
+
+# ---------------------------------------------------------------- video → foley (auto SFX)
+# HunyuanVideo-Foley: watches a piece of video and writes the matching sounds (door, steps, cloth,
+# curtains…) synced to the picture, optionally steered by a short prompt. ~$0.05 a run.
+FOLEY_MODEL = os.environ.get("CS_FOLEY_MODEL", "wavespeed-ai/hunyuan-video-foley")
+FOLEY_PRICE = 0.05
+
+
+def submit_foley(video_url, prompt, requests, api_key=None, seed=-1, model=None):
+    body = {"video": video_url, "seed": int(seed)}
+    if (prompt or "").strip():
+        body["prompt"] = prompt.strip()
+    r = requests.post(f"{API}/{model or FOLEY_MODEL}", headers={"Authorization": f"Bearer {_key(api_key)}",
+                                                                "Content-Type": "application/json"}, json=body, timeout=60)
+    if r.status_code != 200:
+        raise WaveSpeedError(_err(r, "foley"))
+    pid = _j(r).get("id")
+    if not pid:
+        raise WaveSpeedError("WaveSpeed не повернув id задачі.")
+    return pid
