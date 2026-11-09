@@ -97,10 +97,12 @@ def upload(path, requests, api_key=None):
     return _j(r)["download_url"]
 
 
-def submit_edit(video_url, prompt, requests, resolution="720p", keep_audio=True, api_key=None, model=None):
-    """→ prediction id."""
+def submit_edit(video_url, prompt, requests, resolution="720p", keep_audio=True, api_key=None, model=None, refs=None):
+    """→ prediction id. refs = reference image URLs (@Image 1, @Image 2… in the prompt, ≤ 30)."""
     body = {"prompt": (prompt or "").strip(), "video": video_url, "resolution": resolution,
             "generate_audio": not keep_audio}
+    if refs:
+        body["reference_images"] = list(refs)[:30]
     if not body["prompt"]:
         raise WaveSpeedError("Опиши, що змінити в кадрі.")
     r = requests.post(f"{API}/{model or MODEL}", headers={"Authorization": f"Bearer {_key(api_key)}",

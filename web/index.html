@@ -665,7 +665,7 @@
     <div class="panel-content" id="panelContent">
 
     <section class="sec active" data-sec="text">
-    <div id="capsRow" class="capsRow"><span class="cname">Our captions</span><span id="capsNote" class="cnote">будуть у рендері</span>
+    <div id="capsRow" class="capsRow"><span class="cname">Captions</span><span id="capsNote" class="cnote">будуть у рендері</span>
       <label class="switch" title="OFF — кліп уже з титрами (або вони не потрібні): ми нічого не малюємо ні в прев'ю, ні в Export / Assemble. Transcribe тоді не потрібен — кати, музика, SFX, частини працюють і без нього."><input type="checkbox" id="capsOn" checked><span class="slider"></span></label></div>
     <details class="grp" open id="grpTranscribe">
       <summary><span data-i18n="grpTranscription">Transcription</span> <span class="chev">›</span></summary>
@@ -1896,10 +1896,10 @@ async function wsCheck(){const el=()=>$("wsStat");
 function capsOffNow(){const h=(typeof openHookRef==="function")?openHookRef():null, v=variants&&variants[activeVar];return !!((h&&h.capsOff)||(!h&&v&&v.capsOff));}
 function renderCaps(){const off=capsOffNow(), r=$("capsRow"); if(!r)return;
   r.classList.toggle("off",off); if($("capsOn"))$("capsOn").checked=!off; document.body.classList.toggle("capsoff",off);
-  if($("capsNote"))$("capsNote").textContent=off?"вимкнено — цей кліп іде без наших титрів, Transcribe не потрібен":"будуть у рендері";}
+  if($("capsNote"))$("capsNote").textContent=off?"вимкнено — цей кліп іде без титрів, Transcribe не потрібен":"будуть у рендері";}
 if($("capsOn"))$("capsOn").onchange=e=>{const off=!e.target.checked, h=openHookRef(), v=variants[activeVar];
   if(h)h.capsOff=off; if(v)v.capsOff=off; renderCaps(); if(typeof scheduleExact==="function")scheduleExact(); if(typeof renderHookStrip==="function")renderHookStrip();
-  setStatus(off?"🚫 Наші титри вимкнено для цього кліпу — ні в прев'ю, ні в рендері. Кати, музика, SFX і частини працюють і без Transcribe.":"Титри знову увімкнено.","ok");};
+  setStatus(off?"🚫 Титри вимкнено для цього кліпу — ні в прев'ю, ні в рендері. Кати, музика, SFX і частини працюють і без Transcribe.":"Титри знову увімкнено.","ok");};
 function makePackHook(clip,videoUrl,lang){
   return {name:clip,clip:clip,lang:lang||"",                 // tile colour only, best-effort
           videoUrl:videoUrl,words:null,ctrl:JSON.parse(JSON.stringify(sharedCtrl||readControls())),
@@ -3552,17 +3552,24 @@ async function _cutOtherHook(o,spans){
 // ↩ in History. Sound lanes (music / SFX) stay and are re-mixed on top.
 const RG_RATES={"480p":0.11,"720p":0.22,"1080p":0.55};
 const rgCost=(d,res)=>+(2*Math.max(4,Math.min(30,d||0))*(RG_RATES[res]||0.22)).toFixed(2);
-let _rgJobs=[], _rgTimer=null, _rgBal=null;
+let _rgJobs=[], _rgTimer=null, _rgBal=null, _rgLast=null;   // _rgLast: the panel keeps your prompt + references between opens
 function rgOpen(){if(!videoLoaded){setStatus("Спершу відкрий кліп.","err");return;}
-  laneSelect({kind:"regen",text:(_laneSel&&_laneSel.kind==="regen"&&_laneSel.text)||"",res:"720p",keep:true});
+  const prev=(_rgLast||{});
+  laneSelect({kind:"regen",text:prev.text||"",res:prev.res||"720p",keep:prev.keep!==false,refs:prev.refs||[]});
   fetch(API+"/api/wavespeed/status").then(r=>r.json()).then(d=>{_rgBal=d;if(_laneSel&&_laneSel.kind==="regen"){const b=$("rgBal");if(b)b.textContent=d.ok?("баланс $"+(+d.balance).toFixed(2)):("⚠ "+(d.error==="not set"?"немає ключа WaveSpeed (⚙ Settings)":d.error));}}).catch(()=>{});}
 function rgRender(ed,s){
+  _rgLast=s;
   const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
   const dur=video.duration||0, a=pf($("trimIn").value,0), b=pf($("trimOut").value,dur)||dur, zone=(a>0.05||b<dur-0.05);
   const cost=rgCost(dur,s.res), long=dur>30.05;
   ed.innerHTML="<b>✨ Seedance 2.5</b> · увесь кліп "+tc(dur)+(long?" <span style='color:#ff8a7a'>— довше 30 с: спершу ⧉ New part</span>":"")
     +"<textarea id='rgTxt' placeholder='Replace the red car with a black motorcycle. Keep everything else exactly the same.'>"+esc(s.text)+"</textarea>"
     +(zone?"<button type='button' class='tmini' id='rgZone' title='Обмежити зміну зоною In–Out (Seedance розуміє таймкоди в промпті)'>+ From "+a.toFixed(1)+"–"+b.toFixed(1)+"s</button>":"")
+    +"<div class='rgRefs' style='flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center'>"
+      +(s.refs||[]).map((r,i)=>"<span style='display:inline-flex;align-items:center;gap:4px;border:1px solid #3a3e4a;border-radius:7px;padding:2px 5px 2px 2px;background:#111319'><img src='"+r.thumb+"' style='width:28px;height:28px;object-fit:cover;border-radius:5px'>"
+        +"<b data-rgins='"+(i+1)+"' style='cursor:pointer;font-size:11px' title='Вставити в промпт'>@Image "+(i+1)+"</b><span data-rgdel='"+i+"' style='cursor:pointer;color:var(--muted)'>✕</span></span>").join("")
+      +"<label class='tmini' style='cursor:pointer;border-radius:6px'>＋ Reference image<input type='file' id='rgRefIn' accept='image/*' multiple hidden></label>"
+      +"<span class='lhint' style='flex-basis:auto'>Наприклад: «Replace the woman with the person in @Image 1, keep pose and motion».</span></div>"
     +"<select id='rgRes' title='Роздільність генерації (результат все одно підганяється під розмір кліпу)'>"+["480p","720p","1080p"].map(r=>"<option"+(r===s.res?" selected":"")+">"+r+"</option>").join("")+"</select>"
     +"<label title='ON — звук кліпу лишається рівно як був (голос, тайминги, титри валідні). OFF — Seedance пише свій звук'><input type='checkbox' id='rgKeep'"+(s.keep?" checked":"")+">Keep original audio</label>"
     +"<span>≈ <b>$"+cost.toFixed(2)+"</b> · <span id='rgBal'>"+(_rgBal?(_rgBal.ok?"баланс $"+(+_rgBal.balance).toFixed(2):"⚠ "+_rgBal.error):"")+"</span></span>"
@@ -3575,6 +3582,17 @@ function rgRender(ed,s){
   if($("rgZone"))$("rgZone").onclick=()=>{s.text="From "+a.toFixed(1)+"–"+b.toFixed(1)+"s, "+(s.text||"");rgRender(ed,s);};
   $("rgX").onclick=()=>{_laneSel=null;drawLanes();};
   $("rgGo").onclick=()=>rgStart(s);
+  ed.querySelectorAll("[data-rgins]").forEach(b=>b.onclick=()=>{s.text=((s.text||"").trim()+" @Image "+b.dataset.rgins).trim();rgRender(ed,s);});
+  ed.querySelectorAll("[data-rgdel]").forEach(b=>b.onclick=()=>{s.refs.splice(+b.dataset.rgdel,1);rgRender(ed,s);});
+  $("rgRefIn").onchange=async e=>{const fs=[...e.target.files]; if(!fs.length)return;
+    try{await ensureSessionClip();}catch(er){setStatus("Seedance: "+er.message,"err");return;}
+    s.refs=s.refs||[];
+    for(const f of fs){if(s.refs.length>=30)break;
+      const nm="ref_"+Date.now().toString(36)+"_"+(f.name||"img.png").replace(/[^\w.\-]+/g,"_");
+      const fd=new FormData();fd.append("file",new File([f],nm,{type:f.type}));fd.append("file_id",fileId||"");
+      try{const r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||"upload failed");
+        s.refs.push({name:d.name,thumb:URL.createObjectURL(f)});}catch(er){setStatus("Reference: "+er.message,"err");}}
+    rgRender(ed,s);};
 }
 async function rgStart(s){
   const txt=(s.text||"").trim(); if(!txt){setStatus("✨ Опиши, що змінити в кадрі.","err");return;}
@@ -3583,7 +3601,7 @@ async function rgStart(s){
   const src=(o.mix&&o.mix.base)||o.clip, cost=rgCost(video.duration||0,s.res);
   if(!confirm("Seedance 2.5 · "+s.res+" · ≈ $"+cost.toFixed(2)+" з балансу WaveSpeed.\n\n«"+txt+"»\n\nЗапустити?"))return;
   try{const r=await fetch(API+"/api/regen/start",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,clip:src,prompt:txt,resolution:s.res,keep_audio:!!s.keep})});
+      body:JSON.stringify({file_id:fileId,clip:src,prompt:txt,resolution:s.res,keep_audio:!!s.keep,refs:(s.refs||[]).map(r=>r.name)})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"seedance failed"));
     _rgJobs.push({job:d.job,o,src,prompt:txt,cost:d.cost});
     _laneSel=null; drawLanes(); rgPoll();
@@ -4321,12 +4339,15 @@ function renderLaneEdit(){
     h="<b>♪ "+esc(m.music.label)+"</b> · Volume <input type='range' id='leVol' min='0' max='100' value='"+v+"'><span id='leVolL'>"+v+"</span>"
       +"<label title='Музика тихшає, коли звучить голос'><input type='checkbox' id='leDuck'"+(m.music.duck?" checked":"")+">Duck under voice</label>"
       +"<label title='Прибрати стару музику з кліпу (ElevenLabs Audio Isolation), лишити тільки голос'><input type='checkbox' id='leStrip'"+(m.music.strip?" checked":"")+">Remove old music</label>"
-      +"<button type='button' class='tmini' id='lePlay'>▶ Track alone</button><button type='button' class='tmini' id='leDel'>✕ Remove music</button>";
+      +"<button type='button' class='tmini' id='lePlay'>▶ Track alone</button>"
+      +"<a class='tmini' style='text-decoration:none;color:var(--txt);border-radius:6px' href='"+API+m.music.url+"' download='"+esc(m.music.label.replace(/[^\w.-]+/g,"_"))+".mp3' title='Згенерований трек як є — повна довжина, без голосу'>⬇ Track</a>"
+      +"<button type='button' class='tmini' id='leStems' title='Окремі WAV на всю довжину кліпу, від нуля: голос · музика (як лежить, без приглушення) · SFX — щоб у AE покласти свій саунд-дизайн'>⬇ Stems</button>"
+      +"<button type='button' class='tmini' id='leDel'>✕ Remove music</button>";
   }else if(s.kind==="sfx"&&m.sfx[s.i]){
     const x=m.sfx[s.i], v=Math.round((x.volume??0.9)*100);
     h="<b>🔊 «"+esc(x.label)+"»</b> @ "+tc(x.at)+" · Volume <input type='range' id='leVol' min='0' max='150' value='"+v+"'><span id='leVolL'>"+v+"%</span>"
       +"<button type='button' class='tmini' id='lePlay'>▶ Solo</button><button type='button' class='tmini' id='leAgain' title='Той самий опис — нова версія звуку'>↻ Another version</button>"
-      +"<button type='button' class='tmini' id='leDel'>✕ Delete</button><span class='lhint'>Тягни блок по доріжці, щоб пересунути. Delete — видалити.</span>";
+      +"<button type='button' class='tmini' id='leDel'>✕ Delete</button><button type='button' class='tmini' id='leStems' title='Голос · музика · SFX окремими WAV для AE'>⬇ Stems</button><span class='lhint'>Тягни блок по доріжці, щоб пересунути. Delete — видалити.</span>";
   }else{ed.style.display="none";return;}
   ed.innerHTML=h; ed.style.display="flex";
   const on=(id,ev,fn)=>{const e=$(id);if(e)e[ev]=fn;};
@@ -4341,6 +4362,7 @@ function renderLaneEdit(){
   on("leStrip","onchange",e=>{m.music.strip=e.target.checked;LANE_DEF.strip=m.music.strip;laneDefSave();mixSoon(o,50);drawLanes();});
   on("lePlay","onclick",()=>{const a=$("sfxAudio"),src=s.kind==="music"?m.music.url:m.sfx[s.i].url;video.pause();a.src=API+src;a.volume=Math.min(1,s.kind==="music"?0.8:(m.sfx[s.i].volume??0.9));a.play().catch(()=>{});});
   on("leAgain","onclick",()=>laneAgain(s.i));
+  on("leStems","onclick",()=>laneStems());
   on("leDel","onclick",()=>laneDelete(s));
 }
 // ---- actions ----
@@ -4350,6 +4372,19 @@ function laneDelete(s){
   if(s.kind==="music"){m.music=null;setStatus("♪ Музику прибрано з хука — звук як був. Повернути: вибери версію зліва в Hook music.","ok");if(typeof hmRenderList==="function")hmRenderList();}
   else if(s.kind==="sfx"){const x=m.sfx.splice(s.i,1)[0];setStatus("🔊 «"+(x&&x.label)+"» видалено.","ok");}
   _laneSel=null; drawLanes(); mixSoon(o,30);
+}
+// ⬇ Stems: voice · music · sfx as separate WAVs (full clip length, from 0) for sound design in AE
+async function laneStems(){
+  const o=mixHolder(), m=o&&o.mix; if(!m){setStatus("Немає шарів звуку на цьому кліпі.","");return;}
+  busyStart("⬇ Готую stems (голос · музика · SFX)…");
+  try{const r=await fetch(API+"/api/audio/stems",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      file_id:fileId,base:m.base,zone:hmZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
+      music:m.music?{name:m.music.name,volume:m.music.volume,duck:m.music.duck,strip:m.music.strip}:null,
+      sfx:m.sfx.filter(x=>!x.mute).map(x=>({name:x.name,at:x.at,volume:x.volume}))})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"stems failed"));
+    const a=document.createElement("a");a.href=API+d.url;a.download=d.url.split("/").pop();document.body.appendChild(a);a.click();a.remove();
+    busyDone("Stems готові"); setStatus("⬇ "+d.files+" WAV у zip: усі на всю довжину кліпу, від нуля — клади в AE на 0 кадр.","ok");
+  }catch(e){busyStop();setStatus("Stems: "+e.message,"err");}
 }
 async function laneAddSfx(){
   const s=_laneSel; if(!s||s.kind!=="add")return;

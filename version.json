@@ -1,5 +1,5 @@
 {
-  "version": "1.9.105",
+  "version": "1.9.106",
   "channel": "main",
-  "notes": "Frame-exact 30 fps: every render / normalized clip is now exactly N whole frames, with the audio cut or padded to exactly N/30 s. Clips from generators (24/25 fps, audio a few frames longer than the picture) used to leave a 0.1 s hole between joined parts and a black / frozen frame at the end. Length is taken from the picture, not the container. Body cache rebuilds once."
+  "notes": "Captions (was «Our captions»). ⬇ Track and ⬇ Stems on the music block (and SFX): the generated track as is, or voice · music · SFX as separate WAVs, full clip length from 0 — for sound design in After Effects. ✨ Seedance: ＋ Reference image (up to 30) → @Image 1, @Image 2… in the prompt (click the label to insert); the panel keeps your prompt and references between opens."
 }

@@ -1072,6 +1072,7 @@ class RegenReq(BaseModel):
     prompt: str
     resolution: str = "720p"
     keep_audio: bool = True
+    refs: List[str] = []          # reference images already in the session (@Image 1, 2…)
 
 
 def _conform(gen, src, out, keep_audio):
@@ -1094,8 +1095,13 @@ def _regen_run(job, sdir, src, req):
     try:
         J["state"] = "uploading"
         url = ws.upload(src, _rq)
+        refs = []
+        for r_ in (req.refs or [])[:30]:
+            rp = os.path.join(sdir, os.path.basename(r_))
+            if os.path.exists(rp):
+                refs.append(ws.upload(rp, _rq))
         J["state"] = "queued"
-        pid = ws.submit_edit(url, req.prompt, _rq, resolution=req.resolution, keep_audio=req.keep_audio)
+        pid = ws.submit_edit(url, req.prompt, _rq, resolution=req.resolution, keep_audio=req.keep_audio, refs=refs)
         J["prediction"] = pid
         t0 = _t.time()
         while True:
@@ -1409,6 +1415,62 @@ def audio_mix(req: AudioMixReq):
         raise HTTPException(400, str(e))
     _log_timing("audio_mix", _t.time() - t0, name)
     return {"clip": out, "url": f"/clip/{req.file_id}/{out}", "seconds": round(_t.time() - t0, 1)}
+
+
+@app.post("/api/audio/stems")
+def audio_stems(req: AudioMixReq):
+    """⬇ Stems for After Effects: voice · music · sfx as separate WAVs, each the full clip length
+    and aligned to 0 — lay them on the comp and add your own sound design on top."""
+    import zipfile, requests as _rq
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.base)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    J = lambda n: os.path.join(sdir, os.path.basename(n or ""))
+    stem, _ = os.path.splitext(name)
+    zone = req.zone if (req.zone and len(req.zone) == 2) else None
+    m = req.music if (req.music and req.music.get("name") and os.path.exists(J(req.music["name"]))) else None
+    fx = [{"path": J(it.get("name")), "at": float(it.get("at", 0)), "volume": float(it.get("volume", 0.9))}
+          for it in (req.sfx or []) if it.get("name") and os.path.exists(J(it.get("name")))]
+    out_zip = os.path.join(sdir, f"{stem}_stems.zip")
+    tmp = []
+    try:
+        voice = None
+        if m and m.get("strip") and music11.has_audio(src):
+            tag = f"_{zone[0]:.2f}_{zone[1]:.2f}" if zone else ""
+            voice = os.path.join(sdir, f"_voice_{stem}{tag}.wav")
+            if not os.path.exists(voice):
+                music11.isolate_voice(src, voice, _rq, start=(float(zone[0]) if zone else 0.0),
+                                      end=(float(zone[1]) if zone else None))
+        files = []
+        v = os.path.join(sdir, f"_stem_{stem}_voice.wav")
+        music11.mix_layers(src, v, base_volume=req.base_volume, voice_path=voice)
+        files.append((v, "voice.wav" if voice else "clip_audio.wav"))
+        if m:
+            mu = os.path.join(sdir, f"_stem_{stem}_music.wav")
+            music11.mix_layers(src, mu, base_volume=0.0, music={
+                "path": J(m["name"]), "volume": float(m.get("volume", 0.35)), "duck": False,
+                "offset": float(m.get("offset", 0) or 0), "start": float(zone[0]) if zone else 0.0,
+                "end": float(zone[1]) if zone else None})
+            files.append((mu, "music.wav"))
+        if fx:
+            sf = os.path.join(sdir, f"_stem_{stem}_sfx.wav")
+            music11.mix_layers(src, sf, base_volume=0.0, sfx=fx)
+            files.append((sf, "sfx.wav"))
+        with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as z:
+            for pth, arc in files:
+                z.write(pth, f"{stem}_{arc}")
+                tmp.append(pth)
+    except music11.MusicError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        for pth in tmp:
+            try:
+                os.remove(pth)
+            except OSError:
+                pass
+    return {"url": f"/clip/{req.file_id}/{os.path.basename(out_zip)}", "files": len(tmp)}
 
 
 _PEAKS = {}

@@ -57,6 +57,12 @@ def test_upload_then_submit_keeps_the_original_audio_by_default():
     assert WS.result("p1", f)["outputs"] == ["https://cdn/o.mp4"]
 
 
+def test_reference_images_go_to_seedance():
+    f = Fake()
+    WS.submit_edit("https://cdn/x.mp4", "Replace the woman with the person in @Image 1", f, refs=["https://cdn/r1.png"])
+    assert f.calls[-1][2]["reference_images"] == ["https://cdn/r1.png"]
+
+
 def test_empty_prompt_is_refused():
     try:
         WS.submit_edit("u", "  ", Fake())

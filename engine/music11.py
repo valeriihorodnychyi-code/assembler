@@ -284,8 +284,12 @@ def mix_layers(clip_path, out_path, base_volume=1.0, voice_path=None, music=None
         fc.append(voice_lbl + "".join(layers) + f"amix=inputs={len(layers) + 1}:duration=first:normalize=0[aout]")
     else:
         fc[-1] = fc[-1][:-3] + "[aout]"
-    cmd += ["-filter_complex", "; ".join(fc), "-map", "0:v?", "-map", "[aout]", "-c:v", "copy",
-            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-t", f"{dur:.3f}", out_path]
+    if out_path.lower().endswith(".wav"):   # a stem: audio only, lossless, same length as the clip
+        cmd += ["-filter_complex", "; ".join(fc), "-map", "[aout]", "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2",
+                "-t", f"{dur:.3f}", out_path]
+    else:
+        cmd += ["-filter_complex", "; ".join(fc), "-map", "0:v?", "-map", "[aout]", "-c:v", "copy",
+                "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-t", f"{dur:.3f}", out_path]
     _run(cmd)
     return out_path
 

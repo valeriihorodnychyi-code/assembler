@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-09** — Captions label; ⬇ music track and voice / music / SFX stems; Seedance reference images (1.9.106)
 - **2026-11-09** — Frame-exact 30 fps renders: no extra black / frozen frame at the end, no gaps between joined clips (1.9.105)
 - **2026-11-05** — Timeline regrouped: top bar time (play · trim · cut), ruler, bottom bar clip tools + apply to + history (1.9.104)
 - **2026-11-05** — ✨ Seedance 2.5 via WaveSpeed: regenerate a clip / part from a prompt, background job, undo in History (1.9.103)
