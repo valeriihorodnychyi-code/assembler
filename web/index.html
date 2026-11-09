@@ -3627,6 +3627,9 @@ async function rgStart(s){
     setStatus("✨ Seedance запущено (≈ $"+d.cost.toFixed(2)+"). Це кілька хвилин — працюй далі, результат сам стане на місце цього кліпу.","ok");
   }catch(e){setStatus("Seedance: "+e.message,"err");}
 }
+// Auto SFX (video → foley) is PARKED: on real hooks it added stray voices, too loud, low quality.
+// The code stays; switch it back on with localStorage cs_foley=1 (or flip FOLEY_ON) to try another model.
+const FOLEY_ON=(()=>{try{return localStorage.getItem("cs_foley")==="1";}catch(_){return false;}})();
 // 🎙 Dictation for every prompt field: speak in any language → English text (local Whisper,
 // translate task — free, no key). Click 🎙 to start, click again (■) to stop; the English lands
 // at the end of the field. One recording at a time; auto-stops after 60 s.
@@ -4391,7 +4394,7 @@ function drawLanes(){
   const sb=$("laneSfxBody"), list=(m&&m.sfx)||[];
   sb.innerHTML=list.length?list.map((s,i)=>"<div class='lblk sfx"+(_laneSel&&_laneSel.kind==="sfx"&&_laneSel.i===i?" sel":"")+"' data-blk='sfx' data-i='"+i+"' style='left:"+pct(s.at)+"%;width:"+Math.max(0.8,pct(s.at+(s.length||0.5))-pct(s.at))+"%"+(s.mute?";opacity:.35":"")+"' title='«"+esc(s.label)+"» @ "+tc(s.at)+" · тягни, щоб пересунути · клік — налаштування'>"+esc(s.label)+"<span class='lx' data-x='sfx' data-i='"+i+"' title='Видалити'>✕</span></div>").join("")
     +(_laneSel&&_laneSel.kind==="add"?"<div class='lblk sfx' style='left:"+pct(_laneSel.at)+"%;width:6px;opacity:.6;pointer-events:none'></div>":"")
-    :"<div class='lempty'>Потягни по доріжці — авто-звуки під картинку шматка · подвійний клік — один звук</div>";
+    :"<div class='lempty'>"+(FOLEY_ON?"Потягни по доріжці — авто-звуки під картинку шматка · ":"")+"Подвійний клік — звук у цьому місці (🎙 можна надиктувати) · або ＋</div>";
   if(_laneSel&&_laneSel.kind==="foley")sb.innerHTML+="<div class='lblk' style='left:"+pct(_laneSel.a)+"%;width:"+Math.max(0.5,pct(_laneSel.b)-pct(_laneSel.a))+"%;background:rgba(251,146,60,.25);border:1px dashed #fb923c;pointer-events:none'></div>";
   drawWave(o);
   renderLaneEdit();
@@ -4516,6 +4519,7 @@ function laneMute(k){
   const L=$("lanes"); if(!L)return;
   L.querySelectorAll(".lmute").forEach(b=>b.onclick=()=>laneMute(b.dataset.lm));
   if($("sfxAddBtn"))$("sfxAddBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
+  if($("sfxAutoBtn")&&!FOLEY_ON)$("sfxAutoBtn").style.display="none";
   if($("sfxAutoBtn"))$("sfxAutoBtn").onclick=()=>{const o=mixHolder(), z=(o&&hmZone(o))||[0,video.duration||0];
     laneSelect({kind:"foley",a:Math.max(0,z[0]),b:Math.min(video.duration||z[1],z[1]),text:""});};
   let drag=null;
@@ -4528,7 +4532,7 @@ function laneMute(k){
       drag={i,x0:e.clientX,at0:m.sfx[i].at,body,moved:false}; e.preventDefault(); return;}
     if(blk&&blk.dataset.blk==="music"){laneSelect({kind:"music"});return;}
     // SFX lane: drag = pick a piece for auto sounds; a plain click still scrubs
-    if(body.dataset.lane==="sfx"){const x0=e.clientX, t0=laneT(e,body); let rng=false;
+    if(body.dataset.lane==="sfx"&&FOLEY_ON){const x0=e.clientX, t0=laneT(e,body); let rng=false;
       const mv=ev=>{if(!rng&&Math.abs(ev.clientX-x0)<6)return; rng=true; const t1=laneT(ev,body);
         _laneSel={kind:"foley",a:Math.min(t0,t1),b:Math.max(t0,t1),text:(_laneSel&&_laneSel.text)||""}; drawLanes();};
       const up=ev=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);

@@ -1,5 +1,5 @@
 {
-  "version": "1.9.108",
+  "version": "1.9.109",
   "channel": "main",
-  "notes": "🎙 Dictation in every prompt field (Seedance, Auto SFX, one SFX, Hook music): click 🎙, speak in any language, click ■ — the English text lands in the field. Local Whisper (translate), free, no key; needs the browser's microphone permission once."
+  "notes": "Auto SFX for a piece (video → foley) parked: on real hooks it added stray voices and came out too loud / low quality. One-sound SFX (ElevenLabs) with 🎙 dictation stays: double-click the SFX lane or ＋."
 }
