@@ -205,6 +205,10 @@
   .tchip.body .tdot{background:#38bdf8}
   .tchip.part .tdot{background:#a78bfa}
   .tchip.regen .tdot{background:#f472b6}
+  .micbtn{flex:0 0 auto;font-size:13px;padding:3px 7px;border-radius:7px}
+  .micbtn.rec{background:#ff3a22;border-color:#ff3a22;color:#fff;animation:micp 1s ease-in-out infinite}
+  @keyframes micp{50%{opacity:.6}}
+  #hmPrompt+.micbtn{margin-top:4px}
   .tchip.regen.busy{border-color:#f472b6}
   .laneEdit textarea{flex:1 1 100%;min-height:44px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:6px 8px;font-size:12px;resize:vertical;font-family:inherit}
   .capsRow{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);font-size:12.5px}
@@ -3591,7 +3595,7 @@ function rgRender(ed,s){
     +"<button type='button' class='primary' id='rgGo' style='font-size:11px;padding:5px 12px'"+(long?" disabled":"")+">✨ Regenerate</button><button type='button' class='ghost' id='rgX' style='font-size:11px'>✕</button>"
     +"<span class='lhint'>Що змінити і що лишити: «Change only the sunglasses to eyeglasses, keep everything else exactly the same». Шматок часу — «From 2–4s, …». Займає ~5–7 хв, можна працювати далі; результат замінить цей кліп, ↩ — у History. Ціна: (вхід + вихід) × "+(RG_RATES[s.res]||0.22)+" $/с, мінімум 4 с.</span>";
   ed.style.display="flex";
-  $("rgTxt").oninput=e=>{s.text=e.target.value;};
+  $("rgTxt").oninput=e=>{s.text=e.target.value;}; addMic($("rgTxt"));
   $("rgRes").onchange=e=>{s.res=e.target.value;rgRender(ed,s);};
   $("rgKeep").onchange=e=>{s.keep=e.target.checked;};
   if($("rgZone"))$("rgZone").onclick=()=>{s.text="From "+a.toFixed(1)+"–"+b.toFixed(1)+"s, "+(s.text||"");rgRender(ed,s);};
@@ -3623,6 +3627,43 @@ async function rgStart(s){
     setStatus("✨ Seedance запущено (≈ $"+d.cost.toFixed(2)+"). Це кілька хвилин — працюй далі, результат сам стане на місце цього кліпу.","ok");
   }catch(e){setStatus("Seedance: "+e.message,"err");}
 }
+// 🎙 Dictation for every prompt field: speak in any language → English text (local Whisper,
+// translate task — free, no key). Click 🎙 to start, click again (■) to stop; the English lands
+// at the end of the field. One recording at a time; auto-stops after 60 s.
+let _dict=null;   // {rec, chunks, id, btn, timer}
+function addMic(el){
+  if(!el||!el.id||el.dataset.mic)return; el.dataset.mic="1";
+  const b=document.createElement("button"); b.type="button"; b.className="tmini micbtn"; b.dataset.micFor=el.id;
+  b.title="Надиктуй будь-якою мовою — вставиться англійською"; b.textContent="🎙";
+  b.onclick=e=>{e.preventDefault();e.stopPropagation(); if(_dict&&_dict.rec&&_dict.rec.state==="recording")dictStop(); else dictStart(el.id,b);};
+  el.insertAdjacentElement("afterend",b);
+  if(_dict&&_dict.id===el.id&&_dict.rec&&_dict.rec.state==="recording"){b.classList.add("rec");b.textContent="■";}
+}
+async function dictStart(id,btn){
+  if(!navigator.mediaDevices||!window.MediaRecorder){setStatus("🎙 Цей браузер не дає записати мікрофон.","err");return;}
+  let stream; try{stream=await navigator.mediaDevices.getUserMedia({audio:true});}
+  catch(e){setStatus("🎙 Немає доступу до мікрофона — дозволь його для цієї сторінки в браузері.","err");return;}
+  const MR=window.MediaRecorder, rec=new MR(stream), chunks=[];
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  rec.onstop=()=>{stream.getTracks().forEach(t=>t.stop()); dictSend(id,new Blob(chunks,{type:rec.mimeType||"audio/webm"}));};
+  _dict={rec,chunks,id,timer:setTimeout(()=>dictStop(),60000)};
+  rec.start();
+  document.querySelectorAll(".micbtn[data-mic-for='"+id+"']").forEach(x=>{x.classList.add("rec");x.textContent="■";});
+  setStatus("🎙 Слухаю… говори будь-якою мовою, потім ■.","",true);
+}
+function dictStop(){if(!_dict)return; clearTimeout(_dict.timer); try{_dict.rec.stop();}catch(_){}}
+async function dictSend(id,blob){
+  document.querySelectorAll(".micbtn").forEach(x=>{x.classList.remove("rec");x.textContent="🎙";});
+  _dict=null; if(!blob.size){setStatus("🎙 Нічого не записалось.","err");return;}
+  setStatus("🎙 Перекладаю на англійську…","",true);
+  try{const fd=new FormData(); fd.append("file",blob,"dictation"+(blob.type.includes("ogg")?".ogg":blob.type.includes("mp4")?".m4a":".webm"));
+    const r=await fetch(API+"/api/dictate",{method:"POST",body:fd}); const d=await r.json(); if(!r.ok)throw new Error(d.detail||"failed");
+    const el=$(id); if(!el){setStatus("🎙 «"+d.text+"» — поле вже закрите, скопіюй звідси.","ok");return;}
+    el.value=((el.value||"").trim()?(el.value.trim()+" "):"")+d.text;
+    el.dispatchEvent(new Event("input",{bubbles:true})); try{el.focus();}catch(_){}
+    setStatus("🎙 "+(d.language&&d.language!=="en"?("("+d.language.toUpperCase()+" → EN) "):"")+"«"+d.text+"»","ok");
+  }catch(e){setStatus("🎙 "+e.message,"err");}
+}
 // 🔊 Auto SFX for a piece: HunyuanVideo-Foley (WaveSpeed) watches that part and writes the sounds
 // synced to the action (door, steps, sofa, curtains…) as ONE block on the SFX lane. ~$0.05.
 function fyRender(ed,s){
@@ -3633,7 +3674,7 @@ function fyRender(ed,s){
     +"<span>≈ <b>$0.05</b></span><button type='button' class='primary' id='fyGo' style='font-size:11px;padding:5px 12px'"+(long?" disabled":"")+">✨ Generate</button><button type='button' class='ghost' id='fyX' style='font-size:11px'>✕</button>"
     +"<span class='lhint'>Модель дивиться на картинку цього шматка і сама пише звуки під дії, синхронно. Підказка — щоб не пропустила важливе. Результат — один блок на SFX: гучність, ✕, ↻ інша версія. ~1–2 хв.</span>";
   ed.style.display="flex";
-  $("fyTxt").oninput=e=>{s.text=e.target.value;};
+  $("fyTxt").oninput=e=>{s.text=e.target.value;}; addMic($("fyTxt"));
   $("fyTxt").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();fyStart(s);}if(e.key==="Escape"){_laneSel=null;drawLanes();}};
   $("fyX").onclick=()=>{_laneSel=null;drawLanes();};
   $("fyGo").onclick=()=>fyStart(s);
@@ -4032,6 +4073,7 @@ function hmPlay(i){
     a.addEventListener("play",()=>{if(!video.paused)video.pause();});}
 })();
 if($("hmGen"))$("hmGen").onclick=()=>hmGenerate();
+if($("hmPrompt"))addMic($("hmPrompt"));
 hmInit();
 // ---------- Auto: scene cuts + the Hook | Body boundary ----------
 // Cuts are detected for every clip as soon as it lands in the session (a cheap decode of a
@@ -4405,6 +4447,7 @@ function renderLaneEdit(){
   const on=(id,ev,fn)=>{const e=$(id);if(e)e[ev]=fn;};
   on("leX","onclick",()=>{_laneSel=null;drawLanes();});
   on("leGo","onclick",()=>laneAddSfx());
+  if($("leTxt"))addMic($("leTxt"));
   if($("leTxt")){$("leTxt").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();laneAddSfx();}if(e.key==="Escape"){_laneSel=null;drawLanes();}};$("leTxt").oninput=e=>{s.text=e.target.value;};setTimeout(()=>{try{$("leTxt").focus();}catch(_){}} ,0);}
   on("leVol","oninput",e=>{const v=+e.target.value;$("leVolL").textContent=v+(s.kind==="music"?"":"%");
     if(s.kind==="orig"){mixOf(o,true).orig.vol=v/100;} else if(s.kind==="music")m.music.volume=v/100; else m.sfx[s.i].volume=v/100;

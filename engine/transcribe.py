@@ -58,6 +58,19 @@ def transcribe_whisper(video_path: str, model_size: str = "small",
     return {"language": getattr(info, "language", language) or "en", "words": words}
 
 
+def dictate_english(audio_path: str, model_size: str = None, device: str = "cpu") -> dict:
+    """🎙 Dictation for prompt fields: speak in ANY language → English text (Whisper's own
+    translate task — local, free, no key). → {"text", "language"}."""
+    from faster_whisper import WhisperModel  # lazy
+    size = model_size or os.environ.get("CS_DICTATE_MODEL", "small")
+    key = (size, device)
+    if key not in _WHISPER_CACHE:
+        _WHISPER_CACHE[key] = WhisperModel(size, device=device, compute_type="int8")
+    segs, info = _WHISPER_CACHE[key].transcribe(audio_path, task="translate", beam_size=5, vad_filter=False)
+    text = " ".join(seg.text.strip() for seg in segs).strip()
+    return {"text": text, "language": getattr(info, "language", "") or ""}
+
+
 def transcribe_scribe(video_path: str, api_key: str = None, language: str = None) -> dict:
     """ElevenLabs Scribe speech-to-text with word timestamps."""
     import requests  # lazy

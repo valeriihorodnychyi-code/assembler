@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-09** — 🎙 Dictation in prompt fields: any language → English (local Whisper) (1.9.108)
 - **2026-11-09** — Space = play; Auto SFX for a piece (drag on the SFX lane → synced foley via WaveSpeed) (1.9.107)
 - **2026-11-09** — Captions label; ⬇ music track and voice / music / SFX stems; Seedance reference images (1.9.106)
 - **2026-11-09** — Frame-exact 30 fps renders: no extra black / frozen frame at the end, no gaps between joined clips (1.9.105)

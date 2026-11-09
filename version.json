@@ -1,5 +1,5 @@
 {
-  "version": "1.9.107",
+  "version": "1.9.108",
   "channel": "main",
-  "notes": "␣ Space = play / pause everywhere in Edit, except while typing (a focused button no longer gets clicked). 🔊 Auto SFX for a piece: drag along the SFX lane (or ✨ in its head) → optional hint («door opens, sits on a sofa, curtains») → Generate: HunyuanVideo-Foley on WaveSpeed (~$0.05) watches that part and writes the sounds synced to the action as one block — volume, ✕, ↻ another version. One sound at a point: double-click / ＋ as before."
+  "notes": "🎙 Dictation in every prompt field (Seedance, Auto SFX, one SFX, Hook music): click 🎙, speak in any language, click ■ — the English text lands in the field. Local Whisper (translate), free, no key; needs the browser's microphone permission once."
 }

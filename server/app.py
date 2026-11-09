@@ -2446,6 +2446,31 @@ def library_file(name: str):
 # ----- Assemble (hook render + library body) -----
 
 
+@app.post("/api/dictate")
+async def dictate(file: UploadFile = File(...)):
+    """🎙 A recorded voice note (any language) → English prompt text, locally with Whisper."""
+    import time as _t
+    d = tempfile.mkdtemp(prefix="dictate_")
+    raw = os.path.join(d, "in" + (os.path.splitext(file.filename or "")[1] or ".webm"))
+    wav = os.path.join(d, "in.wav")
+    try:
+        with open(raw, "wb") as out:
+            shutil.copyfileobj(file.file, out)
+        ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-vn", "-ac", "1", "-ar", "16000", wav])
+        t0 = _t.time()
+        r = transcribe.dictate_english(wav)
+        _log_timing("dictate", _t.time() - t0, r.get("language", ""))
+        if not r["text"]:
+            raise HTTPException(400, "Не почув слів — спробуй ще раз, ближче до мікрофона.")
+        return r
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"Dictation failed: {e}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
 @app.post("/api/upload_clip")
 async def upload_clip(file: UploadFile = File(...), file_id: str = Form("")):
     """Upload a ready clip (e.g. an external hook) into a session for the batch board.
