@@ -50,6 +50,12 @@ def test_no_trim_sends_the_whole_clip():
     assert abs(SEEN["dur"] - 8.0) < 0.15 and d["words"][0]["start"] == 0.5
 
 
+
+def test_scribe_language_codes_are_made_whisper_safe():
+    """Scribe gives 'eng'; re-transcribing with Whisper must not get it (it only knows 'en')."""
+    from engine.transcribe import lang2
+    assert [lang2(x) for x in ("eng", "ukr", "pt-BR", "EN", "", None, "zzz")] == ["en", "uk", "pt", "en", None, None, None]
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     failed = 0

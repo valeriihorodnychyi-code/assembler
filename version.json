@@ -1,5 +1,5 @@
 {
-  "version": "1.9.109",
+  "version": "1.9.110",
   "channel": "main",
-  "notes": "Auto SFX for a piece (video → foley) parked: on real hooks it added stray voices and came out too loud / low quality. One-sound SFX (ElevenLabs) with 🎙 dictation stays: double-click the SFX lane or ＋."
+  "notes": "Fix: re-Transcribe with Whisper after Scribe failed with «'eng' is not a valid language code». Language codes are now always 2-letter (en, uk, pt…); unknown → auto-detect."
 }

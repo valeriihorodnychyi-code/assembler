@@ -14,6 +14,29 @@ import os
 import subprocess
 import tempfile
 
+# Scribe speaks ISO 639-3 ("eng", "ukr"), Whisper only 639-1 ("en", "uk"). A clip transcribed with
+# Scribe and RE-transcribed with Whisper passed "eng" and Whisper refused. Everything is stored and
+# passed as the 2-letter code; anything unknown → None (auto-detect).
+_ISO3 = {"eng": "en", "ukr": "uk", "rus": "ru", "spa": "es", "fra": "fr", "fre": "fr", "deu": "de", "ger": "de",
+         "ita": "it", "por": "pt", "pol": "pl", "hun": "hu", "ron": "ro", "rum": "ro", "fin": "fi", "nor": "no",
+         "nob": "no", "nno": "nn", "hrv": "hr", "jpn": "ja", "ces": "cs", "cze": "cs", "dan": "da", "bul": "bg",
+         "tur": "tr", "nld": "nl", "dut": "nl", "ara": "ar", "zho": "zh", "chi": "zh", "cmn": "zh", "kor": "ko",
+         "swe": "sv", "ell": "el", "gre": "el", "heb": "he", "hin": "hi", "ind": "id", "vie": "vi", "tha": "th",
+         "slk": "sk", "slo": "sk", "slv": "sl", "srp": "sr", "lit": "lt", "lav": "lv", "est": "et", "cat": "ca",
+         "msa": "ms", "may": "ms", "fil": "tl", "tgl": "tl", "fas": "fa", "per": "fa", "urd": "ur", "ben": "bn",
+         "kaz": "kk", "bel": "be", "aze": "az", "kat": "ka", "geo": "ka", "hye": "hy", "arm": "hy"}
+
+
+def lang2(code):
+    """'eng' / 'en-US' / 'EN' / 'pt_BR' → 'en' / 'pt'; '' / unknown → None."""
+    c = (code or "").strip().lower().replace("_", "-").split("-")[0]
+    if not c:
+        return None
+    if len(c) == 2:
+        return c
+    return _ISO3.get(c)
+
+
 # Cache loaded whisper models by size so repeated calls are fast.
 _WHISPER_CACHE = {}
 
@@ -36,6 +59,7 @@ def transcribe_whisper(video_path: str, model_size: str = "small",
     if key not in _WHISPER_CACHE:
         _WHISPER_CACHE[key] = WhisperModel(model_size, device=device, compute_type="int8")
     model = _WHISPER_CACHE[key]
+    language = lang2(language)
 
     def _collect(segs):
         out = []
@@ -108,7 +132,7 @@ def transcribe_scribe(video_path: str, api_key: str = None, language: str = None
         words.append({"word": (w.get("text") or "").strip(),
                       "start": float(w.get("start", 0.0)),
                       "end": float(w.get("end", 0.0))})
-    return {"language": payload.get("language_code", language) or "en", "words": words}
+    return {"language": lang2(payload.get("language_code")) or lang2(language) or "en", "words": words}
 
 
 def transcribe(video_path: str, engine: str = "whisper", **kwargs) -> dict:
