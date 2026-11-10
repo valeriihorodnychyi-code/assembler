@@ -6385,8 +6385,7 @@ function buildInspector(){
   const colSet=c=>{L.classList.toggle("col",c);document.body.classList.toggle("ilcol",c);try{localStorage.setItem("cs_ilCol",c?"1":"0");}catch(_){}setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);};
   L.querySelector("#ilCol").onclick=()=>colSet(true); rail.onclick=()=>colSet(false);
   L.addEventListener("input",()=>{saveLastStyle();scheduleExact();}); L.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
-  let c0=null; try{c0=localStorage.getItem("cs_ilCol");}catch(_){}
-  colSet(c0==null?true:c0==="1");   // starts folded (the video first); your choice is remembered
+  colSet(true);   // Assembler always OPENS clean: both panels folded, just the video (open what you need)
   qp.classList.add("insp");
   bar.querySelectorAll("[data-it]").forEach(b=>b.onclick=()=>insTab(b.dataset.it));
   const rc=mk("button","ircol","›"); rc.type="button"; rc.title="Згорнути панель"; bar.appendChild(rc);
@@ -6396,7 +6395,7 @@ function buildInspector(){
   rr.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>{insFold(false);insTab(b.dataset.ir);});
   let last="style"; try{last=localStorage.getItem("cs_insTab")||"style";}catch(_){}
   insTab(INS_TABS.some(x=>x[0]===last)?last:"style");
-  {let r0=null; try{r0=localStorage.getItem("cs_irCol");}catch(_){} insFold(r0==null?true:r0==="1");}   // both panels start folded: the video first
+  insFold(true);   // clean start, every time
   document.body.classList.add("ins2");
   setTimeout(()=>{if(typeof renderVoices==="function")renderVoices();},0);
   // Style regions → replaced by 🗣 Voices + Body (Text tab). Hidden unless an old project still uses the split.

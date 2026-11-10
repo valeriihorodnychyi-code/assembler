@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b12",
+  "version": "2.0.0-b13",
   "channel": "v2",
-  "notes": "Calm header: Load · Jira · Projects | Edit / Loc / Assemble | Export ▾ · ⋯ · Send to Assemble · ⚙ — Normalize, SRT and → LOC moved into ⋯. Projects: a strip of small cards right over the video, only when there is more than one clip (languages and parts next to their project) — visible even with both panels folded."
+  "notes": "Assembler always opens clean: both side panels folded, just the video (Text ›, Style · Titles · Sound on the sides)."
 }
