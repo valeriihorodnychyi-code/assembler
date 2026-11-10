@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b3",
+  "version": "2.0.0-b4",
   "channel": "v2",
-  "notes": "2.0 timeline, playhead like Premiere / AE: scrub only on the time ruler (click / drag) or by dragging the white head. A click on the picture no longer moves the playhead — it selects the piece between splits (Delete removes it, Esc deselects); In / Out ears drag as before and the playhead stays where it was."
+  "notes": "2.0 step 2: one inspector on the right with tabs — Text (Captions, Transcribe, Smart captions, re-voice) · Style (presets in a 3-column grid + Base text and every caption-style group, folded) · Titles (titles, stickers) · Sound (hook music). No left sidebar in Edit: the video and the timeline get its width (Assemble keeps its sidebar). The last tab is remembered."
 }

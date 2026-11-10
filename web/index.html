@@ -449,6 +449,26 @@
   #presetRail .presets{grid-template-columns:1fr;gap:6px;margin-top:0}
   .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0}
   /* only the right tools column sits under the fixed tutorial stickers, so only it steps down */
+  /* 2.0 inspector */
+  body.edit2 .app{grid-template-columns:1fr}
+  body.edit2 .app>.panel{display:none}
+  body.edit2 .stage{grid-column:1}
+  body.edit2 .editstage{grid-template-columns:auto auto 420px}
+  body.edit2 .editstage.wide{grid-template-columns:auto minmax(0,1fr) 420px}
+  @media (max-width:1299px){body.edit2 .editstage{grid-template-columns:auto auto 380px}body.edit2 .editstage.wide{grid-template-columns:auto minmax(0,1fr) 380px}}
+  .qpanel.insp{height:calc(100vh - 168px - var(--dockh,0px));gap:0;padding:0;overflow:hidden;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .itabs{display:flex;gap:2px;padding:6px 6px 0;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .itabs button{flex:1;border:0;border-radius:8px 8px 0 0;background:transparent;color:var(--muted);font-weight:600;font-size:12.5px;padding:8px 6px;position:relative}
+  .itabs button.on{color:#fff;background:var(--panel2)}
+  .itabs .idot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:#8b6cff;display:none}
+  .ibody{overflow-y:auto;padding:10px;flex:1 1 auto;min-height:0}
+  .ipane{display:flex;flex-direction:column;gap:8px}
+  .ipresets{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .ipresets .ilbl{font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#6b7080;margin-bottom:6px}
+  .ipreacts{display:flex;gap:6px;margin-bottom:8px}
+  .ipreacts button{flex:1;font-size:11px;padding:5px 8px;border-radius:7px}
+  .ipresets .presetrail{max-height:none;overflow:visible}
+  .ipresets #presetRail .presets{grid-template-columns:repeat(3,1fr);gap:6px}
   .qpanel{display:flex;flex-direction:column;gap:8px;margin-top:46px;max-height:calc(100vh - 168px - var(--dockh,0px));overflow-y:auto;padding:0 2px}   /* header 58 + stage padding 36 + sticker strip 46 + status line 28 */
   #quickPanel .grp{background:transparent;border:0;margin:0 0 4px;flex-shrink:0}   /* the panel SCROLLS — a shrinking group (overflow:hidden) silently clipped the 🎙 box */
   #quickPanel .grp>summary{background:transparent;border-left:0;padding:8px 4px;font-size:12px;color:var(--muted)}
@@ -4597,7 +4617,7 @@ function laneMute(k){
   L.addEventListener("mousedown",e=>{
     if(e.button===2)return;
     const body=e.target.closest&&e.target.closest(".lbody[data-lane]"); if(!body)return;
-    const go=e.target.closest("[data-go]"); if(go){e.preventDefault();const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}return;}
+    const go=e.target.closest("[data-go]"); if(go){e.preventDefault();openHookMusic();return;}
     const x=e.target.closest("[data-x]"); if(x){e.preventDefault();e.stopPropagation();laneDelete({kind:x.dataset.x,i:+x.dataset.i});return;}
     const blk=e.target.closest(".lblk[data-blk]");
     if(blk&&blk.dataset.blk==="sfx"){const i=+blk.dataset.i, m=mixHolder().mix;
@@ -4788,11 +4808,11 @@ function tlContext(ev){
         {label:"▶ Play track alone",on:()=>{const a=$("sfxAudio");video.pause();a.src=API+m.music.url;a.volume=0.8;a.play().catch(()=>{});}},
         {label:"⬇ Download track",on:()=>dlUrl(m.music.url,m.music.label.replace(/[^\w.\-]+/g,"_")+".mp3")},
         {label:m.music.mute?"🔊 Unmute":"🔇 Mute",on:()=>laneMute("music")},
-        !m.music.own?{label:"⇄ Other take…",title:"Версії — у Hook music зліва",on:()=>{const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}}}:null,
+        !m.music.own?{label:"⇄ Other take…",title:"Версії — у Hook music зліва",on:()=>{openHookMusic();}}:null,
         {label:"🎵 Replace with own file…",on:pickOwnMusic},
         {label:"Volume · duck · old music…",on:()=>laneSelect({kind:"music"})},
         "-",{label:"✕ Remove music",on:()=>laneDelete({kind:"music"})}]);
-    }else ctxMenu(ev,[{head:"Music"},{label:"♪ Generate music…",on:()=>{const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}}},{label:"🎵 Add own audio file…",on:pickOwnMusic}]);
+    }else ctxMenu(ev,[{head:"Music"},{label:"♪ Generate music…",on:()=>{openHookMusic();}},{label:"🎵 Add own audio file…",on:pickOwnMusic}]);
     return;}
   if(lane==="sfx"){
     const blk=ev.target.closest(".lblk[data-blk='sfx']");
@@ -4832,7 +4852,7 @@ async function partsFromAll(){const ps=pieces(); for(const pc of ps){$("trimIn")
     if(currentMode!=="edit"||!videoLoaded||e.metaKey||e.ctrlKey||e.altKey)return;
     if(e.code==="KeyC"){e.preventDefault();splitAtPlayhead();}});
   if($("addOwnBtn"))$("addOwnBtn").onclick=pickOwnMusic;
-  if($("addMusicBtn"))$("addMusicBtn").onclick=()=>{const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}setStatus("♪ Вибери настрій і Generate — трек ляже на доріжку Music.","");};
+  if($("addMusicBtn"))$("addMusicBtn").onclick=()=>{openHookMusic();setStatus("♪ Вибери настрій і Generate — трек ляже на доріжку Music.","");};
   if($("addSfxBtn"))$("addSfxBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
 })();
 // ======================= /2.0 step 1 =======================
@@ -5598,6 +5618,7 @@ function setMode(m){
   $("actEdit").style.display=edit?"flex":"none";
   $("actAsm").style.display=asm?"flex":"none";
   $("panelContent").scrollTop=0;
+  document.body.classList.toggle("edit2",edit&&document.body.classList.contains("ins2"));   // 2.0: Edit has no left sidebar
   $("batchStage").style.display=asm?"block":"none";
   $("locStage").style.display=loc?"block":"none";
   $("editStage").style.display=edit?"grid":"none";
@@ -6113,8 +6134,61 @@ function buildStudioLayout(){
   const ptb=$("packTranscribeBtn");
   if(ptb&&tb){ptb.style.width="100%";ptb.style.margin="6px 0 0";ptb.className="go";tb.insertAdjacentElement("beforebegin",ptb);ptb.onclick=transcribePack;}
   qp.addEventListener("input",()=>{saveLastStyle();scheduleExact();});qp.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+  buildInspector();
   initGrpAccordion();
 }
+// ---------- 2.0 step 2: ONE inspector on the right, with tabs ----------
+// Text (captions on/off, transcribe, smart captions) · Style (presets + every caption-style group,
+// folded) · Titles (titles, stickers) · Sound (hook music). The left sidebar is gone in Edit — the
+// video and the timeline get its width. Elements are MOVED (ids, handlers, state stay).
+const INS_TABS=[["text","Text"],["style","Style"],["titles","Titles"],["sound","Sound"]];
+function buildInspector(){
+  const qp=$("quickPanel"); if(!qp||$("insTabs"))return;
+  const mk=(tag,cls,html)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e;};
+  const bar=mk("div","itabs"); bar.id="insTabs";
+  bar.innerHTML=INS_TABS.map(([k,l])=>"<button type='button' data-it='"+k+"'>"+l+"<i class='idot'></i></button>").join("");
+  const panes={}; INS_TABS.forEach(([k])=>{panes[k]=mk("div","ipane");panes[k].dataset.ip=k;});
+  // Text
+  [...qp.children].forEach(c=>{if(c.id==="grpBaseText")return; panes.text.appendChild(c);});
+  // Style: presets first, then base text, then every style group of the old left sidebar
+  const ez=document.querySelector(".editzone");
+  const pre=mk("div","ipresets"); pre.appendChild(mk("div","ilbl","Presets"));
+  const acts=mk("div","ipreacts"); ["saveStyleBtn2","copyAllBtn"].forEach(id=>{const e=$(id);if(e){e.style.cssText="";acts.appendChild(e);}}); pre.appendChild(acts);
+  if($("presetRail"))pre.appendChild($("presetRail"));
+  if(ez)[...ez.children].forEach(c=>{if(!c.classList.contains("railhead")&&c.id!=="presetRail")pre.appendChild(c);});
+  panes.style.appendChild(pre);
+  if($("grpBaseText"))panes.style.appendChild($("grpBaseText"));
+  const sec=document.querySelector("section.sec[data-sec='style']");
+  if(sec)[...sec.querySelectorAll(":scope > details.grp")].forEach(d=>{
+    const t=(d.querySelector("summary")||{}).textContent||"";
+    if(d.id==="grpHookMusic")panes.sound.appendChild(d);
+    else if(/Titles|Overlays/i.test(t))panes.titles.appendChild(d);
+    else panes.style.appendChild(d);});
+  panes.sound.appendChild(mk("div","hint","Музика й звуки лягають на доріжки таймлайну під відео: правий клік по доріжці — меню, ＋ Own audio — свій трек."));
+  qp.innerHTML=""; qp.appendChild(bar); const body=mk("div","ibody"); INS_TABS.forEach(([k])=>body.appendChild(panes[k])); qp.appendChild(body);
+  if(ez)ez.style.display="none";
+  qp.classList.add("insp");
+  bar.querySelectorAll("[data-it]").forEach(b=>b.onclick=()=>insTab(b.dataset.it));
+  let last="text"; try{last=localStorage.getItem("cs_insTab")||"text";}catch(_){}
+  insTab(INS_TABS.some(x=>x[0]===last)?last:"text");
+  document.body.classList.add("ins2");
+  try{document.body.classList.toggle("edit2",currentMode==="edit");}catch(_){}
+  insDots();
+}
+function insTab(k){
+  document.querySelectorAll("#insTabs [data-it]").forEach(b=>b.classList.toggle("on",b.dataset.it===k));
+  document.querySelectorAll("#quickPanel .ipane").forEach(p=>p.style.display=p.dataset.ip===k?"":"none");
+  try{localStorage.setItem("cs_insTab",k);}catch(_){}
+  if(k==="sound"){const g=$("grpHookMusic");if(g&&!g.open)g.open=true;}   // the only group there — open it
+  const ib=document.querySelector("#quickPanel .ibody"); if(ib)ib.scrollTop=0;
+}
+function insDots(){   // a small dot on a tab that has something switched on
+  const dot=(k,on)=>{const b=document.querySelector("#insTabs [data-it='"+k+"'] .idot");if(b)b.style.display=on?"":"none";};
+  try{dot("titles",(typeof titlesOn==="function"&&titlesOn())||!!(typeof overlays!=="undefined"&&overlays&&overlays.length));}catch(_){dot("titles",false);}
+  const o=(typeof mixHolder==="function")?mixHolder():null; dot("sound",!!(o&&o.mix&&(o.mix.music||o.mix.sfx.length)));
+  dot("text",false); dot("style",false);
+}
+function openHookMusic(){insTab("sound");const g=$("grpHookMusic");if(g){g.open=true;setTimeout(()=>{try{g.scrollIntoView({behavior:"smooth",block:"start"});}catch(_){}},30);}}
 // Accordion: opening a section collapses its siblings in the same column, so the open one
 // always fits and nothing gets pushed off / hidden.
 function initGrpAccordion(){
