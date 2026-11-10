@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-10** — Brand orange for the open tab / panel (2.0.0-b14)
 - **2026-11-10** — Always opens clean: both panels folded (2.0.0-b13)
 - **2026-11-10** — Calm header (⋯ menu); Projects strip over the video (2.0.0-b12)
 - **2026-11-10** — Fix: b10 page didn't start (syntax); UI test now checks the page parses (2.0.0-b11)

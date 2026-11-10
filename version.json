@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b13",
+  "version": "2.0.0-b14",
   "channel": "v2",
-  "notes": "Assembler always opens clean: both side panels folded, just the video (Text ›, Style · Titles · Sound on the sides)."
+  "notes": "Brand orange for what is open: the active Style / Titles / Sound tab, the «Text» title of the open left panel; the folded pills light up orange on hover."
 }

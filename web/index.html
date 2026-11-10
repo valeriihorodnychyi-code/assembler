@@ -494,6 +494,11 @@
   .qpanel.insp .irrail button:hover{color:#fff;background:#1d2029}
   .qpanel.insp.col .itabs,.qpanel.insp.col .ibody{display:none}
   .qpanel.insp.col .irrail{display:flex}
+  /* brand orange for what is OPEN: the active tab, a rail pill on hover */
+  .itabs button.on{background:var(--accent)!important;color:#fff!important}
+  .itabs button:not(.on):hover{color:#fff}
+  .qpanel.insp .irrail button:hover,.insleft .ilrail:hover{color:#fff!important;background:var(--accent)!important;border-color:var(--accent)!important}
+  .insleft:not(.col) .ilhead b{color:var(--accent)}
   /* soft open / fold: the columns slide, the content fades in (no hard jumps) */
   body.edit2 .editstage{transition:grid-template-columns .28s cubic-bezier(.2,.7,.2,1)}
   .insleft .ilbody,.insleft .ilhead,.qpanel.insp .itabs,.qpanel.insp .ibody{animation:panIn .26s ease both}
