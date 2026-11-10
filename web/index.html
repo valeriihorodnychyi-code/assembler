@@ -473,6 +473,18 @@
   body.edit2{--lw:clamp(380px,27vw,580px);--rw:clamp(380px,22vw,460px)}
   body.edit2.ilcol{--lw:40px}
   body.edit2.ircol{--rw:40px}
+  body.edit2 #normalizeBtn,body.edit2 #srtBtn,body.edit2 #sLocBtn{display:none!important}
+  body.edit2 #moreBtn{display:inline-flex!important}
+  /* Projects strip over the video */
+  .groupcol.pstrip{flex-direction:row;align-items:center;gap:10px;max-height:none;overflow:visible;width:100%;justify-content:center}
+  .groupcol.pstrip .railhead{margin:0;writing-mode:vertical-rl;transform:rotate(180deg);font-size:9.5px}
+  .groupcol.pstrip #filmstrip{flex-wrap:nowrap!important;overflow-x:auto;max-height:none;padding:2px;gap:8px;justify-content:flex-start;max-width:100%}
+  .groupcol.pstrip #filmstrip .fgroup{flex-direction:row;align-items:flex-end;gap:4px}
+  .groupcol.pstrip #filmstrip .fsub{flex-direction:row;border-left:0;border-bottom:2px solid var(--accent2);padding:0 0 3px;margin:0}
+  .groupcol.pstrip #filmstrip .fcard{width:38px}
+  .groupcol.pstrip #filmstrip .fcard canvas{width:38px;height:67px}
+  .groupcol.pstrip #filmstrip .fcard.fmini{width:30px}
+  .groupcol.pstrip #filmstrip .fcard.fmini canvas{width:30px;height:53px}
   body.edit2 .editstage{gap:28px!important}
   body.edit2 .insleft,body.edit2 .qpanel.insp{background:rgba(22,24,31,.72);border-color:rgba(255,255,255,.05)}
   .qpanel.insp .ircol{flex:0 0 auto;padding:4px 9px;margin:2px 2px 2px auto;border-radius:7px;font-size:13px;background:transparent;border:1px solid var(--line)}
@@ -667,6 +679,7 @@
       <button id="srtBtn" style="display:none" title="Завантажити .srt для цього кліпа — той самий розбив і ті самі таймінги, що й у запечених титрах">⬇ SRT</button>
       <button class="primary" id="renderBtn" data-i18n="sendAsm" disabled>Send to Assemble →</button>
       <button id="sLocBtn" data-i18n="toLoc" style="display:none">→ LOC</button>
+      <button id="moreBtn" class="ghost" title="Ще: Normalize · SRT · → LOC" style="display:none">⋯</button>
       <button id="copyAllBtn" data-i18n="styleAll" style="display:none" title="Скопіювати стиль активного хука на всі">⧉ Style→all</button>
       <button class="primary" id="sendPackAsmBtn" data-i18n="packAsm" style="display:none">Pack → Assemble →</button>
       <button id="sendPackBtn" data-i18n="packLoc" style="display:none">Pack → LOC →</button>
@@ -2196,6 +2209,7 @@ function renderHookStrip(){
   const fs=$("filmstrip");if(!fs)return;
   const gh=$("groupCol")&&$("groupCol").querySelector(".railhead");
   if(gh)gh.style.display=editPack.length?"":"none";        // an empty "Projects" column costs no width
+  {const gcol=$("groupCol"); if(gcol&&gcol.classList.contains("pstrip"))gcol.style.display=editPack.length>1?"":"none";}   // the strip only for a pack
   if(!editPack.length){fs.style.display="none";fs.innerHTML="";return;}
   fs.style.display="flex";fs.innerHTML="";
   // EN = the PROJECT, its localizations = sub-items: one column per project, the language
@@ -4437,7 +4451,7 @@ if($("setupFile"))$("setupFile").onchange=async e=>{const f=e.target.files[0]; i
 function fitVideo(){
   const col=$("previewCol"), vp=$("viewport"); if(!col||!vp)return;
   let ctl=0;
-  ["transport","trimRow","status","varTabs"].forEach(id=>{const e=$(id); if(e&&e.offsetParent!==null){const r=e.getBoundingClientRect(); ctl+=r.height+12;}});
+  ["transport","trimRow","status","varTabs","groupCol"].forEach(id=>{const e=$(id); if(e&&e.offsetParent!==null){const r=e.getBoundingClientRect(); ctl+=r.height+12;}});
   const strip=$("filmstrip"), extra=58+36+30+(document.querySelector(".tut-wrap")?0:0);   // header + stage padding + breathing room
   const v=Math.round(ctl+extra);
   if(Math.abs((fitVideo._v||0)-v)>2){fitVideo._v=v;document.documentElement.style.setProperty("--ctlh",v+"px");}
@@ -4837,6 +4851,14 @@ async function addOwnMusic(f){
     setStatus("🎵 «"+f.name+"» на доріжці Music від початку кліпу"+(m.orig.mute?"":" · звук кліпу теж грає — заглуши його 🔇 (правий клік по Clip audio → Mute), якщо треба тільки твоя музика")+".","ok");
   }catch(e){busyStop();setStatus("Music: "+e.message,"err");}
 }
+// ---------- ⋯ More (header): what used to crowd the top bar ----------
+function moreMenu(ev){
+  const vis=id=>{const e=$(id);return !!(e&&e.style.display!=="none"&&!e.disabled);};
+  ctxMenu(ev,[{head:"More"},
+    {label:"⚙ Normalize for the board",title:"Підготувати кліп до збірки без титрів (швидке склеювання на дошці)",disabled:!vis("normalizeBtn"),on:()=>$("normalizeBtn").click()},
+    {label:"⬇ SRT",title:"Титри файлом .srt",disabled:!vis("srtBtn"),on:()=>$("srtBtn").click()},
+    {label:"→ LOC",title:"Відправити кліп у локалізації",disabled:!vis("sLocBtn"),on:()=>$("sLocBtn").click()}]);
+}
 // ---------- Export ▾ ----------
 function exportMenu(ev){
   const o=mixHolder(), hasWords=!!(realWords&&realWords.length)&&!capsOffNow();
@@ -4929,6 +4951,7 @@ async function partsFromAll(){const ps=pieces(); for(const pc of ps){$("trimIn")
     if(currentMode!=="edit"||!videoLoaded||e.metaKey||e.ctrlKey||e.altKey)return;
     if(e.code==="KeyC"){e.preventDefault();splitAtPlayhead();}});
   if($("addOwnBtn"))$("addOwnBtn").onclick=pickOwnMusic;
+  if($("moreBtn"))$("moreBtn").onclick=moreMenu;
   if($("addMusicBtn"))$("addMusicBtn").onclick=()=>{openHookMusic();setStatus("♪ Вибери настрій і Generate — трек ляже на доріжку Music.","");};
   if($("addSfxBtn"))$("addSfxBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
 })();
@@ -6355,7 +6378,8 @@ function buildInspector(){
   // ---- LEFT: what is said — Projects (a pack) on top, then Text. Collapses IN PLACE to a thin rail ----
   const L=mk("div","insleft"); L.id="insLeft";
   L.innerHTML="<div class='ilhead'><b>Text</b><span class='ilsub'>що говорять</span><button type='button' class='ilcol' id='ilCol' title='Згорнути / розгорнути панель тексту'>‹</button></div>";
-  const lb=mk("div","ilbody"); const gc=$("groupCol"); if(gc)lb.appendChild(gc); panes.text.style.display=""; lb.appendChild(panes.text); L.appendChild(lb);
+  const lb=mk("div","ilbody"); panes.text.style.display=""; lb.appendChild(panes.text); L.appendChild(lb);
+  {const gc=$("groupCol"), pcx=$("previewCol"); if(gc&&pcx){gc.classList.add("pstrip"); pcx.insertBefore(gc,pcx.firstChild); if(typeof renderHookStrip==="function")renderHookStrip();}}   // Projects: a strip over the video, only when there is more than one clip
   const rail=mk("button","ilrail","<span>Text ›</span>"); rail.type="button"; rail.id="ilRail"; rail.title="Розгорнути панель тексту"; L.appendChild(rail);
   const pc=$("previewCol"); if(pc&&pc.parentElement)pc.parentElement.insertBefore(L,pc);
   const colSet=c=>{L.classList.toggle("col",c);document.body.classList.toggle("ilcol",c);try{localStorage.setItem("cs_ilCol",c?"1":"0");}catch(_){}setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);};
