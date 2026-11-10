@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b2",
+  "version": "2.0.0-b3",
   "channel": "v2",
-  "notes": "2.0 step 1, fixes from Val: ✂ Split now cuts AT THE PLAYHEAD (C, like Premiere's Add Edit) — no blade / select modes. Hotkeys by the physical key: C, I, O work in the Ukrainian layout too. Remove a split: double-click it, or ↺ (all) under ✂. ⟳ Repeat taken out of Edit (goes to Assemble as hook ×N)."
+  "notes": "2.0 timeline, playhead like Premiere / AE: scrub only on the time ruler (click / drag) or by dragging the white head. A click on the picture no longer moves the playhead — it selects the piece between splits (Delete removes it, Esc deselects); In / Out ears drag as before and the playhead stays where it was."
 }

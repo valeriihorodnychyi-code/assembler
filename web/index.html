@@ -201,11 +201,14 @@
   .dockBot .histRow{border-top:0;padding-top:0;justify-content:flex-end}
   .dockBot #tbStatus{margin-left:4px}
   .transport.slim{max-width:none;justify-content:center}
-  .lane.lruler{min-height:16px}
-  .lane.lruler .lbody{height:16px;background:none;border:0;cursor:default;overflow:visible}
+  .lane.lruler{min-height:22px}
+  .lane.lruler .lbody{height:22px;background:#1a1d24;border:1px solid #262a33;border-radius:6px;cursor:ew-resize;overflow:visible}
+  .lane.lruler .lbody:hover{background:#20242d;border-color:#3a3f4d}
+  .lane.lruler .rlbl{font-size:9.5px;color:#5d6270;letter-spacing:.5px}
+  #trimBar{cursor:default}
   #tlRuler i{position:absolute;bottom:0;height:6px;width:1px;background:#4a4e5a}
   #tlRuler u{position:absolute;bottom:0;height:3px;width:1px;background:#353844}
-  #tlRuler b{position:absolute;bottom:6px;font:600 9.5px/1 system-ui;color:#6b7080;transform:translateX(3px);white-space:nowrap}
+  #tlRuler b{position:absolute;bottom:7px;font:600 9.5px/1 system-ui;color:#6b7080;transform:translateX(3px);white-space:nowrap}
   .dockFoot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 22px;margin-left:var(--lh)}
   .dockFoot .trimInfo .tmid{order:0;width:auto}
   .dockFoot .cutRow,.dockFoot .histRow{border-top:0;padding-top:0}
@@ -633,7 +636,7 @@
     <div id="trimRow" class="tlDock" style="display:none">
      <div class="lanes" id="lanes">
       <div class="lane lvid"><div class="lhead"><span class="lname">🎬 Picture</span></div><div class="lbody">
-      <div id="trimBar" title="Клік або тягни — плейхед. Тягни [ ] — трім.">
+      <div id="trimBar" title="Тягни [ ] — трім. Клік — вибрати шматок між розрізами. Перемотка — шкала зверху або біла голівка.">
         <div id="trimDimL" class="tdim"></div><div id="trimDimR" class="tdim"></div>
         <div id="trimSel"></div>
         <div id="cutMark"></div>
@@ -651,7 +654,7 @@
       <div id="laneHead"></div>
       <div id="laneBusy"></div>
      </div>
-     <div class="addTrack" id="addTrack"><button type="button" id="addMusicBtn" title="Згенерувати музику (Hook music) — ляже на доріжку Music">＋ Music</button><button type="button" id="addOwnBtn" title="Свій трек mp3 / wav на доріжку Music">＋ Own audio</button><button type="button" id="addSfxBtn" title="Звук у точці плейхеда">＋ SFX</button><span class="addHint">C — розріз під плейхедом · правий клік по доріжках — меню · Space — play</span></div>
+     <div class="addTrack" id="addTrack"><button type="button" id="addMusicBtn" title="Згенерувати музику (Hook music) — ляже на доріжку Music">＋ Music</button><button type="button" id="addOwnBtn" title="Свій трек mp3 / wav на доріжку Music">＋ Own audio</button><button type="button" id="addSfxBtn" title="Звук у точці плейхеда">＋ SFX</button><span class="addHint">перемотка — шкала зверху або біла голівка · C — розріз · правий клік — меню · Space — play</span></div>
      <div id="laneEdit" class="laneEdit" style="display:none"></div>
      <audio id="sfxAudio" preload="none" style="display:none"></audio>
      <div class="dockFoot">
@@ -2418,17 +2421,21 @@ $("trimBar").addEventListener("pointerdown",e=>{
    const xi=r.left+pf($("trimIn").value,0)/dur*r.width, xo=r.left+(pf($("trimOut").value,dur)||dur)/dur*r.width;
    const di=Math.abs(e.clientX-xi), dO=Math.abs(e.clientX-xo);
    if(Math.min(di,dO)<=14&&!(e.target.closest&&e.target.closest("#trimPlayhead"))){trimDrag(di<=dO?"in":"out")(e);return;}}
-  const _was=video.currentTime||0;
-  e.preventDefault();
+  // 2.0, like Premiere / AE: the PICTURE lane never moves the playhead. Only the white head (drag it)
+  // and the time ruler above scrub. A click on the picture selects the piece between splits.
+  if(e.target.closest&&e.target.closest("#trimPlayhead")){scrubDrag(e);return;}
+  if(typeof selectPieceAt==="function")selectPieceAt(xToTime(e.clientX));
+});
+function scrubDrag(e){
+  if(!videoLoaded)return; e.preventDefault();
   const go=ev=>{const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
-    const t=(Math.floor(xToTime(cx)*fps())+0.5)/fps();video.currentTime=Math.min(t,Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
+    const t=(Math.floor(xToTime(cx)*fps())+0.5)/fps();video.currentTime=Math.min(Math.max(0,t),Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
     if(!video.paused){video.pause();$("playBtn").textContent="▶";}
     if(typeof scheduleExact==="function")scheduleExact();};
   go(e);
-  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);
-    if(Math.abs((video.currentTime||0)-_was)>0.25){_phBack=_was;drawGhost();}};
+  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);};
   document.addEventListener("pointermove",go);document.addEventListener("pointerup",up);
-});
+}
 $("trimHOut").addEventListener("pointerdown",trimDrag("out"));
 // I / O + buttons: park the playhead on the right frame with ⟨ ⟩, then stamp it into the trim
 function setTrimFromPlayhead(which){
@@ -4604,11 +4611,9 @@ function laneMute(k){
         if(!rng){if(videoLoaded)video.currentTime=t0;return;}
         if(_laneSel&&_laneSel.kind==="foley"&&_laneSel.b-_laneSel.a<0.5){_laneSel=null;drawLanes();setStatus("Шматок закороткий — потягни ширше (від 0.5 с).","");}};
       window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up); e.preventDefault(); return;}
-    // empty lane: scrub the playhead (and select the lane)
-    if(videoLoaded){video.currentTime=laneT(e,body);}
+    // empty lane: select it (the playhead moves only from the ruler / its own head — like Premiere)
     if(body.dataset.lane==="orig")laneSelect({kind:"orig"});
-    const mv=ev=>{if(videoLoaded)video.currentTime=laneT(ev,body);}, up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};
-    window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
+    else if(_laneSel&&_laneSel.kind!=="add")laneSelect(null);
   });
   window.addEventListener("mousemove",e=>{if(!drag)return; const r=drag.body.getBoundingClientRect(), dur=video.duration||1;
     const dt=(e.clientX-drag.x0)/r.width*dur; if(Math.abs(e.clientX-drag.x0)>3)drag.moved=true; if(!drag.moved)return;
@@ -4654,6 +4659,7 @@ function drawSplits(){
   box.querySelectorAll("[data-split]").forEach(el=>{el.ondblclick=e=>{e.preventDefault();e.stopPropagation();removeSplit(+el.dataset.split);};});
   const cs=$("clrSplits"); if(cs){const n=splitsOf().length; cs.style.display=n?"":"none"; cs.querySelector("small").textContent=n+" ✕";}
   const hl=$("trimPiece"); if(hl&&!hl._keep)hl.style.display="none";
+  if(typeof _selPiece!=="undefined"&&_selPiece&&pieces().length<2){_selPiece=null;if(hl){hl._keep=false;hl.style.display="none";}}
 }
 function hlPiece(p){let e=$("trimPiece"); const bar=$("trimBar"),dur=video.duration||0; if(!bar||!dur)return;
   if(!e){e=document.createElement("div");e.id="trimPiece";bar.appendChild(e);}
@@ -4801,6 +4807,15 @@ function tlContext(ev){
       {label:(m&&m.sfxMute)?"🔊 Unmute all SFX":"🔇 Mute all SFX",disabled:!(m&&m.sfx.length),on:()=>laneMute("sfx")}]);
   }
 }
+let _selPiece=null;
+function selectPieceAt(t){const ps=pieces();
+  if(ps.length<2){_selPiece=null;hlPiece(null);return;}
+  const p=pieceAt(t); if(_selPiece&&p&&_selPiece[0]===p[0]&&_selPiece[1]===p[1]){_selPiece=null;hlPiece(null);return;}
+  _selPiece=p; hlPiece(p); if(p)setStatus("Шматок "+tc(p[0])+"–"+tc(p[1])+" вибрано · Delete — видалити · правий клік — ще дії.","");}
+document.addEventListener("keydown",e=>{if(!_selPiece)return; const tg=e.target,tag=(tg&&tg.tagName)||"";
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
+  if(e.key==="Escape"){_selPiece=null;hlPiece(null);return;}
+  if((e.key==="Delete"||e.key==="Backspace")&&!(_laneSel&&_laneSel.kind==="sfx")){e.preventDefault();const p=_selPiece;_selPiece=null;deletePiece(p);}});
 async function deletePiece(pc){
   if(!pc)return; hlPiece(null);
   await doCut([[pc[0],pc[1]]],false,{label:"✂ Delete piece "+tc(pc[1]-pc[0])+" @ "+tc(pc[0])});
@@ -6030,7 +6045,8 @@ function buildDock(){
   const sc=$("applyScope"); if(sc){const l=sc.querySelector("span");if(l)l.remove();}
   D.insertBefore(top,D.firstChild);
   // ruler (above the Picture lane)
-  const L=$("lanes"); const ru=mk("div","lane lruler","<div class='lhead'></div><div class='lbody' id='tlRuler'></div>"); L.insertBefore(ru,L.firstChild);
+  const L=$("lanes"); const ru=mk("div","lane lruler","<div class='lhead'><span class='rlbl'>⇠ scrub ⇢</span></div><div class='lbody' id='tlRuler' title='Клік або тягни — перемотка (як у Premiere). Плейхед можна тягнути й за білу голівку.'></div>"); L.insertBefore(ru,L.firstChild);
+  ru.querySelector("#tlRuler").addEventListener("pointerdown",e=>{if(e.button===2)return;scrubDrag(e);});
   // bottom bar: clip tools | history
   const bot=mk("div","dockBar dockBot"); bot.id="dockBot";
   bot.appendChild(grp("Clip",["tbCuts","tbBody","tbPart","tbRegen","tbStatus"],"dtools"));
