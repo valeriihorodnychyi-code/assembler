@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b4",
+  "version": "2.0.0-b5",
   "channel": "v2",
-  "notes": "2.0 step 2: one inspector on the right with tabs — Text (Captions, Transcribe, Smart captions, re-voice) · Style (presets in a 3-column grid + Base text and every caption-style group, folded) · Titles (titles, stickers) · Sound (hook music). No left sidebar in Edit: the video and the timeline get its width (Assemble keeps its sidebar). The last tab is remembered."
+  "notes": "2.0 step 3: 🗣 Voices. Text tab → Voices → 🔍 Detect voices (ElevenLabs Scribe, once per clip, cached): every sentence in Sentences gets a coloured voice tag (click it to reassign). Each voice: name, a ♀ / ♂ guess from the pitch, and its own caption preset; Body (after BODY ▸) can have its own preset too. Priority: a phrase styled by hand > Body > voice > base. Same style regions the render already uses (preview = render). Style regions group hidden (unless an old project still uses it)."
 }

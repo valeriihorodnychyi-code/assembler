@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-10** — 2.0 step 3: voices → caption style per voice, Body style; Style regions replaced (2.0.0-b5)
 - **2026-11-10** — 2.0 step 2: right inspector with tabs Text · Style · Titles · Sound; no left sidebar in Edit (2.0.0-b4)
 - **2026-11-10** — 2.0: playhead like Premiere — scrub on the ruler / head; picture click selects a piece, Delete removes it (2.0.0-b3)
 - **2026-11-10** — 2.0: split at playhead (C), hotkeys in any layout, remove splits, Repeat out of Edit (2.0.0-b2)

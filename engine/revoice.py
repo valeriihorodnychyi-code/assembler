@@ -501,3 +501,59 @@ def splice(clip_path, patches, out_path):
             "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2", "-shortest", out_path]
     _run(cmd)
     return out_path
+
+
+# ---------------------------------------------------------------- 🗣 voices for caption styles
+def speaker_spans(dwords, gap=0.6):
+    """Diarized words → contiguous [start, end, speaker] runs (a pause > gap inside one speaker
+    is kept in the same run — the caption style shouldn't flicker on a breath)."""
+    out = []
+    for w in sorted(dwords or [], key=lambda x: float(x["start"])):
+        s, e, sp = float(w["start"]), float(w["end"]), w.get("speaker") or "speaker_0"
+        if out and out[-1][2] == sp and s - out[-1][1] <= max(gap, 10.0):
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e, sp])
+    return [[round(a, 3), round(b, 3), sp] for a, b, sp in out]
+
+
+def voice_pitch(clip_path, ranges, limit=8.0):
+    """Median pitch (Hz) of one speaker over its ranges — the ♀ / ♂ GUESS (Scribe doesn't say).
+    None when numpy is missing or there's too little voiced audio."""
+    try:
+        import numpy as np
+    except Exception:
+        return None
+    sr, got, chunks = 16000, 0.0, []
+    for a, b in ranges:
+        if got >= limit:
+            break
+        d = min(b - a, limit - got)
+        if d < 0.15:
+            continue
+        p = subprocess.run(["ffmpeg", "-v", "quiet", "-ss", f"{a:.3f}", "-t", f"{d:.3f}", "-i", clip_path,
+                            "-vn", "-ac", "1", "-ar", str(sr), "-f", "s16le", "-"], capture_output=True)
+        if p.stdout:
+            chunks.append(np.frombuffer(p.stdout[: len(p.stdout) // 2 * 2], dtype=np.int16).astype(np.float32) / 32768.0)
+            got += d
+    if not chunks:
+        return None
+    x = np.concatenate(chunks)
+    win, hop = int(0.04 * sr), int(0.02 * sr)
+    lo, hi = sr // 400, sr // 70
+    rms_all = float(np.sqrt(np.mean(x ** 2)) or 1e-9)
+    f0 = []
+    for i in range(0, len(x) - win, hop):
+        fr = x[i:i + win] - np.mean(x[i:i + win])
+        if float(np.sqrt(np.mean(fr ** 2))) < 0.6 * rms_all:
+            continue
+        ac = np.correlate(fr, fr, mode="full")[win - 1:]
+        if ac[0] <= 0:
+            continue
+        seg = ac[lo:hi]
+        k = int(np.argmax(seg))
+        if seg[k] / ac[0] > 0.35:
+            f0.append(sr / (lo + k))
+    if len(f0) < 5:
+        return None
+    return round(float(np.median(f0)), 1)

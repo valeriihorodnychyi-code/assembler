@@ -1611,6 +1611,35 @@ def audio_stems(req: AudioMixReq):
     return {"url": f"/clip/{req.file_id}/{os.path.basename(out_zip)}", "files": len(tmp)}
 
 
+class VoicesReq(BaseModel):
+    file_id: str
+    clip: str
+
+
+@app.post("/api/voices")
+def api_voices(req: VoicesReq):
+    """🗣 Who speaks when: ElevenLabs Scribe diarization (cached per clip, the same file re-voice
+    uses) → speaker runs + a pitch-based ♀ / ♂ guess per speaker."""
+    import requests as _rq
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    try:
+        dw = revoice.diarize(src, _rq, cache_path=os.path.join(sdir, f"_diar_{os.path.splitext(name)[0]}.json"))
+    except revoice.RevoiceError as e:
+        raise HTTPException(400, str(e))
+    spans = revoice.speaker_spans(dw)
+    speakers = []
+    for sp in sorted({x[2] for x in spans}, key=lambda k: next(i for i, x in enumerate(spans) if x[2] == k)):
+        rs = [(a, b) for a, b, k in spans if k == sp]
+        hz = revoice.voice_pitch(src, rs)
+        speakers.append({"id": sp, "seconds": round(sum(b - a for a, b in rs), 2), "hz": hz,
+                         "guess": (None if hz is None else ("male" if hz < 160 else "female" if hz > 185 else None))})
+    return {"spans": spans, "speakers": speakers}
+
+
 class ExtractMusicReq(BaseModel):
     file_id: str
     clip: str
