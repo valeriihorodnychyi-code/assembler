@@ -472,6 +472,32 @@
   body.edit2 .stage{grid-column:1}
   body.edit2{--lw:clamp(380px,27vw,580px);--rw:clamp(380px,22vw,460px)}
   body.edit2.ilcol{--lw:40px}
+  body.edit2.ircol{--rw:40px}
+  body.edit2 .editstage{gap:28px!important}
+  body.edit2 .insleft,body.edit2 .qpanel.insp{background:rgba(22,24,31,.72);border-color:rgba(255,255,255,.05)}
+  .qpanel.insp .ircol{flex:0 0 auto;padding:4px 9px;margin:2px 2px 2px auto;border-radius:7px;font-size:13px;background:transparent;border:1px solid var(--line)}
+  .qpanel.insp .irrail{display:none;flex-direction:column;gap:4px;padding:6px 4px;flex:1}
+  .qpanel.insp .irrail button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:12px;padding:12px 0;border-radius:8px}
+  .qpanel.insp .irrail button span{writing-mode:vertical-rl;letter-spacing:1px}
+  .qpanel.insp .irrail button:hover{color:#fff;background:#1d2029}
+  .qpanel.insp.col .itabs,.qpanel.insp.col .ibody{display:none}
+  .qpanel.insp.col .irrail{display:flex}
+  /* folded = no wall next to the video: just small pills at the top */
+  .insleft.col,.qpanel.insp.col{height:auto!important;background:none!important;border-color:transparent!important;align-self:start}
+  .insleft.col .ilrail{flex:0 0 auto;padding:14px 0;border:1px solid var(--line);border-radius:10px;background:#16181f}
+  .qpanel.insp.col .irrail{padding:0;gap:6px}
+  .qpanel.insp.col .irrail button{border:1px solid var(--line);background:#16181f;padding:14px 0;border-radius:10px}
+  /* compact timeline → more height for the video */
+  .v2dock .tlMain{padding:8px 10px 6px;gap:6px}
+  .v2dock .lane{min-height:24px}
+  .v2dock .lane .lbody{height:24px}
+  .v2dock .lane.lvid #trimBar{height:34px}
+  .v2dock .lane.lruler{min-height:18px}
+  .v2dock .lane.lruler .lbody{height:18px}
+  .v2dock .addHint{display:none}
+  .v2dock .dockBot:has(> .dscope[style*="none"]):has(#histRow[style*="none"]){display:none}
+  .v2dock .dockTop{padding-bottom:6px}
+  .v2dock .dockBot{padding-top:6px}
   body.edit2 .editstage{grid-template-columns:var(--lw) auto var(--rw);gap:18px}
   body.edit2 .editstage.wide{grid-template-columns:var(--lw) minmax(0,1fr) var(--rw)}
   @media (max-width:1399px){body.edit2{--lw:340px;--rw:360px}body.edit2.ilcol{--lw:40px}}
@@ -6329,11 +6355,17 @@ function buildInspector(){
   L.querySelector("#ilCol").onclick=()=>colSet(true); rail.onclick=()=>colSet(false);
   L.addEventListener("input",()=>{saveLastStyle();scheduleExact();}); L.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
   let c0=null; try{c0=localStorage.getItem("cs_ilCol");}catch(_){}
-  colSet(c0==null?(innerWidth<1400):c0==="1");   // a laptop starts with the rail; your choice is remembered
+  colSet(c0==null?true:c0==="1");   // starts folded (the video first); your choice is remembered
   qp.classList.add("insp");
   bar.querySelectorAll("[data-it]").forEach(b=>b.onclick=()=>insTab(b.dataset.it));
+  const rc=mk("button","ircol","›"); rc.type="button"; rc.title="Згорнути панель"; bar.appendChild(rc);
+  const rr=mk("div","irrail"); rr.innerHTML=INS_TABS.map(([k,l])=>"<button type='button' data-ir='"+k+"' title='"+l+"'><span>"+l+"</span></button>").join("");
+  qp.appendChild(rr);
+  rc.onclick=()=>insFold(true);
+  rr.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>{insFold(false);insTab(b.dataset.ir);});
   let last="style"; try{last=localStorage.getItem("cs_insTab")||"style";}catch(_){}
   insTab(INS_TABS.some(x=>x[0]===last)?last:"style");
+  {let r0=null; try{r0=localStorage.getItem("cs_irCol");}catch(_){} insFold(r0==null?true:r0==="1");}   // both panels start folded: the video first
   document.body.classList.add("ins2");
   setTimeout(()=>{if(typeof renderVoices==="function")renderVoices();},0);
   // Style regions → replaced by 🗣 Voices + Body (Text tab). Hidden unless an old project still uses the split.
@@ -6341,7 +6373,11 @@ function buildInspector(){
   try{document.body.classList.toggle("edit2",currentMode==="edit");}catch(_){}
   insDots();
 }
+function insFold(c){const q=$("quickPanel"); if(!q)return; q.classList.toggle("col",c); document.body.classList.toggle("ircol",c);
+  try{localStorage.setItem("cs_irCol",c?"1":"0");}catch(_){}
+  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},60);}
 function insTab(k){
+  const q=$("quickPanel"); if(q&&q.classList.contains("col"))insFold(false);   // asking for a tab opens the panel
   document.querySelectorAll("#insTabs [data-it]").forEach(b=>b.classList.toggle("on",b.dataset.it===k));
   document.querySelectorAll("#quickPanel .ipane").forEach(p=>p.style.display=p.dataset.ip===k?"":"none");   // the left Text pane is not in #quickPanel — untouched
   try{localStorage.setItem("cs_insTab",k);}catch(_){}

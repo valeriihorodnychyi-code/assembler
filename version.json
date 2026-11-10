@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b8",
+  "version": "2.0.0-b9",
   "channel": "v2",
-  "notes": "🗣 Voices: the preset list is now the SAME as the Style grid — your own (★), team and built-in presets; a preset you just saved or imported shows up at once (no renaming tricks). Text and Style panels grow with the screen (left up to 580 px, right up to 460 px) so lines don't wrap into a narrow column on a big monitor."
+  "notes": "Breathing room for the video: both side panels start folded (left «Text ›», right Style · Titles · Sound as small pills at the top); open only what you need — › / ‹ fold them back, the choice is remembered; any action that needs a tab (♪ Music…) opens it. Lighter panels, wider gaps around the video, a more compact timeline (taller video)."
 }
