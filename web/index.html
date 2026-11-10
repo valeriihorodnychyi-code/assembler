@@ -2087,6 +2087,7 @@ async function transcribePack(){
       h.txCover=d.cover||null;
       h.words=d.words; h.origWords=JSON.parse(JSON.stringify(d.words)); if(d.language)h.lang=d.language;   // origWords = the recogniser's own timings, the rescue for ↺
       h.scriptFixes=(d.script_fixes||[]);fixedTotal+=h.scriptFixes.length;
+      if(d.voices&&typeof voicesFor==="function")voicesFor(h,(h.mix&&h.mix.base)||h.clip,true);   // 🗣 free: Scribe diarized in the same call
     ok++;}catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
   }
   batchHintHide();
@@ -4920,19 +4921,26 @@ function effOverrides(v,words,holder){
     const last=out[out.length-1]; if(last&&last.ctrl===L.ctrl&&Math.abs(last.end-a)<1e-6)last.end=b; else out.push({start:a,end:b,ctrl:L.ctrl});}
   _effCache={k:key,t:now,v:out}; return out;
 }
+// o = the hook / clip holder; quiet = after a Scribe transcribe (the diarization is already cached → free)
+async function voicesFor(o,src,quiet){
+  const r=await fetch(API+"/api/voices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,clip:src})});
+  const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"voices failed"));
+  const old=o.voices;
+  o.voices={on:old?old.on!==false:true,spans:d.spans||[],fix:{},body:(old&&old.body)||{on:false,style:""},
+    list:(d.speakers||[]).map((s,i)=>{const prev=old&&old.list&&old.list.find(x=>x.id===s.id);
+      return {id:s.id,name:prev?prev.name:("Voice "+(i+1)),color:VCOL[i%VCOL.length],style:prev?prev.style:"",hz:s.hz,guess:s.guess};})};
+  const v=variants[activeVar]; if(v&&v!==o&&(o===cutHolder()))v.voices=o.voices;
+  _effCache.k=null;
+  if(o===cutHolder()){renderVoices(); if(typeof renderSentsView==="function")renderSentsView(true); if(typeof scheduleExact==="function")scheduleExact();}
+  if(quiet&&o.voices.list.length>1&&o===cutHolder())setStatus("🗣 Scribe знайшов "+o.voices.list.length+" голоси — вони вже в Sentences. Стиль на голос — у картці Voices.","ok");
+  return o.voices;
+}
 async function detectVoices(){
   try{await ensureSessionClip();}catch(e){setStatus("🗣 "+e.message,"err");return;}
   const o=cutHolder(); if(!o)return; const src=(o.mix&&o.mix.base)||o.clip;
   busyStart("🗣 Шукаю голоси (ElevenLabs Scribe)…");
-  try{const r=await fetch(API+"/api/voices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,clip:src})});
-    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"voices failed"));
-    const old=o.voices;
-    o.voices={on:old?old.on!==false:true,spans:d.spans||[],fix:{},body:(old&&old.body)||{on:false,style:""},
-      list:(d.speakers||[]).map((s,i)=>{const prev=old&&old.list&&old.list.find(x=>x.id===s.id);
-        return {id:s.id,name:prev?prev.name:("Voice "+(i+1)),color:VCOL[i%VCOL.length],style:prev?prev.style:"",hz:s.hz,guess:s.guess};})};
-    const v=variants[activeVar]; if(v&&v!==o)v.voices=o.voices;
-    busyDone("Голоси знайдено"); setStatus("🗣 Голосів: "+o.voices.list.length+". Дай кожному свій стиль титрів у картці Voices — і подивись у Sentences.","ok");
-    renderVoices(); if(typeof renderSentsView==="function")renderSentsView(true); if(typeof scheduleExact==="function")scheduleExact();
+  try{const V=await voicesFor(o,src,false);
+    busyDone("Голоси знайдено"); setStatus("🗣 Голосів: "+V.list.length+". Дай кожному свій стиль титрів у картці Voices — і подивись у Sentences.","ok");
   }catch(e){busyStop();setStatus("🗣 "+e.message,"err");}
 }
 function renderVoices(){
@@ -4945,7 +4953,7 @@ function renderVoices(){
   const opts=cur=>"<option value=''>— base style —</option>"+presetNames().map(n=>"<option"+(n===cur?" selected":"")+">"+esc(n)+"</option>").join("");
   if(!V||!V.list||!V.list.length){
     card.innerHTML="<div class='vhead'><b>🗣 Voices</b><span class='vhint'>різні голоси — різні титри</span><button type='button' class='tmini' id='vDetect'>🔍 Detect voices</button></div>"
-      +"<div class='vhint'>ElevenLabs Scribe розділить репліки за голосами (один запит на кліп, кеш). Тоді кожному голосу — свій стиль, і видно в Sentences, хто що каже.</div>"
+      +"<div class='vhint'>Транскрайб через <b>Scribe</b> знаходить голоси сам, без зайвих кредитів. Після Whisper — 🔍 Detect voices (один запит у Scribe на кліп). Тоді кожному голосу — свій стиль, і видно в Sentences, хто що каже.</div>"
       +bodyRow(o,V,opts,esc);
   }else{
     const sv=sentenceVoices(realWords||[],V), cnt=id=>sv.filter(s=>s.voice===id).length;
@@ -5071,6 +5079,7 @@ $("transcribeBtn").onclick=async()=>{
     if(typeof setLangSticker==="function")setLangSticker(d.language);
     setStatus("Транскрибовано "+realWords.length+" слів ("+(d.language||"")+").","ok");busyDone("Транскрибовано");
     $("renderBtn").disabled=false;if($("localizeBtn"))$("localizeBtn").disabled=false;
+    if(d.voices&&typeof voicesFor==="function"){const _o=cutHolder(); if(_o)voicesFor(_o,(_o.mix&&_o.mix.base)||_o.clip,true);}   // 🗣 Scribe already split the voices — free
   }catch(e){setStatus("Transcription error: "+e.message,"err");busyStop();}
   $("transcribeBtn").disabled=false;
   updateEditButtons();   // words exist now → the Transcribe CTA stops pulsing

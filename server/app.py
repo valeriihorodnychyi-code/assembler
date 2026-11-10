@@ -1865,6 +1865,7 @@ async def api_transcribe(
     except Exception as e:  # surface a clean message to the UI
         raise HTTPException(500, f"Transcription failed: {e}")
 
+    has_voices = _save_diar(sdir, "source.mp4", result["words"])
     result["words"] = _clean_transcript(result["words"], result.get("language"))
 
     import json
@@ -1876,6 +1877,7 @@ async def api_transcribe(
         "width": w, "height": h, "duration": dur,
         "language": result["language"],
         "words": result["words"],
+        "voices": has_voices,
     }
 
 
@@ -1903,6 +1905,19 @@ class TranscribeClipReq(BaseModel):
 
 
 TX_MARGIN = 1.0
+
+
+def _save_diar(sdir, clip_name, words):
+    """Scribe already said who speaks when (diarize in the transcribe call) → the same cache file
+    🗣 Voices and re-voice read, so detecting voices afterwards costs nothing. → True if saved."""
+    import json as _json
+    dw = [{"start": float(w["start"]), "end": float(w["end"]), "speaker": w["speaker"]}
+          for w in (words or []) if w.get("speaker") and "start" in w and "end" in w]
+    if not dw:
+        return False
+    with open(os.path.join(sdir, f"_diar_{os.path.splitext(os.path.basename(clip_name))[0]}.json"), "w") as f:
+        _json.dump(dw, f)
+    return True
 
 
 @app.post("/api/transcribe_clip")
@@ -1944,6 +1959,7 @@ def api_transcribe_clip(req: TranscribeClipReq):
         for w in result["words"]:
             w["start"] = round(float(w["start"]) + off, 3)
             w["end"] = round(float(w["end"]) + off, 3)
+    has_voices = _save_diar(sdir, clip, result["words"])
     words, fixes = result["words"], []
     if req.script:
         # The recogniser knows WHEN, the task text knows WHAT. Fix only one-for-one
@@ -1952,7 +1968,7 @@ def api_transcribe_clip(req: TranscribeClipReq):
         words, fixes = jira.align_to_script(words, req.script)
     return {"language": result["language"],
             "words": _clean_transcript(words, result.get("language")),
-            "script_fixes": fixes, "cover": [round(cover[0], 3), round(cover[1], 3)]}
+            "script_fixes": fixes, "cover": [round(cover[0], 3), round(cover[1], 3)], "voices": has_voices}
 
 
 class PreviewFrameReq(BaseModel):

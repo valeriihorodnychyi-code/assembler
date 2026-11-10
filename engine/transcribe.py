@@ -106,7 +106,8 @@ def transcribe_scribe(video_path: str, api_key: str = None, language: str = None
     audio = extract_audio(video_path)
     try:
         with open(audio, "rb") as f:
-            data = {"model_id": "scribe_v1", "timestamps_granularity": "word"}
+            # diarize in the SAME request: who speaks when comes free with the words (🗣 Voices)
+            data = {"model_id": "scribe_v1", "timestamps_granularity": "word", "diarize": "true"}
             if language:
                 data["language_code"] = language
             resp = requests.post(
@@ -129,9 +130,10 @@ def transcribe_scribe(video_path: str, api_key: str = None, language: str = None
         # Scribe returns spacing/audio_event tokens too; keep only real words.
         if w.get("type", "word") != "word":
             continue
-        words.append({"word": (w.get("text") or "").strip(),
-                      "start": float(w.get("start", 0.0)),
-                      "end": float(w.get("end", 0.0))})
+        ww = {"word": (w.get("text") or "").strip(), "start": float(w.get("start", 0.0)), "end": float(w.get("end", 0.0))}
+        if w.get("speaker_id"):
+            ww["speaker"] = w["speaker_id"]
+        words.append(ww)
     return {"language": lang2(payload.get("language_code")) or lang2(language) or "en", "words": words}
 
 
