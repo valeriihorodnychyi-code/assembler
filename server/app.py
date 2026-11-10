@@ -1002,6 +1002,62 @@ def api_cut(req: CutReq):
             "orig_words": compose.shift_words_cut(req.orig_words, spans, fps=fps)}
 
 
+# ---------- ⟳ Repeat ×N: a loop played N times (an 8-s animation → 32 s) ----------
+class RepeatReq(BaseModel):
+    file_id: str
+    clip: str
+    n: int = 2
+    words: List[dict] = []
+    orig_words: List[dict] = []
+
+
+@app.post("/api/repeat")
+def api_repeat(req: RepeatReq):
+    """The clip N times in a row → a NEW file "<name>_xN" (frame-exact, one encode); words are
+    repeated on every loop. The original stays for ↩."""
+    import re as _re, time as _t
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip «{name}» not found in the session")
+    n = max(2, min(20, int(req.n)))
+    vdur = ffmpeg_utils.video_stream_duration(src)
+    N = ffmpeg_utils.frames_out(vdur)
+    T = N / ffmpeg_utils.FPS_OUT
+    if T * n > 600:
+        raise HTTPException(400, "Задовго: більше 10 хв після повтору.")
+    stem, ext = os.path.splitext(name)
+    stem = _re.sub(r"(_mix_[0-9a-f]{10})+$", "", stem)
+    out = f"{stem}_x{n}{ext}"
+    k = 1
+    while os.path.exists(os.path.join(sdir, out)):
+        k += 1
+        out = f"{stem}_x{n}_{k}{ext}"
+    has_a = music11.has_audio(src)
+    fc = (f"[0:v]fps={ffmpeg_utils.FPS_OUT},tpad=stop_mode=clone:stop_duration=0.2,trim=end_frame={N},setpts=PTS-STARTPTS,"
+          f"split={n}" + "".join(f"[v{i}]" for i in range(n)) + "; ")
+    if has_a:
+        fc += (f"[0:a]aformat=sample_rates=44100:channel_layouts=stereo,apad,atrim=0:{T:.6f},asetpts=PTS-STARTPTS,"
+               f"asplit={n}" + "".join(f"[a{i}]" for i in range(n)) + "; ")
+        fc += "".join(f"[v{i}][a{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=1[ov][oa]"
+        maps = ["-map", "[ov]", "-map", "[oa]", "-c:a", "aac", "-b:a", "192k"]
+    else:
+        fc += "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[ov]"
+        maps = ["-map", "[ov]"]
+    t0 = _t.time()
+    try:
+        ffmpeg_utils.run(["ffmpeg", "-y", "-i", src, "-filter_complex", fc] + maps
+                         + ffmpeg_utils.encoder_quality_args("12M") + ["-pix_fmt", "yuv420p", os.path.join(sdir, out)])
+    except Exception as e:
+        raise HTTPException(500, f"Repeat failed: {e}")
+    _log_timing("repeat", _t.time() - t0, f"x{n}")
+    rep_w = lambda ws: [dict(w, start=round(float(w["start"]) + i * T, 4), end=round(float(w["end"]) + i * T, 4))
+                        for i in range(n) for w in (ws or []) if "start" in w and "end" in w and float(w["start"]) < T]
+    return {"clip": out, "url": f"/clip/{req.file_id}/{out}", "n": n, "loop": round(T, 4), "dur_before": round(vdur, 4),
+            "words": rep_w(req.words), "orig_words": rep_w(req.orig_words)}
+
+
 # ---------- ⧉ parts: a zone of a clip becomes its own (sub-)project ----------
 class PartReq(BaseModel):
     file_id: str
@@ -1559,6 +1615,7 @@ class ExtractMusicReq(BaseModel):
     file_id: str
     clip: str
     zone: Optional[List[float]] = None
+    separate: bool = True          # False = only the audio as it is (FFmpeg, free)
 
 
 @app.post("/api/audio/extract_music")
@@ -1583,6 +1640,8 @@ def audio_extract_music(req: ExtractMusicReq):
         cmd = ["ffmpeg", "-y"] + (["-ss", f"{float(z[0]):.3f}", "-t", f"{float(z[1]) - float(z[0]):.3f}"] if z else []) \
             + ["-i", src, "-vn", "-ac", "2", "-ar", "44100", "-b:a", "192k", P(raw_n)]
         ffmpeg_utils.run(cmd)
+    if not req.separate:
+        return {"audio": U(raw_n), "name": stem + tag}
     if not os.path.exists(P(inst_n)):
         t0 = _t.time()
         try:

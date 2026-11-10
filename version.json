@@ -1,5 +1,5 @@
 {
-  "version": "1.9.111",
-  "channel": "main",
-  "notes": "⬇ Music from any clip: ⬇ in the Clip audio lane → ♪ Music only (no voice, ElevenLabs Stem Separation) · 🗣 Voice only · Audio as is — for the trim In–Out zone when set (one loop of an animation), else the whole clip. Frame-step ⟨ ⟩ buttons are blue now, easy to find."
+  "version": "2.0.0-b1",
+  "channel": "v2",
+  "notes": "Assembler 2.0 · step 1 (timeline). Compact centred timeline: tools on the left (↖ select V · ✂ blade C), clip actions on the right (Cuts, Body, New part, Seedance, ⟳ Repeat ×N). ✂ Blade: click the picture to split; right-click a piece → ✕ delete it, ⧉ make it a part, ⧉ parts from all pieces. Right-click menus on every lane and block (Picture: split, In / Out, Repeat, Mute · Clip audio: Mute, ⬇ audio as is, music only / voice only · Music: play, ⬇ track, own file, remove · SFX: solo, another version, ⬇, delete). ⟳ Repeat ×N: an 8-s loop → N times, words repeated, ↩ in History. ＋ Own audio: your mp3 / wav on the Music lane over the whole clip. Music / SFX lanes appear only when something is on them. Export ▾: Video · Audio only (FFmpeg, free) · Stems · SRT."
 }

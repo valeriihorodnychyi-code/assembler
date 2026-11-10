@@ -147,6 +147,33 @@
   .laneEdit input[type=range]{width:110px}
   .laneEdit label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
   .laneEdit .lhint{flex-basis:100%;font-size:10.5px;color:#6b7080}
+  /* 2.0 dock: compact & centred, space on both sides */
+  .tlDock.v2dock{max-width:1000px;margin:0 auto;background:none;border:0;padding:0;--lh:118px}
+  .tlGrid{display:grid;grid-template-columns:52px minmax(0,1fr) 150px;gap:12px;align-items:start;width:100%}
+  .tlMain{background:#15171d;border:1px solid var(--line);border-radius:12px;padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .tlTools{display:flex;flex-direction:column;gap:6px}
+  .ttool{width:52px;height:46px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px;line-height:1;background:#1d2029;border:1px solid var(--line);border-radius:10px}
+  .ttool small{font-size:9px;color:var(--muted);margin-top:3px}
+  .ttool.on{background:#1e293b;border-color:#3b82f6;color:#fff}
+  .tlActs{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+  .v2dock #laneOrigDl{display:none}   /* ⬇ lives in the right-click menu and in Export ▾ now */
+  .tlActs .tchip{justify-content:flex-start;padding:7px 10px;font-size:11.5px}
+  .tlActs #tbStatus{font-size:10.5px;color:var(--muted);padding:0 2px}
+  .tchip.rep .tdot{background:#22c55e}
+  #trimBar.blade{cursor:crosshair}
+  #trimSplits{position:absolute;inset:0;pointer-events:none;z-index:4}
+  #trimSplits i{position:absolute;top:-5px;bottom:-5px;width:2px;margin-left:-1px;background:#ff3a22}
+  #trimSplits i::before{content:"✂";position:absolute;top:-13px;left:-4px;font-size:9px;color:#ff3a22}
+  #trimPiece{position:absolute;top:0;bottom:0;display:none;background:rgba(255,58,34,.22);border:1px solid #ff3a22;pointer-events:none;z-index:3}
+  .addTrack{display:flex;gap:6px;align-items:center;margin-left:var(--lh);flex-wrap:wrap}
+  .addTrack button{font-size:11px;padding:3px 9px;border:1px dashed #3a3e4a;background:transparent;color:var(--muted);border-radius:7px}
+  .addTrack button:hover{color:var(--txt);border-color:#5a5f6e}
+  .addTrack .addHint{font-size:10.5px;color:#5d6270;margin-left:auto}
+  .ctxm{min-width:230px}
+  .ctxm .chead{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#6b7080;padding:6px 9px 4px}
+  .ctxm button{display:flex;align-items:center}
+  .ctxm button:disabled{opacity:.4;cursor:default}
+  .ctxm .ckey{margin-left:auto;font-size:10px;color:#6b7080;border:1px solid #3a3e4a;border-radius:4px;padding:0 4px}
   .dockBar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 0;font-size:11.5px;color:var(--muted)}
   .dockBar .dgrp{display:flex;align-items:center;gap:5px;padding:0 12px;border-left:1px solid #2c2f39;min-height:30px}
   .dockBar .dgrp:first-child{border-left:0;padding-left:0}
@@ -622,6 +649,7 @@
       <div id="laneHead"></div>
       <div id="laneBusy"></div>
      </div>
+     <div class="addTrack" id="addTrack"><button type="button" id="addMusicBtn" title="Згенерувати музику (Hook music) — ляже на доріжку Music">＋ Music</button><button type="button" id="addOwnBtn" title="Свій трек mp3 / wav на доріжку Music">＋ Own audio</button><button type="button" id="addSfxBtn" title="Звук у точці плейхеда">＋ SFX</button><span class="addHint">правий клік по доріжках — меню · C — лезо · V — вибір</span></div>
      <div id="laneEdit" class="laneEdit" style="display:none"></div>
      <audio id="sfxAudio" preload="none" style="display:none"></audio>
      <div class="dockFoot">
@@ -2326,7 +2354,7 @@ function drawTrimBar(){
   if(typeof drawCutMark==="function")drawCutMark();
   if(typeof drawBodyMark==="function")drawBodyMark();
   if(typeof drawLanes==="function")drawLanes();
-  drawGhost(); if(typeof drawRuler==="function")drawRuler();
+  drawGhost(); if(typeof drawRuler==="function")drawRuler(); if(typeof drawSplits==="function")drawSplits();
   // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
   $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
   $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
@@ -2380,6 +2408,8 @@ function drawGhost(){const g=$("phGhost"),dur=video.duration||0; if(!g)return;
 $("trimHIn").addEventListener("pointerdown",trimDrag("in"));
 // the bar itself is the SCRUBBER: click / drag anywhere that isn't a handle = move the playhead
 $("trimBar").addEventListener("pointerdown",e=>{
+  if(e.button===2)return;   // right button → the context menu
+  if(videoLoaded&&typeof _tlTool!=="undefined"&&_tlTool==="blade"&&!(e.target.closest&&e.target.closest(".thandle,#trimPlayhead"))){e.preventDefault();addSplit(xToTime(e.clientX));return;}
   if(!videoLoaded||(e.target.closest&&e.target.closest(".thandle")))return;
   if(e.target.closest&&e.target.closest("#phGhost")){e.preventDefault();const b=_phBack;_phBack=null;drawGhost();video.currentTime=b;return;}
   // near an edge = grab the edge, never jump the playhead (the ears are thin; 14 px of grace)
@@ -3461,7 +3491,7 @@ function cutMarkFromPlayhead(which){
 }
 // Every object that holds THIS clip (Edit variant, the open pack hook, board copies, LOC tiles)
 // carries its own copies of words / trim / titles / stickers / caption window — each must move.
-const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out","body"];
+const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out","body","splits"];
 function cutSnapshot(v,h){
   const J=x=>x==null?x:JSON.parse(JSON.stringify(x)), per=new Map();
   rvTargets(v.clip).forEach(o=>{const s={};CUT_FIELDS.forEach(k=>{if(k in o)s[k]=J(o[k]);});if(o.mix)s._sfxAt=o.mix.sfx.map(x=>x.at);per.set(o,s);});
@@ -3490,6 +3520,7 @@ function cutApplyTimes(targets,spans,oldDur,newWords,notActive){
     if(o.titles)o.titles=once(o.titles,rtTitles);
     ["capIn","capOut","cap_in","cap_out","body"].forEach(k=>{if(o[k]!=null)o[k]=R(o[k]);});
     if(o.mix&&o.mix.sfx)once(o.mix.sfx,l=>{l.forEach(s=>{s.at=R(s.at);});return l;});   // 🎚 sounds stay on their picture
+    if(o.splits)o.splits=once(o.splits,l=>l.filter(x=>!cutInside(x,spans)).map(R).filter((x,i,a)=>x>0.05&&a.indexOf(x)===i));
     if(o!==v&&o!==h&&newWords&&("words" in o))o.words=newWords.map(w=>({...w}));   // board / LOC copies get the re-timed captions too
   });
   if(notActive)return;          // another clip of the pack: the editor's own titles / caption window are not its
@@ -4328,6 +4359,9 @@ function mixOf(o,create){
   }
   return o.mix||null;
 }
+function musicZone(o){const m=o&&o.mix;
+  if(m&&m.music&&m.music.own){const tr=o.trim||null;return tr?[+tr[0],+tr[1]]:null;}   // your own track: the whole kept clip, body included
+  return hmZone(o);}
 function mixActive(m){return !!m&&(!!(m.music&&!m.music.mute)||(!m.sfxMute&&m.sfx.some(s=>!s.mute))||!!m.orig.mute||Math.abs((m.orig.vol??1)-1)>0.001);}
 function mixSetMusic(o,t){
   const m=mixOf(o,true), p=m.music;
@@ -4350,7 +4384,7 @@ async function mixRun(o){
     laneBusy(true);
     try{
       const r=await fetch(API+"/api/audio/mix",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-        file_id:fileId,base:m.base,zone:hmZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
+        file_id:fileId,base:m.base,zone:musicZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
         music:(m.music&&!m.music.mute)?{name:m.music.name,volume:m.music.volume,duck:m.music.duck,strip:m.music.strip,sfx:m.music.sfx||""}:null,
         sfx:m.sfxMute?[]:m.sfx.filter(s=>!s.mute).map(s=>({name:s.name,at:s.at,volume:s.volume}))})});
       const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"mix failed"));
@@ -4389,8 +4423,8 @@ function drawLanes(){
   document.querySelectorAll(".lbody[data-lane]").forEach(b=>b.classList.toggle("sel",!!(_laneSel&&_laneSel.kind===b.dataset.lane&&_laneSel.kind!=="sfx")));
   // ♪ music: one block over its zone
   const mb=$("laneMusicBody");
-  if(m&&m.music){const z=hmZone(o)||[0,dur], a=z[0], e=Math.min(dur,z[1]);
-    mb.innerHTML="<div class='lblk music"+(_laneSel&&_laneSel.kind==="music"?" sel":"")+"' data-blk='music' style='left:"+pct(a)+"%;width:"+Math.max(0.5,pct(e)-pct(a))+"%' title='Клік — налаштування музики'>♪ "+esc(m.music.label)+"<span class='lx' data-x='music' title='Прибрати музику'>✕</span></div>";}
+  if(m&&m.music){const z=musicZone(o)||[0,dur], a=z[0], e=Math.min(dur,z[1]);
+    mb.innerHTML="<div class='lblk music"+(_laneSel&&_laneSel.kind==="music"?" sel":"")+"' data-blk='music' style='left:"+pct(a)+"%;width:"+Math.max(0.5,pct(e)-pct(a))+"%' title='Клік — налаштування музики · правий клік — меню'>"+(m.music.own?"🎵 ":"♪ ")+esc(m.music.label)+"<span class='lx' data-x='music' title='Прибрати музику'>✕</span></div>";}
   else mb.innerHTML="<div class='lempty'>Немає музики · <b data-go='music'>♪ Generate</b>&nbsp;у Hook music зліва — вона ляже сюди</div>";
   // 🔊 sfx blocks
   const sb=$("laneSfxBody"), list=(m&&m.sfx)||[];
@@ -4398,10 +4432,14 @@ function drawLanes(){
     +(_laneSel&&_laneSel.kind==="add"?"<div class='lblk sfx' style='left:"+pct(_laneSel.at)+"%;width:6px;opacity:.6;pointer-events:none'></div>":"")
     :"<div class='lempty'>"+(FOLEY_ON?"Потягни по доріжці — авто-звуки під картинку шматка · ":"")+"Подвійний клік — звук у цьому місці (🎙 можна надиктувати) · або ＋</div>";
   if(_laneSel&&_laneSel.kind==="foley")sb.innerHTML+="<div class='lblk' style='left:"+pct(_laneSel.a)+"%;width:"+Math.max(0.5,pct(_laneSel.b)-pct(_laneSel.a))+"%;background:rgba(251,146,60,.25);border:1px dashed #fb923c;pointer-events:none'></div>";
+  // 2.0: Music / SFX lanes only when something is on them (or you're adding a sound)
+  const hasMu=!!(m&&m.music), hasFx=!!(m&&m.sfx.length)||!!(_laneSel&&(_laneSel.kind==="add"||_laneSel.kind==="foley"));
+  $("laneMusic").style.display=hasMu?"":"none"; $("laneSfx").style.display=hasFx?"":"none";
+  if($("addMusicBtn"))$("addMusicBtn").style.display=hasMu?"none":"";
   drawWave(o);
   renderLaneEdit();
   // the music follows the trim / body: when its zone moves, re-mix (debounced)
-  if(m&&m.music&&!m.music.mute){const k=JSON.stringify(hmZone(o));const was=_zoneKey.get(m);_zoneKey.set(m,k);if(was!=null&&was!==k)mixSoon(o,700);}
+  if(m&&m.music&&!m.music.mute){const k=JSON.stringify(musicZone(o));const was=_zoneKey.get(m);_zoneKey.set(m,k);if(was!=null&&was!==k)mixSoon(o,700);}
 }
 async function drawWave(o){
   const cv=$("waveOrig"); if(!cv||!o||!fileId)return;
@@ -4500,7 +4538,7 @@ async function laneStems(){
   const o=mixHolder(), m=o&&o.mix; if(!m){setStatus("Немає шарів звуку на цьому кліпі.","");return;}
   busyStart("⬇ Готую stems (голос · музика · SFX)…");
   try{const r=await fetch(API+"/api/audio/stems",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-      file_id:fileId,base:m.base,zone:hmZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
+      file_id:fileId,base:m.base,zone:musicZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
       music:m.music?{name:m.music.name,volume:m.music.volume,duck:m.music.duck,strip:m.music.strip}:null,
       sfx:m.sfx.filter(x=>!x.mute).map(x=>({name:x.name,at:x.at,volume:x.volume}))})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"stems failed"));
@@ -4549,6 +4587,7 @@ function laneMute(k){
     laneSelect({kind:"foley",a:Math.max(0,z[0]),b:Math.min(video.duration||z[1],z[1]),text:""});};
   let drag=null;
   L.addEventListener("mousedown",e=>{
+    if(e.button===2)return;
     const body=e.target.closest&&e.target.closest(".lbody[data-lane]"); if(!body)return;
     const go=e.target.closest("[data-go]"); if(go){e.preventDefault();const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}return;}
     const x=e.target.closest("[data-x]"); if(x){e.preventDefault();e.stopPropagation();laneDelete({kind:x.dataset.x,i:+x.dataset.i});return;}
@@ -4587,6 +4626,198 @@ function laneMute(k){
   video.addEventListener("play",()=>{["sfxAudio","hmAudio"].forEach(id=>{const a=$(id);if(a&&!a.paused)a.pause();});});
   window.addEventListener("resize",()=>{clearTimeout(wireLanes._r);wireLanes._r=setTimeout(drawLanes,150);});
 })();
+// ======================= 2.0 · timeline step 1 =======================
+// ↖ select / ✂ blade tools, splits → pieces (delete a piece / make parts), right-click menus on
+// every lane and block, ⟳ Repeat ×N, 🎵 your own music file, Export ▾. Native-feeling: what you'd
+// try without reading a guide (right-click, V / C keys, Delete) just works.
+let _tlTool="sel";
+function setTool(t){_tlTool=t;document.querySelectorAll("#tlTools .ttool").forEach(b=>b.classList.toggle("on",b.dataset.tool===t));
+  const tb=$("trimBar"); if(tb)tb.classList.toggle("blade",t==="blade");
+  setStatus(t==="blade"?"✂ Лезо: клік по картинці — розріз. Правий клік по шматку — видалити або зробити частиною. V — назад до вибору.":"↖ Вибір: клік — плейхед, тягни [ ] — трім, правий клік — меню.","");}
+function splitsOf(){const o=cutHolder();return (o&&o.splits)||[];}
+function addSplit(t){const o=cutHolder(); if(!o||!videoLoaded)return; const dur=video.duration||0;
+  t=+((Math.round(t*fps()))/fps()).toFixed(3); if(t<=0.05||t>=dur-0.05)return;
+  const s=(o.splits=o.splits||[]); if(s.some(x=>Math.abs(x-t)<1/fps()))return; s.push(t); s.sort((a,b)=>a-b);
+  const v=variants[activeVar]; if(v&&v!==o)v.splits=s; drawSplits();
+  setStatus("✂ Розріз на "+tc(t)+" · шматків: "+(s.length+1)+". Правий клік по шматку — ✕ видалити / ⧉ частина.","ok");}
+function pieces(){const dur=video.duration||0, s=splitsOf(); const pts=[0].concat(s,[dur]); const out=[];for(let i=0;i<pts.length-1;i++)out.push([pts[i],pts[i+1]]);return out;}
+function pieceAt(t){return pieces().find(([a,b])=>t>=a&&t<b)||null;}
+function drawSplits(){
+  const bar=$("trimBar"),dur=video.duration||0; if(!bar)return;
+  let box=$("trimSplits"); if(!box){box=document.createElement("div");box.id="trimSplits";bar.appendChild(box);}
+  box.innerHTML=dur?splitsOf().map(t=>"<i style='left:"+(t/dur*100)+"%' title='Розріз "+tc(t)+" · правий клік — меню'></i>").join(""):"";
+  const hl=$("trimPiece"); if(hl&&!hl._keep)hl.style.display="none";
+}
+function hlPiece(p){let e=$("trimPiece"); const bar=$("trimBar"),dur=video.duration||0; if(!bar||!dur)return;
+  if(!e){e=document.createElement("div");e.id="trimPiece";bar.appendChild(e);}
+  if(!p){e.style.display="none";e._keep=false;return;} e._keep=true; e.style.display="block"; e.style.left=(p[0]/dur*100)+"%"; e.style.width=((p[1]-p[0])/dur*100)+"%";}
+// ---------- context menu ----------
+function ctxMenu(ev,items,onClose){
+  ev.preventDefault(); ev.stopPropagation();
+  const old=$("ctxm"); if(old)old.remove();
+  const p=document.createElement("div");p.id="ctxm";p.className="tpop ctxm";
+  items.filter(Boolean).forEach(it=>{if(it==="-"){const s=document.createElement("div");s.className="tsep";p.appendChild(s);return;}
+    if(it.head){const s=document.createElement("div");s.className="chead";s.textContent=it.head;p.appendChild(s);return;}
+    const b=document.createElement("button");b.type="button";b.innerHTML=it.label+(it.key?"<span class='ckey'>"+it.key+"</span>":"");if(it.title)b.title=it.title;
+    if(it.disabled){b.disabled=true;} b.onclick=()=>{close();it.on();};p.appendChild(b);});
+  document.body.appendChild(p);
+  p.style.left=Math.max(6,Math.min(ev.clientX,innerWidth-p.offsetWidth-8))+"px";
+  p.style.top=Math.max(6,Math.min(ev.clientY,innerHeight-p.offsetHeight-8))+"px";
+  function close(){p.remove();document.removeEventListener("pointerdown",off,true);document.removeEventListener("keydown",esc,true);if(onClose)onClose();}
+  function off(e){if(!p.contains(e.target))close();}
+  function esc(e){if(e.key==="Escape"){e.preventDefault();close();}}
+  setTimeout(()=>{document.addEventListener("pointerdown",off,true);document.addEventListener("keydown",esc,true);},0);
+}
+function dlUrl(url,name){const a=document.createElement("a");a.href=API+url;a.download=name||url.split("/").pop();document.body.appendChild(a);a.click();a.remove();}
+async function audioAsIs(clip,zone,label){
+  try{await ensureSessionClip();}catch(e){setStatus("⬇ "+e.message,"err");return;}
+  busyStart("⬇ Готую звук…");
+  try{const r=await fetch(API+"/api/audio/extract_music",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,clip,zone,separate:false})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"audio failed"));
+    dlUrl(d.audio,(d.name||"clip")+"_"+(label||"audio")+".mp3"); busyDone("Готово"); setStatus("⬇ Звук"+(zone?" ("+tc(zone[0])+"–"+tc(zone[1])+")":"")+" — скачано. FFmpeg, без кредитів.","ok");
+  }catch(e){busyStop();setStatus("⬇ "+e.message,"err");}
+}
+const trimZoneNow=()=>{const d=video.duration||0,a=pf($("trimIn").value,0),b=pf($("trimOut").value,d)||d;return (a>0.05||b<d-0.05)?[+a.toFixed(3),+b.toFixed(3)]:null;};
+// ---------- ⟳ Repeat ×N ----------
+async function doRepeat(n){
+  n=Math.max(2,Math.min(20,parseInt(n,10)||0)); if(!n)return;
+  try{await ensureSessionClip();}catch(e){setStatus("Repeat: "+e.message,"err");return;}
+  const v=variants[activeVar], h=openHookRef(); if(!v||!v.clip||!fileId)return;
+  const _mo=mixHolder(), _mm=mixUnwrap(_mo);
+  busyStart("⟳ Повторюю кліп ×"+n+"…");
+  try{const r=await fetch(API+"/api/repeat",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:v.clip,n,words:realWords||[],orig_words:origWordsNow()||[]})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"repeat failed"));
+    const before=cutSnapshot(v,h), targets=rvTargets(v.clip);
+    before.label="⟳ Repeat ×"+d.n; before.undoName="repeat";
+    const L=d.loop;
+    targets.forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
+      o.origWords=(d.orig_words||[]).map(w=>({...w}));
+      if(o.cuts&&o.cuts.length){const c=o.cuts.filter(t=>t<L);o.cuts=[].concat(...Array.from({length:d.n},(_,i)=>c.map(t=>+(t+i*L).toFixed(3))));}
+      if("trim" in o)o.trim=null; if(o.splits)o.splits=[]; if(o.body!=null&&o.body>=L)o.body=null;
+      if(o!==v&&o!==h&&("words" in o))o.words=(d.words||[]).map(w=>({...w}));});
+    if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
+    cutLoadVideo(API+d.url); commitWords((d.words||[]).map(w=>({...w})));
+    if(v.cuts)_syncCuts(v.cuts);
+    if(typeof renderHookStrip==="function")renderHookStrip();
+    busyDone("Повторено ×"+d.n);
+    setStatus("⟳ Кліп ×"+d.n+" ("+tc(L*d.n)+"). Свою музику — ＋ Own audio під доріжками. ↩ Undo repeat — у History.","ok");
+  }catch(e){busyStop();setStatus("Repeat: "+e.message,"err");}
+  if(_mm)mixRebase(_mo);
+  if(typeof renderHistory==="function")renderHistory();
+}
+function askRepeat(){const n=prompt("Скільки разів повторити кліп? (2–20)","4"); if(n)doRepeat(n);}
+// ---------- 🎵 own music file on the Music lane ----------
+function pickOwnMusic(){let inp=$("ownMusicIn");
+  if(!inp){inp=document.createElement("input");inp.type="file";inp.id="ownMusicIn";inp.accept="audio/*,.mp3,.wav,.m4a,.aac,.aif,.aiff,.ogg";inp.hidden=true;document.body.appendChild(inp);
+    inp.onchange=async e=>{const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f)await addOwnMusic(f);};}
+  inp.click();}
+async function addOwnMusic(f){
+  try{await ensureSessionClip();}catch(e){setStatus("Music: "+e.message,"err");return;}
+  const o=mixHolder(); if(!o)return;
+  busyStart("🎵 Кладу «"+f.name+"» на доріжку Music…");
+  try{const nm="own_"+Date.now().toString(36)+"_"+(f.name||"music.mp3").replace(/[^\w.\-]+/g,"_");
+    const fd=new FormData();fd.append("file",new File([f],nm,{type:f.type||"audio/mpeg"}));fd.append("file_id",fileId||"");
+    const r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||"upload failed");
+    const m=mixOf(o,true), p=m.music;
+    m.music={name:d.name,url:"/clip/"+fileId+"/"+d.name,label:f.name.replace(/\.[^.]+$/,""),own:true,
+      volume:p&&p.own?p.volume:0.8,duck:p&&p.own?p.duck:false,strip:false,mute:false};
+    if(!m.orig.mute&&!m.music.strip)setStatus("","");
+    busyDone("Музика на доріжці"); drawLanes(); await mixRun(o);
+    setStatus("🎵 «"+f.name+"» на доріжці Music від початку кліпу"+(m.orig.mute?"":" · звук кліпу теж грає — заглуши його 🔇 (правий клік по Clip audio → Mute), якщо треба тільки твоя музика")+".","ok");
+  }catch(e){busyStop();setStatus("Music: "+e.message,"err");}
+}
+// ---------- Export ▾ ----------
+function exportMenu(ev){
+  const o=mixHolder(), hasWords=!!(realWords&&realWords.length)&&!capsOffNow();
+  ctxMenu(ev,[{head:"Export"},
+    {label:"🎬 Video",title:"Відео з титрами, тайтлами і звуком доріжок",on:()=>doExport()},
+    {label:"🔊 Audio only",title:"Звук, як у відео: голос + музика + SFX (зона тріму). FFmpeg, без кредитів",on:()=>audioAsIs(o&&o.clip,trimZoneNow(),"audio")},
+    {label:"🎚 Stems — voice · music · SFX",title:"Окремі WAV на всю довжину кліпу для AE",disabled:!(o&&o.mix),on:()=>laneStems()},
+    {label:"📝 SRT",title:"Титри файлом .srt",disabled:!hasWords,on:()=>downloadSrt()}]);
+}
+// ---------- right-click on the lanes ----------
+function tlContext(ev){
+  const body=ev.target.closest&&ev.target.closest(".lbody[data-lane], #trimBar"); if(!body)return;
+  if(!videoLoaded){return;}
+  const o=mixHolder(), m=o&&o.mix, isPic=body.id==="trimBar"||body.querySelector&&body.querySelector("#trimBar")&&!body.dataset.lane;
+  const bar=$("trimBar"), r=(isPic?bar:body).getBoundingClientRect(), dur=video.duration||0, t=Math.max(0,Math.min(dur,(ev.clientX-r.left)/r.width*dur));
+  const lane=isPic?"pic":body.dataset.lane;
+  if(lane==="pic"){
+    const pc=pieceAt(t), np=pieces().length, near=splitsOf().find(x=>Math.abs(x-t)<=Math.max(1/fps()*3,dur*0.006));
+    if(pc&&np>1)hlPiece(pc);
+    ctxMenu(ev,[{head:"Picture · "+tc(t)},
+      {label:"✂ Split here",key:"C",on:()=>addSplit(t)},
+      np>1?{label:"✕ Delete this piece ("+tc(pc[0])+"–"+tc(pc[1])+")",title:"Вирізати шматок: відео + звук, титри зсуваються",on:()=>deletePiece(pc)}:null,
+      np>1?{label:"⧉ Make part from this piece",on:()=>partFromPiece(pc)}:null,
+      np>1?{label:"⧉ Make parts from all "+np+" pieces",on:()=>partsFromAll()}:null,
+      near!=null?{label:"↺ Remove this split",on:()=>{const o2=cutHolder();o2.splits=o2.splits.filter(x=>x!==near);drawSplits();}}:null,
+      np>1?{label:"↺ Clear all splits",on:()=>{const o2=cutHolder();o2.splits=[];drawSplits();}}:null,
+      "-",
+      {label:"⇤ Set In here",key:"I",on:()=>{video.currentTime=t;setTrimFromPlayhead("in");}},
+      {label:"Set Out here ⇥",key:"O",on:()=>{video.currentTime=t;setTrimFromPlayhead("out");}},
+      "-",
+      {label:"⟳ Repeat ×2",on:()=>doRepeat(2)},{label:"⟳ Repeat ×3",on:()=>doRepeat(3)},{label:"⟳ Repeat ×4",on:()=>doRepeat(4)},{label:"⟳ Repeat ×N…",on:askRepeat},
+      "-",
+      {label:(m&&m.orig.mute)?"🔊 Unmute clip audio":"🔇 Mute clip audio",on:()=>laneMute("orig")}],()=>hlPiece(null));
+    return;}
+  if(lane==="orig"){
+    ctxMenu(ev,[{head:"Clip audio"},
+      {label:(m&&m.orig.mute)?"🔊 Unmute":"🔇 Mute",on:()=>laneMute("orig")},
+      "-",
+      {label:"⬇ Download audio (as is)",title:"FFmpeg, безкоштовно · зона тріму, якщо є",on:()=>audioAsIs((m&&m.base)||(o&&o.clip),trimZoneNow(),"audio")},
+      {label:"⬇ Music only — no voice",title:"ElevenLabs Stem Separation (кредити) — коли в кліпі є голос",on:()=>laneExtract("music")},
+      {label:"⬇ Voice only",title:"ElevenLabs Stem Separation (кредити)",on:()=>laneExtract("voice")},
+      "-",{label:"Volume…",on:()=>laneSelect({kind:"orig"})}]);
+    return;}
+  if(lane==="music"){
+    const onBlk=ev.target.closest(".lblk[data-blk='music']");
+    if(onBlk&&m&&m.music){
+      ctxMenu(ev,[{head:(m.music.own?"🎵 ":"♪ ")+m.music.label},
+        {label:"▶ Play track alone",on:()=>{const a=$("sfxAudio");video.pause();a.src=API+m.music.url;a.volume=0.8;a.play().catch(()=>{});}},
+        {label:"⬇ Download track",on:()=>dlUrl(m.music.url,m.music.label.replace(/[^\w.\-]+/g,"_")+".mp3")},
+        {label:m.music.mute?"🔊 Unmute":"🔇 Mute",on:()=>laneMute("music")},
+        !m.music.own?{label:"⇄ Other take…",title:"Версії — у Hook music зліва",on:()=>{const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}}}:null,
+        {label:"🎵 Replace with own file…",on:pickOwnMusic},
+        {label:"Volume · duck · old music…",on:()=>laneSelect({kind:"music"})},
+        "-",{label:"✕ Remove music",on:()=>laneDelete({kind:"music"})}]);
+    }else ctxMenu(ev,[{head:"Music"},{label:"♪ Generate music…",on:()=>{const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}}},{label:"🎵 Add own audio file…",on:pickOwnMusic}]);
+    return;}
+  if(lane==="sfx"){
+    const blk=ev.target.closest(".lblk[data-blk='sfx']");
+    if(blk&&m&&m.sfx[+blk.dataset.i]){const i=+blk.dataset.i, x=m.sfx[i];
+      ctxMenu(ev,[{head:"🔊 "+x.label+" · "+tc(x.at)},
+        {label:"▶ Play solo",on:()=>{const a=$("sfxAudio");video.pause();a.src=API+x.url;a.volume=Math.min(1,x.volume??0.9);a.play().catch(()=>{});}},
+        {label:"↻ Another version",on:()=>laneAgain(i)},
+        {label:"Volume…",on:()=>laneSelect({kind:"sfx",i})},
+        {label:"⬇ Download",on:()=>dlUrl(x.url,x.label.replace(/[^\w.\-]+/g,"_")+".mp3")},
+        "-",{label:"✕ Delete",key:"Del",on:()=>laneDelete({kind:"sfx",i})}]);
+    }else ctxMenu(ev,[{head:"SFX · "+tc(t)},{label:"＋ Sound here…",on:()=>laneSelect({kind:"add",at:t})},
+      {label:(m&&m.sfxMute)?"🔊 Unmute all SFX":"🔇 Mute all SFX",disabled:!(m&&m.sfx.length),on:()=>laneMute("sfx")}]);
+  }
+}
+async function deletePiece(pc){
+  if(!pc)return; hlPiece(null);
+  await doCut([[pc[0],pc[1]]],false,{label:"✂ Delete piece "+tc(pc[1]-pc[0])+" @ "+tc(pc[0])});
+  drawSplits();   // splits after the piece moved with the cut (cutApplyTimes)
+}
+async function partFromPiece(pc){if(!pc)return; hlPiece(null); $("trimIn").value=pc[0];$("trimOut").value=pc[1];writeTrim();drawTrimBar(); await newPart();}
+async function partsFromAll(){const ps=pieces(); for(const pc of ps){$("trimIn").value=pc[0];$("trimOut").value=pc[1];writeTrim();drawTrimBar(); await newPart();}
+  const o=cutHolder(); if(o)o.splits=[]; drawSplits(); setStatus("⧉ "+ps.length+" частин під проектом у Projects.","ok");}
+(function wireV2(){
+  const T=$("tlTools");
+  const D=$("trimRow"); if(D)D.addEventListener("contextmenu",tlContext);
+  document.addEventListener("keydown",e=>{const tg=e.target, tag=(tg&&tg.tagName)||"";
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
+    if(currentMode!=="edit"||!videoLoaded||e.metaKey||e.ctrlKey||e.altKey)return;
+    const k=e.key.toLowerCase();
+    if(k==="c"){e.preventDefault();if(_tlTool==="blade")addSplit(curFrame()/fps());else setTool("blade");}
+    else if(k==="v"){e.preventDefault();setTool("sel");}});
+  if($("addOwnBtn"))$("addOwnBtn").onclick=pickOwnMusic;
+  if($("addMusicBtn"))$("addMusicBtn").onclick=()=>{const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}setStatus("♪ Вибери настрій і Generate — трек ляже на доріжку Music.","");};
+  if($("addSfxBtn"))$("addSfxBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
+})();
+// ======================= /2.0 step 1 =======================
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
@@ -4802,7 +5033,7 @@ async function doNormalize(){
   if(nb)nb.disabled=false;
 }
 $("normalizeBtn").onclick=doNormalize;
-$("exportBtn").onclick=doExport;
+$("exportBtn").onclick=ev=>(typeof exportMenu==="function"?exportMenu(ev):doExport());
 $("renderBtn").onclick=sendToCompose;
 
 // ---------- localize: STAGE 1 dub (clean clip + editable text), STAGE 2 render ----------
@@ -5808,6 +6039,22 @@ function buildDock(){
   document.querySelectorAll("#trimRow .dockFoot").forEach(e=>e.style.display="none");
   const tr=$("transport"); if(tr)tr.classList.add("slim");
   wireDockJumps();
+  // ---- 2.0: compact, centred — tools left · timeline · clip actions right ----
+  const cutG=top.querySelector(".dcut"); if(cutG){cutG.style.display="none";}   // ✂ blade + right-click replace From / To
+  const grid=mk("div","tlGrid"), left=mk("div","tlTools"), main=mk("div","tlMain"), right=mk("div","tlActs");
+  left.id="tlTools";
+  left.innerHTML="<button type='button' class='ttool on' data-tool='sel' title='Вибір / плейхед (V)'>↖<small>V</small></button>"
+    +"<button type='button' class='ttool' data-tool='blade' title='Лезо: клік по картинці — розріз (C)'>✂<small>C</small></button>";
+  [...D.childNodes].forEach(n=>{if(n.nodeType===1&&!["trimIn","trimOut","trimPlayIn","trimPlayOut","trimAll","cutUndo"].includes(n.id)&&!n.classList.contains("dockFoot"))main.appendChild(n);});
+  const rb=mk("button","tchip rep","<span class='tdot'></span>⟳ Repeat ×N"); rb.type="button"; rb.id="repeatBtn"; rb.title="Повторити кліп кілька разів (зацикленa анімація)";
+  const q=id=>main.querySelector("#"+id)||$(id);   // main is not in the document yet — getElementById can't see into it
+  ["tbCuts","tbBody","tbPart","tbRegen"].forEach(id=>{const e=q(id);if(e)right.appendChild(e);}); right.appendChild(rb);
+  if(q("tbStatus"))right.appendChild(q("tbStatus"));
+  const dt=bot.querySelector(".dtools"); if(dt)dt.remove();
+  grid.appendChild(left); grid.appendChild(main); grid.appendChild(right); D.insertBefore(grid,D.firstChild); D.classList.add("v2dock");
+  left.querySelectorAll(".ttool").forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+  rb.onclick=ev=>ctxMenu(ev,[{head:"⟳ Repeat the clip"},{label:"×2",on:()=>doRepeat(2)},{label:"×3",on:()=>doRepeat(3)},{label:"×4",on:()=>doRepeat(4)},{label:"×N…",on:askRepeat}]);
+  const eb=$("exportBtn"); if(eb&&!/▾/.test(eb.textContent))eb.textContent=eb.textContent.trim()+" ▾";
 }
 function wireDockJumps(){
   [["trimInLbl",()=>pf($("trimIn").value,0)],["trimOutLbl",()=>Math.max(0,(pf($("trimOut").value,video.duration||0)||0)-1/fps())]].forEach(([id,f])=>{const e=$(id);
