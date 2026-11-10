@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-10** — Soft slide / fade for panels and tabs (2.0.0-b10)
 - **2026-11-10** — Video first: both side panels fold to pills, lighter panels, compact timeline (2.0.0-b9)
 - **2026-11-10** — Voices list = all presets incl. new ones; wider side panels on big screens (2.0.0-b8)
 - **2026-11-10** — 2.0 layout: Text panel on the left (folds in place), Style · Titles · Sound on the right (2.0.0-b7)

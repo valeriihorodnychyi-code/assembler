@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b9",
+  "version": "2.0.0-b10",
   "channel": "v2",
-  "notes": "Breathing room for the video: both side panels start folded (left «Text ›», right Style · Titles · Sound as small pills at the top); open only what you need — › / ‹ fold them back, the choice is remembered; any action that needs a tab (♪ Music…) opens it. Lighter panels, wider gaps around the video, a more compact timeline (taller video)."
+  "notes": "Soft panel open / fold: the columns slide (0.28 s) and the content fades in — no hard jumps; tabs fade too. Respects «reduce motion» in macOS."
 }

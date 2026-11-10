@@ -482,6 +482,13 @@
   .qpanel.insp .irrail button:hover{color:#fff;background:#1d2029}
   .qpanel.insp.col .itabs,.qpanel.insp.col .ibody{display:none}
   .qpanel.insp.col .irrail{display:flex}
+  /* soft open / fold: the columns slide, the content fades in (no hard jumps) */
+  body.edit2 .editstage{transition:grid-template-columns .28s cubic-bezier(.2,.7,.2,1)}
+  .insleft .ilbody,.insleft .ilhead,.qpanel.insp .itabs,.qpanel.insp .ibody{animation:panIn .26s ease both}
+  .insleft .ilrail,.qpanel.insp .irrail{animation:panIn .2s ease both}
+  .qpanel.insp .ipane{animation:panIn .18s ease both}
+  @keyframes panIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){body.edit2 .editstage{transition:none}.insleft *,.qpanel.insp *{animation:none!important}}
   /* folded = no wall next to the video: just small pills at the top */
   .insleft.col,.qpanel.insp.col{height:auto!important;background:none!important;border-color:transparent!important;align-self:start}
   .insleft.col .ilrail{flex:0 0 auto;padding:14px 0;border:1px solid var(--line);border-radius:10px;background:#16181f}
@@ -6351,7 +6358,7 @@ function buildInspector(){
   const lb=mk("div","ilbody"); const gc=$("groupCol"); if(gc)lb.appendChild(gc); panes.text.style.display=""; lb.appendChild(panes.text); L.appendChild(lb);
   const rail=mk("button","ilrail","<span>Text ›</span>"); rail.type="button"; rail.id="ilRail"; rail.title="Розгорнути панель тексту"; L.appendChild(rail);
   const pc=$("previewCol"); if(pc&&pc.parentElement)pc.parentElement.insertBefore(L,pc);
-  const colSet=c=>{L.classList.toggle("col",c);document.body.classList.toggle("ilcol",c);try{localStorage.setItem("cs_ilCol",c?"1":"0");}catch(_){}setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},60);};
+  const colSet=c=>{L.classList.toggle("col",c);document.body.classList.toggle("ilcol",c);try{localStorage.setItem("cs_ilCol",c?"1":"0");}catch(_){}setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);   // after the slide};
   L.querySelector("#ilCol").onclick=()=>colSet(true); rail.onclick=()=>colSet(false);
   L.addEventListener("input",()=>{saveLastStyle();scheduleExact();}); L.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
   let c0=null; try{c0=localStorage.getItem("cs_ilCol");}catch(_){}
@@ -6375,7 +6382,7 @@ function buildInspector(){
 }
 function insFold(c){const q=$("quickPanel"); if(!q)return; q.classList.toggle("col",c); document.body.classList.toggle("ircol",c);
   try{localStorage.setItem("cs_irCol",c?"1":"0");}catch(_){}
-  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},60);}
+  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);   // after the slide}
 function insTab(k){
   const q=$("quickPanel"); if(q&&q.classList.contains("col"))insFold(false);   // asking for a tab opens the panel
   document.querySelectorAll("#insTabs [data-it]").forEach(b=>b.classList.toggle("on",b.dataset.it===k));
