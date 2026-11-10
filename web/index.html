@@ -6358,7 +6358,7 @@ function buildInspector(){
   const lb=mk("div","ilbody"); const gc=$("groupCol"); if(gc)lb.appendChild(gc); panes.text.style.display=""; lb.appendChild(panes.text); L.appendChild(lb);
   const rail=mk("button","ilrail","<span>Text ›</span>"); rail.type="button"; rail.id="ilRail"; rail.title="Розгорнути панель тексту"; L.appendChild(rail);
   const pc=$("previewCol"); if(pc&&pc.parentElement)pc.parentElement.insertBefore(L,pc);
-  const colSet=c=>{L.classList.toggle("col",c);document.body.classList.toggle("ilcol",c);try{localStorage.setItem("cs_ilCol",c?"1":"0");}catch(_){}setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);   // after the slide};
+  const colSet=c=>{L.classList.toggle("col",c);document.body.classList.toggle("ilcol",c);try{localStorage.setItem("cs_ilCol",c?"1":"0");}catch(_){}setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);};
   L.querySelector("#ilCol").onclick=()=>colSet(true); rail.onclick=()=>colSet(false);
   L.addEventListener("input",()=>{saveLastStyle();scheduleExact();}); L.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
   let c0=null; try{c0=localStorage.getItem("cs_ilCol");}catch(_){}
@@ -6382,7 +6382,7 @@ function buildInspector(){
 }
 function insFold(c){const q=$("quickPanel"); if(!q)return; q.classList.toggle("col",c); document.body.classList.toggle("ircol",c);
   try{localStorage.setItem("cs_irCol",c?"1":"0");}catch(_){}
-  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);   // after the slide}
+  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);}
 function insTab(k){
   const q=$("quickPanel"); if(q&&q.classList.contains("col"))insFold(false);   // asking for a tab opens the panel
   document.querySelectorAll("#insTabs [data-it]").forEach(b=>b.classList.toggle("on",b.dataset.it===k));

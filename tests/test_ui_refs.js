@@ -6,6 +6,11 @@
 const fs = require("fs"), path = require("path");
 const html = fs.readFileSync(path.join(__dirname, "..", "web", "index.html"), "utf8");
 const raw = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).join("\n");
+// 0) the page must PARSE — 2.0.0-b10 shipped a "//" comment inside a one-line arrow function: the
+// whole script died with "Unexpected end of input" and NO button worked
+{const vm = require("vm"); [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)].forEach((m, i) => {
+  try { new vm.Script(m[1], {filename: "index.html#script" + i}); }
+  catch (e) { console.log("✗ script " + i + " does not parse: " + e.message); process.exit(1); } });}
 // calls are read from code with strings removed FIRST (so "//" inside a URL isn't a comment), then comments
 const js = raw.replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""').replace(/\/\/[^\n]*/g, "");
 const defined = new Set();

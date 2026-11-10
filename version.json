@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b10",
+  "version": "2.0.0-b11",
   "channel": "v2",
-  "notes": "Soft panel open / fold: the columns slide (0.28 s) and the content fades in — no hard jumps; tabs fade too. Respects «reduce motion» in macOS."
+  "notes": "Fix: 2.0.0-b10 did not start (a comment inside a one-line function broke the whole page: no button worked). The UI test now also checks that the page parses, so this can't ship again."
 }
