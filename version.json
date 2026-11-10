@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b7",
+  "version": "2.0.0-b8",
   "channel": "v2",
-  "notes": "2.0 layout: three columns. LEFT — what is said: Projects (a pack) + Text (Captions, Transcribe, Text / Words / Sentences, 🗣 Voices). CENTRE — the video, the timeline under it. RIGHT — how it looks and sounds: Style · Titles · Sound. The left panel folds IN PLACE to a thin «Text ›» rail (‹ in its header); on screens under 1400 px it starts folded, your choice is remembered."
+  "notes": "🗣 Voices: the preset list is now the SAME as the Style grid — your own (★), team and built-in presets; a preset you just saved or imported shows up at once (no renaming tricks). Text and Style panels grow with the screen (left up to 580 px, right up to 460 px) so lines don't wrap into a narrow column on a big monitor."
 }

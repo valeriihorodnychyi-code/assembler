@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-10** — Voices list = all presets incl. new ones; wider side panels on big screens (2.0.0-b8)
 - **2026-11-10** — 2.0 layout: Text panel on the left (folds in place), Style · Titles · Sound on the right (2.0.0-b7)
 - **2026-11-10** — Voices free with a Scribe transcribe (diarize in the same call) (2.0.0-b6)
 - **2026-11-10** — 2.0 step 3: voices → caption style per voice, Body style; Style regions replaced (2.0.0-b5)

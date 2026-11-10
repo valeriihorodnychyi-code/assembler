@@ -470,7 +470,7 @@
   body.edit2 .app{grid-template-columns:1fr}
   body.edit2 .app>.panel{display:none}
   body.edit2 .stage{grid-column:1}
-  body.edit2{--lw:380px;--rw:400px}
+  body.edit2{--lw:clamp(380px,27vw,580px);--rw:clamp(380px,22vw,460px)}
   body.edit2.ilcol{--lw:40px}
   body.edit2 .editstage{grid-template-columns:var(--lw) auto var(--rw);gap:18px}
   body.edit2 .editstage.wide{grid-template-columns:var(--lw) minmax(0,1fr) var(--rw)}
@@ -1706,6 +1706,7 @@ function listPhrases(){   // enumerate caption phrases at the base style, with t
 }
 function presetToCtrl(name){ const base=readControls();
   if(savedStyles[name]) return fromEngineStyle(savedStyles[name]);
+  if(typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES[name]) return fromEngineStyle(BUILTIN_STYLES[name]);
   if(PRESETS[name]) return {...base,...PRESETS[name]};
   return base; }
 // engine regions from the per-phrase overrides (partition timeline; base style fills the gaps)
@@ -3180,6 +3181,7 @@ async function loadSavedStyles(){
     await Promise.all(names.map(async n=>{try{savedStyles[n]=await(await fetch(API+"/api/styles/"+encodeURIComponent(n))).json();}catch(e){}}));
   }catch(e){}
   renderPresetRail();
+  if(typeof renderVoices==="function"){_effCache.k=null;renderVoices();}   // a new / imported preset shows up in 🗣 Voices at once
 }
 async function saveCurrentStyle(){
   const name=(prompt("Назви стиль (напр. brand_bold):")||"").trim();if(!name)return;
@@ -4905,7 +4907,7 @@ async function partsFromAll(){const ps=pieces(); for(const pc of ps){$("trimIn")
 // a phrase you styled by hand > Body > voice > the base style. Replaces "Style regions".
 const VCOL=["#2dd4bf","#f472b6","#fbbf24","#60a5fa","#a78bfa","#fb923c"];
 function voicesOf(){const o=(typeof cutHolder==="function")?cutHolder():null;return (o&&o.voices)||null;}
-function presetNames(){return [...Object.keys(savedStyles||{}),...Object.keys(PRESETS||{})].filter((x,i,a)=>a.indexOf(x)===i);}
+function presetNames(){return [...Object.keys(savedStyles||{}),...Object.keys((typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES)||{})].filter((x,i,a)=>a.indexOf(x)===i);}
 function voiceForRange(V,a,b){
   if(!V||!V.spans||!V.spans.length)return null;
   const fx=V.fix&&V.fix[(+a).toFixed(2)]; if(fx)return fx;
@@ -4967,7 +4969,7 @@ function renderVoices(){
     const tr=$("grpTranscribe"); if(tr&&tr.parentElement===pane)tr.insertAdjacentElement("afterend",card); else pane.appendChild(card);}
   if(card.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
   const o=cutHolder(), V=o&&o.voices, esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
-  const opts=cur=>"<option value=''>— base style —</option>"+presetNames().map(n=>"<option"+(n===cur?" selected":"")+">"+esc(n)+"</option>").join("");
+  const opts=cur=>"<option value=''>— base style —</option>"+presetNames().map(n=>"<option value='"+esc(n)+"'"+(n===cur?" selected":"")+">"+((savedStyles&&savedStyles[n]&&!(officialNames&&officialNames.has(n)))?"★ ":"")+esc(n)+"</option>").join("");
   if(!V||!V.list||!V.list.length){
     card.innerHTML="<div class='vhead'><b>🗣 Voices</b><span class='vhint'>різні голоси — різні титри</span><button type='button' class='tmini' id='vDetect'>🔍 Detect voices</button></div>"
       +"<div class='vhint'>Транскрайб через <b>Scribe</b> знаходить голоси сам, без зайвих кредитів. Після Whisper — 🔍 Detect voices (один запит у Scribe на кліп). Тоді кожному голосу — свій стиль, і видно в Sentences, хто що каже.</div>"
