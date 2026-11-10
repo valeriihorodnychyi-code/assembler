@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b6",
+  "version": "2.0.0-b7",
   "channel": "v2",
-  "notes": "🗣 Voices come free with a Scribe transcribe: the same request now diarizes, the speakers are cached and appear in Sentences right away — no Detect, no extra credits. After Whisper, 🔍 Detect voices as before (one Scribe request)."
+  "notes": "2.0 layout: three columns. LEFT — what is said: Projects (a pack) + Text (Captions, Transcribe, Text / Words / Sentences, 🗣 Voices). CENTRE — the video, the timeline under it. RIGHT — how it looks and sounds: Style · Titles · Sound. The left panel folds IN PLACE to a thin «Text ›» rail (‹ in its header); on screens under 1400 px it starts folded, your choice is remembered."
 }

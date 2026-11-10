@@ -470,9 +470,26 @@
   body.edit2 .app{grid-template-columns:1fr}
   body.edit2 .app>.panel{display:none}
   body.edit2 .stage{grid-column:1}
-  body.edit2 .editstage{grid-template-columns:auto auto 420px}
-  body.edit2 .editstage.wide{grid-template-columns:auto minmax(0,1fr) 420px}
-  @media (max-width:1299px){body.edit2 .editstage{grid-template-columns:auto auto 380px}body.edit2 .editstage.wide{grid-template-columns:auto minmax(0,1fr) 380px}}
+  body.edit2{--lw:380px;--rw:400px}
+  body.edit2.ilcol{--lw:40px}
+  body.edit2 .editstage{grid-template-columns:var(--lw) auto var(--rw);gap:18px}
+  body.edit2 .editstage.wide{grid-template-columns:var(--lw) minmax(0,1fr) var(--rw)}
+  @media (max-width:1399px){body.edit2{--lw:340px;--rw:360px}body.edit2.ilcol{--lw:40px}}
+  .insleft .tvrow{padding-right:0!important;flex-wrap:wrap;gap:4px}
+  .insleft{margin-top:46px;height:calc(100vh - 168px - var(--dockh,0px));display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
+  .insleft .ilhead{display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .insleft .ilhead b{color:var(--txt);font-size:13px}
+  .insleft .ilsub{font-size:11px;color:var(--muted);flex:1}
+  .insleft .ilcol{font-size:13px;padding:2px 8px;border-radius:7px}
+  .insleft .ilbody{overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0}
+  .insleft .ilbody .groupcol{max-height:none;flex:0 0 auto}
+  .insleft .ilbody .groupcol .railhead{text-align:left;margin-bottom:4px}
+  .insleft .ilbody #filmstrip{justify-content:flex-start;max-height:150px;overflow-y:auto}
+  .insleft .ilrail{display:none;flex:1;border:0;border-radius:0;background:transparent;color:var(--muted);font-weight:600;font-size:12px;cursor:pointer}
+  .insleft .ilrail span{display:inline-block;writing-mode:vertical-rl;letter-spacing:1px}
+  .insleft .ilrail:hover{color:#fff;background:#1d2029}
+  .insleft.col .ilhead,.insleft.col .ilbody{display:none}
+  .insleft.col .ilrail{display:block}
   .qpanel.insp{height:calc(100vh - 168px - var(--dockh,0px));gap:0;padding:0;overflow:hidden;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px}
   .itabs{display:flex;gap:2px;padding:6px 6px 0;border-bottom:1px solid var(--line);flex:0 0 auto}
   .itabs button{flex:1;border:0;border-radius:8px 8px 0 0;background:transparent;color:var(--muted);font-weight:600;font-size:12.5px;padding:8px 6px;position:relative}
@@ -761,7 +778,7 @@
           </div></div>
         <input type="hidden" id="language" value="">
         <!-- padding-right keeps the toggle clear of the language sticker pinned to the box's top-right corner -->
-        <div style="display:flex;justify-content:flex-end;margin:4px 0 7px;padding-right:78px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
+        <div class="tvrow" style="display:flex;justify-content:flex-end;margin:4px 0 7px;padding-right:78px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
           <button type="button" id="restoreTimingsBtn" class="ghost" disabled style="margin-right:auto;font-size:11px;padding:5px 9px;white-space:nowrap"
             title="Накласти поточний текст на ОРИГІНАЛЬНІ тайминги транскрайбу. Твої правки тексту лишаються, зіпсований час повертається — без нового транскрайбу. (Ручні правки часу слів теж скинуться.)">↺<span class="rtl"> Тайминги</span></button>
           <div class="seg" id="txtViewSeg">
@@ -4945,7 +4962,7 @@ async function detectVoices(){
 }
 function renderVoices(){
   let card=$("voicesCard");
-  if(!card){const pane=document.querySelector("#quickPanel .ipane[data-ip='text']")||$("quickPanel"); if(!pane)return;
+  if(!card){const pane=document.querySelector(".ipane[data-ip='text']")||$("quickPanel"); if(!pane)return;
     card=document.createElement("div");card.id="voicesCard";card.className="vcard";
     const tr=$("grpTranscribe"); if(tr&&tr.parentElement===pane)tr.insertAdjacentElement("afterend",card); else pane.appendChild(card);}
   if(card.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
@@ -6274,13 +6291,13 @@ function buildStudioLayout(){
 // Text (captions on/off, transcribe, smart captions) · Style (presets + every caption-style group,
 // folded) · Titles (titles, stickers) · Sound (hook music). The left sidebar is gone in Edit — the
 // video and the timeline get its width. Elements are MOVED (ids, handlers, state stay).
-const INS_TABS=[["text","Text"],["style","Style"],["titles","Titles"],["sound","Sound"]];
+const INS_TABS=[["style","Style"],["titles","Titles"],["sound","Sound"]];   // Text lives in the LEFT panel (2.0)
 function buildInspector(){
   const qp=$("quickPanel"); if(!qp||$("insTabs"))return;
   const mk=(tag,cls,html)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e;};
   const bar=mk("div","itabs"); bar.id="insTabs";
   bar.innerHTML=INS_TABS.map(([k,l])=>"<button type='button' data-it='"+k+"'>"+l+"<i class='idot'></i></button>").join("");
-  const panes={}; INS_TABS.forEach(([k])=>{panes[k]=mk("div","ipane");panes[k].dataset.ip=k;});
+  const panes={}; INS_TABS.concat([["text","Text"]]).forEach(([k])=>{panes[k]=mk("div","ipane");panes[k].dataset.ip=k;});
   // Text
   [...qp.children].forEach(c=>{if(c.id==="grpBaseText")return; panes.text.appendChild(c);});
   // Style: presets first, then base text, then every style group of the old left sidebar
@@ -6300,10 +6317,21 @@ function buildInspector(){
   panes.sound.appendChild(mk("div","hint","Музика й звуки лягають на доріжки таймлайну під відео: правий клік по доріжці — меню, ＋ Own audio — свій трек."));
   qp.innerHTML=""; qp.appendChild(bar); const body=mk("div","ibody"); INS_TABS.forEach(([k])=>body.appendChild(panes[k])); qp.appendChild(body);
   if(ez)ez.style.display="none";
+  // ---- LEFT: what is said — Projects (a pack) on top, then Text. Collapses IN PLACE to a thin rail ----
+  const L=mk("div","insleft"); L.id="insLeft";
+  L.innerHTML="<div class='ilhead'><b>Text</b><span class='ilsub'>що говорять</span><button type='button' class='ilcol' id='ilCol' title='Згорнути / розгорнути панель тексту'>‹</button></div>";
+  const lb=mk("div","ilbody"); const gc=$("groupCol"); if(gc)lb.appendChild(gc); panes.text.style.display=""; lb.appendChild(panes.text); L.appendChild(lb);
+  const rail=mk("button","ilrail","<span>Text ›</span>"); rail.type="button"; rail.id="ilRail"; rail.title="Розгорнути панель тексту"; L.appendChild(rail);
+  const pc=$("previewCol"); if(pc&&pc.parentElement)pc.parentElement.insertBefore(L,pc);
+  const colSet=c=>{L.classList.toggle("col",c);document.body.classList.toggle("ilcol",c);try{localStorage.setItem("cs_ilCol",c?"1":"0");}catch(_){}setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},60);};
+  L.querySelector("#ilCol").onclick=()=>colSet(true); rail.onclick=()=>colSet(false);
+  L.addEventListener("input",()=>{saveLastStyle();scheduleExact();}); L.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+  let c0=null; try{c0=localStorage.getItem("cs_ilCol");}catch(_){}
+  colSet(c0==null?(innerWidth<1400):c0==="1");   // a laptop starts with the rail; your choice is remembered
   qp.classList.add("insp");
   bar.querySelectorAll("[data-it]").forEach(b=>b.onclick=()=>insTab(b.dataset.it));
-  let last="text"; try{last=localStorage.getItem("cs_insTab")||"text";}catch(_){}
-  insTab(INS_TABS.some(x=>x[0]===last)?last:"text");
+  let last="style"; try{last=localStorage.getItem("cs_insTab")||"style";}catch(_){}
+  insTab(INS_TABS.some(x=>x[0]===last)?last:"style");
   document.body.classList.add("ins2");
   setTimeout(()=>{if(typeof renderVoices==="function")renderVoices();},0);
   // Style regions → replaced by 🗣 Voices + Body (Text tab). Hidden unless an old project still uses the split.
@@ -6313,7 +6341,7 @@ function buildInspector(){
 }
 function insTab(k){
   document.querySelectorAll("#insTabs [data-it]").forEach(b=>b.classList.toggle("on",b.dataset.it===k));
-  document.querySelectorAll("#quickPanel .ipane").forEach(p=>p.style.display=p.dataset.ip===k?"":"none");
+  document.querySelectorAll("#quickPanel .ipane").forEach(p=>p.style.display=p.dataset.ip===k?"":"none");   // the left Text pane is not in #quickPanel — untouched
   try{localStorage.setItem("cs_insTab",k);}catch(_){}
   if(k==="sound"){const g=$("grpHookMusic");if(g&&!g.open)g.open=true;}   // the only group there — open it
   const ib=document.querySelector("#quickPanel .ibody"); if(ib)ib.scrollTop=0;
@@ -6322,7 +6350,7 @@ function insDots(){   // a small dot on a tab that has something switched on
   const dot=(k,on)=>{const b=document.querySelector("#insTabs [data-it='"+k+"'] .idot");if(b)b.style.display=on?"":"none";};
   try{dot("titles",(typeof titlesOn==="function"&&titlesOn())||!!(typeof overlays!=="undefined"&&overlays&&overlays.length));}catch(_){dot("titles",false);}
   const o=(typeof mixHolder==="function")?mixHolder():null; dot("sound",!!(o&&o.mix&&(o.mix.music||o.mix.sfx.length)));
-  dot("text",false); dot("style",false);
+  dot("style",false);
 }
 function openHookMusic(){insTab("sound");const g=$("grpHookMusic");if(g){g.open=true;setTimeout(()=>{try{g.scrollIntoView({behavior:"smooth",block:"start"});}catch(_){}},30);}}
 // Accordion: opening a section collapses its siblings in the same column, so the open one
