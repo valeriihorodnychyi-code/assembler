@@ -162,6 +162,8 @@
   .dockBar #timeLbl b{color:var(--txt);font-weight:600}
   .dockBar #seek{display:none}
   .dockBar .tbtn{padding:4px 10px;min-width:30px;font-size:13px}
+  .dockBar #frameBack,.dockBar #frameFwd{background:#1d4ed8;border-color:#3b82f6;color:#fff;font-size:15px;min-width:38px}
+  .dockBar #frameBack:hover,.dockBar #frameFwd:hover{background:#2563eb}
   .dockBar .tbtn.tplay{padding:4px 14px;min-width:42px}
   .dockBar .scopeSeg{margin:0}
   .dockTop{padding-bottom:8px;border-bottom:1px solid #23262f}
@@ -614,7 +616,7 @@
         <div id="phGhost"></div>
         <div id="trimPlayhead"><b></b></div>
       </div></div></div>
-      <div class="lane" id="laneOrig"><div class="lhead"><button type="button" class="lmute" data-lm="orig" title="Вимкнути / увімкнути звук кліпу">🔊</button><span class="lname" id="laneOrigName">Clip audio</span></div><div class="lbody" data-lane="orig"><canvas id="waveOrig"></canvas></div></div>
+      <div class="lane" id="laneOrig"><div class="lhead"><button type="button" class="lmute" data-lm="orig" title="Вимкнути / увімкнути звук кліпу">🔊</button><span class="lname" id="laneOrigName">Clip audio</span><button type="button" class="ladd" id="laneOrigDl" title="⬇ Музика з цього кліпу без голосу · голос окремо · звук як є">⬇</button></div><div class="lbody" data-lane="orig"><canvas id="waveOrig"></canvas></div></div>
       <div class="lane" id="laneMusic"><div class="lhead"><button type="button" class="lmute" data-lm="music" title="Вимкнути / увімкнути музику">🔊</button><span class="lname">♪ Music</span></div><div class="lbody" data-lane="music" id="laneMusicBody"></div></div>
       <div class="lane" id="laneSfx"><div class="lhead"><button type="button" class="lmute" data-lm="sfx" title="Вимкнути / увімкнути всі SFX">🔊</button><span class="lname">SFX</span><button type="button" class="ladd" id="sfxAddBtn" title="Один звук у точці плейхеда (або подвійний клік по доріжці)">＋</button><button type="button" class="ladd" id="sfxAutoBtn" title="Авто-звуки під картинку шматка (або потягни по доріжці SFX)">✨</button></div><div class="lbody" data-lane="sfx" id="laneSfxBody"></div></div>
       <div id="laneHead"></div>
@@ -4429,7 +4431,12 @@ function renderLaneEdit(){
       +"<span class='lhint'>Коротко і конкретно — один звук: «single wooden door slam», а не «sounds for a scene». Не сподобалось — ↻ Another version.</span>";
   }else if(s.kind==="orig"){
     const v=m?Math.round((m.orig.vol??1)*100):100;
+    const dz=(()=>{const d=video.duration||0,a=pf($("trimIn").value,0),b=pf($("trimOut").value,d)||d;return (a>0.05||b<d-0.05)?[a,b]:null;})();
     h="<b>"+$("laneOrigName").textContent+"</b> · Volume <input type='range' id='leVol' min='0' max='150' value='"+v+"'><span id='leVolL'>"+v+"%</span>"
+      +"<span style='flex-basis:100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap'><span>⬇ "+(dz?"зона In–Out "+tc(dz[0])+"–"+tc(dz[1]):"весь кліп")+":</span>"
+      +"<button type='button' class='tmini' id='leXMusic' title='ElevenLabs Stem Separation: усе, крім голосу (музика + те, що було з ефектів)'>♪ Music only</button>"
+      +"<button type='button' class='tmini' id='leXVoice' title='Тільки голос (той самий розподіл)'>🗣 Voice only</button>"
+      +"<button type='button' class='tmini' id='leXRaw' title='Звук кліпу як є, mp3'>Audio as is</button></span>"
       +"<span class='lhint'>"+(m&&m.music&&m.music.strip?"Стара музика з кліпу прибрана (Audio Isolation) — тут лише голос. Повернути стару: у музики зніми «Remove old music».":"Звук самого кліпу: голос і все, що в ньому вже було.")+"</span>";
   }else if(s.kind==="music"&&m.music){
     const v=Math.round(m.music.volume*100);
@@ -4461,6 +4468,9 @@ function renderLaneEdit(){
   on("lePlay","onclick",()=>{const a=$("sfxAudio"),src=s.kind==="music"?m.music.url:m.sfx[s.i].url;video.pause();a.src=API+src;a.volume=Math.min(1,s.kind==="music"?0.8:(m.sfx[s.i].volume??0.9));a.play().catch(()=>{});});
   on("leAgain","onclick",()=>laneAgain(s.i));
   on("leStems","onclick",()=>laneStems());
+  on("leXMusic","onclick",()=>laneExtract("music"));
+  on("leXVoice","onclick",()=>laneExtract("voice"));
+  on("leXRaw","onclick",()=>laneExtract("audio"));
   on("leDel","onclick",()=>laneDelete(s));
 }
 // ---- actions ----
@@ -4470,6 +4480,20 @@ function laneDelete(s){
   if(s.kind==="music"){m.music=null;setStatus("♪ Музику прибрано з хука — звук як був. Повернути: вибери версію зліва в Hook music.","ok");if(typeof hmRenderList==="function")hmRenderList();}
   else if(s.kind==="sfx"){const x=m.sfx.splice(s.i,1)[0];setStatus("🔊 «"+(x&&x.label)+"» видалено.","ok");}
   _laneSel=null; drawLanes(); mixSoon(o,30);
+}
+// ⬇ The music (or the voice) OUT of any clip — ElevenLabs Stem Separation, cached per clip + zone.
+// Zone = trim In–Out when set (e.g. one loop of an animation), else the whole clip.
+async function laneExtract(kind){
+  try{await ensureSessionClip();}catch(e){setStatus("⬇ "+e.message,"err");return;}
+  const o=mixHolder(); if(!o)return; const src=(o.mix&&o.mix.base)||o.clip;
+  const d0=video.duration||0,a=pf($("trimIn").value,0),b=pf($("trimOut").value,d0)||d0, zone=(a>0.05||b<d0-0.05)?[+a.toFixed(3),+b.toFixed(3)]:null;
+  busyStart(kind==="audio"?"⬇ Готую звук…":"⬇ Відділяю "+(kind==="music"?"музику":"голос")+" (ElevenLabs)…");
+  try{const r=await fetch(API+"/api/audio/extract_music",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,clip:src,zone})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"extract failed"));
+    const url=d[kind]; if(!url)throw new Error("ElevenLabs не повернув окремий голос — лише музику.");
+    const el=document.createElement("a");el.href=API+url;el.download=(d.name||"clip")+"_"+kind+".mp3";document.body.appendChild(el);el.click();el.remove();
+    busyDone("Готово"); setStatus("⬇ "+(kind==="music"?"Музика без голосу":kind==="voice"?"Голос окремо":"Звук як є")+(zone?" ("+tc(zone[0])+"–"+tc(zone[1])+")":"")+" — скачано."+(kind==="music"?" Ефекти, що були в кліпі, лишаються разом з музикою.":""),"ok");
+  }catch(e){busyStop();setStatus("⬇ "+e.message,"err");}
 }
 // ⬇ Stems: voice · music · sfx as separate WAVs (full clip length, from 0) for sound design in AE
 async function laneStems(){
@@ -4519,6 +4543,7 @@ function laneMute(k){
   const L=$("lanes"); if(!L)return;
   L.querySelectorAll(".lmute").forEach(b=>b.onclick=()=>laneMute(b.dataset.lm));
   if($("sfxAddBtn"))$("sfxAddBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
+  if($("laneOrigDl"))$("laneOrigDl").onclick=e=>{e.stopPropagation();laneSelect({kind:"orig"});};
   if($("sfxAutoBtn")&&!FOLEY_ON)$("sfxAutoBtn").style.display="none";
   if($("sfxAutoBtn"))$("sfxAutoBtn").onclick=()=>{const o=mixHolder(), z=(o&&hmZone(o))||[0,video.duration||0];
     laneSelect({kind:"foley",a:Math.max(0,z[0]),b:Math.min(video.duration||z[1],z[1]),text:""});};

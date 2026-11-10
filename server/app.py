@@ -1555,6 +1555,48 @@ def audio_stems(req: AudioMixReq):
     return {"url": f"/clip/{req.file_id}/{os.path.basename(out_zip)}", "files": len(tmp)}
 
 
+class ExtractMusicReq(BaseModel):
+    file_id: str
+    clip: str
+    zone: Optional[List[float]] = None
+
+
+@app.post("/api/audio/extract_music")
+def audio_extract_music(req: ExtractMusicReq):
+    """⬇ Music from ANY clip in the session (without the voice): ElevenLabs Stem Separation.
+    Also returns the voice stem and the clip audio as it is. Cached per clip + zone."""
+    import requests as _rq, time as _t
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    if not music11.has_audio(src):
+        raise HTTPException(400, "У цього кліпу немає звуку.")
+    stem, _ = os.path.splitext(name)
+    z = req.zone if (req.zone and len(req.zone) == 2) else None
+    tag = f"_{z[0]:.2f}_{z[1]:.2f}" if z else ""
+    inst_n, voc_n, raw_n = f"{stem}{tag}_music.mp3", f"{stem}{tag}_voice.mp3", f"{stem}{tag}_audio.mp3"
+    P = lambda n: os.path.join(sdir, n)
+    U = lambda n: f"/clip/{req.file_id}/{n}"
+    if not os.path.exists(P(raw_n)):
+        cmd = ["ffmpeg", "-y"] + (["-ss", f"{float(z[0]):.3f}", "-t", f"{float(z[1]) - float(z[0]):.3f}"] if z else []) \
+            + ["-i", src, "-vn", "-ac", "2", "-ar", "44100", "-b:a", "192k", P(raw_n)]
+        ffmpeg_utils.run(cmd)
+    if not os.path.exists(P(inst_n)):
+        t0 = _t.time()
+        try:
+            inst, voc = music11.separate_music(P(raw_n), _rq)
+        except music11.MusicError as e:
+            raise HTTPException(400, str(e))
+        open(P(inst_n), "wb").write(inst)
+        if voc:
+            open(P(voc_n), "wb").write(voc)
+        _log_timing("stem_separation", _t.time() - t0, name)
+    return {"music": U(inst_n), "voice": U(voc_n) if os.path.exists(P(voc_n)) else None, "audio": U(raw_n),
+            "name": stem + tag}
+
+
 _PEAKS = {}
 
 

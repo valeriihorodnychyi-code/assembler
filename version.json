@@ -1,5 +1,5 @@
 {
-  "version": "1.9.110",
+  "version": "1.9.111",
   "channel": "main",
-  "notes": "Fix: re-Transcribe with Whisper after Scribe failed with «'eng' is not a valid language code». Language codes are now always 2-letter (en, uk, pt…); unknown → auto-detect."
+  "notes": "⬇ Music from any clip: ⬇ in the Clip audio lane → ♪ Music only (no voice, ElevenLabs Stem Separation) · 🗣 Voice only · Audio as is — for the trim In–Out zone when set (one loop of an animation), else the whole clip. Frame-step ⟨ ⟩ buttons are blue now, easy to find."
 }

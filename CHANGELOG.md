@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-10** — ⬇ Music / voice / audio from any clip (Stem Separation, trim zone); blue frame-step buttons (1.9.111)
 - **2026-11-09** — Fix: Whisper re-transcribe after Scribe ('eng' language code) (1.9.110)
 - **2026-11-09** — Auto SFX (foley) parked; one-sound ElevenLabs SFX with dictation stays (1.9.109)
 - **2026-11-09** — 🎙 Dictation in prompt fields: any language → English (local Whisper) (1.9.108)

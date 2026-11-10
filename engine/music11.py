@@ -158,6 +158,35 @@ def split_tracks(content):
     return music, fx
 
 
+def separate_music(audio_path, requests, api_key=None):
+    """⬇ The music OUT of any clip: ElevenLabs Stem Separation, two stems → (instrumental, vocals)
+    as mp3 bytes. 'Instrumental' = everything that isn't voice (music + whatever SFX were there)."""
+    import io
+    import zipfile
+    with open(audio_path, "rb") as f:
+        r = requests.post(f"{API}/v1/music/stem-separation", headers={"xi-api-key": _key(api_key)},
+                          files=[("file", (os.path.basename(audio_path), f, "audio/mpeg"))],
+                          data={"stem_variation_id": "two_stems_v1"}, params={"output_format": "mp3_44100_128"},
+                          timeout=900)
+    if r.status_code != 200:
+        raise MusicError(_auth(r, "Music Generation"))
+    if not r.content.startswith(b"PK"):
+        raise MusicError("ElevenLabs повернув не архів зі стемами.")
+    inst = voc = None
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        for n in z.namelist():
+            low = os.path.basename(n).lower()
+            if n.endswith("/") or low.rsplit(".", 1)[-1] not in ("mp3", "wav", "m4a", "aac", "ogg", "flac"):
+                continue
+            if any(k in low for k in ("vocal", "voice", "speech")) and voc is None:
+                voc = z.read(n)
+            elif inst is None:
+                inst = z.read(n)
+    if inst is None:
+        raise MusicError("У відповіді ElevenLabs немає інструментальної доріжки.")
+    return inst, voc
+
+
 def isolate_voice(clip_path, out_path, requests, api_key=None, start=0.0, end=None):
     """Voice only (old music / ambience / SFX removed) → out_path (wav, clip time-base).
     Only [start, end] (the trim) is sent — isolation is billed per minute, and a trimmed-off
