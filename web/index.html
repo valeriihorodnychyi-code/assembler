@@ -162,7 +162,9 @@
   .tchip.rep .tdot{background:#22c55e}
   #trimBar.blade{cursor:crosshair}
   #trimSplits{position:absolute;inset:0;pointer-events:none;z-index:4}
-  #trimSplits i{position:absolute;top:-5px;bottom:-5px;width:2px;margin-left:-1px;background:#ff3a22}
+  #trimSplits i{position:absolute;top:-5px;bottom:-5px;width:9px;margin-left:-4.5px;pointer-events:auto;cursor:pointer}
+  #trimSplits i::after{content:"";position:absolute;left:3.5px;top:0;bottom:0;width:2px;background:#ff3a22}
+  #trimSplits i:hover::after{background:#fff}
   #trimSplits i::before{content:"✂";position:absolute;top:-13px;left:-4px;font-size:9px;color:#ff3a22}
   #trimPiece{position:absolute;top:0;bottom:0;display:none;background:rgba(255,58,34,.22);border:1px solid #ff3a22;pointer-events:none;z-index:3}
   .addTrack{display:flex;gap:6px;align-items:center;margin-left:var(--lh);flex-wrap:wrap}
@@ -649,7 +651,7 @@
       <div id="laneHead"></div>
       <div id="laneBusy"></div>
      </div>
-     <div class="addTrack" id="addTrack"><button type="button" id="addMusicBtn" title="Згенерувати музику (Hook music) — ляже на доріжку Music">＋ Music</button><button type="button" id="addOwnBtn" title="Свій трек mp3 / wav на доріжку Music">＋ Own audio</button><button type="button" id="addSfxBtn" title="Звук у точці плейхеда">＋ SFX</button><span class="addHint">правий клік по доріжках — меню · C — лезо · V — вибір</span></div>
+     <div class="addTrack" id="addTrack"><button type="button" id="addMusicBtn" title="Згенерувати музику (Hook music) — ляже на доріжку Music">＋ Music</button><button type="button" id="addOwnBtn" title="Свій трек mp3 / wav на доріжку Music">＋ Own audio</button><button type="button" id="addSfxBtn" title="Звук у точці плейхеда">＋ SFX</button><span class="addHint">C — розріз під плейхедом · правий клік по доріжках — меню · Space — play</span></div>
      <div id="laneEdit" class="laneEdit" style="display:none"></div>
      <audio id="sfxAudio" preload="none" style="display:none"></audio>
      <div class="dockFoot">
@@ -2271,7 +2273,7 @@ document.addEventListener("keydown",(e)=>{
   if(currentMode!=="edit"||!videoLoaded)return;
   const tag=(e.target&&e.target.tagName)||"";
   if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||e.target.isContentEditable)return;
-  const k=e.key.toLowerCase();
+  const k=({KeyI:"i",KeyO:"o"})[e.code]||e.key.toLowerCase();   // by the physical key: works in any keyboard layout (UA too)
   // I / O stamp the playhead into the trim (NLE muscle memory)
   if(e.key==="Escape"&&_wRng&&typeof setWordRange==="function"){e.preventDefault();setWordRange(null);return;}
   if((e.key==="["||e.key==="]")&&txtView==="words"&&_wSel>=0){e.preventDefault();setWordEdge(e.key==="["?"start":"end");return;}
@@ -2409,7 +2411,6 @@ $("trimHIn").addEventListener("pointerdown",trimDrag("in"));
 // the bar itself is the SCRUBBER: click / drag anywhere that isn't a handle = move the playhead
 $("trimBar").addEventListener("pointerdown",e=>{
   if(e.button===2)return;   // right button → the context menu
-  if(videoLoaded&&typeof _tlTool!=="undefined"&&_tlTool==="blade"&&!(e.target.closest&&e.target.closest(".thandle,#trimPlayhead"))){e.preventDefault();addSplit(xToTime(e.clientX));return;}
   if(!videoLoaded||(e.target.closest&&e.target.closest(".thandle")))return;
   if(e.target.closest&&e.target.closest("#phGhost")){e.preventDefault();const b=_phBack;_phBack=null;drawGhost();video.currentTime=b;return;}
   // near an edge = grab the edge, never jump the playhead (the ears are thin; 14 px of grace)
@@ -4631,6 +4632,10 @@ function laneMute(k){
 // every lane and block, ⟳ Repeat ×N, 🎵 your own music file, Export ▾. Native-feeling: what you'd
 // try without reading a guide (right-click, V / C keys, Delete) just works.
 let _tlTool="sel";
+// ✂ Split = a cut AT THE PLAYHEAD (like Premiere's Add Edit): you see the frame you split on.
+function splitAtPlayhead(){if(!videoLoaded)return; addSplit((curFrame()+0)/fps());}
+function clearSplits(){const o=cutHolder(); if(!o||!(o.splits||[]).length)return; o.splits=[]; const v=variants[activeVar]; if(v&&v!==o)v.splits=o.splits; drawSplits(); setStatus("↺ Розрізи прибрано.","ok");}
+function removeSplit(t){const o=cutHolder(); if(!o||!o.splits)return; o.splits=o.splits.filter(x=>x!==t); const v=variants[activeVar]; if(v&&v!==o)v.splits=o.splits; drawSplits(); setStatus("↺ Розріз "+tc(t)+" прибрано.","ok");}
 function setTool(t){_tlTool=t;document.querySelectorAll("#tlTools .ttool").forEach(b=>b.classList.toggle("on",b.dataset.tool===t));
   const tb=$("trimBar"); if(tb)tb.classList.toggle("blade",t==="blade");
   setStatus(t==="blade"?"✂ Лезо: клік по картинці — розріз. Правий клік по шматку — видалити або зробити частиною. V — назад до вибору.":"↖ Вибір: клік — плейхед, тягни [ ] — трім, правий клік — меню.","");}
@@ -4645,7 +4650,9 @@ function pieceAt(t){return pieces().find(([a,b])=>t>=a&&t<b)||null;}
 function drawSplits(){
   const bar=$("trimBar"),dur=video.duration||0; if(!bar)return;
   let box=$("trimSplits"); if(!box){box=document.createElement("div");box.id="trimSplits";bar.appendChild(box);}
-  box.innerHTML=dur?splitsOf().map(t=>"<i style='left:"+(t/dur*100)+"%' title='Розріз "+tc(t)+" · правий клік — меню'></i>").join(""):"";
+  box.innerHTML=dur?splitsOf().map(t=>"<i data-split='"+t+"' style='left:"+(t/dur*100)+"%' title='Розріз "+tc(t)+" · подвійний клік — прибрати · правий клік — меню'></i>").join(""):"";
+  box.querySelectorAll("[data-split]").forEach(el=>{el.ondblclick=e=>{e.preventDefault();e.stopPropagation();removeSplit(+el.dataset.split);};});
+  const cs=$("clrSplits"); if(cs){const n=splitsOf().length; cs.style.display=n?"":"none"; cs.querySelector("small").textContent=n+" ✕";}
   const hl=$("trimPiece"); if(hl&&!hl._keep)hl.style.display="none";
 }
 function hlPiece(p){let e=$("trimPiece"); const bar=$("trimBar"),dur=video.duration||0; if(!bar||!dur)return;
@@ -4747,7 +4754,7 @@ function tlContext(ev){
     const pc=pieceAt(t), np=pieces().length, near=splitsOf().find(x=>Math.abs(x-t)<=Math.max(1/fps()*3,dur*0.006));
     if(pc&&np>1)hlPiece(pc);
     ctxMenu(ev,[{head:"Picture · "+tc(t)},
-      {label:"✂ Split here",key:"C",on:()=>addSplit(t)},
+      {label:"✂ Split at playhead",key:"C",on:splitAtPlayhead},
       np>1?{label:"✕ Delete this piece ("+tc(pc[0])+"–"+tc(pc[1])+")",title:"Вирізати шматок: відео + звук, титри зсуваються",on:()=>deletePiece(pc)}:null,
       np>1?{label:"⧉ Make part from this piece",on:()=>partFromPiece(pc)}:null,
       np>1?{label:"⧉ Make parts from all "+np+" pieces",on:()=>partsFromAll()}:null,
@@ -4756,8 +4763,6 @@ function tlContext(ev){
       "-",
       {label:"⇤ Set In here",key:"I",on:()=>{video.currentTime=t;setTrimFromPlayhead("in");}},
       {label:"Set Out here ⇥",key:"O",on:()=>{video.currentTime=t;setTrimFromPlayhead("out");}},
-      "-",
-      {label:"⟳ Repeat ×2",on:()=>doRepeat(2)},{label:"⟳ Repeat ×3",on:()=>doRepeat(3)},{label:"⟳ Repeat ×4",on:()=>doRepeat(4)},{label:"⟳ Repeat ×N…",on:askRepeat},
       "-",
       {label:(m&&m.orig.mute)?"🔊 Unmute clip audio":"🔇 Mute clip audio",on:()=>laneMute("orig")}],()=>hlPiece(null));
     return;}
@@ -4810,9 +4815,7 @@ async function partsFromAll(){const ps=pieces(); for(const pc of ps){$("trimIn")
   document.addEventListener("keydown",e=>{const tg=e.target, tag=(tg&&tg.tagName)||"";
     if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
     if(currentMode!=="edit"||!videoLoaded||e.metaKey||e.ctrlKey||e.altKey)return;
-    const k=e.key.toLowerCase();
-    if(k==="c"){e.preventDefault();if(_tlTool==="blade")addSplit(curFrame()/fps());else setTool("blade");}
-    else if(k==="v"){e.preventDefault();setTool("sel");}});
+    if(e.code==="KeyC"){e.preventDefault();splitAtPlayhead();}});
   if($("addOwnBtn"))$("addOwnBtn").onclick=pickOwnMusic;
   if($("addMusicBtn"))$("addMusicBtn").onclick=()=>{const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}setStatus("♪ Вибери настрій і Generate — трек ляже на доріжку Music.","");};
   if($("addSfxBtn"))$("addSfxBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
@@ -6043,16 +6046,16 @@ function buildDock(){
   const cutG=top.querySelector(".dcut"); if(cutG){cutG.style.display="none";}   // ✂ blade + right-click replace From / To
   const grid=mk("div","tlGrid"), left=mk("div","tlTools"), main=mk("div","tlMain"), right=mk("div","tlActs");
   left.id="tlTools";
-  left.innerHTML="<button type='button' class='ttool on' data-tool='sel' title='Вибір / плейхед (V)'>↖<small>V</small></button>"
-    +"<button type='button' class='ttool' data-tool='blade' title='Лезо: клік по картинці — розріз (C)'>✂<small>C</small></button>";
+  left.innerHTML="<button type='button' class='ttool' id='splitBtn' title='Розріз там, де стоїть плейхед (клавіша C). Правий клік по шматку — видалити / зробити частиною'>✂<small>C</small></button>"
+    +"<button type='button' class='ttool' id='clrSplits' style='display:none' title='Прибрати всі розрізи (окремий — подвійний клік по ньому)'>↺<small>0 ✕</small></button>";
   [...D.childNodes].forEach(n=>{if(n.nodeType===1&&!["trimIn","trimOut","trimPlayIn","trimPlayOut","trimAll","cutUndo"].includes(n.id)&&!n.classList.contains("dockFoot"))main.appendChild(n);});
   const rb=mk("button","tchip rep","<span class='tdot'></span>⟳ Repeat ×N"); rb.type="button"; rb.id="repeatBtn"; rb.title="Повторити кліп кілька разів (зацикленa анімація)";
   const q=id=>main.querySelector("#"+id)||$(id);   // main is not in the document yet — getElementById can't see into it
-  ["tbCuts","tbBody","tbPart","tbRegen"].forEach(id=>{const e=q(id);if(e)right.appendChild(e);}); right.appendChild(rb);
+  ["tbCuts","tbBody","tbPart","tbRegen"].forEach(id=>{const e=q(id);if(e)right.appendChild(e);});   // ⟳ Repeat → Assemble (hook ×N), not here
   if(q("tbStatus"))right.appendChild(q("tbStatus"));
   const dt=bot.querySelector(".dtools"); if(dt)dt.remove();
   grid.appendChild(left); grid.appendChild(main); grid.appendChild(right); D.insertBefore(grid,D.firstChild); D.classList.add("v2dock");
-  left.querySelectorAll(".ttool").forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+  left.querySelector("#splitBtn").onclick=splitAtPlayhead; left.querySelector("#clrSplits").onclick=clearSplits;
   rb.onclick=ev=>ctxMenu(ev,[{head:"⟳ Repeat the clip"},{label:"×2",on:()=>doRepeat(2)},{label:"×3",on:()=>doRepeat(3)},{label:"×4",on:()=>doRepeat(4)},{label:"×N…",on:askRepeat}]);
   const eb=$("exportBtn"); if(eb&&!/▾/.test(eb.textContent))eb.textContent=eb.textContent.trim()+" ▾";
 }

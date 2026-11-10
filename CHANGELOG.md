@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-10** — 2.0: split at playhead (C), hotkeys in any layout, remove splits, Repeat out of Edit (2.0.0-b2)
 - **2026-11-10** — 2.0 step 1 (branch v2): compact timeline, ✂ blade, right-click menus, ⟳ Repeat ×N, own music file, Export ▾ (2.0.0-b1)
 - **2026-11-10** — ⬇ Music / voice / audio from any clip (Stem Separation, trim zone); blue frame-step buttons (1.9.111)
 - **2026-11-09** — Fix: Whisper re-transcribe after Scribe ('eng' language code) (1.9.110)
