@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b19",
+  "version": "2.0.0-b20",
   "channel": "v2",
-  "notes": "Presets: every card has ✕ on hover — your / team presets are deleted; the shipped ones (styles/) too, in the maintainer's repo clone (then Commit + Push); built-ins can be hidden (🙈, «показати сховані» brings them back). Right-click a preset: Apply · Rename · Duplicate · Delete / Hide. Jira: the window drops down under ⇩ JIRA on the left (no longer over the video), closes on any click outside or Esc, and closes by itself on Import — the creatives load in the background; a failed import keeps your list and the details for the next open. «📁 Projects» button with a label."
+  "notes": "↪ Redo: after ↩ Undo the step can be brought back (several in a row) — the ↪ Redo button in History, Cmd+Z / Cmd+Shift+Z (not while typing); a new edit clears Redo. 🔍 Timeline zoom: Alt + wheel (or a trackpad pinch) around the cursor, = / − / \\ (fit), or the 1× button under ✂ (2–16×); all lanes scroll together, the plain wheel scrolls time, the playhead stays in view while playing. ⤢ Big timeline: taller lanes, full width. 🔊 Hold Cmd while dragging the playhead — you hear the sound under it (short grains, like After Effects)."
 }

@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-12** — ↪ Redo (Cmd+Shift+Z); 🔍 timeline zoom (Alt+wheel, = / −) + ⤢ big timeline; 🔊 Cmd-drag audio scrub (2.0.0-b20)
 - **2026-11-12** — Presets: delete / hide / rename / duplicate (✕ + right-click); Jira window under its button, closes on outside click and on Import (2.0.0-b19)
 - **2026-11-12** — Fix: style changes by click refresh the exact preview at once (2.0.0-b18)
 - **2026-11-12** — Fix: Transcribe pack shows the words at once (2.0.0-b17)

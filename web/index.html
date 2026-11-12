@@ -152,6 +152,18 @@
   .tlGrid{display:grid;grid-template-columns:52px minmax(0,1fr) 150px;gap:12px;align-items:start;width:100%}
   .tlMain{background:#15171d;border:1px solid var(--line);border-radius:12px;padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px;min-width:0}
   .tlTools{display:flex;flex-direction:column;gap:6px}
+  /* 🔍 timeline zoom: lanes scroll sideways together, lane heads stay put */
+  .lanes.zoomed{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#3a3e4a transparent}
+  .lanes.zoomed>.lane{width:calc(var(--lh) + var(--zw));grid-template-columns:var(--lh) var(--zw)}
+  .lanes.zoomed>.lane>.lhead{position:sticky;left:0;z-index:9;background:var(--bg)}
+  .tzoom{display:flex;gap:2px;width:52px}
+  .tzoom button{flex:1;height:26px;padding:0;font-size:11px;line-height:1;background:#1d2029;border:1px solid var(--line);border-radius:7px;color:var(--txt)}
+  .tzoom button.on{border-color:var(--accent);color:#fff}
+  .tlDock.v2dock.big{max-width:none}
+  .v2dock.big .lane{min-height:40px}
+  .v2dock.big .lane .lbody{height:40px}
+  .v2dock.big .lane.lvid #trimBar{height:60px}
+  .v2dock.big .lane.lruler .lbody{height:22px}
   .ttool{width:52px;height:46px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px;line-height:1;background:#1d2029;border:1px solid var(--line);border-radius:10px}
   .ttool small{font-size:9px;color:var(--muted);margin-top:3px}
   .ttool.on{background:#1e293b;border-color:#3b82f6;color:#fff}
@@ -1939,7 +1951,8 @@ function loop(ts){let t,dur;
   if(videoLoaded){t=video.currentTime;dur=video.duration||4;$("seek").value=(t/dur)*100;{const _tl=$("timeLbl"),_k=frameOf(t)+"/"+frameOf(dur);if(_tl._k!==_k){_tl._k=_k;_tl.innerHTML="<b>"+tc(t)+"</b> / "+tc(dur);_tl.title=t.toFixed(3)+" с · кадр "+frameOf(t);}}
     const _onTl=$("trimRow").style.display!=="none";$("transport").classList.toggle("tl",_onTl);
     if(_onTl&&$("trimPlayhead"))$("trimPlayhead").style.left=Math.max(0,Math.min(100,(t/dur)*100))+"%";
-    if(_onTl&&$("laneHead"))$("laneHead").style.left="calc(var(--lh) + (100% - var(--lh)) * "+Math.max(0,Math.min(1,t/dur)).toFixed(5)+")";}
+    if(_onTl&&$("laneHead"))$("laneHead").style.left="calc(var(--lh) + var(--zw, calc(100% - var(--lh))) * "+Math.max(0,Math.min(1,t/dur)).toFixed(5)+")";
+    if(_onTl&&_tlZoom>1)tlFollow(t,dur);}
   else{const dt=(ts-lastTs)/1000||0;demoT=(demoT+dt)%4;t=demoT;dur=4;}
   lastTs=ts;render(t,dur);
   // headline sits on top of the captions and only inside its own [in,out] window
@@ -2583,15 +2596,43 @@ $("trimBar").addEventListener("pointerdown",e=>{
   if(e.target.closest&&e.target.closest("#trimPlayhead")){scrubDrag(e);return;}
   if(typeof selectPieceAt==="function")selectPieceAt(xToTime(e.clientX));
 });
+// ---------- 🔊 audio scrub: hold Cmd (Ctrl) while dragging the playhead — short grains, like AE ----------
+// The clip's own sound as you hear it (the current mix), decoded once per file into Web Audio.
+var _scr={ctx:null,url:"",buf:null,busy:null,last:0,lastT:-1};
+function scrubAudioLoad(){
+  const url=video.currentSrc||video.src; if(!url)return null;
+  if(_scr.url===url&&(_scr.buf||_scr.busy))return _scr.busy;
+  _scr.url=url; _scr.buf=null;
+  try{_scr.ctx=_scr.ctx||new (window.AudioContext||window.webkitAudioContext)();}catch(_){return null;}
+  _scr.busy=fetch(url).then(r=>r.arrayBuffer()).then(a=>new Promise((ok,no)=>_scr.ctx.decodeAudioData(a,ok,no)))
+    .then(b=>{if(_scr.url===url)_scr.buf=b;}).catch(()=>{}).finally(()=>{if(_scr.url===url)_scr.busy=null;});
+  return _scr.busy;
+}
+function scrubGrain(t){
+  if(video.muted)return; const now=performance.now();
+  if(now-_scr.last<45||Math.abs(t-_scr.lastT)<0.5/fps())return;   // a grain every ~45 ms, only when the frame changes
+  if(!_scr.buf||_scr.url!==(video.currentSrc||video.src)){scrubAudioLoad();return;}
+  const c=_scr.ctx; if(c.state==="suspended")c.resume().catch(()=>{});
+  _scr.last=now; _scr.lastT=t;
+  const src=c.createBufferSource(), g=c.createGain(), L=0.06, at=c.currentTime, v=Math.max(0,Math.min(1,video.volume??1));
+  src.buffer=_scr.buf; src.connect(g); g.connect(c.destination);
+  g.gain.setValueAtTime(0,at); g.gain.linearRampToValueAtTime(v,at+0.006); g.gain.setValueAtTime(v,at+L-0.012); g.gain.linearRampToValueAtTime(0,at+L);
+  try{src.start(at,Math.max(0,Math.min(_scr.buf.duration-L,t)),L);}catch(_){}
+}
+document.addEventListener("keydown",e=>{if((e.key==="Meta"||e.key==="Control")&&currentMode==="edit"&&videoLoaded)scrubAudioLoad();});   // decode ahead, so the first grain is instant
 function scrubDrag(e){
   if(!videoLoaded)return; e.preventDefault();
+  const L=$("lanes"); if(L)L._scrub=true;
   const go=ev=>{const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
+    if(L&&_tlZoom>1){const r=L.getBoundingClientRect(), lh=tlLH();   // zoomed: drag past an edge → the lanes scroll
+      if(cx>r.right-16)L.scrollLeft+=Math.min(40,cx-(r.right-16)+6); else if(cx<r.left+lh+16)L.scrollLeft-=Math.min(40,(r.left+lh+16)-cx+6);}
     let x=xToTime(cx), hit=null; if(ev.shiftKey){const m=magnetT(x,"ph");x=m.t+(m.hit?0.0001:0);hit=m.hit;} snapNote(hit,x);
     const t=(Math.floor(x*fps())+0.5)/fps();video.currentTime=Math.min(Math.max(0,t),Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
+    if(ev.metaKey||ev.ctrlKey)scrubGrain(video.currentTime);
     if(!video.paused){video.pause();$("playBtn").textContent="▶";}
     if(typeof scheduleExact==="function")scheduleExact();};
   go(e);
-  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);snapNote(null);};
+  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);snapNote(null);if(L){L._scrub=false;_tlLastT=video.currentTime||0;}};
   document.addEventListener("pointermove",go);document.addEventListener("pointerup",up);
 }
 $("trimHOut").addEventListener("pointerdown",trimDrag("out"));
@@ -3555,6 +3596,11 @@ function revertSpan(sp){
 }
 function rvUndoStack(){const v=variants[activeVar],h=(typeof openHookRef==="function")?openHookRef():null;
   return (v&&v._rvFrom&&v._rvFrom.length)?v._rvFrom:((h&&h._rvFrom&&h._rvFrom.length)?h._rvFrom:null);}
+// ↩ / ↪ — one stack per clip holder. A NEW edit clears the redo stack (like every editor).
+const pushOnce=(a,x)=>{if(a[a.length-1]!==x)a.push(x);};   // holders may SHARE one stack (Edit ⇄ pack hook) — never push a step twice
+function pushUndo(o,before){pushOnce(o._rvFrom=o._rvFrom||[],before);if(o._rdTo)o._rdTo.length=0;}
+function rvRedoStack(){const v=variants[activeVar],h=(typeof openHookRef==="function")?openHookRef():null;
+  return (v&&v._rdTo&&v._rdTo.length)?v._rdTo:((h&&h._rdTo&&h._rdTo.length)?h._rdTo:null);}
 function scheduleRevoiceBox(){clearTimeout(_rvTimer);_rvTimer=setTimeout(renderRevoiceBox,450);}
 function renderRevoiceBox(){
   const box=$("revoiceBox");if(!box)return;
@@ -3640,7 +3686,7 @@ async function doRevoice(list){
     });
     // swap the clip IN PLACE (Edit, LOC and the board hold the same objects); keep the old file for ↩
     const _vh=openHookRef();
-    rvTargets(v.clip).forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;o.origWords=orig.map(w=>({...w}));
+    rvTargets(v.clip).forEach(o=>{pushUndo(o,before);o.clip=d.clip;o.videoUrl=API+d.url;o.origWords=orig.map(w=>({...w}));
       if(o!==v&&o!==_vh&&("words" in o))o.words=cur.map(w=>({...w}));});   // board / LOC copies: the new words too, or they caption the new audio with the old text
     if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);   // ours — don't let the board re-add it as a new hook
     _rvSay={};_wRng=null;
@@ -3662,6 +3708,12 @@ async function doRevoice(list){
 function undoRevoice(){
   const st=rvUndoStack();if(!st||!st.length)return;
   const prev=st[st.length-1], v=variants[activeVar], cur=v&&v.clip, h=openHookRef();
+  // ↪ remember what we're leaving (the CLEAN clip — the mix is rebuilt from it), so Redo can come back
+  const _mo=mixHolder(), _m=_mo&&_mo.mix;
+  const after=(prev.kind==="cut")?cutSnapshot(v,h):{kind:prev.kind,words:(realWords||[]).map(w=>({...w})),origWords:(origWordsNow()||[]).map(w=>({...w}))};
+  after.kind=prev.kind; after.clip=_m?_m.base:(v&&v.clip); after.videoUrl=_m?mixBaseUrl(_m):(v&&v.videoUrl);
+  const rec={undo:prev,after};
+  rvTargets(cur).forEach(o=>{pushOnce(o._rdTo=o._rdTo||[],rec);});
   rvTargets(cur).forEach(o=>{if(o._rvFrom&&o._rvFrom.length&&o._rvFrom[o._rvFrom.length-1]===prev)o._rvFrom.pop();
     o.clip=prev.clip;o.videoUrl=prev.videoUrl;o.origWords=prev.origWords.map(w=>({...w}));
     if(prev.kind!=="cut"&&o!==v&&o!==h&&("words" in o))o.words=prev.words.map(w=>({...w}));});
@@ -3677,6 +3729,38 @@ function undoRevoice(){
   if(typeof drawCutMark==="function")drawCutMark();
   {const mo=mixHolder(); if(mo&&mo.mix&&(prev.kind==="cut"||prev.kind==="revoice"||prev.kind==="regen"))mixRebase(mo);}
 }
+function redoStep(){
+  const st=rvRedoStack();if(!st||!st.length)return;
+  const rec=st[st.length-1], a=rec.after, v=variants[activeVar], cur=v&&v.clip, h=openHookRef();
+  rvTargets(cur).forEach(o=>{if(o._rdTo&&o._rdTo.length&&o._rdTo[o._rdTo.length-1]===rec)o._rdTo.pop();
+    pushOnce(o._rvFrom=o._rvFrom||[],rec.undo);
+    o.clip=a.clip;o.videoUrl=a.videoUrl;o.origWords=(a.origWords||[]).map(w=>({...w}));
+    if(a.kind!=="cut"&&o!==v&&o!==h&&("words" in o))o.words=(a.words||[]).map(w=>({...w}));});
+  if(a.kind==="cut"){
+    cutRestore(a);
+    if(typeof loadCapWin==="function")loadCapWin(h||v);
+    if(typeof renderTitles==="function")try{renderTitles();}catch(_){}
+    cutLoadVideo(a.videoUrl);
+  }else rvLoadVideo(a.videoUrl);
+  commitWords((a.words||[]).map(w=>({...w})));
+  if(typeof renderHookStrip==="function")renderHookStrip();
+  setStatus("↪ Повторено: "+(rec.undo.label||HIST_NAME[a.kind]||a.kind)+".","ok");
+  if(typeof drawCutMark==="function")drawCutMark();
+  {const mo=mixHolder(); if(mo&&mo.mix&&(a.kind==="cut"||a.kind==="revoice"||a.kind==="regen"))mixRebase(mo);}
+  renderHistory(); if(typeof hmRefreshUndo==="function")hmRefreshUndo();
+}
+// Cmd/Ctrl+Z = undo, Cmd/Ctrl+Shift+Z (or Ctrl+Y) = redo — not while typing (the field keeps its own undo)
+document.addEventListener("keydown",e=>{
+  if(!(e.metaKey||e.ctrlKey)||e.altKey)return;
+  const isZ=e.code==="KeyZ", isY=e.code==="KeyY"&&e.ctrlKey&&!e.metaKey;
+  if(!isZ&&!isY)return;
+  const tg=e.target,tag=(tg&&tg.tagName)||"";
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
+  if(currentMode!=="edit")return;
+  e.preventDefault(); if(e.repeat)return;
+  if(isY||e.shiftKey){if(rvRedoStack())redoStep();}
+  else if(rvUndoStack()){undoRevoice();renderHistory();if(typeof hmRefreshUndo==="function")hmRefreshUndo();}
+});
 // ---------- ✂ Cut segment: remove a piece from the MIDDLE of the clip ----------
 // A cut makes a NEW file (server: "<name>_cutN"), swapped in place like a re-voice, so preview,
 // exact, render, board and LOC simply see a shorter clip — nothing downstream has to know.
@@ -3782,7 +3866,7 @@ async function doCut(spans,speech,opts){
     if(opts.clearTrim)before.undoName="trim";
     cutApplyTimes(targets,d.spans,oldDur,d.words||[]);
     if(opts.clearTrim)targets.forEach(o=>{if("trim" in o)o.trim=null;});   // the file IS the trim now
-    targets.forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
+    targets.forEach(o=>{pushUndo(o,before);o.clip=d.clip;o.videoUrl=API+d.url;
       o.origWords=(d.orig_words||[]).map(w=>({...w}));});
     const other=Object.keys(variants).filter(k=>k!==activeVar);   // dubs were made from the UNCUT clip
     if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
@@ -3813,7 +3897,7 @@ async function _cutOtherHook(o,spans){
   const before={kind:"cut",label:"✂ Cut "+tc(d.removed)+" @ "+tc(d.spans[0][0])+" (batch)",clip:o.clip,videoUrl:o.videoUrl,
     words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w})),titles:J(titles),per};
   cutApplyTimes(targets,d.spans,d.dur_before||0,d.words||[],true);
-  targets.forEach(x=>{(x._rvFrom=x._rvFrom||[]).push(before);x.clip=d.clip;x.videoUrl=API+d.url;
+  targets.forEach(x=>{pushUndo(x,before);x.clip=d.clip;x.videoUrl=API+d.url;
     x.origWords=(d.orig_words||[]).map(w=>({...w}));if("words" in x||x===o)x.words=(d.words||[]).map(w=>({...w}));});
   if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
   return d.removed;
@@ -3974,7 +4058,7 @@ function rgApply(j,d){
   const o=j.o, mm=mixUnwrap(o), isOpen=(o===mixHolder());
   const before={kind:"regen",label:"✨ Seedance «"+j.prompt.slice(0,34)+"»",clip:o.clip,videoUrl:o.videoUrl,
     words:((isOpen?realWords:o.words)||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
-  hmTargets(o).forEach(x=>{(x._rvFrom=x._rvFrom||[]).push(before);x.clip=d.clip;x.videoUrl=API+d.url;});
+  hmTargets(o).forEach(x=>{pushUndo(x,before);x.clip=d.clip;x.videoUrl=API+d.url;});
   if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
   if(mm)mixRebase(o); else if(isOpen)rvLoadVideo(API+d.url);
   if(typeof renderHookStrip==="function")renderHookStrip(); if(typeof renderHistory==="function")renderHistory();
@@ -3995,7 +4079,7 @@ async function newPart(){
     const v=variants[activeVar]; const hk=makePackHook(v.clip,v.videoUrl,v.language||"");
     Object.assign(hk,{words:realWords||v.words||null,origWords:v.origWords||null,trim:v.trim||null,cuts:v.cuts||null,body:v.body!=null?v.body:null,capsOff:!!v.capsOff,
       ctrl:readControls(),style:toEngineStyle(readControls()),titles:cloneTitles(),titlesOn:titlesOn()});
-    if(v.mix)hk.mix=v.mix; if(v._rvFrom)hk._rvFrom=v._rvFrom;
+    if(v.mix)hk.mix=v.mix; if(v._rvFrom)hk._rvFrom=v._rvFrom; if(v._rdTo)hk._rdTo=v._rdTo;
     editPack=[hk]; activeHook=-1; editingHook=null; selectHook(0);
   }
   saveActiveHook();
@@ -4070,15 +4154,19 @@ if($("cutUndo"))$("cutUndo").onclick=()=>undoRevoice();
 const HIST_NAME={cut:"cut",revoice:"re-voice",music:"music",sfx:"sfx",regen:"regen"};
 function renderHistory(){
   const el=$("histRow"); if(!el)return;
-  const st=rvUndoStack()||[];
-  if(!st.length){el.style.display="none";el.innerHTML="";return;}
+  const st=rvUndoStack()||[], rd=rvRedoStack()||[];
+  if(!st.length&&!rd.length){el.style.display="none";el.innerHTML="";return;}
+  const rtop=rd[rd.length-1];
+  const redoBtn=rd.length?"<button type='button' id='histRedo' class='tmini' title='Повторити скасоване (Cmd+Shift+Z): "+String(rtop.undo.label||"").replace(/'/g,"&#39;")+"'>↪ Redo "+(rtop.undo.undoName||HIST_NAME[rtop.undo.kind]||"re-voice")+"</button>":"";
   const steps=["Original"].concat(st.map(s=>s.label||(s.kind==="cut"?"✂ Cut":s.kind==="music"?"♪ Music":"🎙 Re-voice")));
   const top=st[st.length-1];
   el.style.display="flex";
+  const undoBtn=top?"<button type='button' id='histUndo' class='tmini' title='Скасувати останній крок (Cmd+Z): "+String(top.label||"").replace(/'/g,"&#39;")+"'>↩ Undo "+(top.undoName||HIST_NAME[top.kind]||"re-voice")+"</button>":"";
   el.innerHTML="<span style='font-weight:600;color:var(--txt)'>History</span>"
     +steps.map((s,i)=>(i?"<span class='harr'>→</span>":"")+"<span class='hstep"+(i===steps.length-1?" cur":"")+"' title='"+String(s).replace(/'/g,"&#39;")+"'>"+s+"</span>").join("")
-    +"<span style='flex:1'></span><button type='button' id='histUndo' class='tmini' title='Скасувати останній крок: "+String(top.label||"").replace(/'/g,"&#39;")+"'>↩ Undo "+(top.undoName||HIST_NAME[top.kind]||"re-voice")+"</button>";
-  $("histUndo").onclick=()=>{undoRevoice();renderHistory();if(typeof hmRefreshUndo==="function")hmRefreshUndo();};
+    +"<span style='flex:1'></span>"+undoBtn+redoBtn;
+  if($("histUndo"))$("histUndo").onclick=()=>{undoRevoice();renderHistory();if(typeof hmRefreshUndo==="function")hmRefreshUndo();};
+  if($("histRedo"))$("histRedo").onclick=redoStep;
 }
 if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{if(_cut.a!=null&&_cut.b==null)drawCutMark();});
 
@@ -4439,7 +4527,7 @@ if($("tbBody"))$("tbBody").onclick=()=>toolPop($("tbBody"),[
 // State = plain data only. Blob URLs and history (↩ snapshots) are not saved: clips are re-served
 // from the session folder, and History starts fresh after opening a project.
 let _projName="", _projSavedKey="", _projTimer=null, _projBusy=false;
-const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_cutsDone","pick"]);
+const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_rdTo","_cutsDone","pick"]);
 function _projClean(o){return JSON.parse(JSON.stringify(o,(k,v)=>{
   if(PROJ_SKIP.has(k))return undefined;
   if(v instanceof Set||v instanceof Map)return undefined;
@@ -4668,7 +4756,7 @@ function drawLanes(){
 async function drawWave(o){
   const cv=$("waveOrig"); if(!cv||!o||!fileId)return;
   const clip=(o.mix&&o.mix.base)||o.clip; if(!clip)return;
-  const w=Math.max(100,Math.round(cv.clientWidth)), hh=Math.max(10,cv.clientHeight), dpr=window.devicePixelRatio||1, n=Math.round(w/2);
+  const w=Math.max(100,Math.min(Math.floor(16000/(window.devicePixelRatio||1)),Math.round(cv.clientWidth))), hh=Math.max(10,cv.clientHeight), dpr=window.devicePixelRatio||1, n=Math.round(w/2);
   const key=clip+"|"+n;
   if(!_peaks.has(key)){_peaks.set(key,null);
     try{const r=await fetch(API+"/api/waveform?file_id="+encodeURIComponent(fileId)+"&clip="+encodeURIComponent(clip)+"&n="+n);const d=await r.json();_peaks.set(key,r.ok?d.peaks:[]);}catch(_){_peaks.set(key,[]);}
@@ -4920,7 +5008,7 @@ async function doRepeat(n){
     const before=cutSnapshot(v,h), targets=rvTargets(v.clip);
     before.label="⟳ Repeat ×"+d.n; before.undoName="repeat";
     const L=d.loop;
-    targets.forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
+    targets.forEach(o=>{pushUndo(o,before);o.clip=d.clip;o.videoUrl=API+d.url;
       o.origWords=(d.orig_words||[]).map(w=>({...w}));
       if(o.cuts&&o.cuts.length){const c=o.cuts.filter(t=>t<L);o.cuts=[].concat(...Array.from({length:d.n},(_,i)=>c.map(t=>+(t+i*L).toFixed(3))));}
       if("trim" in o)o.trim=null; if(o.splits)o.splits=[]; if(o.body!=null&&o.body>=L)o.body=null;
@@ -6379,7 +6467,7 @@ function buildDock(){
   const sc=$("applyScope"); if(sc){const l=sc.querySelector("span");if(l)l.remove();}
   D.insertBefore(top,D.firstChild);
   // ruler (above the Picture lane)
-  const L=$("lanes"); const ru=mk("div","lane lruler","<div class='lhead'><span class='rlbl'>⇠ scrub ⇢</span></div><div class='lbody' id='tlRuler' title='Клік або тягни — перемотка (як у Premiere). Плейхед можна тягнути й за білу голівку.'></div>"); L.insertBefore(ru,L.firstChild);
+  const L=$("lanes"); const ru=mk("div","lane lruler","<div class='lhead'><span class='rlbl'>⇠ scrub ⇢</span></div><div class='lbody' id='tlRuler' title='Клік або тягни — перемотка (як у Premiere). Плейхед можна тягнути й за білу голівку. Cmd + тягни — зі звуком. Alt + колесо — масштаб.'></div>"); L.insertBefore(ru,L.firstChild);
   ru.querySelector("#tlRuler").addEventListener("pointerdown",e=>{if(e.button===2)return;scrubDrag(e);});
   // bottom bar: clip tools | history
   const bot=mk("div","dockBar dockBot"); bot.id="dockBot";
@@ -6397,7 +6485,9 @@ function buildDock(){
   const grid=mk("div","tlGrid"), left=mk("div","tlTools"), main=mk("div","tlMain"), right=mk("div","tlActs");
   left.id="tlTools";
   left.innerHTML="<button type='button' class='ttool' id='splitBtn' title='Розріз там, де стоїть плейхед (клавіша C). Правий клік по шматку — видалити / зробити частиною'>✂<small>C</small></button>"
-    +"<button type='button' class='ttool' id='clrSplits' style='display:none' title='Прибрати всі розрізи (окремий — подвійний клік по ньому)'>↺<small>0 ✕</small></button>";
+    +"<button type='button' class='ttool' id='clrSplits' style='display:none' title='Прибрати всі розрізи (окремий — подвійний клік по ньому)'>↺<small>0 ✕</small></button>"
+    +"<div class='tzoom'><button type='button' id='zoomBtn' title='Масштаб таймлайну: Alt + колесо (або щипок на трекпаді) біля курсора · = / − · \\ — весь кліп'>1×</button>"
+    +"<button type='button' id='bigBtn' title='Великий таймлайн: вищі доріжки на всю ширину'>⤢</button></div>";
   [...D.childNodes].forEach(n=>{if(n.nodeType===1&&!["trimIn","trimOut","trimPlayIn","trimPlayOut","trimAll","cutUndo"].includes(n.id)&&!n.classList.contains("dockFoot"))main.appendChild(n);});
   const rb=mk("button","tchip rep","<span class='tdot'></span>⟳ Repeat ×N"); rb.type="button"; rb.id="repeatBtn"; rb.title="Повторити кліп кілька разів (зацикленa анімація)";
   const q=id=>main.querySelector("#"+id)||$(id);   // main is not in the document yet — getElementById can't see into it
@@ -6406,8 +6496,60 @@ function buildDock(){
   const dt=bot.querySelector(".dtools"); if(dt)dt.remove();
   grid.appendChild(left); grid.appendChild(main); grid.appendChild(right); D.insertBefore(grid,D.firstChild); D.classList.add("v2dock");
   left.querySelector("#splitBtn").onclick=splitAtPlayhead; left.querySelector("#clrSplits").onclick=clearSplits;
+  left.querySelector("#zoomBtn").onclick=ev=>ctxMenu(ev,[{head:"🔍 Timeline zoom"},{label:"Fit — весь кліп",key:"\\",on:()=>tlSetZoom(1)},
+    {label:"2×",on:()=>tlSetZoom(2)},{label:"4×",on:()=>tlSetZoom(4)},{label:"8×",on:()=>tlSetZoom(8)},{label:"16×",on:()=>tlSetZoom(16)}]);
+  left.querySelector("#bigBtn").onclick=()=>tlBig(!D.classList.contains("big"));
+  tlWireZoom(); try{if(localStorage.getItem("cs_tlBig")==="1")tlBig(true);}catch(_){}
   rb.onclick=ev=>ctxMenu(ev,[{head:"⟳ Repeat the clip"},{label:"×2",on:()=>doRepeat(2)},{label:"×3",on:()=>doRepeat(3)},{label:"×4",on:()=>doRepeat(4)},{label:"×N…",on:askRepeat}]);
   const eb=$("exportBtn"); if(eb&&!/▾/.test(eb.textContent))eb.textContent=eb.textContent.trim()+" ▾";
+}
+// ---------- 🔍 timeline zoom (2.0) ----------
+// --zw = width of the lane bodies in px. Everything on the lanes is in %, and every hit-test uses the
+// element's own rect, so zoom is just "make the bodies wider and scroll them together".
+var _tlZoom=1, _tlLastT=-1, _tlRd=0;
+function tlLH(){const L=$("lanes");return L?(parseFloat(getComputedStyle(L).getPropertyValue("--lh"))||118):118;}
+function tlSetZoom(z,anchorX){
+  const L=$("lanes"), dur=video.duration||0; if(!L)return;
+  z=Math.max(1,Math.min(16,+z||1)); if(z<1.04)z=1;
+  const lh=tlLH(), r=L.getBoundingClientRect(), vis=Math.max(50,L.clientWidth-lh);
+  const ax=(anchorX!=null)?anchorX:(r.left+lh+vis/2);
+  const t=(anchorX!=null&&dur)?xToTime(anchorX):(video.currentTime||0);
+  _tlZoom=z;
+  if(z===1){L.classList.remove("zoomed");L.style.removeProperty("--zw");L.scrollLeft=0;}
+  else{L.classList.add("zoomed");L.style.setProperty("--zw",Math.round(vis*z)+"px");
+    if(dur)L.scrollLeft=Math.max(0,lh+t/dur*vis*z-(ax-r.left));}
+  _tlLastT=video.currentTime||0;
+  const b=$("zoomBtn"); if(b){b.textContent=(z===1?"1":(z<10?z.toFixed(z%1?1:0):Math.round(z)))+"×";b.classList.toggle("on",z>1);}
+  if(typeof drawTrimBar==="function")drawTrimBar();
+  clearTimeout(_tlRd); _tlRd=setTimeout(()=>{if(typeof drawLanes==="function")drawLanes();},180);   // waveform at the new width
+}
+// keep the playhead in view when it moves (play, ⟨ ⟩, jumps) — never fight your own scrolling
+function tlFollow(t,dur){
+  if(Math.abs(t-_tlLastT)<1e-4)return; _tlLastT=t;
+  const L=$("lanes"); if(!L||!dur||L._scrub)return;
+  const lh=tlLH(), vis=L.clientWidth-lh, zw=vis*_tlZoom, x=t/dur*zw, a=L.scrollLeft, b=a+vis;
+  if(x<a||x>b-10)L.scrollLeft=Math.max(0,x-(video.paused?vis/2:vis*0.08));
+}
+function tlBig(on){
+  const D=$("trimRow"); if(!D)return; D.classList.toggle("big",!!on);
+  const b=$("bigBtn"); if(b)b.classList.toggle("on",!!on);
+  try{localStorage.setItem("cs_tlBig",on?"1":"0");}catch(_){}
+  requestAnimationFrame(()=>{tlSetZoom(_tlZoom);if(typeof fitVideo==="function")try{fitVideo();}catch(_){}});
+}
+function tlWireZoom(){
+  const L=$("lanes"); if(!L||L._zw)return; L._zw=1;
+  L.addEventListener("wheel",e=>{
+    if(e.altKey||e.ctrlKey){e.preventDefault();   // Alt + wheel, or a trackpad pinch (ctrlKey)
+      const d=e.deltaY||e.deltaX; tlSetZoom(_tlZoom*Math.exp(-d*(e.ctrlKey?0.01:0.0025)),e.clientX);return;}
+    if(_tlZoom>1&&Math.abs(e.deltaY)>Math.abs(e.deltaX)&&!e.shiftKey){e.preventDefault();L.scrollLeft+=e.deltaY;}   // plain wheel scrolls the time, like Premiere
+  },{passive:false});
+  document.addEventListener("keydown",e=>{const tg=e.target,tag=(tg&&tg.tagName)||"";
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
+    if(currentMode!=="edit"||!videoLoaded||e.metaKey||e.ctrlKey||e.altKey)return;
+    if(e.code==="Equal"||e.code==="NumpadAdd"){e.preventDefault();tlSetZoom(_tlZoom*2);}
+    else if(e.code==="Minus"||e.code==="NumpadSubtract"){e.preventDefault();tlSetZoom(_tlZoom/2);}
+    else if(e.code==="Backslash"){e.preventDefault();tlSetZoom(1);}});
+  window.addEventListener("resize",()=>{if(_tlZoom>1)tlSetZoom(_tlZoom);});
 }
 function wireDockJumps(){
   [["trimInLbl",()=>pf($("trimIn").value,0)],["trimOutLbl",()=>Math.max(0,(pf($("trimOut").value,video.duration||0)||0)-1/fps())]].forEach(([id,f])=>{const e=$(id);
@@ -6419,9 +6561,10 @@ function wireDockJumps(){
 function drawRuler(){
   const R=$("tlRuler"), dur=video.duration||0; if(!R||!dur)return;
   const w=R.clientWidth||1, k=dur+"|"+w; if(R._k===k)return; R._k=k;
-  const steps=[0.5,1,2,5,10,15,30,60], minPx=70; const step=steps.find(s=>s/dur*w>=minPx)||120;
-  let h=""; for(let t=0;t<=dur+1e-6;t+=step){const x=t/dur*100;h+="<i style='left:"+x+"%'></i><b style='left:"+x+"%'>"+(dur>=60?Math.floor(t/60)+":"+String(Math.round(t%60)).padStart(2,"0"):(+t.toFixed(1))+"s")+"</b>";}
-  for(let t=step/2;t<dur;t+=step)h+="<u style='left:"+(t/dur*100)+"%'></u>";
+  const steps=[0.1,0.2,0.5,1,2,5,10,15,30,60], minPx=70; const step=steps.find(s=>s/dur*w>=minPx)||120;   // 🔍 zoomed in → down to 0.1 s
+  const lbl=t=>(dur>=60&&step>=1)?Math.floor(t/60)+":"+String(Math.round(t%60)).padStart(2,"0"):(+t.toFixed(2))+"s";
+  let h=""; for(let i=0,t=0;t<=dur+1e-6;t=++i*step){const x=t/dur*100;h+="<i style='left:"+x+"%'></i><b style='left:"+x+"%'>"+lbl(t)+"</b>";}
+  for(let i=0,t=step/2;t<dur;t=step/2+(++i)*step)h+="<u style='left:"+(t/dur*100)+"%'></u>";
   R.innerHTML=h;
 }
 function buildStudioLayout(){
