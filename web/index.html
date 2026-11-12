@@ -2030,6 +2030,11 @@ async function transcribePack(){
   if(ah){realWords=ah.words;if(variants.en){variants.en.words=ah.words;variants.en.lang=ah.lang;}
     $("transcript").value=wordsToText(ah.words);autoGrow();
     if(typeof setLangSticker==="function")setLangSticker(ah.lang);
+    // the views and the caption layout must see the new words NOW (the preview / Words / Sentences
+    // kept the demo text until something else redrew them — it looked like nothing happened)
+    if(typeof invalidateLayout==="function")invalidateLayout();
+    if(typeof txtView!=="undefined"){if(txtView==="words"&&typeof renderWordsView==="function")renderWordsView();
+      if(txtView==="sents"&&typeof renderSentsView==="function")renderSentsView(true);}
     if(typeof scheduleExact==="function")scheduleExact();}
   updateEditButtons();
   if(ok){busyDone(ok+" транскрибовано");if(typeof chime==="function")chime("localize");

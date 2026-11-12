@@ -1,5 +1,5 @@
 {
-  "version": "1.9.113",
+  "version": "1.9.114",
   "channel": "main",
-  "notes": "Fix: assembled creatives no longer start on a black frame in QuickTime / macOS preview — the fast join shifted the video by the AAC priming (23 ms); now the video starts at 0 and is in sync with the sound."
+  "notes": "Fix: Transcribe pack — the words were recognised but the preview, Words and Sentences kept the demo text until something else redrew them (it looked like nothing happened). Now the open clip refreshes at once."
 }
