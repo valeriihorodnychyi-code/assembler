@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-12** — Fix: style changes by click refresh the exact preview at once (2.0.0-b18)
 - **2026-11-12** — Fix: Transcribe pack shows the words at once (2.0.0-b17)
 - **2026-11-12** — Fix: no black first frame in assembled creatives (2.0.0-b16)
 - **2026-11-12** — Trim: render = Edit (layout before trim), clip fps from the start, board re-send updates hooks, Shift-magnet (2.0.0-b15)

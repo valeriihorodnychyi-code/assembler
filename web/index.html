@@ -3224,7 +3224,10 @@ function styleSampleCSS(e){
 function presetCard(label,sampleCSS,custom,onClick){
   const b=document.createElement("div");b.className="preset";b.title=label+(custom?" (custom — редагований, ✕ видалити)":"");b.style.position="relative";
   b.innerHTML="<div class='pv'><span style='"+sampleCSS+"'>Aa</span></div><div class='pn'>"+(custom?"★ ":"")+label+"</div>";
-  b.onclick=()=>{onClick();markPreset(b);};
+  // a preset is applied by writing the controls (no input event) → the exact frame and the
+  // caption layout must be refreshed here, or the preview kept the old style until ✓ exact was re-toggled
+  b.onclick=()=>{onClick();markPreset(b);if(typeof saveLastStyle==="function")saveLastStyle();
+    if(typeof invalidateLayout==="function")invalidateLayout();if(typeof scheduleExact==="function")scheduleExact();};
   if(custom){const x=document.createElement("button");x.className="presetdel";x.textContent="✕";x.title="Видалити пресет";
     x.onclick=(e)=>{e.stopPropagation();deleteStyle(label);};b.appendChild(x);}
   return b;
@@ -6384,6 +6387,9 @@ function buildStudioLayout(){
   const ptb=$("packTranscribeBtn");
   if(ptb&&tb){ptb.style.width="100%";ptb.style.margin="6px 0 0";ptb.className="go";tb.insertAdjacentElement("beforebegin",ptb);ptb.onclick=transcribePack;}
   qp.addEventListener("input",()=>{saveLastStyle();scheduleExact();});qp.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+  // segmented buttons (AA / Aa, align…), header switches and presets change the style by CLICK, with
+  // no input event — refresh the exact frame for those too (debounced inside scheduleExact)
+  qp.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("button,.preset,.switch,label"))setTimeout(()=>{saveLastStyle();scheduleExact();},0);});
   buildInspector();
   initGrpAccordion();
 }
