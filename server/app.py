@@ -716,6 +716,17 @@ def delete_style(name: str):
     return {"deleted": name, "styles": st.list_styles()}
 
 
+@app.delete("/api/styles/official/{name}")
+def delete_official_style(name: str):
+    """Remove a SHIPPED default (repo styles/) — only in the maintainer's git clone (the .app has no
+    repo to commit to). The maintainer then Commits + Pushes the removal."""
+    if not os.path.isdir(os.path.join(ROOT, ".git")):
+        raise HTTPException(403, "Стандартні пресети видаляються тільки в репозиторії (run.command)")
+    d = st.OFFICIAL_STYLES_DIR
+    ok = bool(d) and st.delete_style(name, styles_dir=d)
+    return {"deleted": name if ok else None, "official": _official_names(), "styles": st.list_styles()}
+
+
 @app.post("/api/styles/official")
 def post_official_style(body: SaveStyle):
     """Save a style into the SHIPPED defaults (repo styles/) so it becomes a permanent base

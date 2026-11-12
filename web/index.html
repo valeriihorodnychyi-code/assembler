@@ -325,7 +325,7 @@
   .preset.active{border-color:var(--accent)}
   .preset .pv{height:30px;border-radius:6px;background:#0e1119;display:flex;align-items:center;justify-content:center;margin-bottom:5px;overflow:hidden;font-family:"Arial Black",sans-serif;font-weight:800;font-size:13px;color:#fff}
   .preset .pn{font-size:10.5px;color:var(--muted);text-align:center}
-  .presetdel{position:absolute;top:2px;right:2px;width:17px;height:17px;padding:0;line-height:15px;font-size:10px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#c7c9d1;cursor:pointer;opacity:0;transition:opacity .12s}
+  .presetdel{position:absolute;top:2px;right:2px;width:20px;height:20px;padding:0;line-height:18px;font-size:11px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#c7c9d1;cursor:pointer;opacity:0;transition:opacity .12s}
   .preset:hover .presetdel{opacity:1}
   .presetdel:hover{background:var(--accent);color:#fff}
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:7px;overflow:hidden}
@@ -663,7 +663,7 @@
     </div>
     <button class="primary" id="loadBtn" data-i18n="loadVideo" style="margin-left:4px">LOAD VIDEO</button>
     <button id="jiraBtn" title="Вставити таски з Джири (ключі, лінки або імена файлів) — відео підтягнуться з ADAM прямо в сесію" style="margin-left:4px;font-weight:700">⇩ JIRA</button>
-    <button id="projBtn" title="Projects — зберегти / відкрити (автозбереження кожні 20 с)" style="margin-left:4px">📁</button>
+    <button id="projBtn" title="Projects — зберегти / відкрити (автозбереження кожні 20 с)" style="margin-left:4px">📁 Projects</button>
     <div class="badge" id="encBadge">encoder: …</div>
     </div>
     <div class="modeswitch">
@@ -2071,9 +2071,10 @@ function finishPack(ok,focus){
 let jiraReady=false;
 function openJiraPop(){
   let p=$("jiraPop");
-  if(p){p.remove();return;}
+  if(p){if(p._close)p._close();else p.remove();return;}
   p=document.createElement("div");p.id="jiraPop";
-  p.style.cssText="position:fixed;z-index:210;top:64px;left:50%;transform:translateX(-50%);width:min(560px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)";
+  {const jb=$("jiraBtn"), r=jb?jb.getBoundingClientRect():{left:16,bottom:56};
+   p.style.cssText="position:fixed;z-index:210;top:"+Math.round(r.bottom+8)+"px;left:"+Math.max(8,Math.round(r.left))+"px;width:min(520px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)";}
   p.innerHTML="<div style='display:flex;align-items:center;margin-bottom:8px'><b style='font-size:14px'>⇩ Таски з Джири</b>"
     +"<span id='jiraClose' style='margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px'>✕</span></div>"
     // always rendered, shown/hidden live: saving the key in Settings while this window is open
@@ -2087,7 +2088,14 @@ function openJiraPop(){
     +"<span id='jiraNote' style='font-size:12px;color:var(--muted)'></span></div>"
     +"<div id='jiraOut' style='margin-top:10px;max-height:240px;overflow:auto;font-size:12px'></div>";
   document.body.appendChild(p);
-  $("jiraClose").onclick=()=>p.remove();
+  const close=()=>{p.remove();document.removeEventListener("pointerdown",outside,true);document.removeEventListener("keydown",escK,true);};
+  const outside=e=>{if(!p.contains(e.target)&&!(e.target.closest&&e.target.closest("#jiraBtn,#dzJira")))close();};
+  const escK=e=>{if(e.key==="Escape")close();};
+  setTimeout(()=>{document.addEventListener("pointerdown",outside,true);document.addEventListener("keydown",escK,true);},0);
+  p._close=close;
+  if(window._jiraLastText&&$("jiraText"))$("jiraText").value=window._jiraLastText;   // a failed import keeps your list
+  if(window._jiraLastOut&&$("jiraOut"))$("jiraOut").innerHTML=window._jiraLastOut;
+  $("jiraClose").onclick=close;
   if($("jiraToSettings"))$("jiraToSettings").onclick=()=>{p.remove();if($("settingsBtn"))$("settingsBtn").click();};
   $("jiraGo").onclick=jiraImport;
   $("jiraText").focus();
@@ -2102,12 +2110,14 @@ function openJiraPop(){
 async function jiraImport(){
   const text=($("jiraText")||{}).value||"";
   if(!text.trim()){setStatus("Встав хоч одну таску.","err");return;}
-  const b=$("jiraGo");b.disabled=true;b.textContent="Тягну з ADAM…";
-  $("jiraNote").textContent="";$("jiraOut").innerHTML="";
-  busyStart("Jira → ADAM…");
+  window._jiraLoc=!!($("jiraLoc")&&$("jiraLoc").checked);
+  {const jp=$("jiraPop"); if(jp){if(jp._close)jp._close();else jp.remove();}}   // the window closes at once — the import runs on its own
+  window._jiraLastText=text; window._jiraLastOut="";
+  const b=$("jiraGo")||{}, put=(id,k,v)=>{const e=$(id);if(e)e[k]=v;};
+  busyStart("Jira → ADAM: тягну креативи…");
   try{
     const r=await fetch(API+"/api/jira/import",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({text,file_id:fileId||"",localized:!!(window._jiraLoc=!!($("jiraLoc")&&$("jiraLoc").checked))})});
+      body:JSON.stringify({text,file_id:fileId||"",localized:!!window._jiraLoc})});
     const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"import failed"));
     fileId=d.file_id;
     // APPEND to the pack that's open: re-importing to add one forgotten task must not wipe
@@ -2132,14 +2142,16 @@ async function jiraImport(){
       +(it.warn?"<div style='color:var(--accent);font-size:11px'>"+esc(it.warn)+"</div>":"")+"</div>").join("");
     h+=(d.errors||[]).map(e=>"<div style='padding:4px 0;color:var(--accent)'>✗ "+esc(e.input)+" — "+esc(e.error)+"</div>").join("");
     if((d.unrecognized||[]).length)h+="<div style='padding:4px 0;color:var(--muted)'>не схоже на таску: "+d.unrecognized.map(esc).join(", ")+"</div>";
-    $("jiraOut").innerHTML=h;
-    $("jiraNote").textContent=ok?("+"+ok+" у пак"+(burned?(" · "+burned+" з вшитими титрами"):"")):"нічого нового";
+    window._jiraLastOut=h; put("jiraOut","innerHTML",h);
+    put("jiraNote","textContent",ok?("+"+ok+" у пак"+(burned?(" · "+burned+" з вшитими титрами"):"")):"нічого нового");
+    const nErr=(d.errors||[]).length+((d.unrecognized||[]).length?1:0);
+    if(!nErr)window._jiraLastText="";   // all good — next time the box starts empty
+    if(nErr)setTimeout(()=>setStatus("Jira: "+(d.errors||[]).length+" не знайдено"+((d.unrecognized||[]).length?" · є рядки, не схожі на таску":"")+" — відкрий ⇩ JIRA, там деталі.","err"),ok?2500:0);
     if(ok){finishPack(editPack.length,first);
       setStatus("З Джири: +"+ok+" кліп(ів)"+(burned?(" — у "+burned+" титри вже вшиті, позначено ⚠"):"")+". Далі «① Transcribe pack» — текст із тасок виправить недочуті слова.","ok");}
     else busyStop();
-  }catch(e){busyStop();$("jiraOut").innerHTML="<div style='color:var(--accent)'>✗ "+String(e.message).replace(/</g,"&lt;")+"</div>";
-    setStatus("Jira: "+e.message,"err");}
-  b.disabled=false;b.textContent="Імпортувати";
+  }catch(e){busyStop();window._jiraLastOut="<div style='color:var(--accent)'>✗ "+String(e.message).replace(/</g,"&lt;")+"</div>";put("jiraOut","innerHTML",window._jiraLastOut);
+    setStatus("Jira: "+e.message+" — відкрий ⇩ JIRA, список збережено.","err");}
 }
 if($("jiraBtn"))$("jiraBtn").onclick=openJiraPop;
 if($("dzJira"))$("dzJira").onclick=e=>{e.stopPropagation();openJiraPop();};
@@ -3221,6 +3233,45 @@ function styleSampleCSS(e){
   if(e.karaoke&&e.karaoke.enabled&&e.karaoke.active_color)css+="color:"+rgb(e.karaoke.active_color)+";";
   return css;
 }
+// what a preset card is: "custom" (★ team / your own) · "official" (shipped in styles/) · "builtin" (baked into the app)
+const _hiddenPresets=(()=>{try{return new Set(JSON.parse(localStorage.getItem("cs_hidePresets")||"[]"));}catch(_){return new Set();}})();
+function _saveHidden(){try{localStorage.setItem("cs_hidePresets",JSON.stringify([..._hiddenPresets]));}catch(_){}}
+function presetKind(name){if(savedStyles[name])return (officialNames&&officialNames.has(name))?"official":"custom"; return "builtin";}
+async function renamePreset(name){
+  const nn=(prompt("Нова назва для «"+name+"»:",name)||"").trim(); if(!nn||nn===name)return;
+  const e=savedStyles[name]; if(!e)return;
+  try{let r=await fetch(API+"/api/styles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:nn,style:e})});
+    if(!r.ok)throw new Error("save failed");
+    await fetch(API+"/api/styles/"+encodeURIComponent(name),{method:"DELETE"});
+    setStatus("Пресет «"+name+"» → «"+nn+"».","ok"); await loadSavedStyles();
+  }catch(er){setStatus("Rename: "+er.message,"err");}}
+async function duplicatePreset(name){
+  const e=savedStyles[name]||(typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES[name]); if(!e)return;
+  const nn=(prompt("Назва копії:",name+" copy")||"").trim(); if(!nn)return;
+  try{const r=await fetch(API+"/api/styles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:nn,style:e})});
+    if(!r.ok)throw new Error("save failed"); setStatus("Копія «"+nn+"» збережена ★.","ok"); await loadSavedStyles();
+  }catch(er){setStatus("Duplicate: "+er.message,"err");}}
+async function deletePresetAny(name){
+  const k=presetKind(name);
+  if(k==="builtin"){_hiddenPresets.add(name);_saveHidden();renderPresetRail();setStatus("Пресет «"+name+"» сховано (вбудований). Повернути — «показати сховані» під пресетами.","ok");return;}
+  if(k==="official"){
+    if(!IS_MAINTAINER){setStatus("«"+name+"» — стандартний пресет команди, його можна тільки сховати.","");_hiddenPresets.add(name);_saveHidden();renderPresetRail();return;}
+    if(!confirm("Видалити СТАНДАРТНИЙ пресет «"+name+"» з репозиторію (styles/)? Після Commit + Push він зникне в усієї команди."))return;
+    try{const r=await fetch(API+"/api/styles/official/"+encodeURIComponent(name),{method:"DELETE"});const d=await r.json();
+      if(!r.ok)throw new Error(d.detail||"failed"); setStatus("Стандартний пресет «"+name+"» видалено з styles/ — тепер Commit + Push у GitHub Desktop.","ok"); await loadSavedStyles();
+    }catch(er){setStatus("Delete: "+er.message,"err");}
+    return;}
+  return deleteStyle(name);
+}
+function presetMenu(ev,name){
+  const k=presetKind(name);
+  ctxMenu(ev,[{head:name+(k==="custom"?" · ★ свій":k==="official"?" · стандартний":" · вбудований")},
+    {label:"✓ Apply",on:()=>{const c=[...document.querySelectorAll("#presets .preset")].find(x=>x.dataset.pname===name);if(c)c.click();}},
+    k==="custom"?{label:"✎ Rename…",on:()=>renamePreset(name)}:null,
+    {label:"⧉ Duplicate…",title:"Копія як твій пресет ★ — далі можна правити",on:()=>duplicatePreset(name)},
+    "-",
+    {label:k==="builtin"||(k==="official"&&!IS_MAINTAINER)?"🙈 Hide":"✕ Delete",on:()=>deletePresetAny(name)}]);
+}
 function presetCard(label,sampleCSS,custom,onClick){
   const b=document.createElement("div");b.className="preset";b.title=label+(custom?" (custom — редагований, ✕ видалити)":"");b.style.position="relative";
   b.innerHTML="<div class='pv'><span style='"+sampleCSS+"'>Aa</span></div><div class='pn'>"+(custom?"★ ":"")+label+"</div>";
@@ -3228,8 +3279,15 @@ function presetCard(label,sampleCSS,custom,onClick){
   // caption layout must be refreshed here, or the preview kept the old style until ✓ exact was re-toggled
   b.onclick=()=>{onClick();markPreset(b);if(typeof saveLastStyle==="function")saveLastStyle();
     if(typeof invalidateLayout==="function")invalidateLayout();if(typeof scheduleExact==="function")scheduleExact();};
-  if(custom){const x=document.createElement("button");x.className="presetdel";x.textContent="✕";x.title="Видалити пресет";
-    x.onclick=(e)=>{e.stopPropagation();deleteStyle(label);};b.appendChild(x);}
+  b.dataset.pname=label;
+  const kind=presetKind(label);
+  // ✕ on every card you may remove: your / team presets; shipped ones in the maintainer's repo clone;
+  // built-ins can only be HIDDEN (they're part of the app). Right-click = the full menu.
+  {const x=document.createElement("button");x.className="presetdel";
+    const del=(kind==="custom")||(kind==="official"&&IS_MAINTAINER);
+    x.textContent=del?"✕":"🙈"; x.title=del?"Видалити пресет":"Сховати пресет (повернути — «показати сховані»)";
+    x.onclick=(e)=>{e.stopPropagation();deletePresetAny(label);};b.appendChild(x);}
+  b.addEventListener("contextmenu",e=>presetMenu(e,label));
   return b;
 }
 async function deleteStyle(name){
@@ -3242,9 +3300,11 @@ function renderPresetRail(){
   const pw=$("presets");if(!pw)return;pw.innerHTML="";
   const shown=new Set();
   // Folder presets first (styles/ official + Drive/local customs) — a same-named folder preset WINS.
-  Object.keys(savedStyles).forEach(name=>{shown.add(name);const e=savedStyles[name];const isOff=officialNames.has(name);pw.appendChild(presetCard(name,styleSampleCSS(e),!isOff,()=>writeControls(fromEngineStyle(e))));});   // official (shipped) → no ★; team customs → ★ + ✕
+  Object.keys(savedStyles).forEach(name=>{shown.add(name);if(_hiddenPresets.has(name))return;const e=savedStyles[name];const isOff=officialNames.has(name);pw.appendChild(presetCard(name,styleSampleCSS(e),!isOff,()=>writeControls(fromEngineStyle(e))));});   // official (shipped) → no ★; team customs → ★ + ✕
   // Built-in baseline (baked into the app JS) fills any names the folders didn't deliver — guaranteed for EVERYONE, no ★.
-  Object.keys(BUILTIN_STYLES).forEach(name=>{if(shown.has(name))return;const e=BUILTIN_STYLES[name];pw.appendChild(presetCard(name,styleSampleCSS(e),false,()=>writeControls(fromEngineStyle(e))));});
+  Object.keys(BUILTIN_STYLES).forEach(name=>{if(shown.has(name)||_hiddenPresets.has(name))return;const e=BUILTIN_STYLES[name];pw.appendChild(presetCard(name,styleSampleCSS(e),false,()=>writeControls(fromEngineStyle(e))));});
+  if(_hiddenPresets.size){const sh=document.createElement("div");sh.className="hint";sh.style.cssText="grid-column:1/-1;cursor:pointer;text-decoration:underline dotted;text-align:center";
+    sh.textContent="показати сховані ("+_hiddenPresets.size+")";sh.onclick=()=>{_hiddenPresets.clear();_saveHidden();renderPresetRail();};pw.appendChild(sh);}
   const act=document.createElement("div");act.style.cssText="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px";
   act.innerHTML="<button id='railSave' style='flex:1;font-size:11px;padding:6px 4px'>＋ Save</button>"+
     "<button id='railImport' style='flex:1;font-size:11px;padding:6px 4px' title='Завантажити чийсь стиль-файл (.json)'>⤴ Import</button>"+

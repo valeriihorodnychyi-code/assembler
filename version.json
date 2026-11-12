@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b18",
+  "version": "2.0.0-b19",
   "channel": "v2",
-  "notes": "Fix: caption styles applied by click (a preset card, AA / Aa and other segmented buttons, header switches) did not refresh the exact preview / caption layout — it only changed after re-toggling ✓ exact. Now every style change refreshes at once."
+  "notes": "Presets: every card has ✕ on hover — your / team presets are deleted; the shipped ones (styles/) too, in the maintainer's repo clone (then Commit + Push); built-ins can be hidden (🙈, «показати сховані» brings them back). Right-click a preset: Apply · Rename · Duplicate · Delete / Hide. Jira: the window drops down under ⇩ JIRA on the left (no longer over the video), closes on any click outside or Esc, and closes by itself on Import — the creatives load in the background; a failed import keeps your list and the details for the next open. «📁 Projects» button with a label."
 }
