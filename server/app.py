@@ -1993,6 +1993,7 @@ class PreviewFrameReq(BaseModel):
     lang: str = "en"                  # language for auto-caption stopword rules
     cuts: Optional[List[float]] = None  # scene-cut times → captions don't cross a cut
     titles: Optional[list] = None      # static text overlays, so 'exact' shows them like the render
+    regions: Optional[List[dict]] = None  # per-phrase / voice / Body styles — 'exact' = render
 
 
 @app.get("/api/font_metrics")
@@ -2013,9 +2014,14 @@ def api_preview_frame(req: PreviewFrameReq):
     # caption window: nothing shown outside [cap_in, cap_out]
     if (req.cap_in is not None and req.time < req.cap_in) or (req.cap_out is not None and req.time >= req.cap_out):
         return Response(status_code=204)
-    tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}],
-                                    lang=(req.lang or "en"), cuts=req.cuts)
+    if req.regions:
+        regions = [{"start": float(r.get("start", 0)), "end": r.get("end"),
+                    "style": st.normalize(r.get("style") or req.style)} for r in req.regions]
+    else:
+        regions = [{"start": 0, "end": None, "style": style}]
+    tagged = compose.build_timeline(req.words or [], regions, lang=(req.lang or "en"), cuts=req.cuts)
     events = [e for e, _ in tagged]
+    ev_style = {id(e): s for e, s in tagged}
     # By default do NOT extend the last caption to the clip end — build_events already gives it a
     # readable tail (and trims at a scene cut); extending unconditionally made 'exact' hang the
     # last caption over trailing footage / the packshot. The style switch opts back in.
@@ -2037,7 +2043,8 @@ def api_preview_frame(req: PreviewFrameReq):
     tmp = tempfile.mktemp(suffix=".png")
     font = st.resolve_font(style.get("font_name"))
     if ev is not None:
-        subtitles.render_subtitle_png(ev, tmp, TW, TH, font, style, scale)
+        es = ev_style.get(id(ev)) or style   # the style of THIS caption's region
+        subtitles.render_subtitle_png(ev, tmp, TW, TH, st.resolve_font(es.get("font_name")), es, scale)
     else:
         _Img.new("RGBA", (TW, TH), (0, 0, 0, 0)).save(tmp)
     if act_titles:                                   # composite each title over the caption layer
@@ -2099,7 +2106,8 @@ def api_layout(req: LayoutReq):
         events.append({
             "start": e["start"], "end": e["end"],
             "active": e.get("active_word_index", 0), "manual": bool(e.get("manual", False)),
-            "lines": [[{"text": w.get("text", ""), "start": w.get("start", 0), "end": w.get("end", 0)}
+            "lines": [[{"text": w.get("text", ""), "start": w.get("start", 0), "end": w.get("end", 0),
+                        "accent": bool(w.get("accent"))}
                        for w in line] for line in e.get("lines", [])],
         })
     return {"events": events}

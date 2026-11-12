@@ -414,6 +414,12 @@
   .srow .stext{font-size:14px;line-height:1.45;color:var(--txt);outline:none;padding:2px 4px;border-radius:5px;min-height:20px;word-break:break-word}
   .srow .stext:focus{background:rgba(255,255,255,.05);box-shadow:0 0 0 1px var(--line)}
   .srow .sacts{display:flex;gap:4px}
+  .srow .stext .wacc{color:#ff8a5c;font-weight:700}
+  .srow .stext .wphr{text-decoration:underline 2px #a78bfa;text-underline-offset:3px}
+  .senttool{position:fixed;z-index:60;display:none;gap:4px;align-items:center;padding:4px;background:#1d2029;border:1px solid #3a3e4a;border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .senttool button{font-size:11.5px;padding:5px 9px;border-radius:7px;background:#2a2d36;border:1px solid var(--line);color:var(--txt);white-space:nowrap}
+  .senttool button:hover{border-color:var(--accent)}
+  .senttool .stnote{font-size:11px;color:var(--muted);padding:0 6px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
   .srow .sacts button{font-size:11px;padding:4px 7px}
   .srow .smeta{grid-column:2/4;font-size:10.5px;color:var(--muted);padding:0 4px}
   .srow .smeta b{color:#ffb38f;font-weight:600}
@@ -867,7 +873,13 @@
         </div>
         <div id="revoiceBox" style="display:none"></div>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
-        <div class="row" style="margin-top:8px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків; крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label><label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
+        <div class="row" style="margin-top:8px"><label title="Off — без ком і кінцевих знаків. ?! — без ком і крапок, але ? і ! лишаються (за замовчуванням). All — як у транскрипті. Крапки абревіатур (U.S., e.g.) зберігаються завжди.">Punctuation</label>
+          <input type="hidden" id="punct" value="qe">
+          <div class="seg" id="punctSeg" style="flex:1.3">
+            <button type="button" data-v="off">Off</button>
+            <button type="button" data-v="qe" class="active">?! only</button>
+            <button type="button" data-v="all">All</button>
+          </div></div>
         <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
       </div>
     </details>
@@ -1047,6 +1059,7 @@
       <summary><span data-i18n="secKaraoke">Karaoke (word highlight)</span> <label class="switch hdrsw" title="Enable Karaoke highlight" onclick="hdrTgl(event,this)"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Color</label><input type="color" id="karaokeColor" value="#ffd400"></div>
+        <div class="row"><label title="Колір слів, позначених ✦ Accent у Sentences (працює і з вимкненим karaoke)">✦ Accent words</label><input type="color" id="accentColor" value="#ff5a2c"></div>
         <div class="row"><label>Word plate</label><label class="switch"><input type="checkbox" id="kpOn"><span class="slider"></span></label></div>
         <div class="row"><label>Plate color</label><input type="color" id="kpColor" value="#ff3a22"></div>
         <div class="row"><label>Padding X</label><input type="range" id="kpPadX" min="0" max="40" value="14"><span class="val" id="kpPadXV">14</span></div>
@@ -1297,7 +1310,7 @@ let editingHook=null, packMode="orig";               // packMode: "orig" = origi
 let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct","accentColor"];
 
 // Defaults now live as .json in the repo styles/ folder (official, no ★) + team customs (★).
 // This single hardcoded preset is only a SAFETY NET: shown when the styles folder is empty, so
@@ -1499,13 +1512,14 @@ function readControls(){
     scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value,scrimFade:+($("scrimFade")?$("scrimFade").value:0.25),
     animType:$("animType")?$("animType").value:"none",animSpeed:+($("animSpeed")?$("animSpeed").value:0.25),
     holdLast:$("holdLast")?$("holdLast").checked:false,
-    punct:$("punct")?$("punct").checked:false};
+    punct:punctMode($("punct")?$("punct").value:"qe"),accentColor:$("accentColor")?$("accentColor").value:"#ff5a2c"};
 }
 function writeControls(s){
   const set=(id,v)=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=!!v;else el.value=v;const l=$(id+"V");if(l){if(l.tagName==="INPUT")l.value=v;else l.textContent=v;}};
   for(const k of STYLE_IDS) if(k in s) set(k,s[k]);
   if("fontFamily" in s && s.fontFamily) applyStyleFont(s.fontFamily);   // sync dropdown + customFontName + load font so preview AND render use the style's font (not a stale one)
   if($("caseSeg"))updateCaseSeg();
+  if($("punct")){$("punct").value=punctMode("punct" in s?s.punct:"qe");updatePunctSeg();}
   if($("linesSeg"))updateLinesSeg();
   if($("wrapSeg"))updateWrapSeg();
 }
@@ -1528,7 +1542,7 @@ function loadLastStyle(){try{const s=localStorage.getItem("cs_last_style");retur
 function toEngineStyle(s){
   const arr=(h,a=255)=>{const[r,g,b]=hexToRgb(h);return[r,g,b,a];};
   return {font_name:customFontName||(s.fontFamily+".ttf"),font_size:s.fontSize,text_color:arr(s.textColor),
-    text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,punctuation:!!s.punct,
+    text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,punctuation:punctToEngine(s.punct),
     stroke_on:s.strokeOn!==false,stroke:{width:s.strokeW,color:arr(s.strokeColor)},stroke_outer:{width:s.strokeOuterW,color:arr(s.strokeOuterColor)},
     shadow:{enabled:s.shadowOn,offset_x:s.shX,offset_y:s.shY,glow_blur:s.shBlur,color:arr(s.shColor)},
     shadow2:{enabled:s.shadowOn&&s.shadow2On,offset_x:s.sh2X,offset_y:s.sh2Y,glow_blur:s.sh2Blur,color:arr(s.sh2Color)},
@@ -1536,7 +1550,7 @@ function toEngineStyle(s){
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
     scrim:{enabled:s.scrimOn,color:arr(s.scrimColor,s.scrimAlpha),pad:40,feather:s.scrimFeather,fade:s.scrimFade},
     animation:{type:s.animType||"none",speed:s.animSpeed},hold_last:!!s.holdLast,
-    karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},
+    karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},accent:{color:arr(s.accentColor||"#ff5a2c")},
     gradient:{colors:[arr(s.gradC0),arr(s.gradC1)],direction:s.gradDir||"vertical",on_text:!!s.gradText,on_active:!!s.gradActive,on_plate:!!s.gradPlate},
     karaoke_plate:{enabled:s.kpOn,color:arr(s.kpColor),pad_x:s.kpPadX,pad_y:s.kpPadY,border_radius:s.kpRadius}};
 }
@@ -1665,7 +1679,8 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
     return !t.replace(/\.+$/,"").includes(".");};
   // clean display: mirrors engine _clean_display. keepPunct → keep as transcribed;
   // otherwise drop a trailing comma + true sentence-end mark, keep abbreviation dots.
-  const cleanDisp=s=>{if(keepPunct)return s;let t=s.replace(/,+$/,"");if(isEnd(t))t=t.replace(/[.!?…]+$/,"");return t;};
+  const pm=punctMode(keepPunct);   // all · off · qe (? ! stay)
+  const cleanDisp=s=>{if(pm==="all")return s;let t=s.replace(/,+$/,"");if(isEnd(t))t=t.replace(/[.!?…]+$/,m=>pm==="off"?"":m.replace(/[^?!]/g,""));return t;};
   const cutList=(cuts||[]).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
   const cutBetween=(a,b)=>cutList.some(c=>a<c&&c<=b);   // scene cut between two words → new caption
   let raw;
@@ -1760,7 +1775,7 @@ function styleAt(t){
 function curPhraseStyles(){ const v=variants[activeVar]; if(!v)return []; if(!v.phraseStyles)v.phraseStyles=[]; return v.phraseStyles; }
 function listPhrases(){   // enumerate caption phrases at the base style, with time range + text
   const s=readControls(), dur=(video&&video.duration)||4;
-  const evs=buildEvents(dur,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
+  const evs=buildEvents(dur,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,s.punct);
   const out=[]; let last=null;
   for(const e of evs){ const fw=e.lines.reduce((a,l)=>a.concat(l),[]); if(!fw.length)continue;
     const key=(+fw[0].start).toFixed(2);
@@ -1853,7 +1868,7 @@ function render(t,dur){
   // chunking/line-breaks are identical to the final render. Falls back to the local JS engine for
   // the demo/pre-transcription placeholder (and if the server layout hasn't arrived yet).
   const events=(realWords&&realWords.length&&serverLayout&&_layoutKey===layoutKey())?serverLayout
-    :buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
+    :buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,s.punct);
   if(!events.length)return;
   // #12 continuous faded scrim: opacity from the window fade, drawn even in gaps / pre-roll
   const _scFade=(s.scrimFade!=null?s.scrimFade:0.25);
@@ -1890,7 +1905,7 @@ function render(t,dur){
   const spaceW=ctx.measureText(" ").width;
   let gi=0;const lw=lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*spaceW);
   const pos=[];let y=startY;
-  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,wide:ctx.measureText(w.disp).width,start:w.start});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
+  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,accent:!!w.accent,wide:ctx.measureText(w.disp).width,start:w.start});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
   const boff=(s.boxOffsetY||0)*scale;
   // --- Animated captions (BETA, preview only): each word eases in around its own spoken time ---
   // SAFETY: animation ONLY runs while the video is actually PLAYING. Paused / scrubbing / exact /
@@ -1942,7 +1957,7 @@ function render(t,dur){
     if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
     if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
   }
-  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):rgba(s.textColor,255));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
+  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):(p.accent?rgba(s.accentColor||"#ff5a2c",255):rgba(s.textColor,255)));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
 }
 function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
 
@@ -2693,6 +2708,12 @@ function layoutKey(){
   const w=realWords||[];
   return [activeVar,v.clip||v.videoUrl||"",w.length,(w[0]&&w[0].text)||"",(w[w.length-1]&&w[w.length-1].text)||""].join("|");
 }
+function curRegions(baseEng){
+  if(typeof buildStyleRegions!=="function")return null;
+  baseEng=baseEng||toEngineStyle(readControls());
+  const ov=(typeof effOverrides==="function")?effOverrides():(typeof curPhraseStyles==="function"?curPhraseStyles():[]);
+  return buildStyleRegions(baseEng,ov)||null;
+}
 function invalidateLayout(){serverLayout=null;_layoutKey="";clearTimeout(_layoutTimer);fetchLayout();}
 function scheduleLayout(){clearTimeout(_layoutTimer);_layoutTimer=setTimeout(fetchLayout,250);}
 async function fetchLayout(){
@@ -2700,7 +2721,7 @@ async function fetchLayout(){
   const key=layoutKey();
   if(!words||!words.length){serverLayout=null;_layoutKey="";return;}   // demo/pre-transcription → JS buildEvents fallback
   const baseEng=toEngineStyle(readControls());
-  const regions=(typeof buildStyleRegions==="function")?buildStyleRegions(baseEng,(typeof curPhraseStyles==="function"?curPhraseStyles():[])):null;
+  const regions=curRegions(baseEng);   // ✦ phrase / 🗣 voice / Body styles — the same regions the render uses
   const cuts=(variants[activeVar]&&variants[activeVar].cuts)||null;
   const seq=++_layoutSeq;
   try{const r=await fetch(API+"/api/layout",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -2719,7 +2740,7 @@ async function fetchExact(){
   const _cw=capsOffNow()?[]:v&&v.words;
   if(!v||((!_cw||!_cw.length)&&!(typeof titlesCfg==="function"&&titlesCfg(tLang()).length))){if(typeof hideExact==="function")hideExact();return;}
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({style:toEngineStyle(readControls()),words:_cw,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(tLang())})});
+      body:JSON.stringify({style:toEngineStyle(readControls()),words:_cw,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(tLang()),regions:curRegions()})});
     if(r.status===204){hideExact();return;}
     if(!r.ok)return;
     const url=URL.createObjectURL(await r.blob());const img=$("exactImg");
@@ -3253,14 +3274,14 @@ function fromEngineStyle(e){
   const st=e.stroke||{},so=e.stroke_outer||{},sh=e.shadow||{},pl=e.plate||{},ka=e.karaoke||{},kp=e.karaoke_plate||{},gr=e.gradient||{};
   return {fontFamily:(e.font_name||"Poppins-Bold.ttf").replace(/\.(ttf|otf)$/i,""),fontSize:+e.font_size||80,textColor:hx(e.text_color),
     textCase:(e.text_case===""||e.text_case==null)?"none":e.text_case,wrapMode:e.wrap_mode||"chars",maxChars:(e.wrap_mode==="words")?(+e.words_per_line||3):(+e.max_chars_per_line||15),
-    maxLines:+e.max_lines||(e.force_single_line?1:2),marginBottom:+e.margin_bottom||320,lineSpacing:+g(e,"line_spacing",10),boxOffsetY:+g(e,"box_offset_y",0),punct:!!e.punctuation,
+    maxLines:+e.max_lines||(e.force_single_line?1:2),marginBottom:+e.margin_bottom||320,lineSpacing:+g(e,"line_spacing",10),boxOffsetY:+g(e,"box_offset_y",0),punct:punctMode(e.punctuation),
     strokeW:+g(st,"width",0),strokeColor:hx(st.color),strokeOuterW:+g(so,"width",0),strokeOuterColor:hx(so.color),
     shadowOn:!!sh.enabled,shX:+g(sh,"offset_x",0),shY:+g(sh,"offset_y",8),shBlur:+g(sh,"glow_blur",0),shColor:hx(sh.color),
     shadow2On:!!(e.shadow2&&e.shadow2.enabled),sh2X:+g(e.shadow2||{},"offset_x",0),sh2Y:+g(e.shadow2||{},"offset_y",4),sh2Blur:+g(e.shadow2||{},"glow_blur",0),sh2Color:hx((e.shadow2&&e.shadow2.color)||[0,0,0,255]),
     strokeOn:(e.stroke_on!==false),
     plateShadowOn:!!(e.plate_shadow&&e.plate_shadow.enabled),pshX:+g(e.plate_shadow||{},"offset_x",0),pshY:+g(e.plate_shadow||{},"offset_y",8),pshBlur:+g(e.plate_shadow||{},"glow_blur",0),pshColor:hx((e.plate_shadow&&e.plate_shadow.color)||[0,0,0,255]),
     plateOn:!!pl.enabled,plateLine:!!pl.per_line,plateFull:!!pl.full_width,plateColor:hx(pl.color),plateAlpha:(pl.color&&pl.color[3]!=null)?pl.color[3]:160,platePadX:+g(pl,"pad_x",30),platePadY:+g(pl,"pad_y",15),plateRadius:+g(pl,"border_radius",15),
-    karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
+    karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),accentColor:hx((e.accent&&e.accent.color)||[255,90,44,255]),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
     gradC0:hx((gr.colors&&gr.colors[0])||[255,90,44,255]),gradC1:hx((gr.colors&&gr.colors[1])||[255,212,0,255]),gradDir:gr.direction||"vertical",gradText:!!gr.on_text,gradActive:!!gr.on_active,gradPlate:!!gr.on_plate,
     scrimOn:!!(e.scrim&&e.scrim.enabled),scrimColor:hx((e.scrim&&e.scrim.color)||[0,0,0,150]),scrimAlpha:(e.scrim&&e.scrim.color&&e.scrim.color[3]!=null)?e.scrim.color[3]:150,scrimFeather:+g(e.scrim||{},"feather",70),scrimFade:+g(e.scrim||{},"fade",0.25),
     animType:(e.animation&&e.animation.type)||"none",animSpeed:+g(e.animation||{},"speed",0.25),holdLast:!!e.hold_last};
@@ -3399,6 +3420,13 @@ $("styleFileInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd
   rd.readAsText(f);e.target.value="";};
 
 // case segmented control (buttons instead of dropdown)
+// Punctuation: "off" · "qe" (? ! stay — default) · "all". Old presets stored a bool: true = all, false = qe.
+function punctMode(v){return (v===true||v==="true"||v==="all")?"all":(v==="off"?"off":"qe");}
+function punctToEngine(v){v=punctMode(v);return v==="all"?true:(v==="off"?"off":false);}
+function updatePunctSeg(){const v=punctMode($("punct").value);$("punctSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
+if($("punctSeg"))$("punctSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("punct").value=b.dataset.v;updatePunctSeg();
+  $("punct").dispatchEvent(new Event("change",{bubbles:true}));
+  if(typeof saveLastStyle==="function")saveLastStyle(); if(typeof scheduleExact==="function")scheduleExact();});
 function updateCaseSeg(){const v=$("textCase").value;$("caseSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
 $("caseSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("textCase").value=b.dataset.v;updateCaseSeg();scheduleExact();});
 
@@ -3793,7 +3821,7 @@ function cutMarkFromPlayhead(which){
 }
 // Every object that holds THIS clip (Edit variant, the open pack hook, board copies, LOC tiles)
 // carries its own copies of words / trim / titles / stickers / caption window — each must move.
-const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out","body","splits"];
+const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out","body","splits","phraseStyles"];
 function cutSnapshot(v,h){
   const J=x=>x==null?x:JSON.parse(JSON.stringify(x)), per=new Map();
   rvTargets(v.clip).forEach(o=>{const s={};CUT_FIELDS.forEach(k=>{if(k in o)s[k]=J(o[k]);});if(o.mix)s._sfxAt=o.mix.sfx.map(x=>x.at);per.set(o,s);});
@@ -3825,6 +3853,7 @@ function cutApplyTimes(targets,spans,oldDur,newWords,notActive){
     if(o.voices&&o.voices.spans)once(o.voices,V=>{V.spans=V.spans.filter(([a,b])=>!(cutInside(a,spans)&&cutInside(b,spans))).map(([a,b,id])=>[R(a),R(b),id]);
       const f={};Object.keys(V.fix||{}).forEach(k=>{if(!cutInside(+k,spans))f[(+R(+k)).toFixed(2)]=V.fix[k];});V.fix=f;return V;});   // 🗣 voices stay on their words
     if(o.splits)o.splits=once(o.splits,l=>l.filter(x=>!cutInside(x,spans)).map(R).filter((x,i,a)=>x>0.05&&a.indexOf(x)===i));
+    if(o.phraseStyles)o.phraseStyles=once(o.phraseStyles,l=>l.map(x=>({...x,start:R(+x.start),end:R(+x.end)})).filter(x=>x.end-x.start>0.02));   // 🎨 phrase styles stay on their words
     if(o!==v&&o!==h&&newWords&&("words" in o))o.words=newWords.map(w=>({...w}));   // board / LOC copies get the re-timed captions too
   });
   if(notActive)return;          // another clip of the pack: the editor's own titles / caption window are not its
@@ -4226,7 +4255,7 @@ function renderSentsView(force){
     return "<div class='srow"+(pick?" pick":"")+(_out?" otrim":"")+"' data-k='"+k+"' "+(_out?"title='Поза трімом — у креатив не потрапить'":"")+(_vo?" style='border-left:3px solid "+_vo.color+"'":"")+">"
       +"<div class='scol'><button type='button' class='stime' data-sk='"+k+"' title='Клік — програти речення · Shift+клік — виділити кілька речень, щоб озвучити однією фразою'>"+_fmtT(inf.start)+" <span>▶</span></button>"
       +(_vo?"<button type='button' class='svoicech' data-svch='"+k+"' style='color:"+_vo.color+";border-color:"+_vo.color+"66;background:"+_vo.color+"1f' title='Хто говорить — клік, щоб змінити"+(_vo.style?" · стиль: "+esc(_vo.style):"")+"'>"+esc(_vo.name)+"</button>":"")+"</div>"
-      +"<div class='stext' contenteditable='true' spellcheck='false' data-k='"+k+"'>"+esc(inf.text)+"</div>"
+      +"<div class='stext' contenteditable='true' spellcheck='false' data-k='"+k+"'>"+sentWordsHTML(r,esc)+"</div>"
       +"<div class='sacts'><button type='button' data-svoice='"+k+"' "+((!canVoice||_rvBusy)?"disabled":"")+" title='"+(canVoice?"Переозвучити це речення тим самим голосом":"Потрібен транскрибований кліп у сесії")+"'>🎙</button>"
       +"<button type='button' class='ghost' data-smore='"+k+"' title='Як звучатиме (вимова)'>⋯</button></div>"
       +"<div class='smeta' style='"+(meta?"":"display:none")+"'>"+meta+"</div>"
@@ -4237,6 +4266,73 @@ function renderSentsView(force){
   box.querySelectorAll("[data-svch]").forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();cycleSentVoice(+b.dataset.svch);});
   if(typeof renderVoices==="function")renderVoices();
 }
+// ✦ accent words / 🎨 phrase styles, shown right in the sentence (the row text stays plain words)
+function sentWordsHTML(r,esc){
+  const ws=realWords||[], ps=curPhraseStyles(), W=w=>w.word||w.text||"";
+  const out=[]; for(let i=r[0];i<r[1];i++){const w=ws[i]; if(!w)continue;
+    const ph=ps.find(p=>+w.start>=+p.start&&+w.start<+p.end);
+    const cls=(w.accent?" wacc":"")+(ph?" wphr":""), tt=(w.accent?"✦ accent":"")+(ph?(w.accent?" · ":"")+"🎨 "+(ph.name||"style"):"");
+    out.push("<span data-wi='"+i+"'"+(cls?" class='"+cls.trim()+"'":"")+(tt?" title='"+esc(tt)+"'":"")+">"+esc(W(w))+"</span>");}
+  return out.join(" ");
+}
+// select words in a sentence → a small bar: ✦ Accent (own colour inside the caption) · 🎨 Style (its own caption + preset)
+function sentSelWords(){
+  const sel=window.getSelection&&window.getSelection(); if(!sel||sel.isCollapsed||!sel.rangeCount)return null;
+  const box=$("transcriptSents"); if(!box)return null;
+  const el=n=>n&&(n.nodeType===1?n:n.parentElement);
+  const row=el(sel.anchorNode)&&el(sel.anchorNode).closest(".stext"); if(!row||!box.contains(row))return null;
+  if(!(el(sel.focusNode)&&el(sel.focusNode).closest(".stext")===row))return null;
+  const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return null;
+  if(row.innerText.replace(/\s+/g," ").trim()!==inf.text.replace(/\s+/g," ").trim())return {k,edited:true};   // finish the edit first (Enter)
+  const idx=[...row.querySelectorAll("[data-wi]")].filter(s=>sel.containsNode(s,true)).map(s=>+s.dataset.wi);
+  if(!idx.length)return null;
+  return {k,i0:Math.min(...idx),i1:Math.max(...idx),rect:sel.getRangeAt(0).getBoundingClientRect()};
+}
+function sentToolHide(){const t=$("sentTool"); if(t)t.style.display="none";}
+function sentToolShow(){
+  const S=sentSelWords(); let t=$("sentTool");
+  if(!S){sentToolHide();return;}
+  if(!t){t=document.createElement("div");t.id="sentTool";t.className="senttool";document.body.appendChild(t);
+    t.addEventListener("mousedown",e=>e.preventDefault());}   // keep the text selection while clicking the bar
+  if(S.edited){t.innerHTML="<span class='stnote'>Enter — зберегти правку, потім виділи слова</span>";}
+  else{const ws=realWords||[], txt=ws.slice(S.i0,S.i1+1).map(w=>w.word||w.text||"").join(" ");
+    const allAcc=ws.slice(S.i0,S.i1+1).every(w=>w.accent), ph=curPhraseStyles().some(p=>p.end>+ws[S.i0].start&&p.start<=+ws[S.i1].start);
+    t.innerHTML="<button type='button' id='stAcc' title='Ці слова — іншим кольором усередині титру (колір: Style → Karaoke → ✦ Accent words)'>"+(allAcc?"✦ Прибрати акцент":"✦ Accent")+"</button>"
+      +"<button type='button' id='stSty' title='Ця фраза — окремим титром у своєму пресеті'>🎨 Style ▾</button>"
+      +(ph?"<button type='button' id='stStyX' title='Прибрати окремий стиль фрази'>✕ стиль</button>":"")
+      +"<span class='stnote'>«"+String(txt).replace(/</g,"&lt;").slice(0,40)+"»</span>";
+    t.querySelector("#stAcc").onclick=()=>{sentAccent(S.i0,S.i1,!allAcc);};
+    t.querySelector("#stSty").onclick=ev=>{const names=presetNames();
+      ctxMenu(ev,[{head:"🎨 Стиль фрази — окремий титр"}].concat(names.map(n=>({label:String(n).replace(/</g,"&lt;"),on:()=>sentPhraseStyle(S.i0,S.i1,n)}))));};
+    if(t.querySelector("#stStyX"))t.querySelector("#stStyX").onclick=()=>sentPhraseStyle(S.i0,S.i1,null);}
+  t.style.display="flex";
+  const r=S.rect||{left:0,top:0,width:0}; const w=t.offsetWidth||260;
+  t.style.left=Math.max(8,Math.min(window.innerWidth-w-8,r.left+r.width/2-w/2))+"px";
+  t.style.top=Math.max(8,r.top-t.offsetHeight-8)+"px";
+}
+function sentAccent(i0,i1,on){
+  const ws=(realWords||[]).map(w=>({...w}));
+  for(let i=i0;i<=i1&&i<ws.length;i++){if(on)ws[i].accent=true;else delete ws[i].accent;}
+  sentToolHide(); window.getSelection().removeAllRanges();
+  commitWords(ws); if(txtView==="sents")renderSentsView(true);
+  setStatus(on?"✦ Акцент: слова будуть кольором ✦ Accent words (Style → Karaoke).":"✦ Акцент прибрано.","ok");
+}
+function sentPhraseStyle(i0,i1,name){
+  const ws=realWords||[]; if(!ws[i0]||!ws[i1])return;
+  const a=+ws[i0].start, b=ws[i1+1]?Math.max(+ws[i1].start+0.001,+ws[i1+1].start-0.0005):+ws[i1].end+0.05;
+  const arr=curPhraseStyles();
+  for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);   // one style per word: the new one replaces what it overlaps
+  if(name)arr.push({start:+a.toFixed(3),end:+b.toFixed(3),name,ctrl:presetToCtrl(name)});
+  arr.sort((x,y)=>x.start-y.start);
+  sentToolHide(); window.getSelection().removeAllRanges();
+  _effCache={k:"",t:0,v:null};
+  if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
+  if(typeof saveProjectSoon==="function")saveProjectSoon();
+  renderSentsView(true);
+  setStatus(name?"🎨 «"+ws.slice(i0,i1+1).map(w=>w.word||w.text).join(" ")+"» — окремий титр у стилі "+name+".":"🎨 Окремий стиль фрази прибрано.","ok");
+}
+window.addEventListener("scroll",e=>{const t=$("sentTool");if(t&&t.style.display!=="none"&&!t.contains(e.target))sentToolHide();},true);
+document.addEventListener("selectionchange",()=>{clearTimeout(window._stT);window._stT=setTimeout(()=>{if(txtView==="sents")sentToolShow();else sentToolHide();},120);});
 function renderSentBar(canVoice){
   const bar=$("sentBar"); if(!bar)return;
   const _st=rvUndoStack(), undo=!!(_st&&_st.length&&_st[_st.length-1].kind==="revoice"), n=_sentPick?(_sentPick[1]-_sentPick[0]):0;
@@ -5510,7 +5606,7 @@ function remapWords(text, stored){
   const pairs=[]; {let i=0,j=0;
     while(i<n&&j<m){ if(A[i]===B[j]){pairs.push([i,j]);i++;j++;} else if(dp[i+1][j]>=dp[i][j+1]) i++; else j++; }}
   const out=toks.map(t=>({word:t,start:null,end:null,brk:null}));
-  pairs.forEach(([a,b])=>{const w=stored[b];out[a].start=+w.start;out[a].end=+w.end;out[a].brk=w.brk||null;if(w.manual)out[a].manual=true;});
+  pairs.forEach(([a,b])=>{const w=stored[b];out[a].start=+w.start;out[a].end=+w.end;out[a].brk=w.brk||null;if(w.manual)out[a].manual=true;if(w.accent)out[a].accent=true;});
   // spread new words over [s,e], longer words get proportionally more time
   const spread=(ns,ne,s,e)=>{let tot=0;for(let k=ns;k<ne;k++)tot+=Math.max(1,toks[k].length);
     let t=s;for(let k=ns;k<ne;k++){const d=(e-s)*Math.max(1,toks[k].length)/tot;out[k].start=t;out[k].end=t+d;t+=d;}};
@@ -5522,7 +5618,7 @@ function remapWords(text, stored){
     const nCnt=ne-ns, oCnt=oe-os;
     if(nCnt<=0)continue;                              // pure deletion: nothing to place
     if(oCnt>0){                                       // replacement
-      if(nCnt===oCnt){for(let k=0;k<nCnt;k++){const w=stored[os+k];out[ns+k].start=+w.start;out[ns+k].end=+w.end;out[ns+k].brk=w.brk||null;if(w.manual)out[ns+k].manual=true;}continue;}
+      if(nCnt===oCnt){for(let k=0;k<nCnt;k++){const w=stored[os+k];out[ns+k].start=+w.start;out[ns+k].end=+w.end;out[ns+k].brk=w.brk||null;if(w.manual)out[ns+k].manual=true;if(w.accent)out[ns+k].accent=true;}continue;}
       const s0=+stored[os].start, e0=+stored[oe-1].end;
       spread(ns,ne,s0,Math.max(e0,s0+0.08*nCnt));continue;
     }
@@ -5587,7 +5683,7 @@ function buildVarTabs(){
 const filmVideos={};
 function drawThumbCaption(ctx,W,H,s,words,t){
   if(!s)return;
-  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode,capLang(),null,!!s.punct);
+  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode,capLang(),null,s.punct);
   if(!events.length)return;
   const ev=events.find(e=>t>=e.start&&t<e.end)||events[0];if(!ev)return;
   const scale=W/1080,fs=(s.fontSize||80)*scale;ctx.font=fs+"px '"+(s.fontFamily||"Arial")+"'";ctx.textBaseline="top";

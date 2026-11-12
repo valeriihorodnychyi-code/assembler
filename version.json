@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b20",
+  "version": "2.0.0-b21",
   "channel": "v2",
-  "notes": "↪ Redo: after ↩ Undo the step can be brought back (several in a row) — the ↪ Redo button in History, Cmd+Z / Cmd+Shift+Z (not while typing); a new edit clears Redo. 🔍 Timeline zoom: Alt + wheel (or a trackpad pinch) around the cursor, = / − / \\ (fit), or the 1× button under ✂ (2–16×); all lanes scroll together, the plain wheel scrolls time, the playhead stays in view while playing. ⤢ Big timeline: taller lanes, full width. 🔊 Hold Cmd while dragging the playhead — you hear the sound under it (short grains, like After Effects)."
+  "notes": "Sentences: select words in a sentence → a small bar appears: ✦ Accent (these words in their own colour inside the caption — set the colour in Style → Karaoke → ✦ Accent words) or 🎨 Style ▾ (the phrase becomes its own caption in the preset you pick; ✕ removes it). Marked words are highlighted in the row; they survive text edits and cuts. Punctuation is now Off / ?! only / All: by default commas and full stops go, ? and ! stay (older presets switch to ?! only; pick Off for the old look). ✓ exact now shows voice / Body / phrase styles like the render."
 }

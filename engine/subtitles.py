@@ -44,11 +44,19 @@ def _clean_display(raw, keep_punct):
                         sentence-ending mark, but PRESERVE dots that belong to an
                         abbreviation ("U.S.", "e.g.") so they never lose their period.
     """
-    if keep_punct:
+    # Three modes (old presets stored a bool, so False stays the default):
+    #   True  / "all" -> as transcribed
+    #   "off"          -> the old clean look: no trailing comma, no sentence-end mark
+    #   False / "qe"   -> clean, but "?" and "!" stay — they change the meaning of the line
+    if keep_punct is True or keep_punct == "all":
         return raw
     t = raw.rstrip(",")
     if _is_sentence_end(t):
-        t = t.rstrip(".!?…")
+        if keep_punct == "off":
+            t = t.rstrip(".!?…")
+        else:
+            body = t.rstrip(".!?…")
+            t = body + "".join(c for c in t[len(body):] if c in "?!")
     return t
 
 # English month / weekday names used by the automatic date glue. (Localized
@@ -212,7 +220,8 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
             text = text.lower()
         if text:
             clean.append({"text": text, "start": float(w["start"]), "end": float(w["end"]),
-                          "ends_sentence": ends_sentence, "brk": w.get("brk")})
+                          "ends_sentence": ends_sentence, "brk": w.get("brk"),
+                          "accent": bool(w.get("accent"))})   # ✦ accent word: own colour inside the caption
 
     if not clean:
         return []
@@ -231,6 +240,7 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
             merged[-1]["end"] = w["end"]
             merged[-1]["ends_sentence"] = w["ends_sentence"]
             merged[-1]["brk"] = w.get("brk")
+            merged[-1]["accent"] = bool(merged[-1].get("accent") or w.get("accent"))
         else:
             merged.append(w)
     clean = merged
@@ -597,6 +607,7 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         return
 
     word_positions, current_y, word_counter, cx = [], start_y, 0, width / 2
+    word_accent = []   # parallel to word_positions: ✦ accent words
     # Typewriter animation: words appear one by one as they're spoken. Positions are computed from
     # the FULL caption (so the layout never shifts) but words after the active one aren't drawn —
     # this matches the preview, and costs nothing: the engine already renders one PNG per word.
@@ -611,6 +622,7 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
                 _keep = not (typewriter and word_counter > active_idx)
             if _keep:
                 word_positions.append((current_x, current_y, w["text"], _is_act))
+                word_accent.append(bool(w.get("accent")))
             current_x += font.getlength(w["text"]) + space_width
             word_counter += 1
         current_y += line_height + line_spacing
@@ -764,14 +776,15 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         for x, y, text, _ in word_positions:
             td.text((x, y), text, font=font, fill=so_c, stroke_width=so_w, stroke_fill=so_c)
     grad_glyphs = []
-    for x, y, text, is_active in word_positions:
+    accent_c = tuple((style_cfg.get("accent") or {}).get("color", [255, 90, 44, 255]))
+    for _wi, (x, y, text, is_active) in enumerate(word_positions):
         use_grad = g_on_text or (g_on_active and is_active)
         if use_grad:
             if s_w > 0:   # keep the inner stroke ring; the glyph body is filled by the gradient below
                 td.text((x, y), text, font=font, fill=s_c, stroke_width=s_w, stroke_fill=s_c)
             grad_glyphs.append((x, y, text))
         else:
-            fill = karaoke_c if (karaoke_on and is_active) else text_c
+            fill = karaoke_c if (karaoke_on and is_active) else (accent_c if word_accent[_wi] else text_c)
             if s_w > 0:
                 td.text((x, y), text, font=font, fill=fill, stroke_width=s_w, stroke_fill=s_c)
             else:
