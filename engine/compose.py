@@ -505,6 +505,25 @@ def normalize_clip(path, fmt, bitrates=None):
     return out
 
 
+def _zero_video_start(path):
+    """Stream-copy concat shifts the VIDEO by the AAC priming (1024 samples ≈ 23 ms): the MP4 gets
+    an empty edit at the start, which QuickTime / macOS preview shows as a BLACK first frame (and
+    the picture lags the sound by 23 ms). Move the video back to 0 — a remux, no re-encode."""
+    try:
+        v = float(subprocess.run([ff.FFPROBE, "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                  "stream=start_time", "-of", "csv=p=0", path],
+                                 capture_output=True, text=True).stdout.strip() or 0)
+    except ValueError:
+        return path
+    if v <= 0.0005:
+        return path
+    tmp = path + ".z.mp4"
+    ff.run([ff.FFMPEG, "-itsoffset", f"-{v:.6f}", "-i", path, "-i", path, "-map", "0:v", "-map", "1:a?",
+            "-c", "copy", "-movflags", "+faststart", tmp, "-y"])
+    os.replace(tmp, path)
+    return path
+
+
 def assemble_segments(clips, fmt, output_path, bitrates=None, fast=True):
     """Concat N clips (hook+hook+body+packshot…) into one creative, single pass.
 
@@ -536,6 +555,7 @@ def assemble_segments(clips, fmt, output_path, bitrates=None, fast=True):
                 _j0 = _tj.time()
                 ff.run([ff.FFMPEG, "-f", "concat", "-safe", "0", "-i", lst,
                         "-c", "copy", "-movflags", "+faststart", output_path, "-y"])
+                _zero_video_start(output_path)   # no black first frame (AAC priming shift)
                 OP_TIMES["join_copy"] += _tj.time() - _j0
                 shutil.rmtree(lst_dir, ignore_errors=True)
                 # VERIFY: a stream copy can "succeed" yet produce a wrong-length / drifting file

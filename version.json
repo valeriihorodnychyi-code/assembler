@@ -1,5 +1,5 @@
 {
-  "version": "1.9.112",
+  "version": "1.9.113",
   "channel": "main",
-  "notes": "Trim fixes (from 2.0): render = Edit under a trim — captions are laid out on the whole clip like the preview, then moved onto the trim (no «I» vanishing, same line breaks); voice / phrase / Body styles, the caption window, titles and stickers line up with the trim (Export, Assemble, SRT). The clip's real fps is read from the first second (24 / 25 fps clips no longer start one frame early). Pack → Assemble updates hooks already on the board. Baked-hook cache rebuilds once."
+  "notes": "Fix: assembled creatives no longer start on a black frame in QuickTime / macOS preview — the fast join shifted the video by the AAC priming (23 ms); now the video starts at 0 and is in sync with the sound."
 }

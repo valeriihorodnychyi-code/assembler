@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-12** — Fix: no black first frame in assembled creatives (1.9.113)
 - **2026-11-12** — Trim fixes: render = Edit, real clip fps from the start, board re-send updates hooks (1.9.112)
 - **2026-11-10** — ⬇ Music / voice / audio from any clip (Stem Separation, trim zone); blue frame-step buttons (1.9.111)
 - **2026-11-09** — Fix: Whisper re-transcribe after Scribe ('eng' language code) (1.9.110)
