@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-b14",
+  "version": "2.0.0-b15",
   "channel": "v2",
-  "notes": "Brand orange for what is open: the active Style / Titles / Sound tab, the «Text» title of the open left panel; the folded pills light up orange on hover."
+  "notes": "Trim fixes. (1) Render = Edit under a trim: captions are laid out on the whole clip (as the preview does) and only then moved onto the trim — no more «I» vanishing or different line breaks; voice / Body styles, the caption window, titles and sticker times now line up with the trim too (Export, Assemble, SRT). (2) The frame grid is the clip's own from the first second: a dropped clip goes to the session at once and its real fps is read — on 24 / 25 fps clips In used to land a frame early, so the render began on the frame before the one you saw. (3) Pack → Assemble again updates hooks already on the board (trim, captions, style) instead of keeping the old ones. (4) Hold Shift while dragging In / Out or the playhead: a light magnet to scene cuts, splits, BODY ▸, the other trim edge and the playhead. Baked-hook cache rebuilds once."
 }

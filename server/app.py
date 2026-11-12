@@ -2112,20 +2112,17 @@ def api_srt(req: SrtReq):
         raise HTTPException(400, "No words — transcribe first.")
     base = st.normalize(req.base_style or {})
     words = req.words
-    trim = req.trim
-    if trim and len(trim) == 2:                     # re-base onto the trimmed clip, like the render
-        words = compose.shift_words(words, float(trim[0]), float(trim[1]))
+    trim = req.trim if (req.trim and len(req.trim) == 2) else None
     if req.regions:
         regions = [{"start": float(r.get("start", 0)), "end": r.get("end"),
                     "style": st.normalize(r.get("style") or (req.base_style or {}))} for r in req.regions]
     else:
         regions = [{"start": 0, "end": None, "style": base}]
     cuts = req.cuts
-    if cuts and trim and len(trim) == 2:
-        lo, hi = float(trim[0]), float(trim[1])
-        cuts = [c - lo for c in cuts if lo < c < hi]
     tagged = compose.build_timeline(words or [], regions, lang=(req.lang or "en"), cuts=cuts)
     tagged = compose.clip_caption_window(tagged, req.cap_in, req.cap_out)
+    if trim:   # the same layout the render burns: full clip first, then onto the trim
+        tagged = compose.trim_tagged(tagged, float(trim[0]), float(trim[1]))
     if tagged and req.duration and base.get("hold_last"):
         tagged[-1][0]["end"] = max(float(tagged[-1][0]["end"]), float(req.duration))
     # match_case=True → exactly as on screen (usually ALL CAPS); default → the transcript's
@@ -2190,11 +2187,7 @@ def api_render(req: RenderReq):
         tdir = tempfile.mkdtemp(prefix="cs_rtrim_", dir=sdir)
         trimmed = os.path.join(tdir, "trimmed.mp4")
         compose.trim_clip(src, req.trim[0], req.trim[1], trimmed)
-        src = trimmed
-        words = compose.shift_words(words or [], float(req.trim[0]), float(req.trim[1]))
-        if req.cuts:   # re-base scene cuts to the trimmed clip too
-            lo, hi = float(req.trim[0]), float(req.trim[1])
-            req.cuts = [c - lo for c in req.cuts if lo < c < hi]
+        src = trimmed   # words / regions / cuts / titles stay in clip time — render() moves the layout
 
     import time as _t
     _t0 = _t.time()
@@ -2203,6 +2196,7 @@ def api_render(req: RenderReq):
             src, words or [], req.regions, req.formats, out_dir,
             bodies=bodies, default_body=default_body, smart_trim=req.smart_trim,
             out_prefix=out_prefix, cuts=req.cuts, headline=req.headline,
+            trim=((float(req.trim[0]), float(req.trim[1])) if (req.trim and len(req.trim) == 2) else None),
         )
     except Exception as e:
         raise HTTPException(500, f"Render failed: {e}")

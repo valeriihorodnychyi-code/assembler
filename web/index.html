@@ -161,6 +161,7 @@
   .tlActs #tbStatus{font-size:10.5px;color:var(--muted);padding:0 2px}
   .tchip.rep .tdot{background:#22c55e}
   #trimBar.blade{cursor:crosshair}
+  #trimBar.snapped{box-shadow:0 0 0 2px #fbbf24}
   #trimSplits{position:absolute;inset:0;pointer-events:none;z-index:4}
   #trimSplits i{position:absolute;top:-5px;bottom:-5px;width:9px;margin-left:-4.5px;pointer-events:auto;cursor:pointer}
   #trimSplits i::after{content:"";position:absolute;left:3.5px;top:0;bottom:0;width:2px;background:#ff3a22}
@@ -1983,6 +1984,10 @@ requestAnimationFrame(loop);
 function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if($("language"))$("language").value="";if(typeof setLangSticker==="function")setLangSticker(null);
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();updateEditButtons();
+    // the clip's REAL fps decides the frame grid (trim, ⟨ ⟩, I / O). Until 2.0.0-b15 a freshly dropped
+    // clip used 30 fps until it was uploaded → on a 24 / 25 fps clip In landed one frame EARLY
+    // (the render then started on the frame before the one you saw). Upload now, then probe.
+    setTimeout(()=>{if(typeof ensureSessionClip==="function")ensureSessionClip().then(()=>{if(typeof loadClipFps==="function"){_fpsKey="";loadClipFps();}}).catch(()=>{});},50);
     if(typeof AUTO!=="undefined"&&AUTO.cuts&&!editPack.length)setTimeout(()=>autoAnalyze(),400);};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
   variants={en:{clip:null,videoUrl:url,words:null,style:readControls(),trim:null}};activeVar="en";$("varTabs").style.display="none";if(typeof renderCaps==="function")renderCaps();$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
   if(typeof invalidateLayout==="function")invalidateLayout();
@@ -2287,9 +2292,14 @@ function closeProject(i){
 function sendPack(target){
   if(!editPack.length)return;
   saveActiveHook();let added=0;
-  editPack.forEach(h=>{if(hooks.some(x=>x.clip===h.clip))return;
-    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.capsOff?[]:h.words,style:toEngineStyle(h.ctrl),src:"edit",regions:h.capsOff?null:(h.regions||null),
-                titles:(h.titles!=null?JSON.parse(JSON.stringify(h.titles)):null),titlesOn:(h.titlesOn!==false)});added++;});
+  // UPSERT: a hook already on the board gets the CURRENT trim / words / style. Until 2.0.0-b15 a re-send
+  // skipped it, so a second run rendered the old trim and old captions — and the trim never travelled.
+  editPack.forEach(h=>{
+    const fresh={name:h.clip,clip:h.clip,lang:h.lang,words:h.capsOff?[]:h.words,style:toEngineStyle(h.ctrl),src:"edit",regions:h.capsOff?null:(h.regions||null),
+                titles:(h.titles!=null?JSON.parse(JSON.stringify(h.titles)):null),titlesOn:(h.titlesOn!==false),
+                trim:h.trim?[+h.trim[0],+h.trim[1]]:null,cuts:h.cuts||null,cap_in:(h.cap_in!=null?h.cap_in:null),cap_out:(h.cap_out!=null?h.cap_out:null)};
+    const ex=hooks.find(x=>x.clip===h.clip);
+    if(ex){if(ex!==h)Object.assign(ex,fresh);}else{hooks.push(fresh);added++;}});
   renderHookTiles();setMode(target==="asm"?"asm":"loc");
   setStatus("Пак ("+editPack.length+") → "+(target==="asm"?"Assemble":"LOC")+".","ok");
 }
@@ -2502,15 +2512,35 @@ function nudgeTrim(which,frames){
 }
 // Dragging an edge SHOWS its frame while you drag, and on release the playhead goes back to where
 // it was — moving In / Out never loses your place in the clip.
+// 🧲 hold SHIFT while dragging = a light magnet: In / Out / the playhead stick to scene cuts,
+// splits, the BODY ▸ boundary, the other trim edge and the playhead (within ~10 px).
+function magnetT(t,skip){
+  const bar=$("trimBar"), dur=video.duration||0; if(!bar||!dur)return {t,hit:null};
+  const tol=10/Math.max(1,bar.getBoundingClientRect().width)*dur;
+  const o=(typeof cutHolder==="function")?cutHolder():null;
+  const c=[];
+  (trimCuts()||[]).forEach(x=>c.push([+x,"cut"]));
+  ((o&&o.splits)||[]).forEach(x=>c.push([+x,"split"]));
+  if(o&&o.body!=null)c.push([+o.body,"body"]);
+  if(skip!=="in")c.push([pf($("trimIn").value,0),"In"]);
+  if(skip!=="out")c.push([pf($("trimOut").value,dur)||dur,"Out"]);
+  if(skip!=="ph")c.push([video.currentTime||0,"playhead"]);
+  let best=null; c.forEach(([x,k])=>{const d=Math.abs(x-t); if(d<=tol&&(!best||d<best.d))best={d,x,k};});
+  return best?{t:best.x,hit:best.k}:{t,hit:null};
+}
+function snapNote(hit,t){const el=$("trimBar"); if(!el)return; el.classList.toggle("snapped",!!hit);
+  if(hit)setStatus("🧲 "+hit+" · "+tc(t),"");}
 function trimDrag(which){return e=>{
   e.preventDefault();e.stopPropagation();armTrim(which);
   const t0=video.currentTime||0, x0=e.clientX; let moved=false;
   const move=ev=>{
     const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
     if(!moved&&Math.abs(cx-x0)<2)return; moved=true;
-    setTrimEdge(which,xToTime(cx));
+    let t=xToTime(cx), hit=null;
+    if(ev.shiftKey){const m=magnetT(t,which);t=m.t;hit=m.hit;} snapNote(hit,t);
+    setTrimEdge(which,t,{noMagnet:true});
   };
-  const up=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up);
+  const up=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up);snapNote(null);
     if(moved&&videoLoaded){try{video.currentTime=t0;}catch(_){}}};
   document.addEventListener("pointermove",move);document.addEventListener("pointerup",up);
 };}
@@ -2538,11 +2568,12 @@ $("trimBar").addEventListener("pointerdown",e=>{
 function scrubDrag(e){
   if(!videoLoaded)return; e.preventDefault();
   const go=ev=>{const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
-    const t=(Math.floor(xToTime(cx)*fps())+0.5)/fps();video.currentTime=Math.min(Math.max(0,t),Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
+    let x=xToTime(cx), hit=null; if(ev.shiftKey){const m=magnetT(x,"ph");x=m.t+(m.hit?0.0001:0);hit=m.hit;} snapNote(hit,x);
+    const t=(Math.floor(x*fps())+0.5)/fps();video.currentTime=Math.min(Math.max(0,t),Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
     if(!video.paused){video.pause();$("playBtn").textContent="▶";}
     if(typeof scheduleExact==="function")scheduleExact();};
   go(e);
-  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);};
+  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);snapNote(null);};
   document.addEventListener("pointermove",go);document.addEventListener("pointerup",up);
 }
 $("trimHOut").addEventListener("pointerdown",trimDrag("out"));

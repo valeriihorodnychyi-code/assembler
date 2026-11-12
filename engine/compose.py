@@ -750,6 +750,49 @@ def shift_words(words, start, end):
     return out
 
 
+def trim_tagged(tagged, lo, hi):
+    """PREVIEW = RENDER under a trim. Captions are laid out on the FULL clip (the same chunks the
+    Edit preview shows) and only then moved onto the trimmed clock: shifted by -lo, clamped to
+    [0, hi-lo], events fully outside dropped. Re-laying out the shifted words instead (the old
+    way) re-chunked them: a word that ended just before In vanished and the first caption read
+    «always thought…» in the render while the preview showed «I always thought…»."""
+    lo, hi = float(lo), float(hi)
+    span = max(0.0, hi - lo)
+    out = []
+    for e, s in tagged or []:
+        a, b = float(e["start"]) - lo, float(e["end"]) - lo
+        if b <= 0.0005 or a >= span - 0.0005:
+            continue
+        ne = dict(e)
+        ne["start"], ne["end"] = max(0.0, a), min(span, b)
+        if ne.get("lines"):
+            ne["lines"] = [[dict(w, start=round(float(w["start"]) - lo, 4), end=round(float(w["end"]) - lo, 4))
+                            if isinstance(w, dict) and "start" in w else w for w in line] for line in ne["lines"]]
+        out.append((ne, s))
+    return out
+
+
+def shift_titles(headline, lo, span=None):
+    """Titles carry their in / out in CLIP time; under a trim they move with the picture."""
+    if not headline or not lo:
+        return headline
+    one = not isinstance(headline, (list, tuple))
+    out = []
+    for t in ([headline] if one else headline):
+        if not t:
+            continue
+        t = dict(t)
+        for k in ("in", "out"):
+            if t.get(k) is not None:
+                t[k] = max(0.0, float(t[k]) - float(lo))
+        if span is not None and t.get("in") is not None and float(t["in"]) >= span:
+            continue                                   # the title lives in the trimmed-off part
+        if t.get("out") is not None and float(t["out"]) <= 0:
+            continue
+        out.append(t)
+    return (out[0] if out else None) if one else out
+
+
 def clip_caption_window(tagged, cap_in=None, cap_out=None):
     """Keep captions only inside [cap_in, cap_out] (seconds). Events fully outside are
     dropped; partial ones are clamped. Used to cut titles between scenes / long pauses."""
@@ -786,6 +829,9 @@ def caption_clip(clip_path, words, style, fmt, output_path, work_dir, cap_in=Non
     # readable tail (and trims at a scene cut). Forcing end=duration made the last caption hang
     # over trailing footage / the packshot (the #8 bug); the same fix now applies to this path.
     tagged = clip_caption_window(tagged, cap_in, cap_out)
+    if src_trim:   # words, regions, cuts, caption window: all CLIP time → laid out, then moved
+        tagged = trim_tagged(tagged, src_trim[0], src_trim[1])
+        headline = shift_titles(headline, float(src_trim[0]), float(src_trim[1]) - float(src_trim[0]))
     import time as _tc
     _c0 = _tc.time()
     render_format(clip_path, [(dict(e), s) for e, s in tagged], fmt, output_path,
@@ -873,7 +919,8 @@ def _bake_key(seg, fmt):
         except OSError:
             pass
         return o
-    sig = {"v": 1, "src": src, "fmt": fmt, "trim": seg.get("trim"), "words": seg.get("words"),
+    sig = {"v": 2, "src": src, "fmt": fmt, "trim": seg.get("trim"),   # v2: preview-layout under a trim (2.0.0-b15)
+           "words": seg.get("words"),
            "style": seg.get("style"), "regions": seg.get("regions"), "headline": seg.get("headline"),
            "cap": [seg.get("cap_in"), seg.get("cap_out")], "cuts": seg.get("cuts"),
            "ov": [_ov(o) for o in (seg.get("overlays") or [])]}
@@ -909,8 +956,6 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
                     pass
                 clips.append((hit, seg.get("fade_in")))
                 continue
-            if trim and words:
-                words = shift_words(words, float(trim[0]), float(trim[1]))
             if trim and not bake:   # nothing to burn in → the cut is the only encode
                 tp = os.path.join(work_dir, f"trim_{i}.mp4")
                 trim_clip(path, trim[0], trim[1], tp)
@@ -920,10 +965,7 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
             # e.g. Merge hooks with caption baking off, or a clip that was never transcribed).
             # With a trim, the cut happens INSIDE this pass (one encode instead of two).
             if bake:
-                seg_cuts = seg.get("cuts")
-                if seg_cuts and trim:   # re-base scene cuts to the trimmed clip, like words
-                    lo, hi = float(trim[0]), float(trim[1])
-                    seg_cuts = [c - lo for c in seg_cuts if lo < c < hi]
+                seg_cuts = seg.get("cuts")    # clip time, like the words — caption_clip moves the layout onto the trim
                 cap = os.path.join(work_dir, f"cap_{i}.mp4")
                 caption_clip(path, words or [], seg.get("style") or {}, fmt, cap, work_dir,
                              seg.get("cap_in"), seg.get("cap_out"), cuts=seg_cuts,
@@ -933,7 +975,11 @@ def assemble_recipe(segments, fmt, output_path, work_dir=None, bitrates=None, mu
                 path = cap
             if seg.get("overlays"):  # PNG / alpha-.mov stickers on top (reaction style)
                 ovp = os.path.join(work_dir, f"ov_{i}.mp4")
-                apply_overlays(path, seg["overlays"], fmt, ovp)
+                ovs = seg["overlays"]
+                if trim:   # sticker in / out are clip time; the clip is trimmed by now
+                    lo_ = float(trim[0])
+                    ovs = [dict(o, **{k: max(0.0, float(o[k]) - lo_) for k in ("in", "out") if o.get(k) is not None}) for o in ovs]
+                apply_overlays(path, ovs, fmt, ovp)
                 path = ovp
             if hit and path != seg["clip"]:
                 try:
@@ -1120,7 +1166,7 @@ def assemble(hook_path, body_path, fmt, output_path, work_dir=None, bitrates=Non
 
 def render(video_path, words, regions, formats, output_dir, work_dir=None,
            bodies=None, default_body=None, scale_factors=None, bitrates=None,
-           smart_trim=False, out_prefix="caption", cuts=None, headline=None):
+           smart_trim=False, out_prefix="caption", cuts=None, headline=None, trim=None):
     """Top-level render. Returns list of output file paths (one per format).
 
     `regions`: list of {"start","end","style"} OR pass a single style via
@@ -1134,6 +1180,9 @@ def render(video_path, words, regions, formats, output_dir, work_dir=None,
     outputs = []
     try:
         tagged = build_timeline(words, regions, cuts=cuts)
+        if trim:   # video_path is the trimmed clip; words / regions / cuts / titles are clip time
+            tagged = trim_tagged(tagged, trim[0], trim[1])
+            headline = shift_titles(headline, float(trim[0]), float(trim[1]) - float(trim[0]))
         for fmt in formats:
             body = bodies.get(fmt, default_body)
             out = os.path.join(output_dir, f"{fmt.replace(':', 'x')}_{out_prefix}.mp4")
