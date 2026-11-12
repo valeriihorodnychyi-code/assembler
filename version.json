@@ -1,5 +1,5 @@
 {
-  "version": "1.9.111",
+  "version": "1.9.112",
   "channel": "main",
-  "notes": "⬇ Music from any clip: ⬇ in the Clip audio lane → ♪ Music only (no voice, ElevenLabs Stem Separation) · 🗣 Voice only · Audio as is — for the trim In–Out zone when set (one loop of an animation), else the whole clip. Frame-step ⟨ ⟩ buttons are blue now, easy to find."
+  "notes": "Trim fixes (from 2.0): render = Edit under a trim — captions are laid out on the whole clip like the preview, then moved onto the trim (no «I» vanishing, same line breaks); voice / phrase / Body styles, the caption window, titles and stickers line up with the trim (Export, Assemble, SRT). The clip's real fps is read from the first second (24 / 25 fps clips no longer start one frame early). Pack → Assemble updates hooks already on the board. Baked-hook cache rebuilds once."
 }

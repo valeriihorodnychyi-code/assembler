@@ -39,7 +39,7 @@ def test_one_pass_matches_two_pass():
     C.trim_clip(SRC, *TRIM, cut)
     old, new = os.path.join(TMP, "old.mp4"), os.path.join(TMP, "new.mp4")
     C.caption_clip(cut, C.shift_words(WORDS, *TRIM), style, "9:16", old, w1)
-    C.caption_clip(SRC, C.shift_words(WORDS, *TRIM), style, "9:16", new, w2, src_trim=TRIM)
+    C.caption_clip(SRC, WORDS, style, "9:16", new, w2, src_trim=TRIM)   # clip-time words: the layout moves onto the trim
     assert abs(ff.get_video_duration(old) - ff.get_video_duration(new)) < 0.04
     p = psnr(old, new)
     assert p > 45, f"one-pass picture differs from two-pass (PSNR {p:.1f} dB)"
@@ -59,6 +59,25 @@ def test_same_hook_twice_comes_from_the_cache_and_a_change_misses_it():
     assert C._bake_key(changed, "9:16") != C._bake_key(seg, "9:16"), "an edited word must re-bake the hook"
     assert C._bake_key(dict(seg, trim=[1.0, 4.0]), "9:16") != C._bake_key(seg, "9:16")
 
+
+
+def test_trim_keeps_the_preview_layout():
+    """A word that ENDS just before In must not re-chunk the captions: the render shows the
+    same caption the preview shows at In («I ALWAYS THOUGHT…», not «ALWAYS THOUGHT TAI…»)."""
+    style = st.normalize({})
+    ws = [{"word": w, "start": 0.30 + i * 0.4, "end": 0.6 + i * 0.4} for i, w in enumerate("I always thought Tai Chi was only".split())]
+    full = C.build_timeline(ws, [{"start": 0, "end": None, "style": style}])
+    lo = 0.62                                   # In after «I» ended
+    tr = C.trim_tagged(full, lo, 5.0)
+    first = " ".join(w["text"] for line in tr[0][0]["lines"] for w in line)
+    at_in = [e for e, s in full if e["start"] <= lo < e["end"]][0]
+    assert first == " ".join(w["text"] for line in at_in["lines"] for w in line), first
+    assert tr[0][0]["start"] == 0.0 and all(e["start"] >= 0 for e, s in tr)
+
+
+def test_titles_move_with_the_trim():
+    h = C.shift_titles([{"text": "A", "in": 2.0, "out": 4.0}, {"text": "B", "in": 6.0}], 1.5, 3.0)
+    assert h == [{"text": "A", "in": 0.5, "out": 2.5}], h
 
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]

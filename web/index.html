@@ -1844,6 +1844,9 @@ requestAnimationFrame(loop);
 function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if($("language"))$("language").value="";if(typeof setLangSticker==="function")setLangSticker(null);
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();updateEditButtons();
+    // the clip's REAL fps decides the frame grid (trim, ⟨ ⟩, I / O): a freshly dropped clip used 30 fps
+    // until uploaded → on 24 / 25 fps clips In landed a frame EARLY. Upload now, then probe.
+    setTimeout(()=>{if(typeof ensureSessionClip==="function")ensureSessionClip().then(()=>{if(typeof loadClipFps==="function"){_fpsKey="";loadClipFps();}}).catch(()=>{});},50);
     if(typeof AUTO!=="undefined"&&AUTO.cuts&&!editPack.length)setTimeout(()=>autoAnalyze(),400);};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
   variants={en:{clip:null,videoUrl:url,words:null,style:readControls(),trim:null}};activeVar="en";$("varTabs").style.display="none";if(typeof renderCaps==="function")renderCaps();$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
   if(typeof invalidateLayout==="function")invalidateLayout();
@@ -2145,9 +2148,14 @@ function closeProject(i){
 function sendPack(target){
   if(!editPack.length)return;
   saveActiveHook();let added=0;
-  editPack.forEach(h=>{if(hooks.some(x=>x.clip===h.clip))return;
-    hooks.push({name:h.clip,clip:h.clip,lang:h.lang,words:h.capsOff?[]:h.words,style:toEngineStyle(h.ctrl),src:"edit",regions:h.capsOff?null:(h.regions||null),
-                titles:(h.titles!=null?JSON.parse(JSON.stringify(h.titles)):null),titlesOn:(h.titlesOn!==false)});added++;});
+  // UPSERT: a hook already on the board gets the CURRENT trim / words / style (a re-send used to
+  // skip it → a second run rendered the old trim and old captions, and the trim never travelled)
+  editPack.forEach(h=>{
+    const fresh={name:h.clip,clip:h.clip,lang:h.lang,words:h.capsOff?[]:h.words,style:toEngineStyle(h.ctrl),src:"edit",regions:h.capsOff?null:(h.regions||null),
+                titles:(h.titles!=null?JSON.parse(JSON.stringify(h.titles)):null),titlesOn:(h.titlesOn!==false),
+                trim:h.trim?[+h.trim[0],+h.trim[1]]:null,cuts:h.cuts||null,cap_in:(h.cap_in!=null?h.cap_in:null),cap_out:(h.cap_out!=null?h.cap_out:null)};
+    const ex=hooks.find(x=>x.clip===h.clip);
+    if(ex){if(ex!==h)Object.assign(ex,fresh);}else{hooks.push(fresh);added++;}});
   renderHookTiles();setMode(target==="asm"?"asm":"loc");
   setStatus("Пак ("+editPack.length+") → "+(target==="asm"?"Assemble":"LOC")+".","ok");
 }
