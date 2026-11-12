@@ -2897,6 +2897,8 @@ video.addEventListener("seeked",scheduleExact);
 video.addEventListener("pause",scheduleExact);
 $("panelContent").addEventListener("input",()=>{saveLastStyle();scheduleExact();});
 $("panelContent").addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+// segmented buttons (AA / Aa…), header switches change the style by CLICK, with no input event
+$("panelContent").addEventListener("click",e=>{if(e.target.closest&&e.target.closest("button,.switch,label"))setTimeout(()=>{saveLastStyle();scheduleExact();},0);});
 
 // ---------- fonts ----------
 // register a font file from the server so the canvas preview uses the SAME file the engine renders with
@@ -3053,7 +3055,9 @@ function styleSampleCSS(e){
 function presetCard(label,sampleCSS,custom,onClick){
   const b=document.createElement("div");b.className="preset";b.title=label+(custom?" (custom — редагований, ✕ видалити)":"");b.style.position="relative";
   b.innerHTML="<div class='pv'><span style='"+sampleCSS+"'>Aa</span></div><div class='pn'>"+(custom?"★ ":"")+label+"</div>";
-  b.onclick=()=>{onClick();markPreset(b);};
+  // a preset writes the controls with no input event → refresh the exact frame + caption layout here
+  b.onclick=()=>{onClick();markPreset(b);if(typeof saveLastStyle==="function")saveLastStyle();
+    if(typeof invalidateLayout==="function")invalidateLayout();if(typeof scheduleExact==="function")scheduleExact();};
   if(custom){const x=document.createElement("button");x.className="presetdel";x.textContent="✕";x.title="Видалити пресет";
     x.onclick=(e)=>{e.stopPropagation();deleteStyle(label);};b.appendChild(x);}
   return b;
@@ -5860,6 +5864,7 @@ function buildStudioLayout(){
   const ptb=$("packTranscribeBtn");
   if(ptb&&tb){ptb.style.width="100%";ptb.style.margin="6px 0 0";ptb.className="go";tb.insertAdjacentElement("beforebegin",ptb);ptb.onclick=transcribePack;}
   qp.addEventListener("input",()=>{saveLastStyle();scheduleExact();});qp.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+  qp.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("button,.switch,label"))setTimeout(()=>{saveLastStyle();scheduleExact();},0);});
   initGrpAccordion();
 }
 // Accordion: opening a section collapses its siblings in the same column, so the open one

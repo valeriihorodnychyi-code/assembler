@@ -1,5 +1,5 @@
 {
-  "version": "1.9.114",
+  "version": "1.9.115",
   "channel": "main",
-  "notes": "Fix: Transcribe pack — the words were recognised but the preview, Words and Sentences kept the demo text until something else redrew them (it looked like nothing happened). Now the open clip refreshes at once."
+  "notes": "Fix: caption styles applied by click (a preset card, AA / Aa and other segmented buttons, header switches) did not refresh the exact preview / caption layout — only after re-toggling ✓ exact. Now every style change refreshes at once."
 }
