@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-12** — Fix: no black first frame in assembled creatives (2.0.0-b16)
 - **2026-11-12** — Trim: render = Edit (layout before trim), clip fps from the start, board re-send updates hooks, Shift-magnet (2.0.0-b15)
 - **2026-11-10** — Brand orange for the open tab / panel (2.0.0-b14)
 - **2026-11-10** — Always opens clean: both panels folded (2.0.0-b13)

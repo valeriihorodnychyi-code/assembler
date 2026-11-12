@@ -79,6 +79,17 @@ def test_titles_move_with_the_trim():
     h = C.shift_titles([{"text": "A", "in": 2.0, "out": 4.0}, {"text": "B", "in": 6.0}], 1.5, 3.0)
     assert h == [{"text": "A", "in": 0.5, "out": 2.5}], h
 
+
+def test_joined_creative_starts_on_the_first_frame():
+    """Stream-copy joins used to start the VIDEO 23 ms late (AAC priming): an empty edit that
+    QuickTime shows as a black first frame. The video must start at 0."""
+    out = os.path.join(TMP, "joined.mp4")
+    C.assemble_segments([SRC, SRC], "9:16", out)
+    v = float(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=start_time",
+                              "-of", "csv=p=0", out], capture_output=True, text=True).stdout.strip())
+    assert v < 0.001, f"video starts at {v:.3f} s — black first frame in QuickTime"
+    assert C.CONCAT_STATS["copy"] >= 1
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     failed = 0
