@@ -1,5 +1,5 @@
 {
-  "version": "2.0.1-b3",
+  "version": "2.0.1-b4",
   "channel": "v2",
-  "notes": "✦ Accent is now a full style of its own: Style → ✦ Accent — colour or gradient, any font, italic, size 80–160 %, case, stroke (as the caption / own / none), shadow (as the caption / own / none), a plate under the word. «Взяти вигляд з…» borrows a preset's look (font, colours, stroke, shadow, plate) without its size, position or case. The caption keeps its own layout; karaoke never repaints an accent word; the accent is saved with the preset. In Sentences the second button is now «🎨 Окремий титр» — a phrase as its own caption in another preset."
+  "notes": "Words view highlights dates (yellow) and ✦ accent words too, like Sentences. ✦ Accent is now a full style of its own: Style → ✦ Accent — colour or gradient, any font, italic, size 80–160 %, case, stroke (as the caption / own / none), shadow (as the caption / own / none), a plate under the word. «Взяти вигляд з…» borrows a preset's look (font, colours, stroke, shadow, plate) without its size, position or case. The caption keeps its own layout; karaoke never repaints an accent word; the accent is saved with the preset. In Sentences the second button is now «🎨 Окремий титр» — a phrase as its own caption in another preset."
 }

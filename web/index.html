@@ -414,7 +414,8 @@
   .srow .stext{font-size:14px;line-height:1.45;color:var(--txt);outline:none;padding:2px 4px;border-radius:5px;min-height:20px;word-break:break-word}
   .srow .stext:focus{background:rgba(255,255,255,.05);box-shadow:0 0 0 1px var(--line)}
   .srow .sacts{display:flex;gap:4px}
-  .srow .stext .wacc{color:#ff8a5c;font-weight:700}
+  .srow .stext .wacc,#transcriptWords .w.wacc{color:#ff8a5c;font-weight:700}
+  #transcriptWords .w.wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5);border-radius:3px}
   .srow .stext .wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5);border-radius:3px}
   .datepanel{border:1px solid rgba(250,204,21,.45);background:rgba(250,204,21,.06);border-radius:9px;padding:9px 10px;margin-bottom:8px;font-size:12px;display:flex;flex-direction:column;gap:7px}
   .datepanel .dgroup{display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid rgba(250,204,21,.2)}
@@ -3570,7 +3571,8 @@ function renderWordsView(){
   const box=$("transcriptWords"); if(!box)return; box.innerHTML="";
   (realWords||[]).forEach((w,i)=>{
     const _tr=(variants[activeVar]||{}).trim, _out=!!(_tr&&(+w.end<=_tr[0]||+w.start>=_tr[1]));   // outside the trim = not in the creative
-    const sp=document.createElement("span");sp.className="w"+(i===_wSel?" sel":"")+(w.manual?" man":"")+(_wRng&&i>=_wRng[0]&&i<_wRng[1]?" rng":"")+(_out?" otrim":"");sp.dataset.start=w.start;sp.dataset.i=i;
+    const sp=document.createElement("span");sp.className="w"+(i===_wSel?" sel":"")+(w.manual?" man":"")+(_wRng&&i>=_wRng[0]&&i<_wRng[1]?" rng":"")+(_out?" otrim":"")+(w.accent?" wacc":"")+((typeof dateAt==="function"&&dateAt(i))?" wdate":"");sp.dataset.start=w.start;sp.dataset.i=i;
+    {const _d=(typeof dateAt==="function")?dateAt(i):null; if(_d||w.accent)sp.title=(w.accent?"✦ accent":"")+(_d?(w.accent?" · ":"")+"📅 дата: "+_d.text:"");}
     sp.textContent=(w.word||w.text||""); sp.title=_fmtCut(+w.start);
     box.appendChild(sp); box.appendChild(document.createTextNode(" "));
     if(w.brk==="soft") box.appendChild(document.createElement("br"));
