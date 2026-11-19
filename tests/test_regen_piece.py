@@ -64,7 +64,7 @@ def test_piece_job_and_splice():
             time.sleep(0.1)
         assert s["state"] == "done", s
         done.append({"piece": s["piece"], "a": s["a"], "b": s["b"]})
-    assert sent["model"] == WS.TURBO_MODEL and sent["keep_audio"] is True and sent["resolution"] == "1080p"
+    assert sent["model"] == WS.MODELS["turbo25"] and sent["keep_audio"] is True and sent["resolution"] == "1080p"
     r = C.post("/api/regen/splice", json={"file_id": FID, "clip": "long.mp4", "pieces": done})
     assert r.status_code == 200, r.text
     out = os.path.join(d, r.json()["clip"])

@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-19** — ✨ Generated lane: switch Seedance pieces on / off, compare; Seedance 2.5 Turbo / 2.5 Flash Turbo for dates; 📐 reframe to a medium shot of the speaker (2.0.1-b5)
 - **2026-11-19** — Words view: dates and accents highlighted (2.0.1-b4)
 - **2026-11-19** — ✦ Accent style group: font, italic, size, case, colour / gradient, stroke, shadow, word plate, borrow a preset's look; karaoke leaves accents alone (2.0.1-b3)
 - **2026-11-19** — Re-voice clones each line from the voice near it (Frankenstein creatives); numbers as digits after transcribe (Scribe hyphens, 4 weeks, ages), ⋯ → 123 for old transcripts (2.0.1-b2)

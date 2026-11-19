@@ -138,6 +138,10 @@
   .lempty{position:absolute;inset:0;display:flex;align-items:center;padding-left:10px;font-size:11px;color:#6b7080;pointer-events:none}
   .lempty b{color:#a9a3ff;font-weight:600;pointer-events:auto;cursor:pointer}
   .lane .lbody.sel{border-color:#8a8fa0}
+  .lblk.gen{background:rgba(167,139,250,.45);border:1px solid #a78bfa;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .lblk.gen.off{background:transparent;border-style:dashed;color:#a78bfa}
+  #trimGen{position:absolute;left:0;right:0;bottom:0;height:5px;pointer-events:none;z-index:3}
+  #trimGen i{position:absolute;top:0;bottom:0;background:#a78bfa;border-radius:2px}
   #laneHead{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:rgba(255,255,255,.85);pointer-events:none;z-index:7;left:var(--lh)}
   #laneBusy{position:absolute;right:0;top:-18px;font-size:10.5px;color:#a9a3ff;display:none}
   .laneEdit{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-left:var(--lh);padding:7px 10px;border:1px solid #3a3e4a;border-radius:8px;background:#1b1d24}
@@ -4456,7 +4460,7 @@ function renderDatePanel(){
   if(!G.length){P.style.display="none";P.innerHTML="";if(_datePanelOn&&txtView==="sents"&&!findDates(realWords||[]).length)_datePanelOn=false;return;}
   if(P.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;   // never re-render under the caret
   const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
-  const lips=_dateNew._lips!==false, model=_dateNew._model||"turbo";
+  const lips=_dateNew._lips!==false, model=_dateNew._model||"turbo25";
   P.innerHTML="<div class='drow'><b>📅 Дати в кліпі</b><span style='color:var(--muted);flex:1'>Познач, які міняти, впиши нову дату — голос переозвучиться тим самим голосом"+(lips?", а губи в кадрі підженуться Seedance":"")+".</span>"
       +"<button type='button' class='ghost' id='dpX' style='font-size:11px;padding:3px 7px'>✕</button></div>"
     +G.map((g,gi)=>"<div class='dgroup'><div class='drow'><b>«"+esc(g.label)+"»</b> ×"+g.list.length+"</div>"
@@ -4464,12 +4468,15 @@ function renderDatePanel(){
       +"<div class='drow'><span>→</span><input type='text' data-dnew='"+gi+"' placeholder='напр. November 23rd' value='"+esc(_dateNew[g.key]||"")+"'>"
       +"<button type='button' class='primary' data-dgo2='"+gi+"' style='font-size:11px;padding:5px 10px'>"+(lips?"🎙 + ✨ Замінити":"🎙 Замінити")+"</button></div></div>").join("")
     +"<div class='drow' style='color:var(--muted)'><label><input type='checkbox' id='dpLips'"+(lips?" checked":"")+"> ✨ губи в кадрі (Seedance)</label>"
-      +"<select id='dpModel' title='Turbo — швидко й дешево для дрібних замін; 2.5 — якщо Turbo не впорався'><option value='turbo'"+(model==="turbo"?" selected":"")+">Seedance 2.0 Fast Turbo</option><option value='2.5'"+(model==="2.5"?" selected":"")+">Seedance 2.5</option></select>"
+      +"<select id='dpModel' title='2.5 Turbo — найновіша, якість 2.5, швидше й дешевше за повну 2.5'>"
+        +[["turbo25","Seedance 2.5 Turbo (рекомендую)"],["flash25","2.5 Flash Turbo — дешевше, 480p→1080p"],["2.5","Seedance 2.5 (повна)"],["turbo","2.0 Fast Turbo — найдешевша"]].map(([v,l])=>"<option value='"+v+"'"+(model===v?" selected":"")+">"+l+"</option>").join("")+"</select>"
+      +"<label title='Широкий план, дві людини в кадрі — вклейку видно. Seedance перекадрує шматок на середній / середньо-крупний план того, хто говорить, як окремий кадр монтажу'><input type='checkbox' id='dpReframe'"+(_dateNew._reframe?" checked":"")+"> 📐 середній план мовця</label>"
       +"<span style='flex:1'>Шматок ~4 с навколо кожної дати.</span></div>";
   P.style.display="flex";
   $("dpX").onclick=()=>{_datePanelOn=false;renderDatePanel();renderSentBar(!!origWordsNow());};
   $("dpLips").onchange=e=>{_dateNew._lips=e.target.checked;renderDatePanel();};
   $("dpModel").onchange=e=>{_dateNew._model=e.target.value;};
+  $("dpReframe").onchange=e=>{_dateNew._reframe=e.target.checked;};
   P.querySelectorAll("[data-dnew]").forEach(inp=>{inp.oninput=e=>{_dateNew[G[+inp.dataset.dnew].key]=e.target.value;};
     inp.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();replaceDates(G[+inp.dataset.dnew]);}};});
   P.querySelectorAll("[data-doff]").forEach(cb=>cb.onchange=()=>{const d=findDates(realWords||[]).find(x=>x.i0===+cb.dataset.doff); if(!d)return;
@@ -4484,7 +4491,7 @@ async function replaceDates(g){
   const v=variants[activeVar]; if(!v||!v.clip||!fileId||!origWordsNow()){setStatus("📅 Спершу ① Transcribe цей кліп.","err");return;}
   const occ=g.list.filter(d=>!_dateOff.has(d.start.toFixed(2))).sort((a,b)=>b.i0-a.i0);   // from the end: earlier indices stay valid
   if(!occ.length){setStatus("📅 Не вибрано жодного входження.","err");return;}
-  const lips=_dateNew._lips!==false, model=_dateNew._model||"turbo";
+  const lips=_dateNew._lips!==false, model=_dateNew._model||"turbo25";
   const toks=nt.split(/\s+/).filter(Boolean);
   const ws0=(realWords||[]).map(w=>({...w}));
   let ws=(realWords||[]).map(w=>({...w})); const ranges=[];
@@ -4516,15 +4523,19 @@ function datesLips(list,nt,model){
     return {a,b,ns:x.ns,ne:x.ne};}).sort((x,y)=>x.a-y.a);
   const M=[]; P.forEach(p=>{const l=M[M.length-1]; if(l&&p.a<l.b&&p.b-l.a<=15){l.b=Math.max(l.b,p.b);l.ne=p.ne;}else M.push({...p});});
   const sentOf=(ns,ne)=>{let a=ns,b=ne; while(a>0&&!/[.!?]$/.test(W[a-1].word||""))a--; while(b<W.length&&!/[.!?]$/.test(W[b-1].word||""))b++; return W.slice(a,Math.min(b,W.length)).map(w=>w.word).join(" ");};
-  const est=M.reduce((s,p)=>s+(model==="turbo"?((Math.max(2,p.b-p.a)*0.0675)+(Math.max(4,p.b-p.a)*0.0855)):(2*Math.max(4,p.b-p.a)*0.22)),0);
-  if(!confirm("✨ Губи під нову дату: "+M.length+" шматк. по ~4 с · "+(model==="turbo"?"Seedance 2.0 Fast Turbo · 1080p":"Seedance 2.5 · 720p")+" · ≈ $"+est.toFixed(2)+" з балансу WaveSpeed.\n\nЗапустити?"))
+  const RATE={turbo25:0.234,flash25:0.171}, MN={turbo25:"Seedance 2.5 Turbo · 1080p",flash25:"Seedance 2.5 Flash Turbo · 1080p",turbo:"Seedance 2.0 Fast Turbo · 1080p","2.5":"Seedance 2.5 · 720p"};
+  const est=M.reduce((s,p)=>{const d=p.b-p.a;return s+(model==="turbo"?(Math.max(2,d)*0.0675+Math.max(4,d)*0.0855):model==="2.5"?2*Math.max(4,d)*0.22:Math.max(4,Math.ceil(d))*RATE[model]);},0);
+  const reframe=!!_dateNew._reframe;
+  if(!confirm("✨ Губи під нову дату: "+M.length+" шматк. по ~4 с · "+MN[model]+(reframe?" · 📐 середній план":"")+" · ≈ $"+est.toFixed(2)+" з балансу WaveSpeed.\n\nЗапустити?"))
     {setStatus("📅 Голос замінено. Губи не чіпали — можна запустити пізніше з панелі 📅.","ok");return;}
-  const src=(o.mix&&o.mix.base)||o.clip, grp={id:Date.now().toString(36),n:M.length,done:[],failed:0,o,src,nt};
+  const src=(o.mix&&o.mix.base)||o.clip, grp={id:Date.now().toString(36),n:M.length,done:[],failed:0,o,src,nt,model};
   M.forEach(async p=>{
     const line=sentOf(p.ns,p.ne);
-    const prompt="The person on camera says: \""+line+"\". Re-animate ONLY the lips, mouth and jaw so they match these words, especially \""+nt+"\", in sync with the existing audio. Keep the face, identity, expression, head and body motion, lighting, background, camera and every other detail exactly the same. Do not add text or subtitles.";
+    const prompt=reframe
+      ?"Reframe this shot as a medium close-up (chest up) of the person who is speaking, as if it were the next camera angle in the edit: same person, same outfit, same room, same lighting, natural handheld feel. She says: \""+line+"\" — her lips, mouth and jaw match these words exactly, especially \""+nt+"\", in sync with the existing audio. Keep her identity, expression and gestures. Do not add text or subtitles."
+      :"The person on camera says: \""+line+"\". Re-animate ONLY the lips, mouth and jaw so they match these words, especially \""+nt+"\", in sync with the existing audio. Keep the face, identity, expression, head and body motion, lighting, background, camera and every other detail exactly the same. Do not add text or subtitles.";
     try{const r=await fetch(API+"/api/regen/piece/start",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:src,a:+p.a.toFixed(3),b:+p.b.toFixed(3),prompt,model,resolution:model==="turbo"?"1080p":"720p"})});
+        body:JSON.stringify({file_id:fileId,clip:src,a:+p.a.toFixed(3),b:+p.b.toFixed(3),prompt,model,resolution:model==="2.5"?"720p":"1080p"})});
       const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"seedance failed"));
       _rgJobs.push({job:d.job,kind:"piece",grp,o,prompt:"📅 "+nt}); rgPoll();
     }catch(e){grp.failed++; setStatus("✨ Seedance: "+e.message,"err"); datesMaybeSplice(grp);}
@@ -4536,12 +4547,60 @@ async function datesMaybeSplice(grp){
   if(!grp.done.length){setStatus("✨ Жоден шматок не вдався — голос уже замінено, губи лишились старі.","err");return;}
   const o=grp.o, cur=(o.mix&&o.mix.base)||o.clip;
   if(cur!==grp.src){setStatus("✨ Шматки готові, але кліп змінився, поки вони генерувались — не вклеюю, щоб не зсунути. Запусти 📅 ще раз.","err");return;}
+  // ✨ generated pieces are a LAYER over the clip (like AE): base + pieces, each can be switched off
+  const g=genOf(o), base=g?g.base:cur, baseUrl=g?g.baseUrl:(mixHolder()===o?(o.mix?mixBaseUrl(o.mix):o.videoUrl):o.videoUrl);
+  const fresh=grp.done.map(p=>({...p,on:true,label:grp.nt,model:grp.model||""}));
+  const all=(g?g.pieces.filter(x=>!fresh.some(f=>f.a<x.b&&x.a<f.b)):[]).concat(fresh).sort((x,y)=>x.a-y.a);
   try{const r=await fetch(API+"/api/regen/splice",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({file_id:fileId,clip:cur,pieces:grp.done})});
+      body:JSON.stringify({file_id:fileId,clip:base,pieces:all.filter(x=>x.on)})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"splice failed"));
     rgApply({o,prompt:"📅 губи «"+grp.nt+"» ×"+grp.done.length},{clip:d.clip,url:d.url,seconds:0});
+    hmTargets(o).forEach(x=>{x.gen={base,baseUrl,pieces:all,out:d.clip};});
+    drawGenLane();
     if(grp.failed)setStatus("✨ Вклеєно "+grp.done.length+" з "+grp.n+" шматків; "+grp.failed+" не вдались — там губи старі.","err");
   }catch(e){setStatus("✨ Вклейка: "+e.message,"err");}
+}
+// ---------- ✨ Generated layer: Seedance pieces over the clip, switchable, purple on the timeline ----------
+function genOf(o){o=o||mixHolder(); const g=o&&o.gen; if(!g)return null;
+  const cur=(o.mix&&o.mix.base)||o.clip; return (cur===g.out||cur===g.base)?g:null;}   // any other edit since → the layer is baked in
+async function genSwitch(o,fn){
+  const g=genOf(o); if(!g)return; fn(g);
+  const on=g.pieces.filter(x=>x.on);
+  try{let clip=g.base,url=g.baseUrl;
+    if(on.length){const r=await fetch(API+"/api/regen/splice",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:g.base,pieces:on})});
+      const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"splice failed")); clip=d.clip; url=API+d.url;}
+    const mm=mixUnwrap(o);
+    hmTargets(o).forEach(x=>{x.clip=clip;x.videoUrl=url;if(x.gen)x.gen.out=clip;});
+    if(mm)mixRebase(o); else if(o===mixHolder())rvLoadVideo(url);
+    if(typeof exportedNames!=="undefined")exportedNames.add(clip);
+    drawGenLane();
+    setStatus("✨ Згенеровані шматки: увімкнено "+on.length+" з "+g.pieces.length+(on.length<g.pieces.length?" (вимкнені — оригінальна картинка)":"")+".","ok");
+  }catch(e){setStatus("✨ "+e.message,"err");}
+}
+function drawGenLane(){
+  const pic=document.querySelector("#lanes .lane.lvid"); if(!pic)return;
+  let L=$("laneGen");
+  if(!L){L=document.createElement("div");L.className="lane";L.id="laneGen";
+    L.innerHTML="<div class='lhead'><button type='button' class='lmute' id='genAll' title='Порівняти: усі згенеровані шматки вимкнути / увімкнути'>👁</button><span class='lname' style='color:#c4b5fd'>✨ Generated</span></div><div class='lbody' id='laneGenBody'></div>";
+    pic.insertAdjacentElement("afterend",L);
+    $("genAll").onclick=e=>{e.stopPropagation();const g=genOf(); if(!g)return; const anyOn=g.pieces.some(x=>x.on); genSwitch(mixHolder(),G=>G.pieces.forEach(x=>x.on=!anyOn));};}
+  const g=genOf(), dur=video.duration||0, bar=$("trimBar");
+  let mk=$("trimGen"); if(!mk&&bar){mk=document.createElement("div");mk.id="trimGen";bar.appendChild(mk);}
+  if(!g||!dur){L.style.display="none"; if(mk)mk.innerHTML=""; return;}
+  L.style.display="";
+  const pct=t=>Math.max(0,Math.min(100,t/dur*100));
+  const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/'/g,"&#39;").replace(/</g,"&lt;");
+  $("laneGenBody").innerHTML=g.pieces.map((p,i)=>"<div class='lblk gen"+(p.on?"":" off")+"' data-gi='"+i+"' style='left:"+pct(p.a)+"%;width:"+Math.max(0.6,pct(p.b)-pct(p.a))+"%' title='✨ "+esc(p.label)+" · "+tc(p.a)+"–"+tc(p.b)+" · клік — "+(p.on?"вимкнути (оригінал)":"увімкнути")+" · правий клік — ще'>"+(p.on?"✨":"○")+"</div>").join("");
+  if(mk)mk.innerHTML=g.pieces.filter(p=>p.on).map(p=>"<i style='left:"+pct(p.a)+"%;width:"+Math.max(0.4,pct(p.b)-pct(p.a))+"%'></i>").join("");
+  $("genAll").textContent=g.pieces.some(p=>p.on)?"👁":"◌";
+  $("laneGenBody").querySelectorAll("[data-gi]").forEach(el=>{const i=+el.dataset.gi;
+    el.onpointerdown=e=>e.stopPropagation();
+    el.onclick=e=>{e.stopPropagation(); genSwitch(mixHolder(),G=>{G.pieces[i].on=!G.pieces[i].on;});};
+    el.oncontextmenu=e=>{const p=g.pieces[i]; ctxMenu(e,[{head:"✨ "+p.label+" · "+tc(p.a)},
+      {label:"▶ Подивитись шматок",on:()=>{video.currentTime=Math.max(0,p.a-0.3);_sentStopAt=p.b+0.2;video.play();}},
+      {label:p.on?"Вимкнути (оригінальна картинка)":"Увімкнути",on:()=>genSwitch(mixHolder(),G=>{G.pieces[i].on=!G.pieces[i].on;})},
+      {label:"Вимкнути всі / увімкнути всі",on:()=>$("genAll").click()}]);};});
 }
 // ✦ accent words / 🎨 phrase styles, shown right in the sentence (the row text stays plain words)
 function sentWordsHTML(r,esc){
@@ -4903,7 +4962,7 @@ if($("tbBody"))$("tbBody").onclick=()=>toolPop($("tbBody"),[
 // State = plain data only. Blob URLs and history (↩ snapshots) are not saved: clips are re-served
 // from the session folder, and History starts fresh after opening a project.
 let _projName="", _projSavedKey="", _projTimer=null, _projBusy=false;
-const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_rdTo","_cutsDone","pick"]);
+const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_rdTo","_cutsDone","pick"]);   // gen (✨ layer) is saved: base + pieces
 function _projClean(o){return JSON.parse(JSON.stringify(o,(k,v)=>{
   if(PROJ_SKIP.has(k))return undefined;
   if(v instanceof Set||v instanceof Map)return undefined;
@@ -5125,6 +5184,7 @@ function drawLanes(){
   $("laneMusic").style.display=hasMu?"":"none"; $("laneSfx").style.display=hasFx?"":"none";
   if($("addMusicBtn"))$("addMusicBtn").style.display=hasMu?"none":"";
   drawWave(o);
+  if(typeof drawGenLane==="function")drawGenLane();
   renderLaneEdit();
   // the music follows the trim / body: when its zone moves, re-mix (debounced)
   if(m&&m.music&&!m.music.mute){const k=JSON.stringify(musicZone(o));const was=_zoneKey.get(m);_zoneKey.set(m,k);if(was!=null&&was!==k)mixSoon(o,700);}

@@ -46,7 +46,25 @@ RATES = {"480p": 0.11, "720p": 0.22, "1080p": 0.55}
 # Input 2–15 s, output ≥ 4 s; 720p / 1080p only. Per second of input + output (1080p output costs more).
 TURBO_MODEL = os.environ.get("CS_SEEDANCE_TURBO", "bytedance/seedance-2.0-fast/video-edit-turbo")
 TURBO_RATES = {"720p": (0.0675, 0.0675), "1080p": (0.0675, 0.0855)}   # (input, output) $/s
-MODELS = {"2.5": MODEL, "turbo": TURBO_MODEL}
+MODELS = {"2.5": MODEL, "turbo": TURBO_MODEL,
+          "turbo25": os.environ.get("CS_SEEDANCE_TURBO25", "bytedance/seedance-2.5/video-edit-turbo"),
+          "flash25": os.environ.get("CS_SEEDANCE_FLASH25", "bytedance/seedance-2.5-flash/video-edit-turbo")}
+# 2.5 Turbo: full 2.5 quality, faster / cheaper than 2.5 · 2.5 Flash Turbo: made at 480p and upscaled
+# (cheapest 2.5). Both: billed per input second (rounded up, 4–30 s), $/s by resolution.
+PIECE_RATES = {"turbo25": {"720p": 0.216, "1080p": 0.234}, "flash25": {"720p": 0.153, "1080p": 0.171}}
+PIECE_MAX = {"turbo": 15.0, "turbo25": 30.0, "flash25": 30.0, "2.5": 30.0}
+
+
+def estimate_piece(model, duration_s, resolution="1080p"):
+    """→ (usd, billed_seconds) for one Seedance run on a piece, any of MODELS."""
+    import math
+    if model == "turbo":
+        return estimate_turbo(duration_s, resolution)
+    if model == "2.5":
+        return estimate(duration_s, resolution)
+    r = PIECE_RATES.get(model, PIECE_RATES["turbo25"])
+    sec = max(4, min(30, math.ceil(float(duration_s or 0) - 1e-6)))
+    return round(sec * r.get(resolution, r["1080p"]), 2), float(sec)
 
 
 def estimate_turbo(duration_s, resolution="720p"):

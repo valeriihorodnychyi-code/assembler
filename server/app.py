@@ -1214,7 +1214,7 @@ class RegenPieceReq(BaseModel):
     a: float
     b: float
     prompt: str
-    model: str = "turbo"            # "turbo" (Seedance 2.0 Fast Turbo) | "2.5"
+    model: str = "turbo25"          # turbo25 (Seedance 2.5 Turbo) · flash25 (2.5 Flash Turbo) · 2.5 · turbo (2.0 Fast Turbo)
     resolution: str = "1080p"
     refs: List[str] = []
 
@@ -1240,7 +1240,7 @@ def _regen_piece_run(job, sdir, src, req):
         refs = [ws.upload(os.path.join(sdir, os.path.basename(r_)), _rq) for r_ in (req.refs or [])[:9]
                 if os.path.exists(os.path.join(sdir, os.path.basename(r_)))]
         J["state"] = "queued"
-        model = ws.MODELS.get(req.model, ws.TURBO_MODEL)
+        model = ws.MODELS.get(req.model, ws.MODELS["turbo25"])
         pid = ws.submit_edit(url, req.prompt, _rq, resolution=req.resolution, keep_audio=True, refs=refs, model=model)
         J["prediction"] = pid
         t0 = _t.time()
@@ -1292,15 +1292,16 @@ def regen_piece_start(req: RegenPieceReq):
     fps = float((compose._stream_params(src) or (None, None, 30.0))[2] or 30.0)
     dur = revoice.duration(src)
     a, b = _snap(max(0.0, req.a), fps), _snap(min(dur, req.b), fps)
-    lim = 15.0 if req.model == "turbo" else 30.0
+    if req.model not in ws.MODELS:
+        req.model = "turbo25"
+    lim = ws.PIECE_MAX.get(req.model, 30.0)
     if b - a < 1.0 or b - a > lim + 0.01:
         raise HTTPException(400, f"Шматок має бути 1–{lim:.0f} с (зараз {b - a:.1f} с).")
-    if req.model == "turbo":
-        res = req.resolution if req.resolution in ws.TURBO_RATES else "1080p"
-        cost, billed = ws.estimate_turbo(b - a, res)
-    else:
+    if req.model == "2.5":
         res = req.resolution if req.resolution in ws.RATES else "720p"
-        cost, billed = ws.estimate(b - a, res)
+    else:
+        res = req.resolution if req.resolution in ("720p", "1080p") else "1080p"
+    cost, billed = ws.estimate_piece(req.model, b - a, res)
     req.resolution = res
     job = uuid.uuid4().hex[:12]
     _REGEN[job] = {"state": "starting", "started": _t.time(), "cost": cost, "billed": billed, "clip": None,
