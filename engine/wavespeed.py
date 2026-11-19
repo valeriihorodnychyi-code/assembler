@@ -41,6 +41,20 @@ def balance(requests, api_key=None):
 # shorter is padded to 4 s, longer cut at 30 s). Priced on input + output seconds.
 MODEL = os.environ.get("CS_SEEDANCE_MODEL", "bytedance/seedance-2.5/video-edit")
 RATES = {"480p": 0.11, "720p": 0.22, "1080p": 0.55}
+# Seedance 2.0 Fast · Video-Edit Turbo: the cheap, fast tier — for SMALL fixes in a piece (a date,
+# a word on the lips). 2.5 stays for whole-scene changes and as the fallback when Turbo can't.
+# Input 2–15 s, output ≥ 4 s; 720p / 1080p only. Per second of input + output (1080p output costs more).
+TURBO_MODEL = os.environ.get("CS_SEEDANCE_TURBO", "bytedance/seedance-2.0-fast/video-edit-turbo")
+TURBO_RATES = {"720p": (0.0675, 0.0675), "1080p": (0.0675, 0.0855)}   # (input, output) $/s
+MODELS = {"2.5": MODEL, "turbo": TURBO_MODEL}
+
+
+def estimate_turbo(duration_s, resolution="720p"):
+    """→ (usd, billed_seconds) for one Turbo run on a piece of `duration_s`."""
+    d_in = max(2.0, min(15.0, float(duration_s or 0)))
+    d_out = max(4.0, min(15.0, float(duration_s or 0)))
+    ri, ro = TURBO_RATES.get(resolution, TURBO_RATES["720p"])
+    return round(d_in * ri + d_out * ro, 2), round(d_in + d_out, 1)
 
 
 def estimate(duration_s, resolution="720p"):
@@ -121,7 +135,42 @@ def result(pid, requests, api_key=None):
     if r.status_code != 200:
         raise WaveSpeedError(_err(r, "result"))
     d = _j(r)
-    return {"status": d.get("status") or "", "outputs": d.get("outputs") or [], "error": d.get("error") or ""}
+    return {"status": d.get("status") or "", "outputs": d.get("outputs") or [], "error": d.get("error") or "",
+            "id": d.get("id") or pid}
+
+
+# ---------------------------------------------------------------- text LLM (translate / polish)
+# WaveSpeed "Any LLM": one endpoint, many models, $0.01 a request, the SAME key as Seedance —
+# so the dictation can translate properly without a separate Gemini / OpenAI key.
+LLM_ENDPOINT = "wavespeed-ai/any-llm"
+LLM_MODEL = os.environ.get("CS_LLM_MODEL", "google/gemini-2.5-flash")
+
+
+def llm(prompt, requests, system=None, model=None, temperature=0.2, max_tokens=800, api_key=None,
+        timeout=45, sleep=None):
+    """→ the model's text. Submits and polls (the endpoint is async, usually ~1–3 s)."""
+    import time as _t
+    sleep = sleep or _t.sleep
+    body = {"prompt": prompt, "temperature": temperature, "max_tokens": max_tokens, "model": model or LLM_MODEL}
+    if system:
+        body["system_prompt"] = system
+    hdr = {"Authorization": f"Bearer {_key(api_key)}", "Content-Type": "application/json"}
+    r = requests.post(f"{API}/{LLM_ENDPOINT}", headers=hdr, json=body, timeout=30)
+    if r.status_code != 200:
+        raise WaveSpeedError(_err(r, "llm"))
+    d = _j(r)
+    t_end = _t.time() + timeout
+    while (d.get("status") or "") not in ("completed", "failed", "cancelled", "timeout"):
+        if _t.time() > t_end:
+            raise WaveSpeedError("WaveSpeed LLM: занадто довго — спробуй ще раз.")
+        sleep(0.7)
+        d = result(d.get("id"), requests, api_key=api_key)
+    if d.get("status") != "completed":
+        raise WaveSpeedError("WaveSpeed LLM: " + (d.get("error") or d.get("status") or "failed"))
+    out = (d.get("outputs") or [""])[0]
+    if isinstance(out, dict):
+        out = out.get("text") or out.get("content") or out.get("output") or ""
+    return str(out or "").strip()
 
 
 # ---------------------------------------------------------------- video → foley (auto SFX)

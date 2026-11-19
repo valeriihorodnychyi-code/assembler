@@ -415,6 +415,16 @@
   .srow .stext:focus{background:rgba(255,255,255,.05);box-shadow:0 0 0 1px var(--line)}
   .srow .sacts{display:flex;gap:4px}
   .srow .stext .wacc{color:#ff8a5c;font-weight:700}
+  .srow .stext .wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5);border-radius:3px}
+  .datepanel{border:1px solid rgba(250,204,21,.45);background:rgba(250,204,21,.06);border-radius:9px;padding:9px 10px;margin-bottom:8px;font-size:12px;display:flex;flex-direction:column;gap:7px}
+  .datepanel .dgroup{display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid rgba(250,204,21,.2)}
+  .datepanel .dgroup:first-of-type{border-top:0;padding-top:0}
+  .datepanel .docc{display:flex;gap:5px;flex-wrap:wrap}
+  .datepanel .docc label{display:inline-flex;align-items:center;gap:4px;border:1px solid #3a3e4a;border-radius:6px;padding:2px 6px;background:#111319;cursor:pointer;font:600 10.5px/1.4 ui-monospace,Menlo,monospace}
+  .datepanel .drow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .datepanel input[type=text]{flex:1;min-width:120px}
+  #trimDates{position:absolute;inset:0;pointer-events:none;z-index:4}
+  #trimDates i{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:#facc15;opacity:.9;border-radius:2px;pointer-events:auto;cursor:pointer}
   .srow .stext .wphr{text-decoration:underline 2px #a78bfa;text-underline-offset:3px}
   .senttool{position:fixed;z-index:60;display:none;gap:4px;align-items:center;padding:4px;background:#1d2029;border:1px solid #3a3e4a;border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
   .senttool button{font-size:11.5px;padding:5px 9px;border-radius:7px;background:#2a2d36;border:1px solid var(--line);color:var(--txt);white-space:nowrap}
@@ -860,6 +870,7 @@
           <span id="langSticker" class="lang-sticker" style="display:none"></span>
           <textarea id="transcript" rows="3" style="min-height:210px;max-height:360px;overflow-y:auto;resize:vertical;font-size:15px" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
           <div id="transcriptWords" class="twords" contenteditable="true" spellcheck="false" style="display:none"></div>
+          <div id="datePanel" class="datepanel" style="display:none"></div>
           <div id="transcriptSents" class="tsents" style="display:none"></div>
           <div id="sentBar" style="display:none"></div>
           <div id="wordTools" style="display:none;flex-direction:column;gap:6px;margin-top:6px;font-size:11.5px;color:var(--muted)">
@@ -3433,7 +3444,7 @@ $("caseSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("textCase").
 // ---------- Words view: click a word = seek, active phrase highlights during playback (editing stays in Text) ----------
 $("txtViewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
   $("txtViewSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
-  txtView=b.dataset.v;
+  txtView=b.dataset.v; if(typeof renderDatePanel==="function")setTimeout(renderDatePanel,0);
   const ta=$("transcript"), box=$("transcriptWords");
   if($("wordTools"))$("wordTools").style.display=(txtView==="words")?"flex":"none";
   const sb=$("transcriptSents"); if(sb)sb.style.display=(txtView==="sents")?"flex":"none";
@@ -4030,7 +4041,7 @@ async function dictSend(id,blob){
     const el=$(id); if(!el){setStatus("🎙 «"+d.text+"» — поле вже закрите, скопіюй звідси.","ok");return;}
     el.value=((el.value||"").trim()?(el.value.trim()+" "):"")+d.text;
     el.dispatchEvent(new Event("input",{bubbles:true})); try{el.focus();}catch(_){}
-    setStatus("🎙 "+(d.language&&d.language!=="en"?("("+d.language.toUpperCase()+" → EN) "):"")+"«"+d.text+"»","ok");
+    setStatus("🎙 "+(d.language&&d.language!=="en"?("("+d.language.toUpperCase()+" → EN"+(d.via==="whisper"?", офлайн Whisper":"")+") "):"")+"«"+d.text+"»"+(d.original&&d.original!==d.text?" · було: «"+d.original+"»":""),"ok");
   }catch(e){setStatus("🎙 "+e.message,"err");}
 }
 // 🔊 Auto SFX for a piece: HunyuanVideo-Foley (WaveSpeed) watches that part and writes the sounds
@@ -4077,9 +4088,9 @@ function rgPoll(){clearInterval(_rgTimer); if(!_rgJobs.length){rgLabel();return;
       try{const r=await fetch(API+"/api/regen/"+j.job);const d=await r.json();
         if(!r.ok)throw new Error(d.detail||"job lost");
         j.state=d.state; j.elapsed=d.elapsed;
-        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="foley")fyApply(j,d); else rgApply(j,d);}
-        else if(d.state==="error"){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus((j.kind==="foley"?"🔊 Auto SFX: ":"✨ Seedance: ")+d.error,"err");}
-      }catch(e){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus("✨ Seedance: "+e.message,"err");}
+        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="foley")fyApply(j,d); else if(j.kind==="piece"){j.grp.done.push({piece:d.piece,a:d.a,b:d.b});datesMaybeSplice(j.grp);} else rgApply(j,d);}
+        else if(d.state==="error"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="piece"){j.grp.failed++;datesMaybeSplice(j.grp);} setStatus((j.kind==="foley"?"🔊 Auto SFX: ":"✨ Seedance: ")+d.error,"err");}
+      }catch(e){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="piece"){j.grp.failed++;datesMaybeSplice(j.grp);} setStatus("✨ Seedance: "+e.message,"err");}
     }
     rgLabel(); if(!_rgJobs.length)clearInterval(_rgTimer);
   },5000); rgLabel();}
@@ -4262,16 +4273,168 @@ function renderSentsView(force){
       +(more?"<div class='smore'>як звучатиме:<input data-ssay='"+k+"' placeholder='"+esc(inf.text)+"' value='"+esc(_rvSay[sig]||"")+"' title='Лише вимова для ElevenLabs. У титрах лишиться текст рядка. Напр. «Tie Chee» для «Tai Chi».'>"
         +"<button type='button' class='tmini' data-scut='"+k+"' title='Вирізати це речення з відео і звуку; стики — у паузах'>✂ Cut sentence</button></div>":"")
       +"</div>";}).join("");
-  renderSentBar(canVoice);
+  renderSentBar(canVoice); renderDatePanel();
   box.querySelectorAll("[data-svch]").forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();cycleSentVoice(+b.dataset.svch);});
   if(typeof renderVoices==="function")renderVoices();
+}
+// ---------- 📅 Dates: find every date the speaker says, replace them all at once ----------
+// @@findDates:start
+// Plain rules, no AI (instant, free): Month + day ("November 16th", "Nov. sixteenth"), day + month
+// ("the 16th of November"), an optional weekday before and a year after, and 11/16 · 16.11.
+// "May" / "March" count only next to a day. Same date → one group ("November 16 ×4").
+const DT_MONTHS={january:1,jan:1,february:2,feb:2,march:3,mar:3,april:4,apr:4,may:5,june:6,jun:6,july:7,jul:7,
+  august:8,aug:8,september:9,sep:9,sept:9,october:10,oct:10,november:11,nov:11,december:12,dec:12};
+const DT_WEEK=new Set(["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]);
+const DT_UNITS={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,
+  fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,
+  ninth:9,tenth:10,eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,fifteenth:15,sixteenth:16,seventeenth:17,eighteenth:18,nineteenth:19,
+  twenty:20,twentieth:20,thirty:30,thirtieth:30};
+const DT_SMALL={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9};
+function _dtNorm(w){return String(w&&(w.word||w.text)||"").toLowerCase().replace(/[’']s$/,"").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g,"");}
+// a day at token i → {day, n tokens} ("16", "16th", "sixteenth", "twenty-first", "twenty first")
+function _dtDay(T,i){
+  const t=T[i]; if(t==null)return null;
+  let m=t.match(/^(\d{1,2})(st|nd|rd|th)?$/); if(m){const d=+m[1];return d>=1&&d<=31?{day:d,n:1}:null;}
+  m=t.match(/^(twenty|thirty)-?(\w+)$/); if(m&&DT_SMALL[m[2]]!=null){const d=DT_UNITS[m[1]]+DT_SMALL[m[2]];return d<=31?{day:d,n:1}:null;}
+  if((t==="twenty"||t==="thirty")&&DT_SMALL[T[i+1]]!=null){const d=DT_UNITS[t]+DT_SMALL[T[i+1]];return d<=31?{day:d,n:2}:null;}
+  if(DT_UNITS[t]!=null&&t!=="second"){const d=DT_UNITS[t];return d<=31?{day:d,n:1}:null;}   // "second" is too often a time word
+  return null;
+}
+function findDates(ws){
+  const T=(ws||[]).map(_dtNorm), out=[]; let i=0;
+  const isYear=t=>/^(19|20)\d\d$/.test(t||"");
+  while(i<T.length){
+    let s=i, mo=null, dd=null, e=-1;
+    if(DT_WEEK.has(T[i])&&(DT_MONTHS[T[i+1]]||(T[i+1]==="the"&&_dtDay(T,i+2))||_dtDay(T,i+1)))s=i, i++;   // "Sunday, November 16"
+    if(DT_MONTHS[T[i]]!=null){const d=_dtDay(T,i+1)||(T[i+1]==="the"?(x=>x&&{day:x.day,n:x.n+1})(_dtDay(T,i+2)):null);
+      if(d){mo=DT_MONTHS[T[i]];dd=d.day;e=i+d.n;}}
+    if(e<0){let j=i; if(T[j]==="the")j++; const d=_dtDay(T,j);
+      if(d){let k=j+d.n; if(T[k]==="of")k++; if(DT_MONTHS[T[k]]!=null){mo=DT_MONTHS[T[k]];dd=d.day;e=k;}}}
+    if(e<0){const m=(T[i]||"").match(/^(\d{1,2})[\/.](\d{1,2})(?:[\/.](\d{2,4}))?$/);
+      if(m&&+m[1]<=31&&+m[2]<=31&&(+m[1]<=12||+m[2]<=12)){mo=+m[1]<=12?+m[1]:+m[2];dd=+m[1]<=12?+m[2]:+m[1];e=i;}}
+    if(e<0){i=s+1;continue;}
+    if(isYear(T[e+1]))e++;
+    const text=(ws||[]).slice(s,e+1).map(w=>w.word||w.text||"").join(" ").replace(/[,.;:!?]+$/,"");
+    out.push({i0:s,i1:e,text,key:mo+"-"+dd,start:+ws[s].start,end:+ws[e].end});
+    i=e+1;
+  }
+  return out;
+}
+// @@findDates:end
+let _dateIdxK="", _dateIdx=new Map(), _datePanelOn=false, _dateNew={}, _dateOff=new Set();
+function dateAt(i){const ws=realWords||[], k=ws.length+"|"+ws.map(w=>w.word||w.text).join(" ").length;
+  if(k!==_dateIdxK){_dateIdxK=k;_dateIdx=new Map();findDates(ws).forEach(d=>{for(let j=d.i0;j<=d.i1;j++)_dateIdx.set(j,d);});
+    if(typeof drawDateMarks==="function")setTimeout(drawDateMarks,0);}
+  return _dateIdx.get(i)||null;}
+function drawDateMarks(){
+  const bar=$("trimBar"), dur=video.duration||0; if(!bar)return;
+  let box=$("trimDates"); if(!box){box=document.createElement("div");box.id="trimDates";bar.appendChild(box);}
+  const D=dur?findDates(realWords||[]):[];
+  box.innerHTML=D.map((d,k)=>"<i data-dk='"+k+"' style='left:"+(d.start/dur*100)+"%' title='📅 "+String(d.text).replace(/'/g,"&#39;")+" · "+tc(d.start)+"'></i>").join("");
+  box.querySelectorAll("[data-dk]").forEach(el=>{el.onclick=e=>{e.stopPropagation();const d=D[+el.dataset.dk];if(d&&videoLoaded){video.currentTime=Math.max(0,d.start-0.05);}};
+    el.onpointerdown=e=>e.stopPropagation();});
+}
+function dateGroups(){const g=new Map(); findDates(realWords||[]).forEach(d=>{if(!g.has(d.key))g.set(d.key,{key:d.key,label:d.text,list:[]});g.get(d.key).list.push(d);}); return [...g.values()];}
+function renderDatePanel(){
+  const P=$("datePanel"); if(!P)return;
+  const G=(txtView==="sents"&&_datePanelOn)?dateGroups():[];
+  if(!G.length){P.style.display="none";P.innerHTML="";if(_datePanelOn&&txtView==="sents"&&!findDates(realWords||[]).length)_datePanelOn=false;return;}
+  if(P.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;   // never re-render under the caret
+  const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  const lips=_dateNew._lips!==false, model=_dateNew._model||"turbo";
+  P.innerHTML="<div class='drow'><b>📅 Дати в кліпі</b><span style='color:var(--muted);flex:1'>Познач, які міняти, впиши нову дату — голос переозвучиться тим самим голосом"+(lips?", а губи в кадрі підженуться Seedance":"")+".</span>"
+      +"<button type='button' class='ghost' id='dpX' style='font-size:11px;padding:3px 7px'>✕</button></div>"
+    +G.map((g,gi)=>"<div class='dgroup'><div class='drow'><b>«"+esc(g.label)+"»</b> ×"+g.list.length+"</div>"
+      +"<div class='docc'>"+g.list.map(d=>"<label title='Клік по часу — подивитись'><input type='checkbox' data-doff='"+d.i0+"'"+(_dateOff.has(d.start.toFixed(2))?"":" checked")+"><span data-dgo='"+d.start+"'>"+tc(d.start)+"</span></label>").join("")+"</div>"
+      +"<div class='drow'><span>→</span><input type='text' data-dnew='"+gi+"' placeholder='напр. November 23rd' value='"+esc(_dateNew[g.key]||"")+"'>"
+      +"<button type='button' class='primary' data-dgo2='"+gi+"' style='font-size:11px;padding:5px 10px'>"+(lips?"🎙 + ✨ Замінити":"🎙 Замінити")+"</button></div></div>").join("")
+    +"<div class='drow' style='color:var(--muted)'><label><input type='checkbox' id='dpLips'"+(lips?" checked":"")+"> ✨ губи в кадрі (Seedance)</label>"
+      +"<select id='dpModel' title='Turbo — швидко й дешево для дрібних замін; 2.5 — якщо Turbo не впорався'><option value='turbo'"+(model==="turbo"?" selected":"")+">Seedance 2.0 Fast Turbo</option><option value='2.5'"+(model==="2.5"?" selected":"")+">Seedance 2.5</option></select>"
+      +"<span style='flex:1'>Шматок ~4 с навколо кожної дати.</span></div>";
+  P.style.display="flex";
+  $("dpX").onclick=()=>{_datePanelOn=false;renderDatePanel();renderSentBar(!!origWordsNow());};
+  $("dpLips").onchange=e=>{_dateNew._lips=e.target.checked;renderDatePanel();};
+  $("dpModel").onchange=e=>{_dateNew._model=e.target.value;};
+  P.querySelectorAll("[data-dnew]").forEach(inp=>{inp.oninput=e=>{_dateNew[G[+inp.dataset.dnew].key]=e.target.value;};
+    inp.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();replaceDates(G[+inp.dataset.dnew]);}};});
+  P.querySelectorAll("[data-doff]").forEach(cb=>cb.onchange=()=>{const d=findDates(realWords||[]).find(x=>x.i0===+cb.dataset.doff); if(!d)return;
+    const k=d.start.toFixed(2); cb.checked?_dateOff.delete(k):_dateOff.add(k);});
+  P.querySelectorAll("[data-dgo]").forEach(el=>el.onclick=e=>{e.preventDefault();if(videoLoaded){video.currentTime=Math.max(0,+el.dataset.dgo-0.05);}});
+  P.querySelectorAll("[data-dgo2]").forEach(b=>b.onclick=()=>replaceDates(G[+b.dataset.dgo2]));
+}
+// 🎙 every picked occurrence: new words in the captions → one re-voice pass (same voice) → optional
+// ✨ Seedance on a ~4 s piece around each (lips), spliced back in ONE step when all are back.
+async function replaceDates(g){
+  const nt=String(_dateNew[g.key]||"").trim(); if(!nt){setStatus("📅 Впиши нову дату.","err");return;}
+  const v=variants[activeVar]; if(!v||!v.clip||!fileId||!origWordsNow()){setStatus("📅 Спершу ① Transcribe цей кліп.","err");return;}
+  const occ=g.list.filter(d=>!_dateOff.has(d.start.toFixed(2))).sort((a,b)=>b.i0-a.i0);   // from the end: earlier indices stay valid
+  if(!occ.length){setStatus("📅 Не вибрано жодного входження.","err");return;}
+  const lips=_dateNew._lips!==false, model=_dateNew._model||"turbo";
+  const toks=nt.split(/\s+/).filter(Boolean);
+  const ws0=(realWords||[]).map(w=>({...w}));
+  let ws=(realWords||[]).map(w=>({...w})); const ranges=[];
+  occ.forEach(d=>{const a=+ws[d.i0].start, b=+ws[d.i1].end, lastBrk=ws[d.i1].brk||null, tail=(String(ws[d.i1].word||ws[d.i1].text||"").match(/[,.;:!?]+$/)||[""])[0];
+    const step=(b-a)/toks.length;
+    const fresh=toks.map((t,j)=>({word:t+(j===toks.length-1?tail:""),start:+(a+j*step).toFixed(3),end:+(a+(j+1)*step).toFixed(3),brk:j===toks.length-1?lastBrk:null}));
+    ws.splice(d.i0,d.i1-d.i0+1,...fresh);
+    ranges.forEach(r=>{r[0]+=fresh.length-(d.i1-d.i0+1);r[1]+=fresh.length-(d.i1-d.i0+1);});
+    ranges.push([d.i0,d.i0+fresh.length]);});
+  commitWords(ws);
+  const spans=ranges.sort((x,y)=>x[0]-y[0]).map(([a,b])=>rangeSpan(a,b)).filter(Boolean);
+  spans.forEach(sp=>{_rvSay[sp.sig]=sp.text;});
+  const clip0=v.clip;
+  await doRevoice(spans);
+  if(variants[activeVar].clip===clip0){   // the voice didn't change → don't leave captions saying a date the audio doesn't
+    const msg=($("status")&&$("status").innerText)||""; commitWords(ws0);
+    setStatus("📅 Переозвучка не вдалась, текст повернуто. "+msg.replace(/^Переозвучка:\s*/,""),"err");return;}
+  if(!lips){setStatus("📅 «"+g.label+"» → «"+nt+"»: "+spans.length+"× переозвучено. ↩ Undo re-voice — повернути.","ok");return;}
+  for(let k=0;k<50&&!(video.duration>0&&video.readyState>=1);k++)await new Promise(r=>setTimeout(r,100));   // the re-voiced clip is loading
+  const W2=realWords||[];   // the NEW words of each date (re-voice re-timed them)
+  datesLips(ranges.map(([x,y])=>({a:+W2[x].start,b:+W2[y-1].end,ns:x,ne:y})).filter(p=>p.b>p.a),nt,model);
+}
+function datesLips(list,nt,model){
+  const W=realWords||[], dur=(video.duration>0?video.duration:0)||(W.length?+W[W.length-1].end+0.5:0), o=mixHolder();
+  if(!o||!dur||!list.length){setStatus("📅 Не вийшло запустити губи — відкрий панель 📅 і спробуй ще раз.","err");return;}
+  // ~4 s around each date (Turbo bills ≥ 4 s anyway); overlapping windows merge into one piece
+  let P=list.map(x=>{const mid=(x.a+x.b)/2, half=Math.max(2.0,(x.b-x.a)/2+0.6);
+    let a=Math.max(0,mid-half), b=Math.min(dur,mid+half); if(b-a<4&&dur>=4){if(a===0)b=Math.min(dur,4);else a=Math.max(0,b-4);}
+    return {a,b,ns:x.ns,ne:x.ne};}).sort((x,y)=>x.a-y.a);
+  const M=[]; P.forEach(p=>{const l=M[M.length-1]; if(l&&p.a<l.b&&p.b-l.a<=15){l.b=Math.max(l.b,p.b);l.ne=p.ne;}else M.push({...p});});
+  const sentOf=(ns,ne)=>{let a=ns,b=ne; while(a>0&&!/[.!?]$/.test(W[a-1].word||""))a--; while(b<W.length&&!/[.!?]$/.test(W[b-1].word||""))b++; return W.slice(a,Math.min(b,W.length)).map(w=>w.word).join(" ");};
+  const est=M.reduce((s,p)=>s+(model==="turbo"?((Math.max(2,p.b-p.a)*0.0675)+(Math.max(4,p.b-p.a)*0.0855)):(2*Math.max(4,p.b-p.a)*0.22)),0);
+  if(!confirm("✨ Губи під нову дату: "+M.length+" шматк. по ~4 с · "+(model==="turbo"?"Seedance 2.0 Fast Turbo · 1080p":"Seedance 2.5 · 720p")+" · ≈ $"+est.toFixed(2)+" з балансу WaveSpeed.\n\nЗапустити?"))
+    {setStatus("📅 Голос замінено. Губи не чіпали — можна запустити пізніше з панелі 📅.","ok");return;}
+  const src=(o.mix&&o.mix.base)||o.clip, grp={id:Date.now().toString(36),n:M.length,done:[],failed:0,o,src,nt};
+  M.forEach(async p=>{
+    const line=sentOf(p.ns,p.ne);
+    const prompt="The person on camera says: \""+line+"\". Re-animate ONLY the lips, mouth and jaw so they match these words, especially \""+nt+"\", in sync with the existing audio. Keep the face, identity, expression, head and body motion, lighting, background, camera and every other detail exactly the same. Do not add text or subtitles.";
+    try{const r=await fetch(API+"/api/regen/piece/start",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:src,a:+p.a.toFixed(3),b:+p.b.toFixed(3),prompt,model,resolution:model==="turbo"?"1080p":"720p"})});
+      const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"seedance failed"));
+      _rgJobs.push({job:d.job,kind:"piece",grp,o,prompt:"📅 "+nt}); rgPoll();
+    }catch(e){grp.failed++; setStatus("✨ Seedance: "+e.message,"err"); datesMaybeSplice(grp);}
+  });
+  setStatus("✨ Seedance: "+M.length+" шматк. під «"+nt+"» запущено. Займе кілька хвилин — працюй далі, вони самі вклеяться разом.","ok");
+}
+async function datesMaybeSplice(grp){
+  if(grp.done.length+grp.failed<grp.n)return;
+  if(!grp.done.length){setStatus("✨ Жоден шматок не вдався — голос уже замінено, губи лишились старі.","err");return;}
+  const o=grp.o, cur=(o.mix&&o.mix.base)||o.clip;
+  if(cur!==grp.src){setStatus("✨ Шматки готові, але кліп змінився, поки вони генерувались — не вклеюю, щоб не зсунути. Запусти 📅 ще раз.","err");return;}
+  try{const r=await fetch(API+"/api/regen/splice",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:cur,pieces:grp.done})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"splice failed"));
+    rgApply({o,prompt:"📅 губи «"+grp.nt+"» ×"+grp.done.length},{clip:d.clip,url:d.url,seconds:0});
+    if(grp.failed)setStatus("✨ Вклеєно "+grp.done.length+" з "+grp.n+" шматків; "+grp.failed+" не вдались — там губи старі.","err");
+  }catch(e){setStatus("✨ Вклейка: "+e.message,"err");}
 }
 // ✦ accent words / 🎨 phrase styles, shown right in the sentence (the row text stays plain words)
 function sentWordsHTML(r,esc){
   const ws=realWords||[], ps=curPhraseStyles(), W=w=>w.word||w.text||"";
   const out=[]; for(let i=r[0];i<r[1];i++){const w=ws[i]; if(!w)continue;
     const ph=ps.find(p=>+w.start>=+p.start&&+w.start<+p.end);
-    const cls=(w.accent?" wacc":"")+(ph?" wphr":""), tt=(w.accent?"✦ accent":"")+(ph?(w.accent?" · ":"")+"🎨 "+(ph.name||"style"):"");
+    const dt=dateAt(i);
+    const cls=(w.accent?" wacc":"")+(ph?" wphr":"")+(dt?" wdate":""), tt=(w.accent?"✦ accent":"")+(ph?(w.accent?" · ":"")+"🎨 "+(ph.name||"style"):"")+(dt?((w.accent||ph)?" · ":"")+"📅 дата: "+dt.text:"");
     out.push("<span data-wi='"+i+"'"+(cls?" class='"+cls.trim()+"'":"")+(tt?" title='"+esc(tt)+"'":"")+">"+esc(W(w))+"</span>");}
   return out.join(" ");
 }
@@ -4343,6 +4506,7 @@ function renderSentBar(canVoice){
     +"<button type='button' id='sentCutPick' class='ghost' style='font-size:11px;padding:6px 10px' title='Вирізати виділені речення з відео і звуку'>✂ Cut "+n+" sentences</button>"
     +"<button type='button' id='sentPickX' class='ghost' style='font-size:11px;padding:6px 8px' title='Зняти виділення (Esc)'>✕</button>";
   if(undo)h+="<button type='button' id='sentUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути звук і текст до цієї переозвучки'>↩ Undo re-voice</button>";
+  {const D=findDates(realWords||[]); if(D.length)h+="<button type='button' id='sentDates' class='"+(_datePanelOn?"primary":"ghost")+"' style='font-size:11px;padding:6px 10px' title='Знайдені дати — замінити всі разом (голос + губи)'>📅 Dates · "+D.length+"</button>";}
   h+="<span style='flex:1;min-width:150px'>Правиш текст у рядку — титр міняється одразу; 🎙 — щоб змінився і звук. Довжина кліпу не зміниться.</span>";
   bar.innerHTML=h; bar.style.display=(txtView==="sents")?"flex":"none";
   if($("sentVoicePick"))$("sentVoicePick").onclick=()=>voiceSentences(_sentPick[0],_sentPick[1]);
@@ -4350,6 +4514,7 @@ function renderSentBar(canVoice){
   if($("sentCutPick"))$("sentCutPick").onclick=()=>cutSentences(_sentPick[0],_sentPick[1]);
   if($("sentPickX"))$("sentPickX").onclick=()=>{_sentPick=null;renderSentsView(true);};
   if($("sentUndo"))$("sentUndo").onclick=undoRevoice;
+  if($("sentDates"))$("sentDates").onclick=()=>{_datePanelOn=!_datePanelOn;renderDatePanel();renderSentBar(canVoice);};
 }
 function cutSentences(k0,k1){
   const a=_sentRanges[k0], b=_sentRanges[k1-1], ws=realWords||[]; if(!a||!b||!ws[a[0]]||!ws[b[1]-1])return;
@@ -5054,6 +5219,7 @@ function pieces(){const dur=video.duration||0, s=splitsOf(); const pts=[0].conca
 function pieceAt(t){return pieces().find(([a,b])=>t>=a&&t<b)||null;}
 function drawSplits(){
   const bar=$("trimBar"),dur=video.duration||0; if(!bar)return;
+  if(typeof drawDateMarks==="function")drawDateMarks();
   let box=$("trimSplits"); if(!box){box=document.createElement("div");box.id="trimSplits";bar.appendChild(box);}
   box.innerHTML=dur?splitsOf().map(t=>"<i data-split='"+t+"' style='left:"+(t/dur*100)+"%' title='Розріз "+tc(t)+" · подвійний клік — прибрати · правий клік — меню'></i>").join(""):"";
   box.querySelectorAll("[data-split]").forEach(el=>{el.ondblclick=e=>{e.preventDefault();e.stopPropagation();removeSplit(+el.dataset.split);};});

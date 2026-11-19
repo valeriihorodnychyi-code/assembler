@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
-  "channel": "main",
-  "notes": "Assembler 2.0 — a fast video editor. Opens clean (both panels folded, video first). Timeline like Premiere: scrub on the ruler, C = split at playhead, click a piece + Delete, Shift-magnet, Alt+wheel zoom, ⤢ big timeline, Cmd-drag audio scrub, Undo / Redo (Cmd+Z / Cmd+Shift+Z). Audio lanes: Clip audio · Music · SFX as layers (mute / volume / move), own audio file, music / voice / stems export. Text panel on the left (Text · Words · Sentences): voices get their own caption style, ✦ accent words and 🎨 own style for a phrase. Style · Titles · Sound on the right. Punctuation Off / ?! only / All — ? and ! now stay by default (older presets too; pick Off for the old look). Style regions → Voices + Body. Repeat moved out of Edit. Export ▾ menu: Video · Audio only · Stems · SRT."
+  "version": "2.0.1-b1",
+  "channel": "v2",
+  "notes": "📅 Dates: Sentences finds every spoken date (Monday, November 16th · the 16th of November · 11/16) — highlighted in the rows, yellow marks on the timeline, «📅 Dates · N» opens a panel: tick the ones to change, type the new date → 🎙 one re-voice pass in the same voice, then ✨ Seedance 2.0 Fast Turbo (cheap, fast) re-animates the lips in a ~4 s piece around each, all spliced back in ONE ↩ step. Seedance 2.5 stays for whole scenes and as the fallback (choose it in the panel). 🎙 Dictation: ElevenLabs Scribe hears the note (good Ukrainian), Gemini 2.5 Flash via WaveSpeed writes clean English (same WaveSpeed key, ~$0.01); local Whisper only as the offline fallback."
 }

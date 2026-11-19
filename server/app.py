@@ -1204,6 +1204,164 @@ def _regen_run(job, sdir, src, req):
         J.update(state="error", error=str(e))
 
 
+# ---------- ✨ Seedance on a PIECE of a long clip (dates, a word on the lips) ----------
+# The piece [a, b] goes up alone (Turbo: 2–15 s), comes back conformed to the clip's size / fps
+# and exact length, and waits; /api/regen/splice then puts every finished piece back into the
+# clip in ONE pass (one new file, one ↩ step). The clip's own audio stays — re-voice it first.
+class RegenPieceReq(BaseModel):
+    file_id: str
+    clip: str
+    a: float
+    b: float
+    prompt: str
+    model: str = "turbo"            # "turbo" (Seedance 2.0 Fast Turbo) | "2.5"
+    resolution: str = "1080p"
+    refs: List[str] = []
+
+
+def _snap(t, fps):
+    return round(float(t) * fps) / fps
+
+
+def _regen_piece_run(job, sdir, src, req):
+    import requests as _rq, time as _t
+    from engine import wavespeed as ws
+    J = _REGEN[job]
+    p = compose._stream_params(src) or (None,) * 8
+    w, h, fps = int(p[0] or 1080), int(p[1] or 1920), float(p[2] or 30.0)
+    a, b = J["a"], J["b"]
+    seg = os.path.join(sdir, f"_piece_{job}.mp4")
+    try:
+        J["state"] = "uploading"
+        ffmpeg_utils.run(["ffmpeg", "-y", "-ss", f"{a:.4f}", "-i", src, "-t", f"{b - a:.4f}",
+                          "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p",
+                          "-c:a", "aac", "-b:a", "192k", seg])
+        url = ws.upload(seg, _rq)
+        refs = [ws.upload(os.path.join(sdir, os.path.basename(r_)), _rq) for r_ in (req.refs or [])[:9]
+                if os.path.exists(os.path.join(sdir, os.path.basename(r_)))]
+        J["state"] = "queued"
+        model = ws.MODELS.get(req.model, ws.TURBO_MODEL)
+        pid = ws.submit_edit(url, req.prompt, _rq, resolution=req.resolution, keep_audio=True, refs=refs, model=model)
+        J["prediction"] = pid
+        t0 = _t.time()
+        while True:
+            _t.sleep(4)
+            r = ws.result(pid, _rq)
+            J["state"] = r["status"] or "processing"
+            if r["status"] == "completed":
+                if not r["outputs"]:
+                    raise ws.WaveSpeedError("Seedance завершив, але без відео.")
+                break
+            if r["status"] in ("failed", "cancelled", "timeout", "deleted"):
+                raise ws.WaveSpeedError("Seedance: " + (r["error"] or r["status"]))
+            if _t.time() - t0 > 30 * 60:
+                raise ws.WaveSpeedError("Seedance не встиг за 30 хв (id " + pid + ").")
+        J["state"] = "downloading"
+        out0 = r["outputs"][0]
+        g = _rq.get(out0 if isinstance(out0, str) else out0.get("url", ""), timeout=600)
+        if g.status_code != 200 or len(g.content) < 1000:
+            raise ws.WaveSpeedError(f"Не вдалося скачати результат (HTTP {g.status_code}).")
+        raw = os.path.join(sdir, f"_piece_{job}_raw.mp4")
+        with open(raw, "wb") as f:
+            f.write(g.content)
+        J["state"] = "conforming"
+        name = f"_piece_{job}_ok.mp4"   # picture only, exactly b - a long, the clip's size and fps
+        vf = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps:g},setsar=1"
+        ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-an", "-vf", vf, "-frames:v", str(max(1, round((b - a) * fps))),
+                          "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p",
+                          os.path.join(sdir, name)])
+        J.update(state="done", piece=name, piece_url=f"/clip/{req.file_id}/{name}",
+                 seconds=round(_t.time() - J["started"]))
+        _log_timing("seedance-piece", _t.time() - J["started"], req.model + " " + req.resolution)
+    except Exception as e:  # noqa: BLE001
+        J.update(state="error", error=str(e))
+
+
+@app.post("/api/regen/piece/start")
+def regen_piece_start(req: RegenPieceReq):
+    import threading, time as _t, uuid
+    from engine import wavespeed as ws
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    if not os.environ.get("WAVESPEED_API_KEY"):
+        raise HTTPException(400, "Немає ключа WaveSpeed — додай його в ⚙ Settings.")
+    if not (req.prompt or "").strip():
+        raise HTTPException(400, "Опиши, що змінити в кадрі.")
+    fps = float((compose._stream_params(src) or (None, None, 30.0))[2] or 30.0)
+    dur = revoice.duration(src)
+    a, b = _snap(max(0.0, req.a), fps), _snap(min(dur, req.b), fps)
+    lim = 15.0 if req.model == "turbo" else 30.0
+    if b - a < 1.0 or b - a > lim + 0.01:
+        raise HTTPException(400, f"Шматок має бути 1–{lim:.0f} с (зараз {b - a:.1f} с).")
+    if req.model == "turbo":
+        res = req.resolution if req.resolution in ws.TURBO_RATES else "1080p"
+        cost, billed = ws.estimate_turbo(b - a, res)
+    else:
+        res = req.resolution if req.resolution in ws.RATES else "720p"
+        cost, billed = ws.estimate(b - a, res)
+    req.resolution = res
+    job = uuid.uuid4().hex[:12]
+    _REGEN[job] = {"state": "starting", "started": _t.time(), "cost": cost, "billed": billed, "clip": None,
+                   "error": "", "a": a, "b": b, "kind": "piece"}
+    threading.Thread(target=_regen_piece_run, args=(job, sdir, src, req), daemon=True).start()
+    return {"job": job, "cost": cost, "a": a, "b": b}
+
+
+class SpliceReq(BaseModel):
+    file_id: str
+    clip: str
+    pieces: List[dict]              # [{piece, a, b}] — finished /api/regen/piece results
+
+
+@app.post("/api/regen/splice")
+def regen_splice(req: SpliceReq):
+    """Every finished piece back into the clip in one pass: picture swapped frame-exact, the clip's
+    audio untouched. → a new clip "<stem>_sdN" (↩ in History goes back to the one before)."""
+    import re as _re
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    p = compose._stream_params(src) or (None,) * 8
+    fps = float(p[2] or 30.0)
+    dur = ffmpeg_utils.video_stream_duration(src) or revoice.duration(src)
+    ps = []
+    for x in sorted(req.pieces or [], key=lambda x: float(x.get("a", 0))):
+        f = os.path.join(sdir, os.path.basename(str(x.get("piece", ""))))
+        a, b = _snap(x.get("a", 0), fps), _snap(x.get("b", 0), fps)
+        if os.path.exists(f) and b > a and (not ps or a >= ps[-1][2] - 1e-6):
+            ps.append((f, a, b))
+    if not ps:
+        raise HTTPException(400, "Немає готових шматків для вклейки.")
+    inputs = ["-i", src]
+    parts, chain, t = [], "", 0.0
+    for k, (f, a, b) in enumerate(ps, start=1):
+        inputs += ["-i", f]
+        if a - t > 0.5 / fps:
+            chain += f"[0:v]trim=start={t:.6f}:end={a:.6f},setpts=PTS-STARTPTS[o{k}];"
+            parts.append(f"[o{k}]")
+        chain += f"[{k}:v]setpts=PTS-STARTPTS,fps={fps:g}[p{k}];"
+        parts.append(f"[p{k}]")
+        t = b
+    if dur - t > 0.5 / fps:
+        chain += f"[0:v]trim=start={t:.6f},setpts=PTS-STARTPTS[otail];"
+        parts.append("[otail]")
+    chain += "".join(parts) + f"concat=n={len(parts)}:v=1:a=0[v]"
+    stem, ext = os.path.splitext(os.path.basename(src))
+    stem = _re.sub(r"(_mix_[0-9a-f]{10}|_sd\d+)+$", "", stem)
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"{stem}_sd{k}{ext}")):
+        k += 1
+    out = f"{stem}_sd{k}{ext}"
+    cmd = ["ffmpeg", "-y"] + inputs + ["-filter_complex", chain, "-map", "[v]", "-map", "0:a:0?",
+           "-frames:v", str(max(1, round(dur * fps)))]
+    cmd += ffmpeg_utils.encoder_quality_args("12M") + ["-c:a", "copy", os.path.join(sdir, out)]
+    ffmpeg_utils.run(cmd)
+    return {"clip": out, "url": f"/clip/{req.file_id}/{out}", "pieces": len(ps)}
+
+
 @app.post("/api/regen/start")
 def regen_start(req: RegenReq):
     import threading, time as _t, uuid
@@ -2605,6 +2763,34 @@ def library_file(name: str):
 # ----- Assemble (hook render + library body) -----
 
 
+def _dictate(wav):
+    """Best available path: Scribe hears it (good Ukrainian) → WaveSpeed LLM writes clean English.
+    Falls back step by step to local Whisper translate (offline, weaker)."""
+    import requests as _rq
+    from engine import wavespeed
+    src = None
+    if os.environ.get("ELEVENLABS_API_KEY"):
+        try:
+            src = transcribe.scribe_text(wav)
+        except Exception as e:  # noqa: BLE001
+            print(f"[dictate] Scribe failed, falling back to Whisper: {e}", flush=True)
+    if src and src["text"]:
+        if src["language"] == "en" and len(src["text"]) < 400:
+            return {"text": src["text"], "language": "en", "original": src["text"], "via": "scribe"}
+        if os.environ.get("WAVESPEED_API_KEY"):
+            try:
+                en = wavespeed.llm(src["text"], _rq, system=transcribe.DICTATE_SYSTEM)
+                if en:
+                    return {"text": en, "language": src["language"], "original": src["text"], "via": "scribe+llm"}
+            except Exception as e:  # noqa: BLE001
+                print(f"[dictate] LLM failed, falling back to Whisper translate: {e}", flush=True)
+    r = transcribe.dictate_english(wav)
+    r["via"] = "whisper"
+    if src and src["text"]:
+        r["original"] = src["text"]
+    return r
+
+
 @app.post("/api/dictate")
 async def dictate(file: UploadFile = File(...)):
     """🎙 A recorded voice note (any language) → English prompt text, locally with Whisper."""
@@ -2617,8 +2803,8 @@ async def dictate(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, out)
         ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-vn", "-ac", "1", "-ar", "16000", wav])
         t0 = _t.time()
-        r = transcribe.dictate_english(wav)
-        _log_timing("dictate", _t.time() - t0, r.get("language", ""))
+        r = _dictate(wav)
+        _log_timing("dictate", _t.time() - t0, r.get("language", "") + " " + r.get("via", ""))
         if not r["text"]:
             raise HTTPException(400, "Не почув слів — спробуй ще раз, ближче до мікрофона.")
         return r
