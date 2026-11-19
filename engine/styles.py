@@ -46,7 +46,12 @@ DEFAULT_STYLE = {
     "gradient": {"colors": [[255, 90, 44, 255], [255, 212, 0, 255]], "direction": "vertical",
                  "on_text": False, "on_active": False, "on_plate": False},
     "karaoke": {"enabled": True, "active_color": [255, 212, 0, 255]},
-    "accent": {"color": [255, 90, 44, 255]},   # ✦ accent words (Sentences): their own colour inside the caption
+    # ✦ accent words (Sentences): their own look INSIDE the caption. font_name "" = the caption's font;
+    # case "" = as the caption; stroke / shadow mode: inherit (the caption's) · own · none
+    "accent": {"color": [255, 90, 44, 255], "gradient": False, "font_name": "", "italic": False, "scale": 1.0,
+               "case": "", "stroke": {"mode": "inherit", "width": 6, "color": [0, 0, 0, 255]},
+               "shadow": {"mode": "inherit", "offset_x": 0, "offset_y": 6, "glow_blur": 0, "color": [0, 0, 0, 255]},
+               "plate": {"enabled": False, "color": [255, 255, 255, 255], "pad_x": 14, "pad_y": 6, "border_radius": 10}},
     "karaoke_plate": {"enabled": False, "color": [255, 92, 57, 255], "pad_x": 14, "pad_y": 6, "border_radius": 10},
 }
 

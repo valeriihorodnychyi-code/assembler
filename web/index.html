@@ -1066,11 +1066,35 @@
       </div>
     </details>
 
+    <details class="grp" id="grpAccent">
+      <summary><span>✦ Accent</span> <span class="hint" style="margin:0 6px;font-size:10.5px">слова, виділені в Sentences</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div class="row"><label title="Підставити шрифт, кольори, обведення, тінь і плашку з іншого пресету. Розмір, позиція, перенос і регістр титру не міняються">Взяти вигляд з…</label><select id="accFrom"><option value="">— пресет —</option></select></div>
+        <div class="row"><label>Колір</label><input type="color" id="accentColor" value="#ff5a2c"></div>
+        <div class="row"><label title="Градієнт з групи Gradient замість кольору">Градієнт</label><label class="switch"><input type="checkbox" id="accGrad"><span class="slider"></span></label></div>
+        <div class="row"><label>Шрифт</label><select id="accFont"><option value="">як у титрі</option></select></div>
+        <div class="row"><label title="Нахил (italic). Якщо в шрифту немає курсиву, слово просто нахиляється">Italic</label><label class="switch"><input type="checkbox" id="accItalic"><span class="slider"></span></label></div>
+        <div class="row"><label>Розмір</label><input type="range" id="accScale" min="80" max="160" value="100"><span class="val" id="accScaleV">100</span></div>
+        <div class="row"><label>Регістр</label><input type="hidden" id="accCase" value="">
+          <div class="seg" id="accCaseSeg" style="flex:1.3"><button type="button" data-v="" class="active">як у титрі</button><button type="button" data-v="uppercase">AA</button><button type="button" data-v="lowercase">aa</button></div></div>
+        <div class="row"><label>Обведення</label><select id="accStroke"><option value="inherit">як у титрі</option><option value="own">своє</option><option value="none">без</option></select></div>
+        <div class="row accOwnStroke"><label>· товщина</label><input type="range" id="accStrokeW" min="0" max="20" value="6"><span class="val" id="accStrokeWV">6</span></div>
+        <div class="row accOwnStroke"><label>· колір</label><input type="color" id="accStrokeColor" value="#000000"></div>
+        <div class="row"><label>Тінь</label><select id="accShadow"><option value="inherit">як у титрі</option><option value="own">своя</option><option value="none">без</option></select></div>
+        <div class="row accOwnShadow"><label>· X / Y</label><input type="range" id="accShX" min="-30" max="30" value="0"><span class="val" id="accShXV">0</span><input type="range" id="accShY" min="-30" max="30" value="6"><span class="val" id="accShYV">6</span></div>
+        <div class="row accOwnShadow"><label>· розмиття</label><input type="range" id="accShBlur" min="0" max="30" value="0"><span class="val" id="accShBlurV">0</span></div>
+        <div class="row accOwnShadow"><label>· колір</label><input type="color" id="accShColor" value="#000000"></div>
+        <div class="row"><label>Плашка під словом</label><label class="switch"><input type="checkbox" id="accPlateOn"><span class="slider"></span></label></div>
+        <div class="row accPlate"><label>· колір</label><input type="color" id="accPlateColor" value="#ffffff"></div>
+        <div class="row accPlate"><label>· відступ X / Y</label><input type="range" id="accPlatePadX" min="0" max="40" value="14"><span class="val" id="accPlatePadXV">14</span><input type="range" id="accPlatePadY" min="0" max="30" value="6"><span class="val" id="accPlatePadYV">6</span></div>
+        <div class="row accPlate"><label>· заокруглення</label><input type="range" id="accPlateRadius" min="0" max="40" value="10"><span class="val" id="accPlateRadiusV">10</span></div>
+        <div class="hint">Karaoke акцентні слова не перефарбовує. Акцент зберігається разом із пресетом.</div>
+      </div>
+    </details>
     <details class="grp">
       <summary><span data-i18n="secKaraoke">Karaoke (word highlight)</span> <label class="switch hdrsw" title="Enable Karaoke highlight" onclick="hdrTgl(event,this)"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Color</label><input type="color" id="karaokeColor" value="#ffd400"></div>
-        <div class="row"><label title="Колір слів, позначених ✦ Accent у Sentences (працює і з вимкненим karaoke)">✦ Accent words</label><input type="color" id="accentColor" value="#ff5a2c"></div>
         <div class="row"><label>Word plate</label><label class="switch"><input type="checkbox" id="kpOn"><span class="slider"></span></label></div>
         <div class="row"><label>Plate color</label><input type="color" id="kpColor" value="#ff3a22"></div>
         <div class="row"><label>Padding X</label><input type="range" id="kpPadX" min="0" max="40" value="14"><span class="val" id="kpPadXV">14</span></div>
@@ -1321,7 +1345,7 @@ let editingHook=null, packMode="orig";               // packMode: "orig" = origi
 let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct","accentColor"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct","accentColor","accGrad","accFont","accItalic","accScale","accCase","accStroke","accStrokeW","accStrokeColor","accShadow","accShX","accShY","accShBlur","accShColor","accPlateOn","accPlateColor","accPlatePadX","accPlatePadY","accPlateRadius"];
 
 // Defaults now live as .json in the repo styles/ folder (official, no ★) + team customs (★).
 // This single hardcoded preset is only a SAFETY NET: shown when the styles folder is empty, so
@@ -1523,11 +1547,13 @@ function readControls(){
     scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value,scrimFade:+($("scrimFade")?$("scrimFade").value:0.25),
     animType:$("animType")?$("animType").value:"none",animSpeed:+($("animSpeed")?$("animSpeed").value:0.25),
     holdLast:$("holdLast")?$("holdLast").checked:false,
-    punct:punctMode($("punct")?$("punct").value:"qe"),accentColor:$("accentColor")?$("accentColor").value:"#ff5a2c"};
+    punct:punctMode($("punct")?$("punct").value:"qe"),accentColor:$("accentColor")?$("accentColor").value:"#ff5a2c",...readAccent()};
 }
 function writeControls(s){
   const set=(id,v)=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=!!v;else el.value=v;const l=$(id+"V");if(l){if(l.tagName==="INPUT")l.value=v;else l.textContent=v;}};
+  if(typeof fillAccFont==="function")fillAccFont();
   for(const k of STYLE_IDS) if(k in s) set(k,s[k]);
+  if(typeof accUiSync==="function")accUiSync();
   if("fontFamily" in s && s.fontFamily) applyStyleFont(s.fontFamily);   // sync dropdown + customFontName + load font so preview AND render use the style's font (not a stale one)
   if($("caseSeg"))updateCaseSeg();
   if($("punct")){$("punct").value=punctMode("punct" in s?s.punct:"qe");updatePunctSeg();}
@@ -1561,7 +1587,7 @@ function toEngineStyle(s){
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
     scrim:{enabled:s.scrimOn,color:arr(s.scrimColor,s.scrimAlpha),pad:40,feather:s.scrimFeather,fade:s.scrimFade},
     animation:{type:s.animType||"none",speed:s.animSpeed},hold_last:!!s.holdLast,
-    karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},accent:{color:arr(s.accentColor||"#ff5a2c")},
+    karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},accent:accentToEngine(s,arr),
     gradient:{colors:[arr(s.gradC0),arr(s.gradC1)],direction:s.gradDir||"vertical",on_text:!!s.gradText,on_active:!!s.gradActive,on_plate:!!s.gradPlate},
     karaoke_plate:{enabled:s.kpOn,color:arr(s.kpColor),pad_x:s.kpPadX,pad_y:s.kpPadY,border_radius:s.kpRadius}};
 }
@@ -1895,13 +1921,19 @@ function render(t,dur){
   let ev=events.find(e=>t>=e.start&&t<e.end);
   if(!ev){if(_scFac>0){const r=_scrimRect||fallbackRect();paintScrim(r.y0,r.Hh,_scFac);}return;} // in a gap / pre-roll: keep the scrim, no text
   {var _fw=ev.lines.reduce((a,l)=>a.concat(l),[]); _capRange=_fw.length?[_fw[0].start,_fw[_fw.length-1].end]:[ev.start,ev.end];}   // whole caption phrase range → highlight the full phrase, not one word
-  const lines=ev.lines.map(l=>l.map(w=>({...w,disp:applyCase(w.text,s.textCase)})));
-  let fs=s.fontSize*scale;ctx.font=`${fs}px "${s.fontFamily}"`;
+  // ✦ accent words: own font / size / case — same baseline and line as the caption (= engine)
+  const aFam=(s.accFont?s.accFont.replace(/\.(ttf|otf|ttc)$/i,""):s.fontFamily), aSc=Math.max(0.5,Math.min(2,(+s.accScale||100)/100));
+  const aCase=w=>s.accCase==="uppercase"?w.toUpperCase():(s.accCase==="lowercase"?w.toLowerCase():w);
+  const lines=ev.lines.map(l=>l.map(w=>{const d=applyCase(w.text,s.textCase);return {...w,disp:w.accent?aCase(d):d};}));
+  let fs=s.fontSize*scale;
+  const bFont=()=>`${fs}px "${s.fontFamily}"`, aFont=()=>`${Math.max(8,Math.floor(fs*aSc))}px "${aFam}"`;
+  const wW=w=>{ctx.font=w.accent?aFont():bFont();const x=ctx.measureText(w.disp).width;ctx.font=bFont();return x;};
+  ctx.font=bFont();
   // shrink-to-fit: keep a caption within the safe frame width. Skip for MANUAL layouts
   // (user controls breaks) and never shrink below 55% (so the size slider still works).
   if(!ev.manual){const SAFE=W*0.92,sw=ctx.measureText(" ").width;
-   const mw=Math.max(0,...lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*sw));
-   if(mw>SAFE&&mw>0){fs=Math.max(8,Math.floor(fs*Math.max(SAFE/mw,0.55)));ctx.font=`${fs}px "${s.fontFamily}"`;}}
+   const mw=Math.max(0,...lines.map(l=>l.reduce((a,w)=>a+wW(w),0)+(l.length-1)*sw));
+   if(mw>SAFE&&mw>0){fs=Math.max(8,Math.floor(fs*Math.max(SAFE/mw,0.55)));ctx.font=bFont();}}
   ctx.textBaseline="alphabetic";
   const mkey=(customFontName||(s.fontFamily+".ttf"))+"|"+Math.round(fs);
   const em=fontMetricsCache[mkey];
@@ -1910,13 +1942,18 @@ function render(t,dur){
   else{const _m=ctx.measureText("Ag");lineH=(_m.fontBoundingBoxAscent!=null)?(_m.fontBoundingBoxAscent+_m.fontBoundingBoxDescent):fs*1.18;
        if(!em)fetchMetrics(mkey,(customFontName||(s.fontFamily+".ttf")),Math.round(fs));}
   const asc=(em&&em.ascent!=null)?em.ascent:fs*0.8;   // baseline offset to match engine glyph placement
+  const aSize=Math.max(8,Math.floor(fs*aSc)), aFile=(s.accFont||customFontName||(s.fontFamily+".ttf")), akey=aFile+"|"+aSize;
+  const aem=fontMetricsCache[akey]; if(!aem&&lines.some(l=>l.some(w=>w.accent)))fetchMetrics(akey,aFile,aSize);
+  const aasc=(aem&&aem.ascent!=null)?aem.ascent:asc*aSc;
   const lineSp=s.lineSpacing*scale;
   const totalH=lines.length*lineH+(lines.length-1)*lineSp;
   const startY=(H-s.marginBottom*scale)-totalH/2;
   const spaceW=ctx.measureText(" ").width;
-  let gi=0;const lw=lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*spaceW);
+  let gi=0;const lw=lines.map(l=>l.reduce((a,w)=>a+wW(w),0)+(l.length-1)*spaceW);
   const pos=[];let y=startY;
-  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,accent:!!w.accent,wide:ctx.measureText(w.disp).width,start:w.start});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
+  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){const ww=wW(w);
+    pos.push({x,y:w.accent?y+(asc-aasc):y,disp:w.disp,active:gi===ev.active,accent:!!w.accent,wide:ww,start:w.start});x+=ww+spaceW;gi++;}y+=lineH+lineSp;}
+  const posB=pos.filter(p=>!p.accent), posA=pos.filter(p=>p.accent);
   const boff=(s.boxOffsetY||0)*scale;
   // --- Animated captions (BETA, preview only): each word eases in around its own spoken time ---
   // SAFETY: animation ONLY runs while the video is actually PLAYING. Paused / scrubbing / exact /
@@ -1960,16 +1997,39 @@ function render(t,dur){
     else{const m=Math.max(...lw,0);rr(W/2-m/2-px,startY-py-boff,m+px*2,totalH+py*2,rad);ctx.fill();}
     ctx.restore();}
   if(s.kpOn){ctx.save();pshadow();
-    for(const p of pos)if(p.active){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:asc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;const top=(p.y+asc)-ga;const h=ga+gd;ctx.fillStyle=s.gradPlate?capGrad():rgba(s.kpColor,255);rr(p.x-s.kpPadX*scale,top-s.kpPadY*scale-boff,p.wide+s.kpPadX*2*scale,h+s.kpPadY*2*scale,s.kpRadius*scale);ctx.fill();}
+    for(const p of posB)if(p.active){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:asc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;const top=(p.y+asc)-ga;const h=ga+gd;ctx.fillStyle=s.gradPlate?capGrad():rgba(s.kpColor,255);rr(p.x-s.kpPadX*scale,top-s.kpPadY*scale-boff,p.wide+s.kpPadX*2*scale,h+s.kpPadY*2*scale,s.kpRadius*scale);ctx.fill();}
     ctx.restore();}
-  if(s.shadowOn&&s.shadow2On){ctx.save();ctx.shadowColor=rgba(s.sh2Color,255);ctx.shadowBlur=s.sh2Blur*scale;ctx.shadowOffsetX=s.sh2X*scale;ctx.shadowOffsetY=s.sh2Y*scale;ctx.fillStyle=rgba(s.sh2Color,255);for(const p of pos)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // #11 second word shadow — gated by the master Shadow toggle, drawn UNDER the first
-  if(s.shadowOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of pos)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // word shadow — over the plate too
+  if(s.accPlateOn&&posA.length){ctx.save();ctx.font=aFont();ctx.fillStyle=rgba(s.accPlateColor||"#ffffff",255);
+    for(const p of posA){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:aasc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;
+      const top=(p.y+aasc)-ga, xr=s.accItalic?ga*ACCENT_ITALIC*0.5:0;
+      rr(p.x-s.accPlatePadX*scale,top-s.accPlatePadY*scale-boff,p.wide+xr+s.accPlatePadX*2*scale,ga+gd+s.accPlatePadY*2*scale,s.accPlateRadius*scale);ctx.fill();}
+    ctx.font=bFont();ctx.restore();}
+  if(s.shadowOn&&s.shadow2On){ctx.save();ctx.shadowColor=rgba(s.sh2Color,255);ctx.shadowBlur=s.sh2Blur*scale;ctx.shadowOffsetX=s.sh2X*scale;ctx.shadowOffsetY=s.sh2Y*scale;ctx.fillStyle=rgba(s.sh2Color,255);for(const p of posB)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // #11 second word shadow — gated by the master Shadow toggle, drawn UNDER the first
+  if(s.shadowOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of posB)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // word shadow — over the plate too
   if(s.strokeOn!==false){
-    if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
-    if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
+    if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of posB)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
+    if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of posB)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
   }
-  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):(p.accent?rgba(s.accentColor||"#ff5a2c",255):rgba(s.textColor,255)));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
+  for(const p of posB){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):rgba(s.textColor,255));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
+  if(posA.length){   // ✦ accent pass: own stroke / shadow / colour / italic; karaoke never repaints it
+    const so=(s.strokeOn!==false)?s.strokeOuterW:0, si=(s.strokeOn!==false)?s.strokeW:0;
+    const stOuter=s.accStroke==="inherit"?so:0, stInner=s.accStroke==="inherit"?si:(s.accStroke==="own"?+s.accStrokeW:0);
+    const stInC=s.accStroke==="own"?s.accStrokeColor:s.strokeColor;
+    const shs=s.accShadow==="inherit"?[...(s.shadowOn&&s.shadow2On?[[s.sh2X,s.sh2Y,s.sh2Blur,s.sh2Color]]:[]),...(s.shadowOn?[[s.shX,s.shY,s.shBlur,s.shColor]]:[])]
+      :(s.accShadow==="own"?[[+s.accShX,+s.accShY,+s.accShBlur,s.accShColor]]:[]);
+    ctx.font=aFont();
+    for(const p of posA){
+      ctx.save();
+      if(s.accItalic){const yb=p.y+aasc, k=ACCENT_ITALIC; ctx.transform(1,0,-k,1,k*yb,0);}
+      for(const [x,y2,b,c] of shs){ctx.save();ctx.shadowColor=rgba(c,255);ctx.shadowBlur=b*scale;ctx.shadowOffsetX=x*scale;ctx.shadowOffsetY=y2*scale;ctx.fillStyle=rgba(c,255);
+        awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+aasc));ctx.restore();}
+      if(stOuter>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=stOuter*2*scale;awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+aasc));}
+      if(stInner>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(stInC,255);ctx.lineWidth=stInner*2*scale;awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+aasc));}
+      ctx.fillStyle=s.accGrad?capGrad():rgba(s.accentColor||"#ff5a2c",255); awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+aasc));
+      ctx.restore();}
+    ctx.font=bFont();}
 }
+const ACCENT_ITALIC=0.21;   // = engine subtitles.ACCENT_ITALIC
 function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
 
 const video=$("video");let videoLoaded=false,demoT=0,lastTs=0;
@@ -3292,7 +3352,7 @@ function fromEngineStyle(e){
     strokeOn:(e.stroke_on!==false),
     plateShadowOn:!!(e.plate_shadow&&e.plate_shadow.enabled),pshX:+g(e.plate_shadow||{},"offset_x",0),pshY:+g(e.plate_shadow||{},"offset_y",8),pshBlur:+g(e.plate_shadow||{},"glow_blur",0),pshColor:hx((e.plate_shadow&&e.plate_shadow.color)||[0,0,0,255]),
     plateOn:!!pl.enabled,plateLine:!!pl.per_line,plateFull:!!pl.full_width,plateColor:hx(pl.color),plateAlpha:(pl.color&&pl.color[3]!=null)?pl.color[3]:160,platePadX:+g(pl,"pad_x",30),platePadY:+g(pl,"pad_y",15),plateRadius:+g(pl,"border_radius",15),
-    karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),accentColor:hx((e.accent&&e.accent.color)||[255,90,44,255]),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
+    karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),accentColor:hx((e.accent&&e.accent.color)||[255,90,44,255]),...accentFromEngine(e.accent||{},hx),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
     gradC0:hx((gr.colors&&gr.colors[0])||[255,90,44,255]),gradC1:hx((gr.colors&&gr.colors[1])||[255,212,0,255]),gradDir:gr.direction||"vertical",gradText:!!gr.on_text,gradActive:!!gr.on_active,gradPlate:!!gr.on_plate,
     scrimOn:!!(e.scrim&&e.scrim.enabled),scrimColor:hx((e.scrim&&e.scrim.color)||[0,0,0,150]),scrimAlpha:(e.scrim&&e.scrim.color&&e.scrim.color[3]!=null)?e.scrim.color[3]:150,scrimFeather:+g(e.scrim||{},"feather",70),scrimFade:+g(e.scrim||{},"fade",0.25),
     animType:(e.animation&&e.animation.type)||"none",animSpeed:+g(e.animation||{},"speed",0.25),holdLast:!!e.hold_last};
@@ -3432,6 +3492,59 @@ $("styleFileInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd
 
 // case segmented control (buttons instead of dropdown)
 // Punctuation: "off" · "qe" (? ! stay — default) · "all". Old presets stored a bool: true = all, false = qe.
+// ---------- ✦ Accent: its own look inside the caption (engine key "accent") ----------
+const ACC_DEF={accGrad:false,accFont:"",accItalic:false,accScale:100,accCase:"",accStroke:"inherit",accStrokeW:6,accStrokeColor:"#000000",
+  accShadow:"inherit",accShX:0,accShY:6,accShBlur:0,accShColor:"#000000",accPlateOn:false,accPlateColor:"#ffffff",accPlatePadX:14,accPlatePadY:6,accPlateRadius:10};
+function readAccent(){const o={};Object.keys(ACC_DEF).forEach(k=>{const e=$(k),d=ACC_DEF[k];
+  o[k]=!e?d:(e.type==="checkbox"?e.checked:(typeof d==="number"?+e.value:e.value));});return o;}
+function accentToEngine(s,arr){const g=(k)=>(s[k]!=null?s[k]:ACC_DEF[k]);
+  return {color:arr(s.accentColor||"#ff5a2c"),gradient:!!g("accGrad"),font_name:g("accFont")||"",italic:!!g("accItalic"),scale:(+g("accScale")||100)/100,
+    case:g("accCase")||"",stroke:{mode:g("accStroke"),width:+g("accStrokeW"),color:arr(g("accStrokeColor"))},
+    shadow:{mode:g("accShadow"),offset_x:+g("accShX"),offset_y:+g("accShY"),glow_blur:+g("accShBlur"),color:arr(g("accShColor"))},
+    plate:{enabled:!!g("accPlateOn"),color:arr(g("accPlateColor")),pad_x:+g("accPlatePadX"),pad_y:+g("accPlatePadY"),border_radius:+g("accPlateRadius")}};}
+function accentFromEngine(a,hx){const st=a.stroke||{},sh=a.shadow||{},pl=a.plate||{},n=(v,d)=>(v==null?d:+v);
+  return {accGrad:!!a.gradient,accFont:a.font_name||"",accItalic:!!a.italic,accScale:Math.round(n(a.scale,1)*100),accCase:a.case||"",
+    accStroke:st.mode||"inherit",accStrokeW:n(st.width,6),accStrokeColor:hx(st.color||[0,0,0,255]),
+    accShadow:sh.mode||"inherit",accShX:n(sh.offset_x,0),accShY:n(sh.offset_y,6),accShBlur:n(sh.glow_blur,0),accShColor:hx(sh.color||[0,0,0,255]),
+    accPlateOn:!!pl.enabled,accPlateColor:hx(pl.color||[255,255,255,255]),accPlatePadX:n(pl.pad_x,14),accPlatePadY:n(pl.pad_y,6),accPlateRadius:n(pl.border_radius,10)};}
+function fillAccFont(){const sel=$("accFont"),src=$("fontSelect"); if(!sel||!src)return; const cur=sel.value;
+  if(sel.options.length<2&&src.options.length>1){sel.innerHTML="<option value=''>як у титрі</option>"+src.innerHTML;}
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;}
+function accUiSync(){
+  const v=k=>$(k)?($(k).type==="checkbox"?$(k).checked:$(k).value):"";
+  document.querySelectorAll(".accOwnStroke").forEach(r=>r.style.display=v("accStroke")==="own"?"":"none");
+  document.querySelectorAll(".accOwnShadow").forEach(r=>r.style.display=v("accShadow")==="own"?"":"none");
+  document.querySelectorAll(".accPlate").forEach(r=>r.style.display=v("accPlateOn")?"":"none");
+  if($("accCaseSeg"))$("accCaseSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===(v("accCase")||"")));
+  const f=v("accFont"); if(f&&typeof registerServerFont==="function")registerServerFont(f);
+}
+function fillAccFrom(){const sel=$("accFrom"); if(!sel)return;
+  sel.innerHTML="<option value=''>— пресет —</option>"+presetNames().map(n=>"<option>"+String(n).replace(/</g,"&lt;")+"</option>").join("");}
+// borrow the LOOK of a preset (font, colours, stroke, shadow, plate) — not its size / position / case
+function accentFrom(name){
+  const e=(savedStyles&&savedStyles[name])||((typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES)||{})[name]; if(!e)return;
+  const hx=a=>a?("#"+[a[0],a[1],a[2]].map(n=>(+n).toString(16).padStart(2,"0")).join("")):"#000000";
+  const st=e.stroke||{},sh=e.shadow||{},pl=e.plate||{},kp=e.karaoke_plate||{},gr=e.gradient||{};
+  const plate=(kp.enabled?kp:(pl.enabled?pl:null));
+  const set=(id,v)=>{const el=$(id); if(!el)return; if(el.type==="checkbox")el.checked=!!v; else el.value=v; const l=$(id+"V"); if(l)l.textContent=v;};
+  set("accentColor",hx(e.text_color||[255,255,255,255])); set("accGrad",!!gr.on_text);
+  fillAccFont(); set("accFont",e.font_name||""); 
+  const sw=(e.stroke_on===false)?0:(+st.width||0);
+  set("accStroke",sw>0?"own":"none"); set("accStrokeW",sw); set("accStrokeColor",hx(st.color||[0,0,0,255]));
+  set("accShadow",sh.enabled?"own":"none"); set("accShX",+sh.offset_x||0); set("accShY",+(sh.offset_y??6)); set("accShBlur",+sh.glow_blur||0); set("accShColor",hx(sh.color||[0,0,0,255]));
+  set("accPlateOn",!!plate); if(plate){set("accPlateColor",hx(plate.color)); set("accPlatePadX",+(plate.pad_x??14)); set("accPlatePadY",+(plate.pad_y??6)); set("accPlateRadius",+(plate.border_radius??10));}
+  accUiSync(); saveLastStyle(); if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
+  setStatus("✦ Акцент узяв вигляд з «"+name+"» (шрифт, кольори, обведення, тінь, плашка). Розмір і позиція титру не змінились.","ok");
+}
+(function wireAccent(){
+  const g=$("grpAccent"); if(!g)return;
+  g.addEventListener("toggle",()=>{if(g.open){fillAccFont();fillAccFrom();accUiSync();}});
+  g.addEventListener("change",()=>{accUiSync(); if(typeof invalidateLayout==="function")invalidateLayout();});
+  if($("accCaseSeg"))$("accCaseSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("accCase").value=b.dataset.v;accUiSync();
+    if(typeof invalidateLayout==="function")invalidateLayout(); saveLastStyle(); scheduleExact();});
+  if($("accFrom"))$("accFrom").onchange=e=>{const n=e.target.value; e.target.value=""; if(n)accentFrom(n);};
+  accUiSync();
+})();
 function punctMode(v){return (v===true||v==="true"||v==="all")?"all":(v==="off"?"off":"qe");}
 function punctToEngine(v){v=punctMode(v);return v==="all"?true:(v==="off"?"off":false);}
 function updatePunctSeg(){const v=punctMode($("punct").value);$("punctSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
@@ -4460,8 +4573,8 @@ function sentToolShow(){
   if(S.edited){t.innerHTML="<span class='stnote'>Enter — зберегти правку, потім виділи слова</span>";}
   else{const ws=realWords||[], txt=ws.slice(S.i0,S.i1+1).map(w=>w.word||w.text||"").join(" ");
     const allAcc=ws.slice(S.i0,S.i1+1).every(w=>w.accent), ph=curPhraseStyles().some(p=>p.end>+ws[S.i0].start&&p.start<=+ws[S.i1].start);
-    t.innerHTML="<button type='button' id='stAcc' title='Ці слова — іншим кольором усередині титру (колір: Style → Karaoke → ✦ Accent words)'>"+(allAcc?"✦ Прибрати акцент":"✦ Accent")+"</button>"
-      +"<button type='button' id='stSty' title='Ця фраза — окремим титром у своєму пресеті'>🎨 Style ▾</button>"
+    t.innerHTML="<button type='button' id='stAcc' title='Ці слова — своїм виглядом усередині того самого титру. Як саме виглядають: Style → ✦ Accent'>"+(allAcc?"✦ Прибрати акцент":"✦ Accent")+"</button>"
+      +"<button type='button' id='stSty' title='Ця фраза — ОКРЕМИМ титром у вибраному пресеті (свій розмір, регістр, позиція)'>🎨 Окремий титр ▾</button>"
       +(ph?"<button type='button' id='stStyX' title='Прибрати окремий стиль фрази'>✕ стиль</button>":"")
       +"<span class='stnote'>«"+String(txt).replace(/</g,"&lt;").slice(0,40)+"»</span>";
     t.querySelector("#stAcc").onclick=()=>{sentAccent(S.i0,S.i1,!allAcc);};
@@ -4478,7 +4591,7 @@ function sentAccent(i0,i1,on){
   for(let i=i0;i<=i1&&i<ws.length;i++){if(on)ws[i].accent=true;else delete ws[i].accent;}
   sentToolHide(); window.getSelection().removeAllRanges();
   commitWords(ws); if(txtView==="sents")renderSentsView(true);
-  setStatus(on?"✦ Акцент: слова будуть кольором ✦ Accent words (Style → Karaoke).":"✦ Акцент прибрано.","ok");
+  setStatus(on?"✦ Акцент. Як він виглядає — Style → ✦ Accent (колір, шрифт, italic, розмір, обведення, тінь, плашка).":"✦ Акцент прибрано.","ok");
 }
 function sentPhraseStyle(i0,i1,name){
   const ws=realWords||[]; if(!ws[i0]||!ws[i1])return;
