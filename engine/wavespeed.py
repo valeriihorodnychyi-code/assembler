@@ -52,12 +52,34 @@ MODELS = {"2.5": MODEL, "turbo": TURBO_MODEL,
 # 2.5 Turbo: full 2.5 quality, faster / cheaper than 2.5 · 2.5 Flash Turbo: made at 480p and upscaled
 # (cheapest 2.5). Both: billed per input second (rounded up, 4–30 s), $/s by resolution.
 PIECE_RATES = {"turbo25": {"720p": 0.216, "1080p": 0.234}, "flash25": {"720p": 0.153, "1080p": 0.171}}
-PIECE_MAX = {"turbo": 15.0, "turbo25": 30.0, "flash25": 30.0, "2.5": 30.0}
+PIECE_MAX = {"turbo": 15.0, "turbo25": 30.0, "flash25": 30.0, "2.5": 30.0, "lipsync": 60.0}
+
+
+# 👄 lip-sync only (after an ElevenLabs re-voice): the mouth is re-animated to the new audio,
+# every other pixel stays — no Seedance re-paint. Sync Lipsync-2-Pro, $0.084 / s (rounded up).
+LIPSYNC_MODEL = os.environ.get("CS_LIPSYNC_MODEL", "sync/lipsync-2-pro")
+LIPSYNC_RATE = 0.084
+
+
+def submit_lipsync(video_url, audio_url, requests, api_key=None, model=None):
+    """→ prediction id. The piece's video + the NEW audio → the same piece with matching lips."""
+    r = requests.post(f"{API}/{model or LIPSYNC_MODEL}", headers={"Authorization": f"Bearer {_key(api_key)}",
+                                                                 "Content-Type": "application/json"},
+                      json={"video": video_url, "audio": audio_url, "sync_mode": "cut_off"}, timeout=60)
+    if r.status_code != 200:
+        raise WaveSpeedError(_err(r, "lipsync"))
+    pid = _j(r).get("id")
+    if not pid:
+        raise WaveSpeedError("WaveSpeed не повернув id задачі.")
+    return pid
 
 
 def estimate_piece(model, duration_s, resolution="1080p"):
     """→ (usd, billed_seconds) for one Seedance run on a piece, any of MODELS."""
     import math
+    if model == "lipsync":
+        sec = max(1, math.ceil(float(duration_s or 0) - 1e-6))
+        return round(sec * LIPSYNC_RATE, 2), float(sec)
     if model == "turbo":
         return estimate_turbo(duration_s, resolution)
     if model == "2.5":

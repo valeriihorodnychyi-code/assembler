@@ -75,6 +75,41 @@ def test_piece_job_and_splice():
     assert _px(out, 5.2)[2] > 200 and _px(out, 6.5)[0] > 200 and _px(out, 7.8)[2] > 200
 
 
+def test_lipsync_and_seedance_with_its_own_sound():
+    d, gen = _setup()
+    _ff("-y", "-f", "lavfi", "-i", "color=c=red:s=720x1280:r=24:d=4", "-f", "lavfi", "-i", "sine=f=1500:d=4",
+        "-pix_fmt", "yuv420p", "-shortest", gen)
+    calls = []
+    WS.upload = lambda path, rq, api_key=None: "https://fake/" + os.path.basename(path)
+    WS.submit_lipsync = lambda v, a, rq, **k: calls.append(("lip", v, a)) or "lp1"
+    WS.submit_edit = lambda url, prompt, rq, **k: calls.append(("sd", k["keep_audio"])) or "sd1"
+    WS.result = lambda pid, rq, api_key=None: {"status": "completed", "outputs": ["https://fake/out.mp4"], "error": "", "id": pid}
+    import requests as R
+    class G:
+        status_code = 200
+        content = open(gen, "rb").read()
+    R.get = lambda u, *a, **k: G()
+    def run(body):
+        r = C.post("/api/regen/piece/start", json=dict({"file_id": FID, "clip": "long.mp4", "prompt": ""}, **body))
+        assert r.status_code == 200, r.text
+        j = r.json()["job"]
+        for _ in range(100):
+            s = C.get(f"/api/regen/{j}").json()
+            if s["state"] in ("done", "error"):
+                return s
+            time.sleep(0.1)
+    s1 = run({"a": 1.0, "b": 2.5, "model": "lipsync"})
+    assert s1["state"] == "done" and calls[0][0] == "lip" and calls[0][2].endswith(".wav") and "audio" not in s1
+    assert abs(s1["cost"] - 0.17) < 0.01           # 2 s × $0.084
+    s2 = run({"a": 4.0, "b": 6.0, "model": "turbo25", "keep_audio": False, "prompt": "She says December 1st."})
+    assert s2["state"] == "done" and calls[1] == ("sd", False) and s2.get("audio")
+    r = C.post("/api/regen/splice", json={"file_id": FID, "clip": "long.mp4", "pieces": [
+        {"piece": s1["piece"], "a": s1["a"], "b": s1["b"]}, {"piece": s2["piece"], "a": s2["a"], "b": s2["b"], "audio": s2["audio"]}]})
+    assert r.status_code == 200, r.text
+    out = os.path.join(d, r.json()["clip"])
+    assert abs(RV.duration(out) - 8.0) < 0.08
+
+
 def test_piece_limits():
     _setup()
     r = C.post("/api/regen/piece/start", json={"file_id": FID, "clip": "long.mp4", "a": 0, "b": 0.5, "prompt": "x"})

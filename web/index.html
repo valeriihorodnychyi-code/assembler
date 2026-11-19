@@ -3699,7 +3699,7 @@ if(typeof video!=="undefined"&&video){["timeupdate","seeked","loadedmetadata"].f
 // "Changed" means: different from what was actually SAID — the recogniser's original words
 // (origWords), not the previous edit. Case and punctuation don't count (they don't change the
 // sound). A deletion leaves the audio alone; an insertion or replacement can be re-voiced.
-let _rvSay={}, _rvTimer=null, _rvBusy=false, _rvSkip=new Set();
+let _rvSay={}, _rvTimer=null, _rvBusy=false, _rvSkip=new Set(), _lastRv=null;
 function rvHilite(r){const box=$("transcriptWords");if(!box)return;box.querySelectorAll(".w").forEach(sp=>{const i=+sp.dataset.i;sp.classList.toggle("rvhl",!!(r&&i>=r[0]&&i<r[1]));});}
 const rvNorm=s=>String(s||"").toLowerCase().replace(/[\u2019\u2018\u02BC`\u00B4]/g,"'").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
 // LCS of the current words against what the audio actually says → matched [cur i, orig j] pairs
@@ -3859,6 +3859,7 @@ async function doRevoice(list){
       if(o!==v&&o!==_vh&&("words" in o))o.words=cur.map(w=>({...w}));});   // board / LOC copies: the new words too, or they caption the new audio with the old text
     if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);   // ours — don't let the board re-add it as a new hook
     _rvSay={};_wRng=null;
+    _lastRv={clip:d.clip,list:(d.spans||[]).map(x=>{const w=(x&&x.words)||[];return w.length?{a:+w[0].start,b:+w[w.length-1].end}:null;}).filter(Boolean)};   // 👄 lips can follow
     rvLoadVideo(API+d.url);
     commitWords(cur);
     if(typeof renderHookStrip==="function")renderHookStrip();
@@ -4081,7 +4082,7 @@ const rgCost=(d,res)=>+(2*Math.max(4,Math.min(30,d||0))*(RG_RATES[res]||0.22)).t
 let _rgJobs=[], _rgTimer=null, _rgBal=null, _rgLast=null;   // _rgLast: the panel keeps your prompt + references between opens
 function rgOpen(){if(!videoLoaded){setStatus("Спершу відкрий кліп.","err");return;}
   const prev=(_rgLast||{});
-  laneSelect({kind:"regen",text:prev.text||"",res:prev.res||"720p",keep:prev.keep!==false,refs:prev.refs||[]});
+  laneSelect({kind:"regen",text:prev.text||"",res:prev.res||"720p",keep:prev.keep===true,refs:prev.refs||[]});   // default OFF: Seedance changes the sound AND the picture
   fetch(API+"/api/wavespeed/status").then(r=>r.json()).then(d=>{_rgBal=d;if(_laneSel&&_laneSel.kind==="regen"){const b=$("rgBal");if(b)b.textContent=d.ok?("баланс $"+(+d.balance).toFixed(2)):("⚠ "+(d.error==="not set"?"немає ключа WaveSpeed (⚙ Settings)":d.error));}}).catch(()=>{});}
 function rgRender(ed,s){
   _rgLast=s;
@@ -4097,7 +4098,7 @@ function rgRender(ed,s){
       +"<label class='tmini' style='cursor:pointer;border-radius:6px'>＋ Reference image<input type='file' id='rgRefIn' accept='image/*' multiple hidden></label>"
       +"<span class='lhint' style='flex-basis:auto'>Наприклад: «Replace the woman with the person in @Image 1, keep pose and motion».</span></div>"
     +"<select id='rgRes' title='Роздільність генерації (результат все одно підганяється під розмір кліпу)'>"+["480p","720p","1080p"].map(r=>"<option"+(r===s.res?" selected":"")+">"+r+"</option>").join("")+"</select>"
-    +"<label title='ON — звук кліпу лишається рівно як був (голос, тайминги, титри валідні). OFF — Seedance пише свій звук'><input type='checkbox' id='rgKeep'"+(s.keep?" checked":"")+">Keep original audio</label>"
+    +"<label title='OFF (за замовчуванням) — Seedance міняє і звук, і картинку (нові слова скаже сам). ON — звук кліпу лишається як був, міняється тільки картинка'><input type='checkbox' id='rgKeep'"+(s.keep?" checked":"")+">Keep original audio</label>"
     +"<span>≈ <b>$"+cost.toFixed(2)+"</b> · <span id='rgBal'>"+(_rgBal?(_rgBal.ok?"баланс $"+(+_rgBal.balance).toFixed(2):"⚠ "+_rgBal.error):"")+"</span></span>"
     +"<button type='button' class='primary' id='rgGo' style='font-size:11px;padding:5px 12px'"+(long?" disabled":"")+">✨ Regenerate</button><button type='button' class='ghost' id='rgX' style='font-size:11px'>✕</button>"
     +"<span class='lhint'>Що змінити і що лишити: «Change only the sunglasses to eyeglasses, keep everything else exactly the same». Шматок часу — «From 2–4s, …». Займає ~5–7 хв, можна працювати далі; результат замінить цей кліп, ↩ — у History. Ціна: (вхід + вихід) × "+(RG_RATES[s.res]||0.22)+" $/с, мінімум 4 с.</span>";
@@ -4218,7 +4219,7 @@ function rgPoll(){clearInterval(_rgTimer); if(!_rgJobs.length){rgLabel();return;
       try{const r=await fetch(API+"/api/regen/"+j.job);const d=await r.json();
         if(!r.ok)throw new Error(d.detail||"job lost");
         j.state=d.state; j.elapsed=d.elapsed;
-        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="foley")fyApply(j,d); else if(j.kind==="piece"){j.grp.done.push({piece:d.piece,a:d.a,b:d.b});datesMaybeSplice(j.grp);} else rgApply(j,d);}
+        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="foley")fyApply(j,d); else if(j.kind==="piece"){j.grp.done.push({piece:d.piece,a:d.a,b:d.b,audio:d.audio||null});datesMaybeSplice(j.grp);} else rgApply(j,d);}
         else if(d.state==="error"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="piece"){j.grp.failed++;datesMaybeSplice(j.grp);} setStatus((j.kind==="foley"?"🔊 Auto SFX: ":"✨ Seedance: ")+d.error,"err");}
       }catch(e){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="piece"){j.grp.failed++;datesMaybeSplice(j.grp);} setStatus("✨ Seedance: "+e.message,"err");}
     }
@@ -4471,23 +4472,24 @@ function renderDatePanel(){
   if(!G.length){P.style.display="none";P.innerHTML="";if(_datePanelOn&&txtView==="sents"&&!findDates(realWords||[]).length)_datePanelOn=false;return;}
   if(P.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;   // never re-render under the caret
   const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
-  const lips=_dateNew._lips!==false, model=_dateNew._model||"turbo25";
-  P.innerHTML="<div class='drow'><b>📅 Дати в кліпі</b><span style='color:var(--muted);flex:1'>Познач, які міняти, впиши нову дату — голос переозвучиться тим самим голосом"+(lips?", а губи в кадрі підженуться Seedance":"")+".</span>"
+  const mode=_dateNew._mode||"lips", lips=mode!=="voice", model=_dateNew._model||"turbo25";
+  P.innerHTML="<div class='drow'><b>📅 Дати в кліпі</b><span style='color:var(--muted);flex:1'>Познач, які міняти, впиши нову дату.</span>"
       +"<button type='button' class='ghost' id='dpX' style='font-size:11px;padding:3px 7px'>✕</button></div>"
     +G.map((g,gi)=>"<div class='dgroup'><div class='drow'><b>«"+esc(g.label)+"»</b> ×"+g.list.length+"</div>"
       +"<div class='docc'>"+g.list.map(d=>"<label title='Клік по часу — подивитись'><input type='checkbox' data-doff='"+d.i0+"'"+(_dateOff.has(d.start.toFixed(2))?"":" checked")+"><span data-dgo='"+d.start+"'>"+tc(d.start)+"</span></label>").join("")+"</div>"
       +"<div class='drow'><span>→</span><input type='text' data-dnew='"+gi+"' placeholder='напр. November 23rd' value='"+esc(_dateNew[g.key]||"")+"'>"
-      +"<button type='button' class='primary' data-dgo2='"+gi+"' style='font-size:11px;padding:5px 10px'>"+(lips?"🎙 + ✨ Замінити":"🎙 Замінити")+"</button></div></div>").join("")
-    +"<div class='drow' style='color:var(--muted)'><label><input type='checkbox' id='dpLips'"+(lips?" checked":"")+"> ✨ губи в кадрі (Seedance)</label>"
-      +"<select id='dpModel' title='2.5 Turbo — найновіша, якість 2.5, швидше й дешевше за повну 2.5'>"
+      +"<button type='button' class='primary' data-dgo2='"+gi+"' style='font-size:11px;padding:5px 10px'>"+(mode==="lips"?"🎙 + 👄 Замінити":mode==="seedance"?"✨ Замінити":"🎙 Замінити")+"</button></div></div>").join("")
+    +"<div class='drow' style='color:var(--muted)'><select id='dpMode' title='Як міняти'>"
+      +[["lips","🎙 ElevenLabs + 👄 губи (рекомендую)"],["voice","🎙 тільки голос (ElevenLabs)"],["seedance","✨ Seedance: звук і картинка"]].map(([v,l])=>"<option value='"+v+"'"+(mode===v?" selected":"")+">"+l+"</option>").join("")+"</select>"
+      +(mode!=="seedance"?"":"<select id='dpModel' title='2.5 Turbo — найновіша, якість 2.5, швидше й дешевше за повну 2.5'>"
         +[["turbo25","Seedance 2.5 Turbo (рекомендую)"],["flash25","2.5 Flash Turbo — дешевше, 480p→1080p"],["2.5","Seedance 2.5 (повна)"],["turbo","2.0 Fast Turbo — найдешевша"]].map(([v,l])=>"<option value='"+v+"'"+(model===v?" selected":"")+">"+l+"</option>").join("")+"</select>"
-      +"<label title='Широкий план, дві людини в кадрі — вклейку видно. Seedance перекадрує шматок на середній / середньо-крупний план того, хто говорить, як окремий кадр монтажу'><input type='checkbox' id='dpReframe'"+(_dateNew._reframe?" checked":"")+"> 📐 середній план мовця</label>"
-      +"<span style='flex:1'>Шматок ~4 с навколо кожної дати.</span></div>";
+      +"<label title='Широкий план, дві людини в кадрі — вклейку видно. Seedance перекадрує шматок на середній / середньо-крупний план того, хто говорить, як окремий кадр монтажу'><input type='checkbox' id='dpReframe'"+(_dateNew._reframe?" checked":"")+"> 📐 середній план мовця</label>")
+      +"<span style='flex:1'>"+(mode==="lips"?"Голос — ElevenLabs тим самим голосом, губи — Sync Lipsync-2-Pro (≈ $0.08 / с), картинка не перемальовується.":mode==="seedance"?"Seedance сам каже нову дату і перемальовує ~4 с навколо.":"Тільки звук, картинка без змін.")+"</span></div>";
   P.style.display="flex";
   $("dpX").onclick=()=>{_datePanelOn=false;renderDatePanel();renderSentBar(!!origWordsNow());};
-  $("dpLips").onchange=e=>{_dateNew._lips=e.target.checked;renderDatePanel();};
-  $("dpModel").onchange=e=>{_dateNew._model=e.target.value;};
-  $("dpReframe").onchange=e=>{_dateNew._reframe=e.target.checked;};
+  $("dpMode").onchange=e=>{_dateNew._mode=e.target.value;renderDatePanel();};
+  if($("dpModel"))$("dpModel").onchange=e=>{_dateNew._model=e.target.value;};
+  if($("dpReframe"))$("dpReframe").onchange=e=>{_dateNew._reframe=e.target.checked;};
   P.querySelectorAll("[data-dnew]").forEach(inp=>{inp.oninput=e=>{_dateNew[G[+inp.dataset.dnew].key]=e.target.value;};
     inp.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();replaceDates(G[+inp.dataset.dnew]);}};});
   P.querySelectorAll("[data-doff]").forEach(cb=>cb.onchange=()=>{const d=findDates(realWords||[]).find(x=>x.i0===+cb.dataset.doff); if(!d)return;
@@ -4502,7 +4504,7 @@ async function replaceDates(g){
   const v=variants[activeVar]; if(!v||!v.clip||!fileId||!origWordsNow()){setStatus("📅 Спершу ① Transcribe цей кліп.","err");return;}
   const occ=g.list.filter(d=>!_dateOff.has(d.start.toFixed(2))).sort((a,b)=>b.i0-a.i0);   // from the end: earlier indices stay valid
   if(!occ.length){setStatus("📅 Не вибрано жодного входження.","err");return;}
-  const lips=_dateNew._lips!==false, model=_dateNew._model||"turbo25";
+  const mode=_dateNew._mode||"lips", lips=mode!=="voice", model=_dateNew._model||"turbo25";
   const toks=nt.split(/\s+/).filter(Boolean);
   const ws0=(realWords||[]).map(w=>({...w}));
   let ws=(realWords||[]).map(w=>({...w})); const ranges=[];
@@ -4513,6 +4515,10 @@ async function replaceDates(g){
     ranges.forEach(r=>{r[0]+=fresh.length-(d.i1-d.i0+1);r[1]+=fresh.length-(d.i1-d.i0+1);});
     ranges.push([d.i0,d.i0+fresh.length]);});
   commitWords(ws);
+  if(mode==="seedance"){   // ✨ Seedance says the new date itself: no ElevenLabs, sound + picture from Seedance
+    const W2=realWords||[];
+    datesLips(ranges.sort((x,y)=>x[0]-y[0]).map(([x,y])=>({a:+W2[x].start,b:+W2[y-1].end,ns:x,ne:y})),nt,model,{keepAudio:false});
+    return;}
   const spans=ranges.sort((x,y)=>x[0]-y[0]).map(([a,b])=>rangeSpan(a,b)).filter(Boolean);
   spans.forEach(sp=>{_rvSay[sp.sig]=sp.text;});
   const clip0=v.clip;
@@ -4523,35 +4529,39 @@ async function replaceDates(g){
   if(!lips){setStatus("📅 «"+g.label+"» → «"+nt+"»: "+spans.length+"× переозвучено. ↩ Undo re-voice — повернути.","ok");return;}
   for(let k=0;k<50&&!(video.duration>0&&video.readyState>=1);k++)await new Promise(r=>setTimeout(r,100));   // the re-voiced clip is loading
   const W2=realWords||[];   // the NEW words of each date (re-voice re-timed them)
-  datesLips(ranges.map(([x,y])=>({a:+W2[x].start,b:+W2[y-1].end,ns:x,ne:y})).filter(p=>p.b>p.a),nt,model);
+  datesLips(ranges.map(([x,y])=>({a:+W2[x].start,b:+W2[y-1].end,ns:x,ne:y})).filter(p=>p.b>p.a),nt,"lipsync");
 }
-function datesLips(list,nt,model){
+function datesLips(list,nt,model,opt){
+  opt=opt||{}; const LIP=model==="lipsync", keepAudio=opt.keepAudio!==false;
   const W=realWords||[], dur=(video.duration>0?video.duration:0)||(W.length?+W[W.length-1].end+0.5:0), o=mixHolder();
   if(!o||!dur||!list.length){setStatus("📅 Не вийшло запустити губи — відкрий панель 📅 і спробуй ще раз.","err");return;}
-  // ~4 s around each date (Turbo bills ≥ 4 s anyway); overlapping windows merge into one piece
-  let P=list.map(x=>{const mid=(x.a+x.b)/2, half=Math.max(2.0,(x.b-x.a)/2+0.6);
+  // 👄 lip-sync: just the words ± 0.5 s · ✨ Seedance: ~4 s around (it bills ≥ 4 s anyway); overlaps merge
+  let P=LIP?list.map(x=>{let a=Math.max(0,x.a-0.5), b=Math.min(dur,x.b+0.5); if(b-a<1.5){const m=(a+b)/2;a=Math.max(0,m-0.75);b=Math.min(dur,m+0.75);} return {a,b,ns:x.ns,ne:x.ne};}).sort((x,y)=>x.a-y.a)
+   :list.map(x=>{const mid=(x.a+x.b)/2, half=Math.max(2.0,(x.b-x.a)/2+0.6);
     let a=Math.max(0,mid-half), b=Math.min(dur,mid+half); if(b-a<4&&dur>=4){if(a===0)b=Math.min(dur,4);else a=Math.max(0,b-4);}
     return {a,b,ns:x.ns,ne:x.ne};}).sort((x,y)=>x.a-y.a);
   const M=[]; P.forEach(p=>{const l=M[M.length-1]; if(l&&p.a<l.b&&p.b-l.a<=15){l.b=Math.max(l.b,p.b);l.ne=p.ne;}else M.push({...p});});
   const sentOf=(ns,ne)=>{let a=ns,b=ne; while(a>0&&!/[.!?]$/.test(W[a-1].word||""))a--; while(b<W.length&&!/[.!?]$/.test(W[b-1].word||""))b++; return W.slice(a,Math.min(b,W.length)).map(w=>w.word).join(" ");};
-  const RATE={turbo25:0.234,flash25:0.171}, MN={turbo25:"Seedance 2.5 Turbo · 1080p",flash25:"Seedance 2.5 Flash Turbo · 1080p",turbo:"Seedance 2.0 Fast Turbo · 1080p","2.5":"Seedance 2.5 · 720p"};
-  const est=M.reduce((s,p)=>{const d=p.b-p.a;return s+(model==="turbo"?(Math.max(2,d)*0.0675+Math.max(4,d)*0.0855):model==="2.5"?2*Math.max(4,d)*0.22:Math.max(4,Math.ceil(d))*RATE[model]);},0);
-  const reframe=!!_dateNew._reframe;
-  if(!confirm("✨ Губи під нову дату: "+M.length+" шматк. по ~4 с · "+MN[model]+(reframe?" · 📐 середній план":"")+" · ≈ $"+est.toFixed(2)+" з балансу WaveSpeed.\n\nЗапустити?"))
+  const RATE={turbo25:0.234,flash25:0.171}, MN={lipsync:"👄 Sync Lipsync-2-Pro (тільки губи)",turbo25:"Seedance 2.5 Turbo · 1080p",flash25:"Seedance 2.5 Flash Turbo · 1080p",turbo:"Seedance 2.0 Fast Turbo · 1080p","2.5":"Seedance 2.5 · 720p"};
+  const est=M.reduce((s,p)=>{const d=p.b-p.a;return s+(LIP?Math.max(1,Math.ceil(d))*0.084:model==="turbo"?(Math.max(2,d)*0.0675+Math.max(4,d)*0.0855):model==="2.5"?2*Math.max(4,d)*0.22:Math.max(4,Math.ceil(d))*RATE[model]);},0);
+  const reframe=!LIP&&!!_dateNew._reframe;
+  if(!confirm((LIP?"👄 Губи під нову озвучку: ":keepAudio?"✨ Губи під нову дату: ":"✨ Seedance міняє звук і картинку: ")+M.length+" шматк. · "+MN[model]+(reframe?" · 📐 середній план":"")+" · ≈ $"+est.toFixed(2)+" з балансу WaveSpeed.\n\nЗапустити?"))
     {setStatus("📅 Голос замінено. Губи не чіпали — можна запустити пізніше з панелі 📅.","ok");return;}
   const src=(o.mix&&o.mix.base)||o.clip, grp={id:Date.now().toString(36),n:M.length,done:[],failed:0,o,src,nt,model};
   M.forEach(async p=>{
     const line=sentOf(p.ns,p.ne);
-    const prompt=reframe
+    const prompt=LIP?"lipsync":!keepAudio
+      ?(reframe?"Reframe this shot as a medium close-up (chest up) of the person who is speaking, as the next camera angle in the edit: same person, outfit, room and lighting. ":"")+"The person on camera now says exactly: \""+line+"\" — in her own voice, same tone and pace, her lips matching the words. Keep her identity, expression, gestures, the background and the camera"+(reframe?"":" exactly the same")+". Do not add music, text or subtitles."
+      :reframe
       ?"Reframe this shot as a medium close-up (chest up) of the person who is speaking, as if it were the next camera angle in the edit: same person, same outfit, same room, same lighting, natural handheld feel. She says: \""+line+"\" — her lips, mouth and jaw match these words exactly, especially \""+nt+"\", in sync with the existing audio. Keep her identity, expression and gestures. Do not add text or subtitles."
       :"The person on camera says: \""+line+"\". Re-animate ONLY the lips, mouth and jaw so they match these words, especially \""+nt+"\", in sync with the existing audio. Keep the face, identity, expression, head and body motion, lighting, background, camera and every other detail exactly the same. Do not add text or subtitles.";
     try{const r=await fetch(API+"/api/regen/piece/start",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({file_id:fileId,clip:src,a:+p.a.toFixed(3),b:+p.b.toFixed(3),prompt,model,resolution:model==="2.5"?"720p":"1080p"})});
+        body:JSON.stringify({file_id:fileId,clip:src,a:+p.a.toFixed(3),b:+p.b.toFixed(3),prompt,model,resolution:model==="2.5"?"720p":"1080p",keep_audio:keepAudio})});
       const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"seedance failed"));
       _rgJobs.push({job:d.job,kind:"piece",grp,o,prompt:"📅 "+nt}); rgPoll();
     }catch(e){grp.failed++; setStatus("✨ Seedance: "+e.message,"err"); datesMaybeSplice(grp);}
   });
-  setStatus("✨ Seedance: "+M.length+" шматк. під «"+nt+"» запущено. Займе кілька хвилин — працюй далі, вони самі вклеяться разом.","ok");
+  setStatus((LIP?"👄 Губи: ":"✨ Seedance: ")+M.length+" шматк. під «"+nt+"» запущено. Займе кілька хвилин — працюй далі, вони самі вклеяться разом.","ok");
 }
 async function datesMaybeSplice(grp){
   if(grp.done.length+grp.failed<grp.n)return;
@@ -4707,6 +4717,8 @@ function renderSentBar(canVoice){
     +"<button type='button' id='sentCutPick' class='ghost' style='font-size:11px;padding:6px 10px' title='Вирізати виділені речення з відео і звуку'>✂ Cut "+n+" sentences</button>"
     +"<button type='button' id='sentPickX' class='ghost' style='font-size:11px;padding:6px 8px' title='Зняти виділення (Esc)'>✕</button>";
   if(undo)h+="<button type='button' id='sentUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути звук і текст до цієї переозвучки'>↩ Undo re-voice</button>";
+  {const _mo=mixHolder(), cur=_mo&&((_mo.mix&&_mo.mix.base)||_mo.clip);
+   if(undo&&_lastRv&&_lastRv.clip===cur&&_lastRv.list.length)h+="<button type='button' id='sentLips' class='primary' style='font-size:11px;padding:6px 10px' title='Підігнати губи під нову озвучку (Sync Lipsync-2-Pro через WaveSpeed). Картинка не перемальовується, тільки рот'>👄 Губи під озвучку ("+_lastRv.list.length+")</button>";}
   {const D=findDates(realWords||[]); if(D.length)h+="<button type='button' id='sentDates' class='"+(_datePanelOn?"primary":"ghost")+"' style='font-size:11px;padding:6px 10px' title='Знайдені дати — замінити всі разом (голос + губи)'>📅 Dates · "+D.length+"</button>";}
   h+="<span style='flex:1;min-width:150px'>Правиш текст у рядку — титр міняється одразу; 🎙 — щоб змінився і звук. Довжина кліпу не зміниться.</span>";
   bar.innerHTML=h; bar.style.display=(txtView==="sents")?"flex":"none";
@@ -4715,6 +4727,7 @@ function renderSentBar(canVoice){
   if($("sentCutPick"))$("sentCutPick").onclick=()=>cutSentences(_sentPick[0],_sentPick[1]);
   if($("sentPickX"))$("sentPickX").onclick=()=>{_sentPick=null;renderSentsView(true);};
   if($("sentUndo"))$("sentUndo").onclick=undoRevoice;
+  if($("sentLips"))$("sentLips").onclick=()=>{const W=realWords||[]; datesLips(_lastRv.list.map(x=>{const ns=W.findIndex(w=>+w.end>x.a); let ne=ns; while(ne<W.length&&+W[ne].start<x.b)ne++; return {...x,ns:Math.max(0,ns),ne:Math.max(ns+1,ne)};}),"переозвучка","lipsync");};
   if($("sentDates"))$("sentDates").onclick=()=>{_datePanelOn=!_datePanelOn;renderDatePanel();renderSentBar(canVoice);};
 }
 function cutSentences(k0,k1){

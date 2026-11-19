@@ -1217,6 +1217,7 @@ class RegenPieceReq(BaseModel):
     model: str = "turbo25"          # turbo25 (Seedance 2.5 Turbo) · flash25 (2.5 Flash Turbo) · 2.5 · turbo (2.0 Fast Turbo)
     resolution: str = "1080p"
     refs: List[str] = []
+    keep_audio: bool = True         # Seedance: True = the clip's audio stays (lips only) · False = Seedance writes the sound too
 
 
 def _snap(t, fps):
@@ -1237,11 +1238,18 @@ def _regen_piece_run(job, sdir, src, req):
                           "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p",
                           "-c:a", "aac", "-b:a", "192k", seg])
         url = ws.upload(seg, _rq)
-        refs = [ws.upload(os.path.join(sdir, os.path.basename(r_)), _rq) for r_ in (req.refs or [])[:9]
-                if os.path.exists(os.path.join(sdir, os.path.basename(r_)))]
-        J["state"] = "queued"
-        model = ws.MODELS.get(req.model, ws.MODELS["turbo25"])
-        pid = ws.submit_edit(url, req.prompt, _rq, resolution=req.resolution, keep_audio=True, refs=refs, model=model)
+        if req.model == "lipsync":     # 👄 the piece + its (re-voiced) audio → lips only
+            wav = os.path.join(sdir, f"_piece_{job}.wav")
+            ffmpeg_utils.run(["ffmpeg", "-y", "-i", seg, "-vn", "-ac", "1", "-ar", "44100", wav])
+            aurl = ws.upload(wav, _rq)
+            J["state"] = "queued"
+            pid = ws.submit_lipsync(url, aurl, _rq)
+        else:
+            refs = [ws.upload(os.path.join(sdir, os.path.basename(r_)), _rq) for r_ in (req.refs or [])[:9]
+                    if os.path.exists(os.path.join(sdir, os.path.basename(r_)))]
+            J["state"] = "queued"
+            model = ws.MODELS.get(req.model, ws.MODELS["turbo25"])
+            pid = ws.submit_edit(url, req.prompt, _rq, resolution=req.resolution, keep_audio=req.keep_audio, refs=refs, model=model)
         J["prediction"] = pid
         t0 = _t.time()
         while True:
@@ -1270,6 +1278,11 @@ def _regen_piece_run(job, sdir, src, req):
         ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-an", "-vf", vf, "-frames:v", str(max(1, round((b - a) * fps))),
                           "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p",
                           os.path.join(sdir, name)])
+        if not req.keep_audio and req.model != "lipsync":   # Seedance wrote the SOUND too → keep it with the piece
+            aname = f"_piece_{job}_ok.wav"
+            ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-vn", "-ac", "2", "-ar", "44100", "-t", f"{b - a:.4f}",
+                              "-af", f"apad=whole_dur={b - a:.4f}", os.path.join(sdir, aname)])
+            J["audio"] = aname
         J.update(state="done", piece=name, piece_url=f"/clip/{req.file_id}/{name}",
                  seconds=round(_t.time() - J["started"]))
         _log_timing("seedance-piece", _t.time() - J["started"], req.model + " " + req.resolution)
@@ -1287,15 +1300,17 @@ def regen_piece_start(req: RegenPieceReq):
         raise HTTPException(404, "Clip not found in the session")
     if not os.environ.get("WAVESPEED_API_KEY"):
         raise HTTPException(400, "Немає ключа WaveSpeed — додай його в ⚙ Settings.")
-    if not (req.prompt or "").strip():
+    if not (req.prompt or "").strip() and req.model != "lipsync":
         raise HTTPException(400, "Опиши, що змінити в кадрі.")
     fps = float((compose._stream_params(src) or (None, None, 30.0))[2] or 30.0)
     dur = revoice.duration(src)
     a, b = _snap(max(0.0, req.a), fps), _snap(min(dur, req.b), fps)
-    if req.model not in ws.MODELS:
+    if req.model not in ws.MODELS and req.model != "lipsync":
         req.model = "turbo25"
+    if req.model == "lipsync":
+        req.keep_audio = True
     lim = ws.PIECE_MAX.get(req.model, 30.0)
-    if b - a < 1.0 or b - a > lim + 0.01:
+    if b - a < (0.5 if req.model == "lipsync" else 1.0) or b - a > lim + 0.01:
         raise HTTPException(400, f"Шматок має бути 1–{lim:.0f} с (зараз {b - a:.1f} с).")
     if req.model == "2.5":
         res = req.resolution if req.resolution in ws.RATES else "720p"
@@ -1328,12 +1343,15 @@ def regen_splice(req: SpliceReq):
     p = compose._stream_params(src) or (None,) * 8
     fps = float(p[2] or 30.0)
     dur = ffmpeg_utils.video_stream_duration(src) or revoice.duration(src)
-    ps = []
+    ps, aud = [], {}
     for x in sorted(req.pieces or [], key=lambda x: float(x.get("a", 0))):
         f = os.path.join(sdir, os.path.basename(str(x.get("piece", ""))))
         a, b = _snap(x.get("a", 0), fps), _snap(x.get("b", 0), fps)
         if os.path.exists(f) and b > a and (not ps or a >= ps[-1][2] - 1e-6):
             ps.append((f, a, b))
+            af = os.path.join(sdir, os.path.basename(str(x.get("audio") or "")))
+            if x.get("audio") and os.path.exists(af):
+                aud[len(ps) - 1] = af      # ✨ Seedance wrote this piece's SOUND too
     if not ps:
         raise HTTPException(400, "Немає готових шматків для вклейки.")
     inputs = ["-i", src]
@@ -1350,15 +1368,34 @@ def regen_splice(req: SpliceReq):
         chain += f"[0:v]trim=start={t:.6f},setpts=PTS-STARTPTS[otail];"
         parts.append("[otail]")
     chain += "".join(parts) + f"concat=n={len(parts)}:v=1:a=0[v]"
+    amap = ["-map", "0:a:0?"]
+    acodec = ["-c:a", "copy"]
+    if aud:                                  # the clip's audio, with the Seedance pieces' own sound in their slots
+        ain = len(ps) + 1
+        aparts, t = [], 0.0
+        for k, (f, a, b) in enumerate(ps):
+            if k in aud:
+                inputs += ["-i", aud[k]]
+                if a - t > 0.001:
+                    chain += f";[0:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=start={t:.6f}:end={a:.6f},asetpts=PTS-STARTPTS[ao{k}]"
+                    aparts.append(f"[ao{k}]")
+                chain += f";[{ain}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:{b - a:.6f},asetpts=PTS-STARTPTS[ap{k}]"
+                aparts.append(f"[ap{k}]")
+                ain += 1
+                t = b
+        chain += f";[0:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=start={t:.6f},asetpts=PTS-STARTPTS[aot]"
+        aparts.append("[aot]")
+        chain += ";" + "".join(aparts) + f"concat=n={len(aparts)}:v=0:a=1[a]"
+        amap, acodec = ["-map", "[a]"], ["-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
     stem, ext = os.path.splitext(os.path.basename(src))
     stem = _re.sub(r"(_mix_[0-9a-f]{10}|_sd\d+)+$", "", stem)
     k = 1
     while os.path.exists(os.path.join(sdir, f"{stem}_sd{k}{ext}")):
         k += 1
     out = f"{stem}_sd{k}{ext}"
-    cmd = ["ffmpeg", "-y"] + inputs + ["-filter_complex", chain, "-map", "[v]", "-map", "0:a:0?",
+    cmd = ["ffmpeg", "-y"] + inputs + ["-filter_complex", chain, "-map", "[v]"] + amap + [
            "-frames:v", str(max(1, round(dur * fps)))]
-    cmd += ffmpeg_utils.encoder_quality_args("12M") + ["-c:a", "copy", os.path.join(sdir, out)]
+    cmd += ffmpeg_utils.encoder_quality_args("12M") + acodec + [os.path.join(sdir, out)]
     ffmpeg_utils.run(cmd)
     return {"clip": out, "url": f"/clip/{req.file_id}/{out}", "pieces": len(ps)}
 
