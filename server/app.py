@@ -2063,6 +2063,21 @@ def _clean_transcript(words, lang=None):
         return words
 
 
+class TextCleanReq(BaseModel):
+    words: List[dict] = []
+    orig_words: List[dict] = []
+    lang: str = "en"
+
+
+@app.post("/api/text/clean")
+def api_text_clean(req: TextCleanReq):
+    """The after-transcribe clean-up (numbers → digits, unit swaps) for a transcript made before it."""
+    w2 = _clean_transcript(req.words, req.lang)
+    o2 = _clean_transcript(req.orig_words, req.lang) if req.orig_words else []
+    changed = sum(1 for a in w2 if a not in req.words)
+    return {"words": w2, "orig_words": o2, "changed": changed}
+
+
 class TranscribeClipReq(BaseModel):
     file_id: str
     clip: str = "source.mp4"

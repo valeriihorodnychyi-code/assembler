@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-19** — Re-voice clones each line from the voice near it (Frankenstein creatives); numbers as digits after transcribe (Scribe hyphens, 4 weeks, ages), ⋯ → 123 for old transcripts (2.0.1-b2)
 - **2026-11-19** — 📅 Dates: find, highlight, replace all (re-voice + Seedance Fast Turbo lips per piece, one splice); 🎙 dictation = Scribe + Gemini via WaveSpeed (2.0.1-b1)
 - **2026-11-19** — Assembler 2.0.0: v2 merged into main (fast editor layout, Premiere-like timeline, audio lanes, voices / accents / phrase styles, Punctuation ?! only). Rollback: tag v1-final
 - **2026-11-12** — Sentences: ✦ accent words + 🎨 own style for a phrase; Punctuation Off / ?! only / All (? ! stay by default); exact shows voice / phrase styles (2.0.0-b21)

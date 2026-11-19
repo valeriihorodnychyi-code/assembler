@@ -289,6 +289,8 @@ def plan_patch(span, speech_len, clip_dur):
 STT_MODEL = os.environ.get("CS_DIARIZE_MODEL", "scribe_v2")
 MIN_SAMPLE = 2.5        # seconds of one speaker's speech below which a clone is not worth making
 MAX_SAMPLE = 120.0
+LOCAL_R = 20.0          # clone from the speaker's speech within ±20 s of the line (its own source video)
+LOCAL_MIN = 4.0         # …if there are at least 4 s of it there; else a wider window, else the whole clip
 
 
 def diarize(clip_path, requests, api_key=None, cache_path=None):
@@ -383,15 +385,33 @@ def voice_plan(clip_path, spans, requests, api_key=None, wd=None, cache_path=Non
         return [{"speaker": None, "sample": whole, "seconds": None, "idx": list(range(len(spans)))}], \
             f"мовців не розпізнано ({e}) — клон з усього кліпу"
     speakers = sorted({w["speaker"] for w in dw})
-    groups = {}
+    # A long creative is often a "Frankenstein" of several source videos: different people, and
+    # the diarizer may still give two similar voices ONE label. So the clone is made from the
+    # speaker's speech NEAR the line (±LOCAL_R s — the same source video), not from all over the
+    # clip; spans of one speaker that are far apart get a clone each.
+    clusters = []                     # [{speaker, lo, hi, idx}]
     for i, sp in enumerate(spans):
-        groups.setdefault(speaker_of(sp, dw), []).append(i)
+        spk = speaker_of(sp, dw)
+        a, b = float(sp["a"]), float(sp["b"])
+        c = next((c for c in clusters if c["speaker"] == spk and a - c["hi"] < 2 * LOCAL_R and c["lo"] - b < 2 * LOCAL_R), None)
+        if c:
+            c["lo"], c["hi"] = min(c["lo"], a), max(c["hi"], b)
+            c["idx"].append(i)
+        else:
+            clusters.append({"speaker": spk, "lo": a, "hi": b, "idx": [i]})
     out, notes = [], []
-    for spk, idx in groups.items():
+    for k, cl in enumerate(clusters):
+        spk, idx = cl["speaker"], cl["idx"]
         rngs = speaker_ranges(dw, spk) if spk else []
+        for r_ in (LOCAL_R, 3 * LOCAL_R):          # near the line first, then a wider window
+            near = [(max(s, cl["lo"] - r_), min(e, cl["hi"] + r_)) for s, e in rngs
+                    if e > cl["lo"] - r_ and s < cl["hi"] + r_]   # clipped to the window
+            if sum(e - s for s, e in near) >= LOCAL_MIN:
+                rngs = near
+                break
         secs = sum(e - s for s, e in rngs)
         if spk and secs >= MIN_SAMPLE:
-            path = os.path.join(wd, f"voice_{spk}.mp3")
+            path = os.path.join(wd, f"voice_{spk}_{k}.mp3")
             cut_sample(clip_path, rngs, path)
             out.append({"speaker": spk, "sample": path, "seconds": round(secs, 1), "idx": idx})
         else:
@@ -399,7 +419,8 @@ def voice_plan(clip_path, spans, requests, api_key=None, wd=None, cache_path=Non
                 _run(["ffmpeg", "-y", "-i", clip_path, "-vn", "-ac", "1", "-ar", "44100", "-t", "180", "-b:a", "128k", whole])
             out.append({"speaker": spk, "sample": whole, "seconds": None, "idx": idx})
             notes.append(f"у {spk or 'мовця'} лише {secs:.1f} с мови — клон з усього кліпу")
-    note = (f"мовців у кліпі: {len(speakers)}" + ("; " + "; ".join(notes) if notes else "")) if len(speakers) > 1 or notes else ""
+    note = (f"мовців у кліпі: {len(speakers)}" + (f", клонів: {len(out)} (голос з місця кожної фрази)" if len(out) > 1 else "")
+            + ("; " + "; ".join(notes) if notes else "")) if len(speakers) > 1 or notes or len(out) > 1 else ""
     return out, note
 
 

@@ -1,5 +1,5 @@
 {
-  "version": "2.0.1-b1",
+  "version": "2.0.1-b2",
   "channel": "v2",
-  "notes": "📅 Dates: Sentences finds every spoken date (Monday, November 16th · the 16th of November · 11/16) — highlighted in the rows, yellow marks on the timeline, «📅 Dates · N» opens a panel: tick the ones to change, type the new date → 🎙 one re-voice pass in the same voice, then ✨ Seedance 2.0 Fast Turbo (cheap, fast) re-animates the lips in a ~4 s piece around each, all spliced back in ONE ↩ step. Seedance 2.5 stays for whole scenes and as the fallback (choose it in the panel). 🎙 Dictation: ElevenLabs Scribe hears the note (good Ukrainian), Gemini 2.5 Flash via WaveSpeed writes clean English (same WaveSpeed key, ~$0.01); local Whisper only as the offline fallback."
+  "notes": "🎙 Re-voice in a long «Frankenstein» creative: each line is cloned from the voice NEAR it (±20 s — its own source video), so 4 dates said by 4 people are dubbed in 4 voices, even when the speaker detector gives two people one label. 123: numbers come out as digits after every transcribe — Scribe's «twenty-eight-day», «four weeks», «fifty-two» → «28-day», «4 weeks», «52»; «one» stays a word unless it's a quantity («1 week», «Day 1»); 10,000 with a comma. For a transcript made earlier: ⋯ → 123 Числа цифрами."
 }
