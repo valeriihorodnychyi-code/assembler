@@ -33,7 +33,7 @@ DEFAULT_STYLE = {
     "margin_bottom": 320,
     "box_offset_y": 0,                 # nudge plate/highlight box up(+)/down(-), text stays
     "force_single_line": False,
-    "punctuation": False,              # False = clean look (abbreviation dots kept); True = keep punctuation as transcribed
+    "punctuation": False,              # False = clean look but ? and ! stay; "off" = no end marks at all; True = as transcribed
     "hold_last": False,                # False = last caption gets a short tail (never sits on a packshot); True = it stays to the clip end
     "stroke_on": True,                 # master on/off for the whole outline (inner + outer = double stroke)
     "stroke": {"width": 0, "color": [0, 0, 0, 255]},
@@ -46,6 +46,7 @@ DEFAULT_STYLE = {
     "gradient": {"colors": [[255, 90, 44, 255], [255, 212, 0, 255]], "direction": "vertical",
                  "on_text": False, "on_active": False, "on_plate": False},
     "karaoke": {"enabled": True, "active_color": [255, 212, 0, 255]},
+    "accent": {"color": [255, 90, 44, 255]},   # ✦ accent words (Sentences): their own colour inside the caption
     "karaoke_plate": {"enabled": False, "color": [255, 92, 57, 255], "pad_x": 14, "pad_y": 6, "border_radius": 10},
 }
 

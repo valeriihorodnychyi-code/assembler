@@ -1,5 +1,5 @@
 {
-  "version": "1.9.115",
+  "version": "2.0.0",
   "channel": "main",
-  "notes": "Fix: caption styles applied by click (a preset card, AA / Aa and other segmented buttons, header switches) did not refresh the exact preview / caption layout — only after re-toggling ✓ exact. Now every style change refreshes at once."
+  "notes": "Assembler 2.0 — a fast video editor. Opens clean (both panels folded, video first). Timeline like Premiere: scrub on the ruler, C = split at playhead, click a piece + Delete, Shift-magnet, Alt+wheel zoom, ⤢ big timeline, Cmd-drag audio scrub, Undo / Redo (Cmd+Z / Cmd+Shift+Z). Audio lanes: Clip audio · Music · SFX as layers (mute / volume / move), own audio file, music / voice / stems export. Text panel on the left (Text · Words · Sentences): voices get their own caption style, ✦ accent words and 🎨 own style for a phrase. Style · Titles · Sound on the right. Punctuation Off / ?! only / All — ? and ! now stay by default (older presets too; pick Off for the old look). Style regions → Voices + Body. Repeat moved out of Edit. Export ▾ menu: Video · Audio only · Stems · SRT."
 }

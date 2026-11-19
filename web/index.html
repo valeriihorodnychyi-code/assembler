@@ -147,6 +147,48 @@
   .laneEdit input[type=range]{width:110px}
   .laneEdit label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
   .laneEdit .lhint{flex-basis:100%;font-size:10.5px;color:#6b7080}
+  /* 2.0 dock: compact & centred, space on both sides */
+  .tlDock.v2dock{max-width:1000px;margin:0 auto;background:none;border:0;padding:0;--lh:118px}
+  .tlGrid{display:grid;grid-template-columns:52px minmax(0,1fr) 150px;gap:12px;align-items:start;width:100%}
+  .tlMain{background:#15171d;border:1px solid var(--line);border-radius:12px;padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .tlTools{display:flex;flex-direction:column;gap:6px}
+  /* 🔍 timeline zoom: lanes scroll sideways together, lane heads stay put */
+  .lanes.zoomed{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#3a3e4a transparent}
+  .lanes.zoomed>.lane{width:calc(var(--lh) + var(--zw));grid-template-columns:var(--lh) var(--zw)}
+  .lanes.zoomed>.lane>.lhead{position:sticky;left:0;z-index:9;background:var(--bg)}
+  .tzoom{display:flex;gap:2px;width:52px}
+  .tzoom button{flex:1;height:26px;padding:0;font-size:11px;line-height:1;background:#1d2029;border:1px solid var(--line);border-radius:7px;color:var(--txt)}
+  .tzoom button.on{border-color:var(--accent);color:#fff}
+  .tlDock.v2dock.big{max-width:none}
+  .v2dock.big .lane{min-height:40px}
+  .v2dock.big .lane .lbody{height:40px}
+  .v2dock.big .lane.lvid #trimBar{height:60px}
+  .v2dock.big .lane.lruler .lbody{height:22px}
+  .ttool{width:52px;height:46px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:18px;line-height:1;background:#1d2029;border:1px solid var(--line);border-radius:10px}
+  .ttool small{font-size:9px;color:var(--muted);margin-top:3px}
+  .ttool.on{background:#1e293b;border-color:#3b82f6;color:#fff}
+  .tlActs{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+  .v2dock #laneOrigDl{display:none}   /* ⬇ lives in the right-click menu and in Export ▾ now */
+  .tlActs .tchip{justify-content:flex-start;padding:7px 10px;font-size:11.5px}
+  .tlActs #tbStatus{font-size:10.5px;color:var(--muted);padding:0 2px}
+  .tchip.rep .tdot{background:#22c55e}
+  #trimBar.blade{cursor:crosshair}
+  #trimBar.snapped{box-shadow:0 0 0 2px #fbbf24}
+  #trimSplits{position:absolute;inset:0;pointer-events:none;z-index:4}
+  #trimSplits i{position:absolute;top:-5px;bottom:-5px;width:9px;margin-left:-4.5px;pointer-events:auto;cursor:pointer}
+  #trimSplits i::after{content:"";position:absolute;left:3.5px;top:0;bottom:0;width:2px;background:#ff3a22}
+  #trimSplits i:hover::after{background:#fff}
+  #trimSplits i::before{content:"✂";position:absolute;top:-13px;left:-4px;font-size:9px;color:#ff3a22}
+  #trimPiece{position:absolute;top:0;bottom:0;display:none;background:rgba(255,58,34,.22);border:1px solid #ff3a22;pointer-events:none;z-index:3}
+  .addTrack{display:flex;gap:6px;align-items:center;margin-left:var(--lh);flex-wrap:wrap}
+  .addTrack button{font-size:11px;padding:3px 9px;border:1px dashed #3a3e4a;background:transparent;color:var(--muted);border-radius:7px}
+  .addTrack button:hover{color:var(--txt);border-color:#5a5f6e}
+  .addTrack .addHint{font-size:10.5px;color:#5d6270;margin-left:auto}
+  .ctxm{min-width:230px}
+  .ctxm .chead{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#6b7080;padding:6px 9px 4px}
+  .ctxm button{display:flex;align-items:center}
+  .ctxm button:disabled{opacity:.4;cursor:default}
+  .ctxm .ckey{margin-left:auto;font-size:10px;color:#6b7080;border:1px solid #3a3e4a;border-radius:4px;padding:0 4px}
   .dockBar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 0;font-size:11.5px;color:var(--muted)}
   .dockBar .dgrp{display:flex;align-items:center;gap:5px;padding:0 12px;border-left:1px solid #2c2f39;min-height:30px}
   .dockBar .dgrp:first-child{border-left:0;padding-left:0}
@@ -172,11 +214,14 @@
   .dockBot .histRow{border-top:0;padding-top:0;justify-content:flex-end}
   .dockBot #tbStatus{margin-left:4px}
   .transport.slim{max-width:none;justify-content:center}
-  .lane.lruler{min-height:16px}
-  .lane.lruler .lbody{height:16px;background:none;border:0;cursor:default;overflow:visible}
+  .lane.lruler{min-height:22px}
+  .lane.lruler .lbody{height:22px;background:#1a1d24;border:1px solid #262a33;border-radius:6px;cursor:ew-resize;overflow:visible}
+  .lane.lruler .lbody:hover{background:#20242d;border-color:#3a3f4d}
+  .lane.lruler .rlbl{font-size:9.5px;color:#5d6270;letter-spacing:.5px}
+  #trimBar{cursor:default}
   #tlRuler i{position:absolute;bottom:0;height:6px;width:1px;background:#4a4e5a}
   #tlRuler u{position:absolute;bottom:0;height:3px;width:1px;background:#353844}
-  #tlRuler b{position:absolute;bottom:6px;font:600 9.5px/1 system-ui;color:#6b7080;transform:translateX(3px);white-space:nowrap}
+  #tlRuler b{position:absolute;bottom:7px;font:600 9.5px/1 system-ui;color:#6b7080;transform:translateX(3px);white-space:nowrap}
   .dockFoot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 22px;margin-left:var(--lh)}
   .dockFoot .trimInfo .tmid{order:0;width:auto}
   .dockFoot .cutRow,.dockFoot .histRow{border-top:0;padding-top:0}
@@ -207,6 +252,23 @@
   .tchip.body .tdot{background:#38bdf8}
   .tchip.part .tdot{background:#a78bfa}
   .tchip.regen .tdot{background:#f472b6}
+  .vcard{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+  .vcard .vhead{display:flex;align-items:center;gap:8px}
+  .vcard .vhead b{color:var(--txt)}
+  .vcard .vhint{font-size:11px;color:var(--muted);flex:1}
+  .vcard .vlink{color:#a9a3ff;cursor:pointer;white-space:nowrap}
+  .vrow{display:flex;align-items:center;gap:6px}
+  .vrow.off{opacity:.5}
+  .vdot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+  .vrow .vname{width:96px;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px 6px;font-size:12px}
+  .vrow .vg{font-size:11px;color:var(--muted);width:44px;white-space:nowrap}
+  .vrow .vc{font-size:10.5px;color:#6b7080;width:16px;text-align:right}
+  .vrow select{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:3px 5px;font-size:11.5px}
+  .vrow .vbl{flex:1;font-size:12px;color:var(--txt)}
+  .vbody{border-top:1px dashed var(--line);padding-top:6px;margin-top:2px}
+  .vbody select{flex:0 1 150px}
+  .scol{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+  .svoicech{font-size:10px;padding:0 6px;border:1px solid;border-radius:5px;line-height:1.6;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .micbtn{flex:0 0 auto;font-size:13px;padding:3px 7px;border-radius:7px}
   .micbtn.rec{background:#ff3a22;border-color:#ff3a22;color:#fff;animation:micp 1s ease-in-out infinite}
   @keyframes micp{50%{opacity:.6}}
@@ -275,7 +337,7 @@
   .preset.active{border-color:var(--accent)}
   .preset .pv{height:30px;border-radius:6px;background:#0e1119;display:flex;align-items:center;justify-content:center;margin-bottom:5px;overflow:hidden;font-family:"Arial Black",sans-serif;font-weight:800;font-size:13px;color:#fff}
   .preset .pn{font-size:10.5px;color:var(--muted);text-align:center}
-  .presetdel{position:absolute;top:2px;right:2px;width:17px;height:17px;padding:0;line-height:15px;font-size:10px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#c7c9d1;cursor:pointer;opacity:0;transition:opacity .12s}
+  .presetdel{position:absolute;top:2px;right:2px;width:20px;height:20px;padding:0;line-height:18px;font-size:11px;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#c7c9d1;cursor:pointer;opacity:0;transition:opacity .12s}
   .preset:hover .presetdel{opacity:1}
   .presetdel:hover{background:var(--accent);color:#fff}
   .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:7px;overflow:hidden}
@@ -352,6 +414,12 @@
   .srow .stext{font-size:14px;line-height:1.45;color:var(--txt);outline:none;padding:2px 4px;border-radius:5px;min-height:20px;word-break:break-word}
   .srow .stext:focus{background:rgba(255,255,255,.05);box-shadow:0 0 0 1px var(--line)}
   .srow .sacts{display:flex;gap:4px}
+  .srow .stext .wacc{color:#ff8a5c;font-weight:700}
+  .srow .stext .wphr{text-decoration:underline 2px #a78bfa;text-underline-offset:3px}
+  .senttool{position:fixed;z-index:60;display:none;gap:4px;align-items:center;padding:4px;background:#1d2029;border:1px solid #3a3e4a;border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  .senttool button{font-size:11.5px;padding:5px 9px;border-radius:7px;background:#2a2d36;border:1px solid var(--line);color:var(--txt);white-space:nowrap}
+  .senttool button:hover{border-color:var(--accent)}
+  .senttool .stnote{font-size:11px;color:var(--muted);padding:0 6px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis}
   .srow .sacts button{font-size:11px;padding:4px 7px}
   .srow .smeta{grid-column:2/4;font-size:10.5px;color:var(--muted);padding:0 4px}
   .srow .smeta b{color:#ffb38f;font-weight:600}
@@ -417,6 +485,93 @@
   #presetRail .presets{grid-template-columns:1fr;gap:6px;margin-top:0}
   .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0}
   /* only the right tools column sits under the fixed tutorial stickers, so only it steps down */
+  /* 2.0 inspector */
+  body.edit2 .app{grid-template-columns:1fr}
+  body.edit2 .app>.panel{display:none}
+  body.edit2 .stage{grid-column:1}
+  body.edit2{--lw:clamp(380px,27vw,580px);--rw:clamp(380px,22vw,460px)}
+  body.edit2.ilcol{--lw:40px}
+  body.edit2.ircol{--rw:40px}
+  body.edit2 #normalizeBtn,body.edit2 #srtBtn,body.edit2 #sLocBtn{display:none!important}
+  body.edit2 #moreBtn{display:inline-flex!important}
+  /* Projects strip over the video */
+  .groupcol.pstrip{flex-direction:row;align-items:center;gap:10px;max-height:none;overflow:visible;width:100%;justify-content:center}
+  .groupcol.pstrip .railhead{margin:0;writing-mode:vertical-rl;transform:rotate(180deg);font-size:9.5px}
+  .groupcol.pstrip #filmstrip{flex-wrap:nowrap!important;overflow-x:auto;max-height:none;padding:2px;gap:8px;justify-content:flex-start;max-width:100%}
+  .groupcol.pstrip #filmstrip .fgroup{flex-direction:row;align-items:flex-end;gap:4px}
+  .groupcol.pstrip #filmstrip .fsub{flex-direction:row;border-left:0;border-bottom:2px solid var(--accent2);padding:0 0 3px;margin:0}
+  .groupcol.pstrip #filmstrip .fcard{width:38px}
+  .groupcol.pstrip #filmstrip .fcard canvas{width:38px;height:67px}
+  .groupcol.pstrip #filmstrip .fcard.fmini{width:30px}
+  .groupcol.pstrip #filmstrip .fcard.fmini canvas{width:30px;height:53px}
+  body.edit2 .editstage{gap:28px!important}
+  body.edit2 .insleft,body.edit2 .qpanel.insp{background:rgba(22,24,31,.72);border-color:rgba(255,255,255,.05)}
+  .qpanel.insp .ircol{flex:0 0 auto;padding:4px 9px;margin:2px 2px 2px auto;border-radius:7px;font-size:13px;background:transparent;border:1px solid var(--line)}
+  .qpanel.insp .irrail{display:none;flex-direction:column;gap:4px;padding:6px 4px;flex:1}
+  .qpanel.insp .irrail button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:12px;padding:12px 0;border-radius:8px}
+  .qpanel.insp .irrail button span{writing-mode:vertical-rl;letter-spacing:1px}
+  .qpanel.insp .irrail button:hover{color:#fff;background:#1d2029}
+  .qpanel.insp.col .itabs,.qpanel.insp.col .ibody{display:none}
+  .qpanel.insp.col .irrail{display:flex}
+  /* brand orange for what is OPEN: the active tab, a rail pill on hover */
+  .itabs button.on{background:var(--accent)!important;color:#fff!important}
+  .itabs button:not(.on):hover{color:#fff}
+  .qpanel.insp .irrail button:hover,.insleft .ilrail:hover{color:#fff!important;background:var(--accent)!important;border-color:var(--accent)!important}
+  .insleft:not(.col) .ilhead b{color:var(--accent)}
+  /* soft open / fold: the columns slide, the content fades in (no hard jumps) */
+  body.edit2 .editstage{transition:grid-template-columns .28s cubic-bezier(.2,.7,.2,1)}
+  .insleft .ilbody,.insleft .ilhead,.qpanel.insp .itabs,.qpanel.insp .ibody{animation:panIn .26s ease both}
+  .insleft .ilrail,.qpanel.insp .irrail{animation:panIn .2s ease both}
+  .qpanel.insp .ipane{animation:panIn .18s ease both}
+  @keyframes panIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){body.edit2 .editstage{transition:none}.insleft *,.qpanel.insp *{animation:none!important}}
+  /* folded = no wall next to the video: just small pills at the top */
+  .insleft.col,.qpanel.insp.col{height:auto!important;background:none!important;border-color:transparent!important;align-self:start}
+  .insleft.col .ilrail{flex:0 0 auto;padding:14px 0;border:1px solid var(--line);border-radius:10px;background:#16181f}
+  .qpanel.insp.col .irrail{padding:0;gap:6px}
+  .qpanel.insp.col .irrail button{border:1px solid var(--line);background:#16181f;padding:14px 0;border-radius:10px}
+  /* compact timeline → more height for the video */
+  .v2dock .tlMain{padding:8px 10px 6px;gap:6px}
+  .v2dock .lane{min-height:24px}
+  .v2dock .lane .lbody{height:24px}
+  .v2dock .lane.lvid #trimBar{height:34px}
+  .v2dock .lane.lruler{min-height:18px}
+  .v2dock .lane.lruler .lbody{height:18px}
+  .v2dock .addHint{display:none}
+  .v2dock .dockBot:has(> .dscope[style*="none"]):has(#histRow[style*="none"]){display:none}
+  .v2dock .dockTop{padding-bottom:6px}
+  .v2dock .dockBot{padding-top:6px}
+  body.edit2 .editstage{grid-template-columns:var(--lw) auto var(--rw);gap:18px}
+  body.edit2 .editstage.wide{grid-template-columns:var(--lw) minmax(0,1fr) var(--rw)}
+  @media (max-width:1399px){body.edit2{--lw:340px;--rw:360px}body.edit2.ilcol{--lw:40px}}
+  .insleft .tvrow{padding-right:0!important;flex-wrap:wrap;gap:4px}
+  .insleft{margin-top:46px;height:calc(100vh - 168px - var(--dockh,0px));display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
+  .insleft .ilhead{display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .insleft .ilhead b{color:var(--txt);font-size:13px}
+  .insleft .ilsub{font-size:11px;color:var(--muted);flex:1}
+  .insleft .ilcol{font-size:13px;padding:2px 8px;border-radius:7px}
+  .insleft .ilbody{overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0}
+  .insleft .ilbody .groupcol{max-height:none;flex:0 0 auto}
+  .insleft .ilbody .groupcol .railhead{text-align:left;margin-bottom:4px}
+  .insleft .ilbody #filmstrip{justify-content:flex-start;max-height:150px;overflow-y:auto}
+  .insleft .ilrail{display:none;flex:1;border:0;border-radius:0;background:transparent;color:var(--muted);font-weight:600;font-size:12px;cursor:pointer}
+  .insleft .ilrail span{display:inline-block;writing-mode:vertical-rl;letter-spacing:1px}
+  .insleft .ilrail:hover{color:#fff;background:#1d2029}
+  .insleft.col .ilhead,.insleft.col .ilbody{display:none}
+  .insleft.col .ilrail{display:block}
+  .qpanel.insp{height:calc(100vh - 168px - var(--dockh,0px));gap:0;padding:0;overflow:hidden;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .itabs{display:flex;gap:2px;padding:6px 6px 0;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .itabs button{flex:1;border:0;border-radius:8px 8px 0 0;background:transparent;color:var(--muted);font-weight:600;font-size:12.5px;padding:8px 6px;position:relative}
+  .itabs button.on{color:#fff;background:var(--panel2)}
+  .itabs .idot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:#8b6cff;display:none}
+  .ibody{overflow-y:auto;padding:10px;flex:1 1 auto;min-height:0}
+  .ipane{display:flex;flex-direction:column;gap:8px}
+  .ipresets{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .ipresets .ilbl{font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#6b7080;margin-bottom:6px}
+  .ipreacts{display:flex;gap:6px;margin-bottom:8px}
+  .ipreacts button{flex:1;font-size:11px;padding:5px 8px;border-radius:7px}
+  .ipresets .presetrail{max-height:none;overflow:visible}
+  .ipresets #presetRail .presets{grid-template-columns:repeat(3,1fr);gap:6px}
   .qpanel{display:flex;flex-direction:column;gap:8px;margin-top:46px;max-height:calc(100vh - 168px - var(--dockh,0px));overflow-y:auto;padding:0 2px}   /* header 58 + stage padding 36 + sticker strip 46 + status line 28 */
   #quickPanel .grp{background:transparent;border:0;margin:0 0 4px;flex-shrink:0}   /* the panel SCROLLS — a shrinking group (overflow:hidden) silently clipped the 🎙 box */
   #quickPanel .grp>summary{background:transparent;border-left:0;padding:8px 4px;font-size:12px;color:var(--muted)}
@@ -526,7 +681,7 @@
     </div>
     <button class="primary" id="loadBtn" data-i18n="loadVideo" style="margin-left:4px">LOAD VIDEO</button>
     <button id="jiraBtn" title="Вставити таски з Джири (ключі, лінки або імена файлів) — відео підтягнуться з ADAM прямо в сесію" style="margin-left:4px;font-weight:700">⇩ JIRA</button>
-    <button id="projBtn" title="Projects — зберегти / відкрити (автозбереження кожні 20 с)" style="margin-left:4px">📁</button>
+    <button id="projBtn" title="Projects — зберегти / відкрити (автозбереження кожні 20 с)" style="margin-left:4px">📁 Projects</button>
     <div class="badge" id="encBadge">encoder: …</div>
     </div>
     <div class="modeswitch">
@@ -548,6 +703,7 @@
       <button id="srtBtn" style="display:none" title="Завантажити .srt для цього кліпа — той самий розбив і ті самі таймінги, що й у запечених титрах">⬇ SRT</button>
       <button class="primary" id="renderBtn" data-i18n="sendAsm" disabled>Send to Assemble →</button>
       <button id="sLocBtn" data-i18n="toLoc" style="display:none">→ LOC</button>
+      <button id="moreBtn" class="ghost" title="Ще: Normalize · SRT · → LOC" style="display:none">⋯</button>
       <button id="copyAllBtn" data-i18n="styleAll" style="display:none" title="Скопіювати стиль активного хука на всі">⧉ Style→all</button>
       <button class="primary" id="sendPackAsmBtn" data-i18n="packAsm" style="display:none">Pack → Assemble →</button>
       <button id="sendPackBtn" data-i18n="packLoc" style="display:none">Pack → LOC →</button>
@@ -604,7 +760,7 @@
     <div id="trimRow" class="tlDock" style="display:none">
      <div class="lanes" id="lanes">
       <div class="lane lvid"><div class="lhead"><span class="lname">🎬 Picture</span></div><div class="lbody">
-      <div id="trimBar" title="Клік або тягни — плейхед. Тягни [ ] — трім.">
+      <div id="trimBar" title="Тягни [ ] — трім. Клік — вибрати шматок між розрізами. Перемотка — шкала зверху або біла голівка.">
         <div id="trimDimL" class="tdim"></div><div id="trimDimR" class="tdim"></div>
         <div id="trimSel"></div>
         <div id="cutMark"></div>
@@ -622,6 +778,7 @@
       <div id="laneHead"></div>
       <div id="laneBusy"></div>
      </div>
+     <div class="addTrack" id="addTrack"><button type="button" id="addMusicBtn" title="Згенерувати музику (Hook music) — ляже на доріжку Music">＋ Music</button><button type="button" id="addOwnBtn" title="Свій трек mp3 / wav на доріжку Music">＋ Own audio</button><button type="button" id="addSfxBtn" title="Звук у точці плейхеда">＋ SFX</button><span class="addHint">перемотка — шкала зверху або біла голівка · C — розріз · правий клік — меню · Space — play</span></div>
      <div id="laneEdit" class="laneEdit" style="display:none"></div>
      <audio id="sfxAudio" preload="none" style="display:none"></audio>
      <div class="dockFoot">
@@ -691,7 +848,7 @@
           </div></div>
         <input type="hidden" id="language" value="">
         <!-- padding-right keeps the toggle clear of the language sticker pinned to the box's top-right corner -->
-        <div style="display:flex;justify-content:flex-end;margin:4px 0 7px;padding-right:78px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
+        <div class="tvrow" style="display:flex;justify-content:flex-end;margin:4px 0 7px;padding-right:78px" title="Text — редагувати; Words — навігація: клік по слову перемотує, активна фраза підсвічується під час програвання">
           <button type="button" id="restoreTimingsBtn" class="ghost" disabled style="margin-right:auto;font-size:11px;padding:5px 9px;white-space:nowrap"
             title="Накласти поточний текст на ОРИГІНАЛЬНІ тайминги транскрайбу. Твої правки тексту лишаються, зіпсований час повертається — без нового транскрайбу. (Ручні правки часу слів теж скинуться.)">↺<span class="rtl"> Тайминги</span></button>
           <div class="seg" id="txtViewSeg">
@@ -716,7 +873,13 @@
         </div>
         <div id="revoiceBox" style="display:none"></div>
         <div class="hint" id="transcriptHint">Demo text with even timing. After Transcribe, real word timecodes drive the preview. You can still edit the text here.</div>
-        <div class="row" style="margin-top:8px"><label title="ON — залишати пунктуацію як у транскрипті (крапки, коми). OFF — чистий вигляд без кінцевих знаків; крапки абревіатур (U.S., e.g.) зберігаються.">Punctuation</label><label class="switch"><input type="checkbox" id="punct"><span class="slider"></span></label></div>
+        <div class="row" style="margin-top:8px"><label title="Off — без ком і кінцевих знаків. ?! — без ком і крапок, але ? і ! лишаються (за замовчуванням). All — як у транскрипті. Крапки абревіатур (U.S., e.g.) зберігаються завжди.">Punctuation</label>
+          <input type="hidden" id="punct" value="qe">
+          <div class="seg" id="punctSeg" style="flex:1.3">
+            <button type="button" data-v="off">Off</button>
+            <button type="button" data-v="qe" class="active">?! only</button>
+            <button type="button" data-v="all">All</button>
+          </div></div>
         <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
       </div>
     </details>
@@ -896,6 +1059,7 @@
       <summary><span data-i18n="secKaraoke">Karaoke (word highlight)</span> <label class="switch hdrsw" title="Enable Karaoke highlight" onclick="hdrTgl(event,this)"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Color</label><input type="color" id="karaokeColor" value="#ffd400"></div>
+        <div class="row"><label title="Колір слів, позначених ✦ Accent у Sentences (працює і з вимкненим karaoke)">✦ Accent words</label><input type="color" id="accentColor" value="#ff5a2c"></div>
         <div class="row"><label>Word plate</label><label class="switch"><input type="checkbox" id="kpOn"><span class="slider"></span></label></div>
         <div class="row"><label>Plate color</label><input type="color" id="kpColor" value="#ff3a22"></div>
         <div class="row"><label>Padding X</label><input type="range" id="kpPadX" min="0" max="40" value="14"><span class="val" id="kpPadXV">14</span></div>
@@ -1146,7 +1310,7 @@ let editingHook=null, packMode="orig";               // packMode: "orig" = origi
 let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct","accentColor"];
 
 // Defaults now live as .json in the repo styles/ folder (official, no ★) + team customs (★).
 // This single hardcoded preset is only a SAFETY NET: shown when the styles folder is empty, so
@@ -1348,13 +1512,14 @@ function readControls(){
     scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value,scrimFade:+($("scrimFade")?$("scrimFade").value:0.25),
     animType:$("animType")?$("animType").value:"none",animSpeed:+($("animSpeed")?$("animSpeed").value:0.25),
     holdLast:$("holdLast")?$("holdLast").checked:false,
-    punct:$("punct")?$("punct").checked:false};
+    punct:punctMode($("punct")?$("punct").value:"qe"),accentColor:$("accentColor")?$("accentColor").value:"#ff5a2c"};
 }
 function writeControls(s){
   const set=(id,v)=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=!!v;else el.value=v;const l=$(id+"V");if(l){if(l.tagName==="INPUT")l.value=v;else l.textContent=v;}};
   for(const k of STYLE_IDS) if(k in s) set(k,s[k]);
   if("fontFamily" in s && s.fontFamily) applyStyleFont(s.fontFamily);   // sync dropdown + customFontName + load font so preview AND render use the style's font (not a stale one)
   if($("caseSeg"))updateCaseSeg();
+  if($("punct")){$("punct").value=punctMode("punct" in s?s.punct:"qe");updatePunctSeg();}
   if($("linesSeg"))updateLinesSeg();
   if($("wrapSeg"))updateWrapSeg();
 }
@@ -1377,7 +1542,7 @@ function loadLastStyle(){try{const s=localStorage.getItem("cs_last_style");retur
 function toEngineStyle(s){
   const arr=(h,a=255)=>{const[r,g,b]=hexToRgb(h);return[r,g,b,a];};
   return {font_name:customFontName||(s.fontFamily+".ttf"),font_size:s.fontSize,text_color:arr(s.textColor),
-    text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,punctuation:!!s.punct,
+    text_case:s.textCase==="none"?"":s.textCase,wrap_mode:s.wrapMode||"chars",max_chars_per_line:(s.wrapMode==="words")?15:s.maxChars,words_per_line:(s.wrapMode==="words")?s.maxChars:3,max_lines:s.maxLines,line_spacing:s.lineSpacing,margin_bottom:s.marginBottom,box_offset_y:s.boxOffsetY,force_single_line:s.maxLines===1,punctuation:punctToEngine(s.punct),
     stroke_on:s.strokeOn!==false,stroke:{width:s.strokeW,color:arr(s.strokeColor)},stroke_outer:{width:s.strokeOuterW,color:arr(s.strokeOuterColor)},
     shadow:{enabled:s.shadowOn,offset_x:s.shX,offset_y:s.shY,glow_blur:s.shBlur,color:arr(s.shColor)},
     shadow2:{enabled:s.shadowOn&&s.shadow2On,offset_x:s.sh2X,offset_y:s.sh2Y,glow_blur:s.sh2Blur,color:arr(s.sh2Color)},
@@ -1385,7 +1550,7 @@ function toEngineStyle(s){
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
     scrim:{enabled:s.scrimOn,color:arr(s.scrimColor,s.scrimAlpha),pad:40,feather:s.scrimFeather,fade:s.scrimFade},
     animation:{type:s.animType||"none",speed:s.animSpeed},hold_last:!!s.holdLast,
-    karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},
+    karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},accent:{color:arr(s.accentColor||"#ff5a2c")},
     gradient:{colors:[arr(s.gradC0),arr(s.gradC1)],direction:s.gradDir||"vertical",on_text:!!s.gradText,on_active:!!s.gradActive,on_plate:!!s.gradPlate},
     karaoke_plate:{enabled:s.kpOn,color:arr(s.kpColor),pad_x:s.kpPadX,pad_y:s.kpPadY,border_radius:s.kpRadius}};
 }
@@ -1514,7 +1679,8 @@ function buildEvents(dur,limit,maxLines,wordsOverride,wrapMode,lang,cuts,keepPun
     return !t.replace(/\.+$/,"").includes(".");};
   // clean display: mirrors engine _clean_display. keepPunct → keep as transcribed;
   // otherwise drop a trailing comma + true sentence-end mark, keep abbreviation dots.
-  const cleanDisp=s=>{if(keepPunct)return s;let t=s.replace(/,+$/,"");if(isEnd(t))t=t.replace(/[.!?…]+$/,"");return t;};
+  const pm=punctMode(keepPunct);   // all · off · qe (? ! stay)
+  const cleanDisp=s=>{if(pm==="all")return s;let t=s.replace(/,+$/,"");if(isEnd(t))t=t.replace(/[.!?…]+$/,m=>pm==="off"?"":m.replace(/[^?!]/g,""));return t;};
   const cutList=(cuts||[]).map(Number).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
   const cutBetween=(a,b)=>cutList.some(c=>a<c&&c<=b);   // scene cut between two words → new caption
   let raw;
@@ -1600,7 +1766,7 @@ function styleAt(t){
   else{ const cur=readControls(); const split=splitAt()!=null?splitAt():+$("splitTime").value;
     base=(editingSlot==="A") ? (t<split?cur:(styleB||cur)) : (t<split?(window._styleA||cur):cur); }
   // #10 per-phrase override wins for its own time range
-  const ov=curPhraseStyles();
+  const ov=(typeof effOverrides==="function")?effOverrides():curPhraseStyles();   // + 🗣 voices / Body styles
   if(ov&&ov.length){ for(const o of ov){ if(t>=o.start&&t<o.end) return o.ctrl; } }
   return base;
 }
@@ -1609,7 +1775,7 @@ function styleAt(t){
 function curPhraseStyles(){ const v=variants[activeVar]; if(!v)return []; if(!v.phraseStyles)v.phraseStyles=[]; return v.phraseStyles; }
 function listPhrases(){   // enumerate caption phrases at the base style, with time range + text
   const s=readControls(), dur=(video&&video.duration)||4;
-  const evs=buildEvents(dur,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
+  const evs=buildEvents(dur,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,s.punct);
   const out=[]; let last=null;
   for(const e of evs){ const fw=e.lines.reduce((a,l)=>a.concat(l),[]); if(!fw.length)continue;
     const key=(+fw[0].start).toFixed(2);
@@ -1619,6 +1785,7 @@ function listPhrases(){   // enumerate caption phrases at the base style, with t
 }
 function presetToCtrl(name){ const base=readControls();
   if(savedStyles[name]) return fromEngineStyle(savedStyles[name]);
+  if(typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES[name]) return fromEngineStyle(BUILTIN_STYLES[name]);
   if(PRESETS[name]) return {...base,...PRESETS[name]};
   return base; }
 // engine regions from the per-phrase overrides (partition timeline; base style fills the gaps)
@@ -1701,7 +1868,7 @@ function render(t,dur){
   // chunking/line-breaks are identical to the final render. Falls back to the local JS engine for
   // the demo/pre-transcription placeholder (and if the server layout hasn't arrived yet).
   const events=(realWords&&realWords.length&&serverLayout&&_layoutKey===layoutKey())?serverLayout
-    :buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,!!s.punct);
+    :buildEvents(dur||4,s.maxChars,s.maxLines,undefined,s.wrapMode,capLang(),(variants[activeVar]&&variants[activeVar].cuts)||null,s.punct);
   if(!events.length)return;
   // #12 continuous faded scrim: opacity from the window fade, drawn even in gaps / pre-roll
   const _scFade=(s.scrimFade!=null?s.scrimFade:0.25);
@@ -1738,7 +1905,7 @@ function render(t,dur){
   const spaceW=ctx.measureText(" ").width;
   let gi=0;const lw=lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*spaceW);
   const pos=[];let y=startY;
-  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,wide:ctx.measureText(w.disp).width,start:w.start});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
+  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,accent:!!w.accent,wide:ctx.measureText(w.disp).width,start:w.start});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
   const boff=(s.boxOffsetY||0)*scale;
   // --- Animated captions (BETA, preview only): each word eases in around its own spoken time ---
   // SAFETY: animation ONLY runs while the video is actually PLAYING. Paused / scrubbing / exact /
@@ -1790,7 +1957,7 @@ function render(t,dur){
     if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
     if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
   }
-  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):rgba(s.textColor,255));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
+  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):(p.accent?rgba(s.accentColor||"#ff5a2c",255):rgba(s.textColor,255)));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
 }
 function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
 
@@ -1799,7 +1966,8 @@ function loop(ts){let t,dur;
   if(videoLoaded){t=video.currentTime;dur=video.duration||4;$("seek").value=(t/dur)*100;{const _tl=$("timeLbl"),_k=frameOf(t)+"/"+frameOf(dur);if(_tl._k!==_k){_tl._k=_k;_tl.innerHTML="<b>"+tc(t)+"</b> / "+tc(dur);_tl.title=t.toFixed(3)+" с · кадр "+frameOf(t);}}
     const _onTl=$("trimRow").style.display!=="none";$("transport").classList.toggle("tl",_onTl);
     if(_onTl&&$("trimPlayhead"))$("trimPlayhead").style.left=Math.max(0,Math.min(100,(t/dur)*100))+"%";
-    if(_onTl&&$("laneHead"))$("laneHead").style.left="calc(var(--lh) + (100% - var(--lh)) * "+Math.max(0,Math.min(1,t/dur)).toFixed(5)+")";}
+    if(_onTl&&$("laneHead"))$("laneHead").style.left="calc(var(--lh) + var(--zw, calc(100% - var(--lh))) * "+Math.max(0,Math.min(1,t/dur)).toFixed(5)+")";
+    if(_onTl&&_tlZoom>1)tlFollow(t,dur);}
   else{const dt=(ts-lastTs)/1000||0;demoT=(demoT+dt)%4;t=demoT;dur=4;}
   lastTs=ts;render(t,dur);
   // headline sits on top of the captions and only inside its own [in,out] window
@@ -1844,8 +2012,9 @@ requestAnimationFrame(loop);
 function loadVideo(file){editPack=[];activeHook=-1;editingHook=null;packMode="orig";updateEditButtons();if($("capIn")){$("capIn").value="";$("capOut").value="";}if($("language"))$("language").value="";if(typeof setLangSticker==="function")setLangSticker(null);
   videoFile=file;const url=URL.createObjectURL(file);enVideoUrl=url;video.src=url;video.hidden=false;canvas.hidden=false;$("dropzone").style.display="none";
   video.onloadedmetadata=()=>{videoLoaded=true;if($("musicPreview")&&(!musicAudio||musicAudio.paused))$("musicPreview").textContent=musicLabel();updateEditButtons();
-    // the clip's REAL fps decides the frame grid (trim, ⟨ ⟩, I / O): a freshly dropped clip used 30 fps
-    // until uploaded → on 24 / 25 fps clips In landed a frame EARLY. Upload now, then probe.
+    // the clip's REAL fps decides the frame grid (trim, ⟨ ⟩, I / O). Until 2.0.0-b15 a freshly dropped
+    // clip used 30 fps until it was uploaded → on a 24 / 25 fps clip In landed one frame EARLY
+    // (the render then started on the frame before the one you saw). Upload now, then probe.
     setTimeout(()=>{if(typeof ensureSessionClip==="function")ensureSessionClip().then(()=>{if(typeof loadClipFps==="function"){_fpsKey="";loadClipFps();}}).catch(()=>{});},50);
     if(typeof AUTO!=="undefined"&&AUTO.cuts&&!editPack.length)setTimeout(()=>autoAnalyze(),400);};$("transcribeBtn").disabled=false;$("renderBtn").disabled=false;realWords=null;fileId=null;
   variants={en:{clip:null,videoUrl:url,words:null,style:readControls(),trim:null}};activeVar="en";$("varTabs").style.display="none";if(typeof renderCaps==="function")renderCaps();$("locResults").innerHTML="";if(typeof updateCutsLabel==="function")updateCutsLabel();
@@ -1930,9 +2099,10 @@ function finishPack(ok,focus){
 let jiraReady=false;
 function openJiraPop(){
   let p=$("jiraPop");
-  if(p){p.remove();return;}
+  if(p){if(p._close)p._close();else p.remove();return;}
   p=document.createElement("div");p.id="jiraPop";
-  p.style.cssText="position:fixed;z-index:210;top:64px;left:50%;transform:translateX(-50%);width:min(560px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)";
+  {const jb=$("jiraBtn"), r=jb?jb.getBoundingClientRect():{left:16,bottom:56};
+   p.style.cssText="position:fixed;z-index:210;top:"+Math.round(r.bottom+8)+"px;left:"+Math.max(8,Math.round(r.left))+"px;width:min(520px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55)";}
   p.innerHTML="<div style='display:flex;align-items:center;margin-bottom:8px'><b style='font-size:14px'>⇩ Таски з Джири</b>"
     +"<span id='jiraClose' style='margin-left:auto;cursor:pointer;color:var(--muted);font-size:16px'>✕</span></div>"
     // always rendered, shown/hidden live: saving the key in Settings while this window is open
@@ -1946,7 +2116,14 @@ function openJiraPop(){
     +"<span id='jiraNote' style='font-size:12px;color:var(--muted)'></span></div>"
     +"<div id='jiraOut' style='margin-top:10px;max-height:240px;overflow:auto;font-size:12px'></div>";
   document.body.appendChild(p);
-  $("jiraClose").onclick=()=>p.remove();
+  const close=()=>{p.remove();document.removeEventListener("pointerdown",outside,true);document.removeEventListener("keydown",escK,true);};
+  const outside=e=>{if(!p.contains(e.target)&&!(e.target.closest&&e.target.closest("#jiraBtn,#dzJira")))close();};
+  const escK=e=>{if(e.key==="Escape")close();};
+  setTimeout(()=>{document.addEventListener("pointerdown",outside,true);document.addEventListener("keydown",escK,true);},0);
+  p._close=close;
+  if(window._jiraLastText&&$("jiraText"))$("jiraText").value=window._jiraLastText;   // a failed import keeps your list
+  if(window._jiraLastOut&&$("jiraOut"))$("jiraOut").innerHTML=window._jiraLastOut;
+  $("jiraClose").onclick=close;
   if($("jiraToSettings"))$("jiraToSettings").onclick=()=>{p.remove();if($("settingsBtn"))$("settingsBtn").click();};
   $("jiraGo").onclick=jiraImport;
   $("jiraText").focus();
@@ -1961,12 +2138,14 @@ function openJiraPop(){
 async function jiraImport(){
   const text=($("jiraText")||{}).value||"";
   if(!text.trim()){setStatus("Встав хоч одну таску.","err");return;}
-  const b=$("jiraGo");b.disabled=true;b.textContent="Тягну з ADAM…";
-  $("jiraNote").textContent="";$("jiraOut").innerHTML="";
-  busyStart("Jira → ADAM…");
+  window._jiraLoc=!!($("jiraLoc")&&$("jiraLoc").checked);
+  {const jp=$("jiraPop"); if(jp){if(jp._close)jp._close();else jp.remove();}}   // the window closes at once — the import runs on its own
+  window._jiraLastText=text; window._jiraLastOut="";
+  const b=$("jiraGo")||{}, put=(id,k,v)=>{const e=$(id);if(e)e[k]=v;};
+  busyStart("Jira → ADAM: тягну креативи…");
   try{
     const r=await fetch(API+"/api/jira/import",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({text,file_id:fileId||"",localized:!!(window._jiraLoc=!!($("jiraLoc")&&$("jiraLoc").checked))})});
+      body:JSON.stringify({text,file_id:fileId||"",localized:!!window._jiraLoc})});
     const d=await r.json();if(!r.ok)throw new Error(apiErr(r,d,"import failed"));
     fileId=d.file_id;
     // APPEND to the pack that's open: re-importing to add one forgotten task must not wipe
@@ -1991,14 +2170,16 @@ async function jiraImport(){
       +(it.warn?"<div style='color:var(--accent);font-size:11px'>"+esc(it.warn)+"</div>":"")+"</div>").join("");
     h+=(d.errors||[]).map(e=>"<div style='padding:4px 0;color:var(--accent)'>✗ "+esc(e.input)+" — "+esc(e.error)+"</div>").join("");
     if((d.unrecognized||[]).length)h+="<div style='padding:4px 0;color:var(--muted)'>не схоже на таску: "+d.unrecognized.map(esc).join(", ")+"</div>";
-    $("jiraOut").innerHTML=h;
-    $("jiraNote").textContent=ok?("+"+ok+" у пак"+(burned?(" · "+burned+" з вшитими титрами"):"")):"нічого нового";
+    window._jiraLastOut=h; put("jiraOut","innerHTML",h);
+    put("jiraNote","textContent",ok?("+"+ok+" у пак"+(burned?(" · "+burned+" з вшитими титрами"):"")):"нічого нового");
+    const nErr=(d.errors||[]).length+((d.unrecognized||[]).length?1:0);
+    if(!nErr)window._jiraLastText="";   // all good — next time the box starts empty
+    if(nErr)setTimeout(()=>setStatus("Jira: "+(d.errors||[]).length+" не знайдено"+((d.unrecognized||[]).length?" · є рядки, не схожі на таску":"")+" — відкрий ⇩ JIRA, там деталі.","err"),ok?2500:0);
     if(ok){finishPack(editPack.length,first);
       setStatus("З Джири: +"+ok+" кліп(ів)"+(burned?(" — у "+burned+" титри вже вшиті, позначено ⚠"):"")+". Далі «① Transcribe pack» — текст із тасок виправить недочуті слова.","ok");}
     else busyStop();
-  }catch(e){busyStop();$("jiraOut").innerHTML="<div style='color:var(--accent)'>✗ "+String(e.message).replace(/</g,"&lt;")+"</div>";
-    setStatus("Jira: "+e.message,"err");}
-  b.disabled=false;b.textContent="Імпортувати";
+  }catch(e){busyStop();window._jiraLastOut="<div style='color:var(--accent)'>✗ "+String(e.message).replace(/</g,"&lt;")+"</div>";put("jiraOut","innerHTML",window._jiraLastOut);
+    setStatus("Jira: "+e.message+" — відкрий ⇩ JIRA, список збережено.","err");}
 }
 if($("jiraBtn"))$("jiraBtn").onclick=openJiraPop;
 if($("dzJira"))$("dzJira").onclick=e=>{e.stopPropagation();openJiraPop();};
@@ -2020,6 +2201,7 @@ async function transcribePack(){
       h.txCover=d.cover||null;
       h.words=d.words; h.origWords=JSON.parse(JSON.stringify(d.words)); if(d.language)h.lang=d.language;   // origWords = the recogniser's own timings, the rescue for ↺
       h.scriptFixes=(d.script_fixes||[]);fixedTotal+=h.scriptFixes.length;
+      if(d.voices&&typeof voicesFor==="function")voicesFor(h,(h.mix&&h.mix.base)||h.clip,true);   // 🗣 free: Scribe diarized in the same call
     ok++;}catch(e){setStatus("Хук "+(i+1)+" помилка: "+e.message,"err");}
   }
   batchHintHide();
@@ -2030,11 +2212,12 @@ async function transcribePack(){
   if(ah){realWords=ah.words;if(variants.en){variants.en.words=ah.words;variants.en.lang=ah.lang;}
     $("transcript").value=wordsToText(ah.words);autoGrow();
     if(typeof setLangSticker==="function")setLangSticker(ah.lang);
-    // the views and the caption layout must see the new words NOW (the preview / Words / Sentences
-    // kept the demo text until something else redrew them — it looked like nothing happened)
+    // the views and the caption layout must see the new words NOW — until 2.0.0-b17 the text box
+    // was filled but the preview / Words / Sentences kept the demo until something else redrew them
     if(typeof invalidateLayout==="function")invalidateLayout();
     if(typeof txtView!=="undefined"){if(txtView==="words"&&typeof renderWordsView==="function")renderWordsView();
       if(txtView==="sents"&&typeof renderSentsView==="function")renderSentsView(true);}
+    if(typeof renderVoices==="function")renderVoices();
     if(typeof scheduleExact==="function")scheduleExact();}
   updateEditButtons();
   if(ok){busyDone(ok+" транскрибовано");if(typeof chime==="function")chime("localize");
@@ -2048,7 +2231,7 @@ function saveActiveHook(){
   try{const rw=parseBreaksToWords($("transcript").value,h.words);if(rw)h.words=rw;}catch(e){}
   h.ctrl=readControls();h.style=toEngineStyle(h.ctrl);   // h is a board hook → board stays current
   if(splitOn){const ab=styleAB();h.ctrl=ab[0];h.style=toEngineStyle(ab[0]);}   // base = the HOOK style; the body style lives in the regions
-  {const v=variants[activeVar];const rg=buildStyleRegions(h.style,(v&&v.phraseStyles)||[],splitOn?(h.body!=null?+h.body:splitAt()):null);h.regions=rg||null;}
+  {const v=variants[activeVar];const rg=buildStyleRegions(h.style,(typeof effOverrides==="function")?effOverrides(v,h.words,h):((v&&v.phraseStyles)||[]),splitOn?(h.body!=null?+h.body:splitAt()):null);h.regions=rg||null;}
   h.titles=cloneTitles();h.titlesOn=titlesOn();          // titles belong to THIS clip
   h.trim=(variants.en&&variants.en.trim)||h.trim||null;   // and so does the trim
 }
@@ -2073,6 +2256,7 @@ function selectHook(i){
   if(typeof setLangSticker==="function")setLangSticker(h.lang);
   $("transcribeBtn").disabled=false;$("renderBtn").disabled=false;
   renderHookStrip();renderGroupBar();updateEditButtons();
+  if(typeof renderVoices==="function")renderVoices();
   if(typeof syncTrim==="function")syncTrim();                   // this clip's own trim back on the bar
   if(typeof invalidateLayout==="function")invalidateLayout();   // drop the previous clip's caption layout at once
   if(typeof exactOn!=="undefined"&&exactOn)scheduleExact();
@@ -2081,6 +2265,7 @@ function renderHookStrip(){
   const fs=$("filmstrip");if(!fs)return;
   const gh=$("groupCol")&&$("groupCol").querySelector(".railhead");
   if(gh)gh.style.display=editPack.length?"":"none";        // an empty "Projects" column costs no width
+  {const gcol=$("groupCol"); if(gcol&&gcol.classList.contains("pstrip"))gcol.style.display=editPack.length>1?"":"none";}   // the strip only for a pack
   if(!editPack.length){fs.style.display="none";fs.innerHTML="";return;}
   fs.style.display="flex";fs.innerHTML="";
   // EN = the PROJECT, its localizations = sub-items: one column per project, the language
@@ -2153,8 +2338,8 @@ function closeProject(i){
 function sendPack(target){
   if(!editPack.length)return;
   saveActiveHook();let added=0;
-  // UPSERT: a hook already on the board gets the CURRENT trim / words / style (a re-send used to
-  // skip it → a second run rendered the old trim and old captions, and the trim never travelled)
+  // UPSERT: a hook already on the board gets the CURRENT trim / words / style. Until 2.0.0-b15 a re-send
+  // skipped it, so a second run rendered the old trim and old captions — and the trim never travelled.
   editPack.forEach(h=>{
     const fresh={name:h.clip,clip:h.clip,lang:h.lang,words:h.capsOff?[]:h.words,style:toEngineStyle(h.ctrl),src:"edit",regions:h.capsOff?null:(h.regions||null),
                 titles:(h.titles!=null?JSON.parse(JSON.stringify(h.titles)):null),titlesOn:(h.titlesOn!==false),
@@ -2256,7 +2441,7 @@ document.addEventListener("keydown",(e)=>{
   if(currentMode!=="edit"||!videoLoaded)return;
   const tag=(e.target&&e.target.tagName)||"";
   if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||e.target.isContentEditable)return;
-  const k=e.key.toLowerCase();
+  const k=({KeyI:"i",KeyO:"o"})[e.code]||e.key.toLowerCase();   // by the physical key: works in any keyboard layout (UA too)
   // I / O stamp the playhead into the trim (NLE muscle memory)
   if(e.key==="Escape"&&_wRng&&typeof setWordRange==="function"){e.preventDefault();setWordRange(null);return;}
   if((e.key==="["||e.key==="]")&&txtView==="words"&&_wSel>=0){e.preventDefault();setWordEdge(e.key==="["?"start":"end");return;}
@@ -2339,7 +2524,7 @@ function drawTrimBar(){
   if(typeof drawCutMark==="function")drawCutMark();
   if(typeof drawBodyMark==="function")drawBodyMark();
   if(typeof drawLanes==="function")drawLanes();
-  drawGhost(); if(typeof drawRuler==="function")drawRuler();
+  drawGhost(); if(typeof drawRuler==="function")drawRuler(); if(typeof drawSplits==="function")drawSplits();
   // timecode MM:SS:FF — frame-exact AND readable; exact seconds in the tooltip
   $("trimInLbl").textContent=tc(i);$("trimInLbl").title=i.toFixed(3)+" с · кадр "+frameOf(i);
   $("trimOutLbl").textContent=tc(o);$("trimOutLbl").title=o.toFixed(3)+" с · кадр "+frameOf(o);
@@ -2373,15 +2558,35 @@ function nudgeTrim(which,frames){
 }
 // Dragging an edge SHOWS its frame while you drag, and on release the playhead goes back to where
 // it was — moving In / Out never loses your place in the clip.
+// 🧲 hold SHIFT while dragging = a light magnet: In / Out / the playhead stick to scene cuts,
+// splits, the BODY ▸ boundary, the other trim edge and the playhead (within ~10 px).
+function magnetT(t,skip){
+  const bar=$("trimBar"), dur=video.duration||0; if(!bar||!dur)return {t,hit:null};
+  const tol=10/Math.max(1,bar.getBoundingClientRect().width)*dur;
+  const o=(typeof cutHolder==="function")?cutHolder():null;
+  const c=[];
+  (trimCuts()||[]).forEach(x=>c.push([+x,"cut"]));
+  ((o&&o.splits)||[]).forEach(x=>c.push([+x,"split"]));
+  if(o&&o.body!=null)c.push([+o.body,"body"]);
+  if(skip!=="in")c.push([pf($("trimIn").value,0),"In"]);
+  if(skip!=="out")c.push([pf($("trimOut").value,dur)||dur,"Out"]);
+  if(skip!=="ph")c.push([video.currentTime||0,"playhead"]);
+  let best=null; c.forEach(([x,k])=>{const d=Math.abs(x-t); if(d<=tol&&(!best||d<best.d))best={d,x,k};});
+  return best?{t:best.x,hit:best.k}:{t,hit:null};
+}
+function snapNote(hit,t){const el=$("trimBar"); if(!el)return; el.classList.toggle("snapped",!!hit);
+  if(hit)setStatus("🧲 "+hit+" · "+tc(t),"");}
 function trimDrag(which){return e=>{
   e.preventDefault();e.stopPropagation();armTrim(which);
   const t0=video.currentTime||0, x0=e.clientX; let moved=false;
   const move=ev=>{
     const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
     if(!moved&&Math.abs(cx-x0)<2)return; moved=true;
-    setTrimEdge(which,xToTime(cx));
+    let t=xToTime(cx), hit=null;
+    if(ev.shiftKey){const m=magnetT(t,which);t=m.t;hit=m.hit;} snapNote(hit,t);
+    setTrimEdge(which,t,{noMagnet:true});
   };
-  const up=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up);
+  const up=()=>{document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",up);snapNote(null);
     if(moved&&videoLoaded){try{video.currentTime=t0;}catch(_){}}};
   document.addEventListener("pointermove",move);document.addEventListener("pointerup",up);
 };}
@@ -2393,6 +2598,7 @@ function drawGhost(){const g=$("phGhost"),dur=video.duration||0; if(!g)return;
 $("trimHIn").addEventListener("pointerdown",trimDrag("in"));
 // the bar itself is the SCRUBBER: click / drag anywhere that isn't a handle = move the playhead
 $("trimBar").addEventListener("pointerdown",e=>{
+  if(e.button===2)return;   // right button → the context menu
   if(!videoLoaded||(e.target.closest&&e.target.closest(".thandle")))return;
   if(e.target.closest&&e.target.closest("#phGhost")){e.preventDefault();const b=_phBack;_phBack=null;drawGhost();video.currentTime=b;return;}
   // near an edge = grab the edge, never jump the playhead (the ears are thin; 14 px of grace)
@@ -2400,17 +2606,50 @@ $("trimBar").addEventListener("pointerdown",e=>{
    const xi=r.left+pf($("trimIn").value,0)/dur*r.width, xo=r.left+(pf($("trimOut").value,dur)||dur)/dur*r.width;
    const di=Math.abs(e.clientX-xi), dO=Math.abs(e.clientX-xo);
    if(Math.min(di,dO)<=14&&!(e.target.closest&&e.target.closest("#trimPlayhead"))){trimDrag(di<=dO?"in":"out")(e);return;}}
-  const _was=video.currentTime||0;
-  e.preventDefault();
+  // 2.0, like Premiere / AE: the PICTURE lane never moves the playhead. Only the white head (drag it)
+  // and the time ruler above scrub. A click on the picture selects the piece between splits.
+  if(e.target.closest&&e.target.closest("#trimPlayhead")){scrubDrag(e);return;}
+  if(typeof selectPieceAt==="function")selectPieceAt(xToTime(e.clientX));
+});
+// ---------- 🔊 audio scrub: hold Cmd (Ctrl) while dragging the playhead — short grains, like AE ----------
+// The clip's own sound as you hear it (the current mix), decoded once per file into Web Audio.
+var _scr={ctx:null,url:"",buf:null,busy:null,last:0,lastT:-1};
+function scrubAudioLoad(){
+  const url=video.currentSrc||video.src; if(!url)return null;
+  if(_scr.url===url&&(_scr.buf||_scr.busy))return _scr.busy;
+  _scr.url=url; _scr.buf=null;
+  try{_scr.ctx=_scr.ctx||new (window.AudioContext||window.webkitAudioContext)();}catch(_){return null;}
+  _scr.busy=fetch(url).then(r=>r.arrayBuffer()).then(a=>new Promise((ok,no)=>_scr.ctx.decodeAudioData(a,ok,no)))
+    .then(b=>{if(_scr.url===url)_scr.buf=b;}).catch(()=>{}).finally(()=>{if(_scr.url===url)_scr.busy=null;});
+  return _scr.busy;
+}
+function scrubGrain(t){
+  if(video.muted)return; const now=performance.now();
+  if(now-_scr.last<45||Math.abs(t-_scr.lastT)<0.5/fps())return;   // a grain every ~45 ms, only when the frame changes
+  if(!_scr.buf||_scr.url!==(video.currentSrc||video.src)){scrubAudioLoad();return;}
+  const c=_scr.ctx; if(c.state==="suspended")c.resume().catch(()=>{});
+  _scr.last=now; _scr.lastT=t;
+  const src=c.createBufferSource(), g=c.createGain(), L=0.06, at=c.currentTime, v=Math.max(0,Math.min(1,video.volume??1));
+  src.buffer=_scr.buf; src.connect(g); g.connect(c.destination);
+  g.gain.setValueAtTime(0,at); g.gain.linearRampToValueAtTime(v,at+0.006); g.gain.setValueAtTime(v,at+L-0.012); g.gain.linearRampToValueAtTime(0,at+L);
+  try{src.start(at,Math.max(0,Math.min(_scr.buf.duration-L,t)),L);}catch(_){}
+}
+document.addEventListener("keydown",e=>{if((e.key==="Meta"||e.key==="Control")&&currentMode==="edit"&&videoLoaded)scrubAudioLoad();});   // decode ahead, so the first grain is instant
+function scrubDrag(e){
+  if(!videoLoaded)return; e.preventDefault();
+  const L=$("lanes"); if(L)L._scrub=true;
   const go=ev=>{const cx=(ev.touches&&ev.touches[0]?ev.touches[0].clientX:ev.clientX);
-    const t=(Math.floor(xToTime(cx)*fps())+0.5)/fps();video.currentTime=Math.min(t,Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
+    if(L&&_tlZoom>1){const r=L.getBoundingClientRect(), lh=tlLH();   // zoomed: drag past an edge → the lanes scroll
+      if(cx>r.right-16)L.scrollLeft+=Math.min(40,cx-(r.right-16)+6); else if(cx<r.left+lh+16)L.scrollLeft-=Math.min(40,(r.left+lh+16)-cx+6);}
+    let x=xToTime(cx), hit=null; if(ev.shiftKey){const m=magnetT(x,"ph");x=m.t+(m.hit?0.0001:0);hit=m.hit;} snapNote(hit,x);
+    const t=(Math.floor(x*fps())+0.5)/fps();video.currentTime=Math.min(Math.max(0,t),Math.max(0,(video.duration||0)-0.001));   // frame centre, like ⟨ ⟩
+    if(ev.metaKey||ev.ctrlKey)scrubGrain(video.currentTime);
     if(!video.paused){video.pause();$("playBtn").textContent="▶";}
     if(typeof scheduleExact==="function")scheduleExact();};
   go(e);
-  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);
-    if(Math.abs((video.currentTime||0)-_was)>0.25){_phBack=_was;drawGhost();}};
+  const up=()=>{document.removeEventListener("pointermove",go);document.removeEventListener("pointerup",up);snapNote(null);if(L){L._scrub=false;_tlLastT=video.currentTime||0;}};
   document.addEventListener("pointermove",go);document.addEventListener("pointerup",up);
-});
+}
 $("trimHOut").addEventListener("pointerdown",trimDrag("out"));
 // I / O + buttons: park the playhead on the right frame with ⟨ ⟩, then stamp it into the trim
 function setTrimFromPlayhead(which){
@@ -2469,6 +2708,12 @@ function layoutKey(){
   const w=realWords||[];
   return [activeVar,v.clip||v.videoUrl||"",w.length,(w[0]&&w[0].text)||"",(w[w.length-1]&&w[w.length-1].text)||""].join("|");
 }
+function curRegions(baseEng){
+  if(typeof buildStyleRegions!=="function")return null;
+  baseEng=baseEng||toEngineStyle(readControls());
+  const ov=(typeof effOverrides==="function")?effOverrides():(typeof curPhraseStyles==="function"?curPhraseStyles():[]);
+  return buildStyleRegions(baseEng,ov)||null;
+}
 function invalidateLayout(){serverLayout=null;_layoutKey="";clearTimeout(_layoutTimer);fetchLayout();}
 function scheduleLayout(){clearTimeout(_layoutTimer);_layoutTimer=setTimeout(fetchLayout,250);}
 async function fetchLayout(){
@@ -2476,7 +2721,7 @@ async function fetchLayout(){
   const key=layoutKey();
   if(!words||!words.length){serverLayout=null;_layoutKey="";return;}   // demo/pre-transcription → JS buildEvents fallback
   const baseEng=toEngineStyle(readControls());
-  const regions=(typeof buildStyleRegions==="function")?buildStyleRegions(baseEng,(typeof curPhraseStyles==="function"?curPhraseStyles():[])):null;
+  const regions=curRegions(baseEng);   // ✦ phrase / 🗣 voice / Body styles — the same regions the render uses
   const cuts=(variants[activeVar]&&variants[activeVar].cuts)||null;
   const seq=++_layoutSeq;
   try{const r=await fetch(API+"/api/layout",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -2495,7 +2740,7 @@ async function fetchExact(){
   const _cw=capsOffNow()?[]:v&&v.words;
   if(!v||((!_cw||!_cw.length)&&!(typeof titlesCfg==="function"&&titlesCfg(tLang()).length))){if(typeof hideExact==="function")hideExact();return;}
   try{const r=await fetch(API+"/api/preview_frame",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({style:toEngineStyle(readControls()),words:_cw,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(tLang())})});
+      body:JSON.stringify({style:toEngineStyle(readControls()),words:_cw,time:video.currentTime||0,format:ratio,dur:video.duration||0,cap_in:capWin().in,cap_out:capWin().out,lang:capLang(),cuts:v.cuts||null,titles:titlesCfg(tLang()),regions:curRegions()})});
     if(r.status===204){hideExact();return;}
     if(!r.ok)return;
     const url=URL.createObjectURL(await r.blob());const img=$("exactImg");
@@ -2897,8 +3142,6 @@ video.addEventListener("seeked",scheduleExact);
 video.addEventListener("pause",scheduleExact);
 $("panelContent").addEventListener("input",()=>{saveLastStyle();scheduleExact();});
 $("panelContent").addEventListener("change",()=>{saveLastStyle();scheduleExact();});
-// segmented buttons (AA / Aa…), header switches change the style by CLICK, with no input event
-$("panelContent").addEventListener("click",e=>{if(e.target.closest&&e.target.closest("button,.switch,label"))setTimeout(()=>{saveLastStyle();scheduleExact();},0);});
 
 // ---------- fonts ----------
 // register a font file from the server so the canvas preview uses the SAME file the engine renders with
@@ -3031,14 +3274,14 @@ function fromEngineStyle(e){
   const st=e.stroke||{},so=e.stroke_outer||{},sh=e.shadow||{},pl=e.plate||{},ka=e.karaoke||{},kp=e.karaoke_plate||{},gr=e.gradient||{};
   return {fontFamily:(e.font_name||"Poppins-Bold.ttf").replace(/\.(ttf|otf)$/i,""),fontSize:+e.font_size||80,textColor:hx(e.text_color),
     textCase:(e.text_case===""||e.text_case==null)?"none":e.text_case,wrapMode:e.wrap_mode||"chars",maxChars:(e.wrap_mode==="words")?(+e.words_per_line||3):(+e.max_chars_per_line||15),
-    maxLines:+e.max_lines||(e.force_single_line?1:2),marginBottom:+e.margin_bottom||320,lineSpacing:+g(e,"line_spacing",10),boxOffsetY:+g(e,"box_offset_y",0),punct:!!e.punctuation,
+    maxLines:+e.max_lines||(e.force_single_line?1:2),marginBottom:+e.margin_bottom||320,lineSpacing:+g(e,"line_spacing",10),boxOffsetY:+g(e,"box_offset_y",0),punct:punctMode(e.punctuation),
     strokeW:+g(st,"width",0),strokeColor:hx(st.color),strokeOuterW:+g(so,"width",0),strokeOuterColor:hx(so.color),
     shadowOn:!!sh.enabled,shX:+g(sh,"offset_x",0),shY:+g(sh,"offset_y",8),shBlur:+g(sh,"glow_blur",0),shColor:hx(sh.color),
     shadow2On:!!(e.shadow2&&e.shadow2.enabled),sh2X:+g(e.shadow2||{},"offset_x",0),sh2Y:+g(e.shadow2||{},"offset_y",4),sh2Blur:+g(e.shadow2||{},"glow_blur",0),sh2Color:hx((e.shadow2&&e.shadow2.color)||[0,0,0,255]),
     strokeOn:(e.stroke_on!==false),
     plateShadowOn:!!(e.plate_shadow&&e.plate_shadow.enabled),pshX:+g(e.plate_shadow||{},"offset_x",0),pshY:+g(e.plate_shadow||{},"offset_y",8),pshBlur:+g(e.plate_shadow||{},"glow_blur",0),pshColor:hx((e.plate_shadow&&e.plate_shadow.color)||[0,0,0,255]),
     plateOn:!!pl.enabled,plateLine:!!pl.per_line,plateFull:!!pl.full_width,plateColor:hx(pl.color),plateAlpha:(pl.color&&pl.color[3]!=null)?pl.color[3]:160,platePadX:+g(pl,"pad_x",30),platePadY:+g(pl,"pad_y",15),plateRadius:+g(pl,"border_radius",15),
-    karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
+    karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),accentColor:hx((e.accent&&e.accent.color)||[255,90,44,255]),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
     gradC0:hx((gr.colors&&gr.colors[0])||[255,90,44,255]),gradC1:hx((gr.colors&&gr.colors[1])||[255,212,0,255]),gradDir:gr.direction||"vertical",gradText:!!gr.on_text,gradActive:!!gr.on_active,gradPlate:!!gr.on_plate,
     scrimOn:!!(e.scrim&&e.scrim.enabled),scrimColor:hx((e.scrim&&e.scrim.color)||[0,0,0,150]),scrimAlpha:(e.scrim&&e.scrim.color&&e.scrim.color[3]!=null)?e.scrim.color[3]:150,scrimFeather:+g(e.scrim||{},"feather",70),scrimFade:+g(e.scrim||{},"fade",0.25),
     animType:(e.animation&&e.animation.type)||"none",animSpeed:+g(e.animation||{},"speed",0.25),holdLast:!!e.hold_last};
@@ -3052,14 +3295,61 @@ function styleSampleCSS(e){
   if(e.karaoke&&e.karaoke.enabled&&e.karaoke.active_color)css+="color:"+rgb(e.karaoke.active_color)+";";
   return css;
 }
+// what a preset card is: "custom" (★ team / your own) · "official" (shipped in styles/) · "builtin" (baked into the app)
+const _hiddenPresets=(()=>{try{return new Set(JSON.parse(localStorage.getItem("cs_hidePresets")||"[]"));}catch(_){return new Set();}})();
+function _saveHidden(){try{localStorage.setItem("cs_hidePresets",JSON.stringify([..._hiddenPresets]));}catch(_){}}
+function presetKind(name){if(savedStyles[name])return (officialNames&&officialNames.has(name))?"official":"custom"; return "builtin";}
+async function renamePreset(name){
+  const nn=(prompt("Нова назва для «"+name+"»:",name)||"").trim(); if(!nn||nn===name)return;
+  const e=savedStyles[name]; if(!e)return;
+  try{let r=await fetch(API+"/api/styles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:nn,style:e})});
+    if(!r.ok)throw new Error("save failed");
+    await fetch(API+"/api/styles/"+encodeURIComponent(name),{method:"DELETE"});
+    setStatus("Пресет «"+name+"» → «"+nn+"».","ok"); await loadSavedStyles();
+  }catch(er){setStatus("Rename: "+er.message,"err");}}
+async function duplicatePreset(name){
+  const e=savedStyles[name]||(typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES[name]); if(!e)return;
+  const nn=(prompt("Назва копії:",name+" copy")||"").trim(); if(!nn)return;
+  try{const r=await fetch(API+"/api/styles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:nn,style:e})});
+    if(!r.ok)throw new Error("save failed"); setStatus("Копія «"+nn+"» збережена ★.","ok"); await loadSavedStyles();
+  }catch(er){setStatus("Duplicate: "+er.message,"err");}}
+async function deletePresetAny(name){
+  const k=presetKind(name);
+  if(k==="builtin"){_hiddenPresets.add(name);_saveHidden();renderPresetRail();setStatus("Пресет «"+name+"» сховано (вбудований). Повернути — «показати сховані» під пресетами.","ok");return;}
+  if(k==="official"){
+    if(!IS_MAINTAINER){setStatus("«"+name+"» — стандартний пресет команди, його можна тільки сховати.","");_hiddenPresets.add(name);_saveHidden();renderPresetRail();return;}
+    if(!confirm("Видалити СТАНДАРТНИЙ пресет «"+name+"» з репозиторію (styles/)? Після Commit + Push він зникне в усієї команди."))return;
+    try{const r=await fetch(API+"/api/styles/official/"+encodeURIComponent(name),{method:"DELETE"});const d=await r.json();
+      if(!r.ok)throw new Error(d.detail||"failed"); setStatus("Стандартний пресет «"+name+"» видалено з styles/ — тепер Commit + Push у GitHub Desktop.","ok"); await loadSavedStyles();
+    }catch(er){setStatus("Delete: "+er.message,"err");}
+    return;}
+  return deleteStyle(name);
+}
+function presetMenu(ev,name){
+  const k=presetKind(name);
+  ctxMenu(ev,[{head:name+(k==="custom"?" · ★ свій":k==="official"?" · стандартний":" · вбудований")},
+    {label:"✓ Apply",on:()=>{const c=[...document.querySelectorAll("#presets .preset")].find(x=>x.dataset.pname===name);if(c)c.click();}},
+    k==="custom"?{label:"✎ Rename…",on:()=>renamePreset(name)}:null,
+    {label:"⧉ Duplicate…",title:"Копія як твій пресет ★ — далі можна правити",on:()=>duplicatePreset(name)},
+    "-",
+    {label:k==="builtin"||(k==="official"&&!IS_MAINTAINER)?"🙈 Hide":"✕ Delete",on:()=>deletePresetAny(name)}]);
+}
 function presetCard(label,sampleCSS,custom,onClick){
   const b=document.createElement("div");b.className="preset";b.title=label+(custom?" (custom — редагований, ✕ видалити)":"");b.style.position="relative";
   b.innerHTML="<div class='pv'><span style='"+sampleCSS+"'>Aa</span></div><div class='pn'>"+(custom?"★ ":"")+label+"</div>";
-  // a preset writes the controls with no input event → refresh the exact frame + caption layout here
+  // a preset is applied by writing the controls (no input event) → the exact frame and the
+  // caption layout must be refreshed here, or the preview kept the old style until ✓ exact was re-toggled
   b.onclick=()=>{onClick();markPreset(b);if(typeof saveLastStyle==="function")saveLastStyle();
     if(typeof invalidateLayout==="function")invalidateLayout();if(typeof scheduleExact==="function")scheduleExact();};
-  if(custom){const x=document.createElement("button");x.className="presetdel";x.textContent="✕";x.title="Видалити пресет";
-    x.onclick=(e)=>{e.stopPropagation();deleteStyle(label);};b.appendChild(x);}
+  b.dataset.pname=label;
+  const kind=presetKind(label);
+  // ✕ on every card you may remove: your / team presets; shipped ones in the maintainer's repo clone;
+  // built-ins can only be HIDDEN (they're part of the app). Right-click = the full menu.
+  {const x=document.createElement("button");x.className="presetdel";
+    const del=(kind==="custom")||(kind==="official"&&IS_MAINTAINER);
+    x.textContent=del?"✕":"🙈"; x.title=del?"Видалити пресет":"Сховати пресет (повернути — «показати сховані»)";
+    x.onclick=(e)=>{e.stopPropagation();deletePresetAny(label);};b.appendChild(x);}
+  b.addEventListener("contextmenu",e=>presetMenu(e,label));
   return b;
 }
 async function deleteStyle(name){
@@ -3072,9 +3362,11 @@ function renderPresetRail(){
   const pw=$("presets");if(!pw)return;pw.innerHTML="";
   const shown=new Set();
   // Folder presets first (styles/ official + Drive/local customs) — a same-named folder preset WINS.
-  Object.keys(savedStyles).forEach(name=>{shown.add(name);const e=savedStyles[name];const isOff=officialNames.has(name);pw.appendChild(presetCard(name,styleSampleCSS(e),!isOff,()=>writeControls(fromEngineStyle(e))));});   // official (shipped) → no ★; team customs → ★ + ✕
+  Object.keys(savedStyles).forEach(name=>{shown.add(name);if(_hiddenPresets.has(name))return;const e=savedStyles[name];const isOff=officialNames.has(name);pw.appendChild(presetCard(name,styleSampleCSS(e),!isOff,()=>writeControls(fromEngineStyle(e))));});   // official (shipped) → no ★; team customs → ★ + ✕
   // Built-in baseline (baked into the app JS) fills any names the folders didn't deliver — guaranteed for EVERYONE, no ★.
-  Object.keys(BUILTIN_STYLES).forEach(name=>{if(shown.has(name))return;const e=BUILTIN_STYLES[name];pw.appendChild(presetCard(name,styleSampleCSS(e),false,()=>writeControls(fromEngineStyle(e))));});
+  Object.keys(BUILTIN_STYLES).forEach(name=>{if(shown.has(name)||_hiddenPresets.has(name))return;const e=BUILTIN_STYLES[name];pw.appendChild(presetCard(name,styleSampleCSS(e),false,()=>writeControls(fromEngineStyle(e))));});
+  if(_hiddenPresets.size){const sh=document.createElement("div");sh.className="hint";sh.style.cssText="grid-column:1/-1;cursor:pointer;text-decoration:underline dotted;text-align:center";
+    sh.textContent="показати сховані ("+_hiddenPresets.size+")";sh.onclick=()=>{_hiddenPresets.clear();_saveHidden();renderPresetRail();};pw.appendChild(sh);}
   const act=document.createElement("div");act.style.cssText="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px";
   act.innerHTML="<button id='railSave' style='flex:1;font-size:11px;padding:6px 4px'>＋ Save</button>"+
     "<button id='railImport' style='flex:1;font-size:11px;padding:6px 4px' title='Завантажити чийсь стиль-файл (.json)'>⤴ Import</button>"+
@@ -3103,6 +3395,7 @@ async function loadSavedStyles(){
     await Promise.all(names.map(async n=>{try{savedStyles[n]=await(await fetch(API+"/api/styles/"+encodeURIComponent(n))).json();}catch(e){}}));
   }catch(e){}
   renderPresetRail();
+  if(typeof renderVoices==="function"){_effCache.k=null;renderVoices();}   // a new / imported preset shows up in 🗣 Voices at once
 }
 async function saveCurrentStyle(){
   const name=(prompt("Назви стиль (напр. brand_bold):")||"").trim();if(!name)return;
@@ -3127,6 +3420,13 @@ $("styleFileInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd
   rd.readAsText(f);e.target.value="";};
 
 // case segmented control (buttons instead of dropdown)
+// Punctuation: "off" · "qe" (? ! stay — default) · "all". Old presets stored a bool: true = all, false = qe.
+function punctMode(v){return (v===true||v==="true"||v==="all")?"all":(v==="off"?"off":"qe");}
+function punctToEngine(v){v=punctMode(v);return v==="all"?true:(v==="off"?"off":false);}
+function updatePunctSeg(){const v=punctMode($("punct").value);$("punctSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
+if($("punctSeg"))$("punctSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("punct").value=b.dataset.v;updatePunctSeg();
+  $("punct").dispatchEvent(new Event("change",{bubbles:true}));
+  if(typeof saveLastStyle==="function")saveLastStyle(); if(typeof scheduleExact==="function")scheduleExact();});
 function updateCaseSeg(){const v=$("textCase").value;$("caseSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
 $("caseSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("textCase").value=b.dataset.v;updateCaseSeg();scheduleExact();});
 
@@ -3324,6 +3624,11 @@ function revertSpan(sp){
 }
 function rvUndoStack(){const v=variants[activeVar],h=(typeof openHookRef==="function")?openHookRef():null;
   return (v&&v._rvFrom&&v._rvFrom.length)?v._rvFrom:((h&&h._rvFrom&&h._rvFrom.length)?h._rvFrom:null);}
+// ↩ / ↪ — one stack per clip holder. A NEW edit clears the redo stack (like every editor).
+const pushOnce=(a,x)=>{if(a[a.length-1]!==x)a.push(x);};   // holders may SHARE one stack (Edit ⇄ pack hook) — never push a step twice
+function pushUndo(o,before){pushOnce(o._rvFrom=o._rvFrom||[],before);if(o._rdTo)o._rdTo.length=0;}
+function rvRedoStack(){const v=variants[activeVar],h=(typeof openHookRef==="function")?openHookRef():null;
+  return (v&&v._rdTo&&v._rdTo.length)?v._rdTo:((h&&h._rdTo&&h._rdTo.length)?h._rdTo:null);}
 function scheduleRevoiceBox(){clearTimeout(_rvTimer);_rvTimer=setTimeout(renderRevoiceBox,450);}
 function renderRevoiceBox(){
   const box=$("revoiceBox");if(!box)return;
@@ -3409,7 +3714,7 @@ async function doRevoice(list){
     });
     // swap the clip IN PLACE (Edit, LOC and the board hold the same objects); keep the old file for ↩
     const _vh=openHookRef();
-    rvTargets(v.clip).forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;o.origWords=orig.map(w=>({...w}));
+    rvTargets(v.clip).forEach(o=>{pushUndo(o,before);o.clip=d.clip;o.videoUrl=API+d.url;o.origWords=orig.map(w=>({...w}));
       if(o!==v&&o!==_vh&&("words" in o))o.words=cur.map(w=>({...w}));});   // board / LOC copies: the new words too, or they caption the new audio with the old text
     if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);   // ours — don't let the board re-add it as a new hook
     _rvSay={};_wRng=null;
@@ -3431,6 +3736,12 @@ async function doRevoice(list){
 function undoRevoice(){
   const st=rvUndoStack();if(!st||!st.length)return;
   const prev=st[st.length-1], v=variants[activeVar], cur=v&&v.clip, h=openHookRef();
+  // ↪ remember what we're leaving (the CLEAN clip — the mix is rebuilt from it), so Redo can come back
+  const _mo=mixHolder(), _m=_mo&&_mo.mix;
+  const after=(prev.kind==="cut")?cutSnapshot(v,h):{kind:prev.kind,words:(realWords||[]).map(w=>({...w})),origWords:(origWordsNow()||[]).map(w=>({...w}))};
+  after.kind=prev.kind; after.clip=_m?_m.base:(v&&v.clip); after.videoUrl=_m?mixBaseUrl(_m):(v&&v.videoUrl);
+  const rec={undo:prev,after};
+  rvTargets(cur).forEach(o=>{pushOnce(o._rdTo=o._rdTo||[],rec);});
   rvTargets(cur).forEach(o=>{if(o._rvFrom&&o._rvFrom.length&&o._rvFrom[o._rvFrom.length-1]===prev)o._rvFrom.pop();
     o.clip=prev.clip;o.videoUrl=prev.videoUrl;o.origWords=prev.origWords.map(w=>({...w}));
     if(prev.kind!=="cut"&&o!==v&&o!==h&&("words" in o))o.words=prev.words.map(w=>({...w}));});
@@ -3446,6 +3757,38 @@ function undoRevoice(){
   if(typeof drawCutMark==="function")drawCutMark();
   {const mo=mixHolder(); if(mo&&mo.mix&&(prev.kind==="cut"||prev.kind==="revoice"||prev.kind==="regen"))mixRebase(mo);}
 }
+function redoStep(){
+  const st=rvRedoStack();if(!st||!st.length)return;
+  const rec=st[st.length-1], a=rec.after, v=variants[activeVar], cur=v&&v.clip, h=openHookRef();
+  rvTargets(cur).forEach(o=>{if(o._rdTo&&o._rdTo.length&&o._rdTo[o._rdTo.length-1]===rec)o._rdTo.pop();
+    pushOnce(o._rvFrom=o._rvFrom||[],rec.undo);
+    o.clip=a.clip;o.videoUrl=a.videoUrl;o.origWords=(a.origWords||[]).map(w=>({...w}));
+    if(a.kind!=="cut"&&o!==v&&o!==h&&("words" in o))o.words=(a.words||[]).map(w=>({...w}));});
+  if(a.kind==="cut"){
+    cutRestore(a);
+    if(typeof loadCapWin==="function")loadCapWin(h||v);
+    if(typeof renderTitles==="function")try{renderTitles();}catch(_){}
+    cutLoadVideo(a.videoUrl);
+  }else rvLoadVideo(a.videoUrl);
+  commitWords((a.words||[]).map(w=>({...w})));
+  if(typeof renderHookStrip==="function")renderHookStrip();
+  setStatus("↪ Повторено: "+(rec.undo.label||HIST_NAME[a.kind]||a.kind)+".","ok");
+  if(typeof drawCutMark==="function")drawCutMark();
+  {const mo=mixHolder(); if(mo&&mo.mix&&(a.kind==="cut"||a.kind==="revoice"||a.kind==="regen"))mixRebase(mo);}
+  renderHistory(); if(typeof hmRefreshUndo==="function")hmRefreshUndo();
+}
+// Cmd/Ctrl+Z = undo, Cmd/Ctrl+Shift+Z (or Ctrl+Y) = redo — not while typing (the field keeps its own undo)
+document.addEventListener("keydown",e=>{
+  if(!(e.metaKey||e.ctrlKey)||e.altKey)return;
+  const isZ=e.code==="KeyZ", isY=e.code==="KeyY"&&e.ctrlKey&&!e.metaKey;
+  if(!isZ&&!isY)return;
+  const tg=e.target,tag=(tg&&tg.tagName)||"";
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
+  if(currentMode!=="edit")return;
+  e.preventDefault(); if(e.repeat)return;
+  if(isY||e.shiftKey){if(rvRedoStack())redoStep();}
+  else if(rvUndoStack()){undoRevoice();renderHistory();if(typeof hmRefreshUndo==="function")hmRefreshUndo();}
+});
 // ---------- ✂ Cut segment: remove a piece from the MIDDLE of the clip ----------
 // A cut makes a NEW file (server: "<name>_cutN"), swapped in place like a re-voice, so preview,
 // exact, render, board and LOC simply see a shorter clip — nothing downstream has to know.
@@ -3478,7 +3821,7 @@ function cutMarkFromPlayhead(which){
 }
 // Every object that holds THIS clip (Edit variant, the open pack hook, board copies, LOC tiles)
 // carries its own copies of words / trim / titles / stickers / caption window — each must move.
-const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out","body"];
+const CUT_FIELDS=["words","trim","cuts","overlays","titles","capIn","capOut","cap_in","cap_out","body","splits","phraseStyles"];
 function cutSnapshot(v,h){
   const J=x=>x==null?x:JSON.parse(JSON.stringify(x)), per=new Map();
   rvTargets(v.clip).forEach(o=>{const s={};CUT_FIELDS.forEach(k=>{if(k in o)s[k]=J(o[k]);});if(o.mix)s._sfxAt=o.mix.sfx.map(x=>x.at);per.set(o,s);});
@@ -3507,6 +3850,10 @@ function cutApplyTimes(targets,spans,oldDur,newWords,notActive){
     if(o.titles)o.titles=once(o.titles,rtTitles);
     ["capIn","capOut","cap_in","cap_out","body"].forEach(k=>{if(o[k]!=null)o[k]=R(o[k]);});
     if(o.mix&&o.mix.sfx)once(o.mix.sfx,l=>{l.forEach(s=>{s.at=R(s.at);});return l;});   // 🎚 sounds stay on their picture
+    if(o.voices&&o.voices.spans)once(o.voices,V=>{V.spans=V.spans.filter(([a,b])=>!(cutInside(a,spans)&&cutInside(b,spans))).map(([a,b,id])=>[R(a),R(b),id]);
+      const f={};Object.keys(V.fix||{}).forEach(k=>{if(!cutInside(+k,spans))f[(+R(+k)).toFixed(2)]=V.fix[k];});V.fix=f;return V;});   // 🗣 voices stay on their words
+    if(o.splits)o.splits=once(o.splits,l=>l.filter(x=>!cutInside(x,spans)).map(R).filter((x,i,a)=>x>0.05&&a.indexOf(x)===i));
+    if(o.phraseStyles)o.phraseStyles=once(o.phraseStyles,l=>l.map(x=>({...x,start:R(+x.start),end:R(+x.end)})).filter(x=>x.end-x.start>0.02));   // 🎨 phrase styles stay on their words
     if(o!==v&&o!==h&&newWords&&("words" in o))o.words=newWords.map(w=>({...w}));   // board / LOC copies get the re-timed captions too
   });
   if(notActive)return;          // another clip of the pack: the editor's own titles / caption window are not its
@@ -3548,7 +3895,7 @@ async function doCut(spans,speech,opts){
     if(opts.clearTrim)before.undoName="trim";
     cutApplyTimes(targets,d.spans,oldDur,d.words||[]);
     if(opts.clearTrim)targets.forEach(o=>{if("trim" in o)o.trim=null;});   // the file IS the trim now
-    targets.forEach(o=>{(o._rvFrom=o._rvFrom||[]).push(before);o.clip=d.clip;o.videoUrl=API+d.url;
+    targets.forEach(o=>{pushUndo(o,before);o.clip=d.clip;o.videoUrl=API+d.url;
       o.origWords=(d.orig_words||[]).map(w=>({...w}));});
     const other=Object.keys(variants).filter(k=>k!==activeVar);   // dubs were made from the UNCUT clip
     if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
@@ -3579,7 +3926,7 @@ async function _cutOtherHook(o,spans){
   const before={kind:"cut",label:"✂ Cut "+tc(d.removed)+" @ "+tc(d.spans[0][0])+" (batch)",clip:o.clip,videoUrl:o.videoUrl,
     words:(o.words||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w})),titles:J(titles),per};
   cutApplyTimes(targets,d.spans,d.dur_before||0,d.words||[],true);
-  targets.forEach(x=>{(x._rvFrom=x._rvFrom||[]).push(before);x.clip=d.clip;x.videoUrl=API+d.url;
+  targets.forEach(x=>{pushUndo(x,before);x.clip=d.clip;x.videoUrl=API+d.url;
     x.origWords=(d.orig_words||[]).map(w=>({...w}));if("words" in x||x===o)x.words=(d.words||[]).map(w=>({...w}));});
   if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
   return d.removed;
@@ -3740,7 +4087,7 @@ function rgApply(j,d){
   const o=j.o, mm=mixUnwrap(o), isOpen=(o===mixHolder());
   const before={kind:"regen",label:"✨ Seedance «"+j.prompt.slice(0,34)+"»",clip:o.clip,videoUrl:o.videoUrl,
     words:((isOpen?realWords:o.words)||[]).map(w=>({...w})),origWords:(o.origWords||[]).map(w=>({...w}))};
-  hmTargets(o).forEach(x=>{(x._rvFrom=x._rvFrom||[]).push(before);x.clip=d.clip;x.videoUrl=API+d.url;});
+  hmTargets(o).forEach(x=>{pushUndo(x,before);x.clip=d.clip;x.videoUrl=API+d.url;});
   if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
   if(mm)mixRebase(o); else if(isOpen)rvLoadVideo(API+d.url);
   if(typeof renderHookStrip==="function")renderHookStrip(); if(typeof renderHistory==="function")renderHistory();
@@ -3761,7 +4108,7 @@ async function newPart(){
     const v=variants[activeVar]; const hk=makePackHook(v.clip,v.videoUrl,v.language||"");
     Object.assign(hk,{words:realWords||v.words||null,origWords:v.origWords||null,trim:v.trim||null,cuts:v.cuts||null,body:v.body!=null?v.body:null,capsOff:!!v.capsOff,
       ctrl:readControls(),style:toEngineStyle(readControls()),titles:cloneTitles(),titlesOn:titlesOn()});
-    if(v.mix)hk.mix=v.mix; if(v._rvFrom)hk._rvFrom=v._rvFrom;
+    if(v.mix)hk.mix=v.mix; if(v._rvFrom)hk._rvFrom=v._rvFrom; if(v._rdTo)hk._rdTo=v._rdTo;
     editPack=[hk]; activeHook=-1; editingHook=null; selectHook(0);
   }
   saveActiveHook();
@@ -3836,15 +4183,19 @@ if($("cutUndo"))$("cutUndo").onclick=()=>undoRevoice();
 const HIST_NAME={cut:"cut",revoice:"re-voice",music:"music",sfx:"sfx",regen:"regen"};
 function renderHistory(){
   const el=$("histRow"); if(!el)return;
-  const st=rvUndoStack()||[];
-  if(!st.length){el.style.display="none";el.innerHTML="";return;}
+  const st=rvUndoStack()||[], rd=rvRedoStack()||[];
+  if(!st.length&&!rd.length){el.style.display="none";el.innerHTML="";return;}
+  const rtop=rd[rd.length-1];
+  const redoBtn=rd.length?"<button type='button' id='histRedo' class='tmini' title='Повторити скасоване (Cmd+Shift+Z): "+String(rtop.undo.label||"").replace(/'/g,"&#39;")+"'>↪ Redo "+(rtop.undo.undoName||HIST_NAME[rtop.undo.kind]||"re-voice")+"</button>":"";
   const steps=["Original"].concat(st.map(s=>s.label||(s.kind==="cut"?"✂ Cut":s.kind==="music"?"♪ Music":"🎙 Re-voice")));
   const top=st[st.length-1];
   el.style.display="flex";
+  const undoBtn=top?"<button type='button' id='histUndo' class='tmini' title='Скасувати останній крок (Cmd+Z): "+String(top.label||"").replace(/'/g,"&#39;")+"'>↩ Undo "+(top.undoName||HIST_NAME[top.kind]||"re-voice")+"</button>":"";
   el.innerHTML="<span style='font-weight:600;color:var(--txt)'>History</span>"
     +steps.map((s,i)=>(i?"<span class='harr'>→</span>":"")+"<span class='hstep"+(i===steps.length-1?" cur":"")+"' title='"+String(s).replace(/'/g,"&#39;")+"'>"+s+"</span>").join("")
-    +"<span style='flex:1'></span><button type='button' id='histUndo' class='tmini' title='Скасувати останній крок: "+String(top.label||"").replace(/'/g,"&#39;")+"'>↩ Undo "+(top.undoName||HIST_NAME[top.kind]||"re-voice")+"</button>";
-  $("histUndo").onclick=()=>{undoRevoice();renderHistory();if(typeof hmRefreshUndo==="function")hmRefreshUndo();};
+    +"<span style='flex:1'></span>"+undoBtn+redoBtn;
+  if($("histUndo"))$("histUndo").onclick=()=>{undoRevoice();renderHistory();if(typeof hmRefreshUndo==="function")hmRefreshUndo();};
+  if($("histRedo"))$("histRedo").onclick=redoStep;
 }
 if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{if(_cut.a!=null&&_cut.b==null)drawCutMark();});
 
@@ -3900,9 +4251,11 @@ function renderSentsView(force){
   box.innerHTML=ranges.map((r,k)=>{const inf=sentInfo(k), meta=sentMetaHTML(k,esc), sig="sent:"+r[0]+":"+r[1], more=_sentMore.has(k);
     const pick=_sentPick&&k>=_sentPick[0]&&k<_sentPick[1];
     const _tr=(variants[activeVar]||{}).trim, _out=!!(_tr&&(inf.end<=_tr[0]||inf.start>=_tr[1]));
-    return "<div class='srow"+(pick?" pick":"")+(_out?" otrim":"")+"' data-k='"+k+"' "+(_out?"title='Поза трімом — у креатив не потрапить'":"")+">"
-      +"<button type='button' class='stime' data-sk='"+k+"' title='Клік — програти речення · Shift+клік — виділити кілька речень, щоб озвучити однією фразою'>"+_fmtT(inf.start)+" <span>▶</span></button>"
-      +"<div class='stext' contenteditable='true' spellcheck='false' data-k='"+k+"'>"+esc(inf.text)+"</div>"
+    const _V=(typeof voicesOf==="function")?voicesOf():null, _vid=_V&&_V.list&&_V.list.length?voiceForRange(_V,inf.start,inf.end):null, _vo=_vid&&_V.list.find(x=>x.id===_vid);
+    return "<div class='srow"+(pick?" pick":"")+(_out?" otrim":"")+"' data-k='"+k+"' "+(_out?"title='Поза трімом — у креатив не потрапить'":"")+(_vo?" style='border-left:3px solid "+_vo.color+"'":"")+">"
+      +"<div class='scol'><button type='button' class='stime' data-sk='"+k+"' title='Клік — програти речення · Shift+клік — виділити кілька речень, щоб озвучити однією фразою'>"+_fmtT(inf.start)+" <span>▶</span></button>"
+      +(_vo?"<button type='button' class='svoicech' data-svch='"+k+"' style='color:"+_vo.color+";border-color:"+_vo.color+"66;background:"+_vo.color+"1f' title='Хто говорить — клік, щоб змінити"+(_vo.style?" · стиль: "+esc(_vo.style):"")+"'>"+esc(_vo.name)+"</button>":"")+"</div>"
+      +"<div class='stext' contenteditable='true' spellcheck='false' data-k='"+k+"'>"+sentWordsHTML(r,esc)+"</div>"
       +"<div class='sacts'><button type='button' data-svoice='"+k+"' "+((!canVoice||_rvBusy)?"disabled":"")+" title='"+(canVoice?"Переозвучити це речення тим самим голосом":"Потрібен транскрибований кліп у сесії")+"'>🎙</button>"
       +"<button type='button' class='ghost' data-smore='"+k+"' title='Як звучатиме (вимова)'>⋯</button></div>"
       +"<div class='smeta' style='"+(meta?"":"display:none")+"'>"+meta+"</div>"
@@ -3910,7 +4263,76 @@ function renderSentsView(force){
         +"<button type='button' class='tmini' data-scut='"+k+"' title='Вирізати це речення з відео і звуку; стики — у паузах'>✂ Cut sentence</button></div>":"")
       +"</div>";}).join("");
   renderSentBar(canVoice);
+  box.querySelectorAll("[data-svch]").forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();cycleSentVoice(+b.dataset.svch);});
+  if(typeof renderVoices==="function")renderVoices();
 }
+// ✦ accent words / 🎨 phrase styles, shown right in the sentence (the row text stays plain words)
+function sentWordsHTML(r,esc){
+  const ws=realWords||[], ps=curPhraseStyles(), W=w=>w.word||w.text||"";
+  const out=[]; for(let i=r[0];i<r[1];i++){const w=ws[i]; if(!w)continue;
+    const ph=ps.find(p=>+w.start>=+p.start&&+w.start<+p.end);
+    const cls=(w.accent?" wacc":"")+(ph?" wphr":""), tt=(w.accent?"✦ accent":"")+(ph?(w.accent?" · ":"")+"🎨 "+(ph.name||"style"):"");
+    out.push("<span data-wi='"+i+"'"+(cls?" class='"+cls.trim()+"'":"")+(tt?" title='"+esc(tt)+"'":"")+">"+esc(W(w))+"</span>");}
+  return out.join(" ");
+}
+// select words in a sentence → a small bar: ✦ Accent (own colour inside the caption) · 🎨 Style (its own caption + preset)
+function sentSelWords(){
+  const sel=window.getSelection&&window.getSelection(); if(!sel||sel.isCollapsed||!sel.rangeCount)return null;
+  const box=$("transcriptSents"); if(!box)return null;
+  const el=n=>n&&(n.nodeType===1?n:n.parentElement);
+  const row=el(sel.anchorNode)&&el(sel.anchorNode).closest(".stext"); if(!row||!box.contains(row))return null;
+  if(!(el(sel.focusNode)&&el(sel.focusNode).closest(".stext")===row))return null;
+  const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return null;
+  if(row.innerText.replace(/\s+/g," ").trim()!==inf.text.replace(/\s+/g," ").trim())return {k,edited:true};   // finish the edit first (Enter)
+  const idx=[...row.querySelectorAll("[data-wi]")].filter(s=>sel.containsNode(s,true)).map(s=>+s.dataset.wi);
+  if(!idx.length)return null;
+  return {k,i0:Math.min(...idx),i1:Math.max(...idx),rect:sel.getRangeAt(0).getBoundingClientRect()};
+}
+function sentToolHide(){const t=$("sentTool"); if(t)t.style.display="none";}
+function sentToolShow(){
+  const S=sentSelWords(); let t=$("sentTool");
+  if(!S){sentToolHide();return;}
+  if(!t){t=document.createElement("div");t.id="sentTool";t.className="senttool";document.body.appendChild(t);
+    t.addEventListener("mousedown",e=>e.preventDefault());}   // keep the text selection while clicking the bar
+  if(S.edited){t.innerHTML="<span class='stnote'>Enter — зберегти правку, потім виділи слова</span>";}
+  else{const ws=realWords||[], txt=ws.slice(S.i0,S.i1+1).map(w=>w.word||w.text||"").join(" ");
+    const allAcc=ws.slice(S.i0,S.i1+1).every(w=>w.accent), ph=curPhraseStyles().some(p=>p.end>+ws[S.i0].start&&p.start<=+ws[S.i1].start);
+    t.innerHTML="<button type='button' id='stAcc' title='Ці слова — іншим кольором усередині титру (колір: Style → Karaoke → ✦ Accent words)'>"+(allAcc?"✦ Прибрати акцент":"✦ Accent")+"</button>"
+      +"<button type='button' id='stSty' title='Ця фраза — окремим титром у своєму пресеті'>🎨 Style ▾</button>"
+      +(ph?"<button type='button' id='stStyX' title='Прибрати окремий стиль фрази'>✕ стиль</button>":"")
+      +"<span class='stnote'>«"+String(txt).replace(/</g,"&lt;").slice(0,40)+"»</span>";
+    t.querySelector("#stAcc").onclick=()=>{sentAccent(S.i0,S.i1,!allAcc);};
+    t.querySelector("#stSty").onclick=ev=>{const names=presetNames();
+      ctxMenu(ev,[{head:"🎨 Стиль фрази — окремий титр"}].concat(names.map(n=>({label:String(n).replace(/</g,"&lt;"),on:()=>sentPhraseStyle(S.i0,S.i1,n)}))));};
+    if(t.querySelector("#stStyX"))t.querySelector("#stStyX").onclick=()=>sentPhraseStyle(S.i0,S.i1,null);}
+  t.style.display="flex";
+  const r=S.rect||{left:0,top:0,width:0}; const w=t.offsetWidth||260;
+  t.style.left=Math.max(8,Math.min(window.innerWidth-w-8,r.left+r.width/2-w/2))+"px";
+  t.style.top=Math.max(8,r.top-t.offsetHeight-8)+"px";
+}
+function sentAccent(i0,i1,on){
+  const ws=(realWords||[]).map(w=>({...w}));
+  for(let i=i0;i<=i1&&i<ws.length;i++){if(on)ws[i].accent=true;else delete ws[i].accent;}
+  sentToolHide(); window.getSelection().removeAllRanges();
+  commitWords(ws); if(txtView==="sents")renderSentsView(true);
+  setStatus(on?"✦ Акцент: слова будуть кольором ✦ Accent words (Style → Karaoke).":"✦ Акцент прибрано.","ok");
+}
+function sentPhraseStyle(i0,i1,name){
+  const ws=realWords||[]; if(!ws[i0]||!ws[i1])return;
+  const a=+ws[i0].start, b=ws[i1+1]?Math.max(+ws[i1].start+0.001,+ws[i1+1].start-0.0005):+ws[i1].end+0.05;
+  const arr=curPhraseStyles();
+  for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);   // one style per word: the new one replaces what it overlaps
+  if(name)arr.push({start:+a.toFixed(3),end:+b.toFixed(3),name,ctrl:presetToCtrl(name)});
+  arr.sort((x,y)=>x.start-y.start);
+  sentToolHide(); window.getSelection().removeAllRanges();
+  _effCache={k:"",t:0,v:null};
+  if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
+  if(typeof saveProjectSoon==="function")saveProjectSoon();
+  renderSentsView(true);
+  setStatus(name?"🎨 «"+ws.slice(i0,i1+1).map(w=>w.word||w.text).join(" ")+"» — окремий титр у стилі "+name+".":"🎨 Окремий стиль фрази прибрано.","ok");
+}
+window.addEventListener("scroll",e=>{const t=$("sentTool");if(t&&t.style.display!=="none"&&!t.contains(e.target))sentToolHide();},true);
+document.addEventListener("selectionchange",()=>{clearTimeout(window._stT);window._stT=setTimeout(()=>{if(txtView==="sents")sentToolShow();else sentToolHide();},120);});
 function renderSentBar(canVoice){
   const bar=$("sentBar"); if(!bar)return;
   const _st=rvUndoStack(), undo=!!(_st&&_st.length&&_st[_st.length-1].kind==="revoice"), n=_sentPick?(_sentPick[1]-_sentPick[0]):0;
@@ -4201,7 +4623,7 @@ if($("tbBody"))$("tbBody").onclick=()=>toolPop($("tbBody"),[
 // State = plain data only. Blob URLs and history (↩ snapshots) are not saved: clips are re-served
 // from the session folder, and History starts fresh after opening a project.
 let _projName="", _projSavedKey="", _projTimer=null, _projBusy=false;
-const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_cutsDone","pick"]);
+const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_rdTo","_cutsDone","pick"]);
 function _projClean(o){return JSON.parse(JSON.stringify(o,(k,v)=>{
   if(PROJ_SKIP.has(k))return undefined;
   if(v instanceof Set||v instanceof Map)return undefined;
@@ -4318,7 +4740,7 @@ if($("setupFile"))$("setupFile").onchange=async e=>{const f=e.target.files[0]; i
 function fitVideo(){
   const col=$("previewCol"), vp=$("viewport"); if(!col||!vp)return;
   let ctl=0;
-  ["transport","trimRow","status","varTabs"].forEach(id=>{const e=$(id); if(e&&e.offsetParent!==null){const r=e.getBoundingClientRect(); ctl+=r.height+12;}});
+  ["transport","trimRow","status","varTabs","groupCol"].forEach(id=>{const e=$(id); if(e&&e.offsetParent!==null){const r=e.getBoundingClientRect(); ctl+=r.height+12;}});
   const strip=$("filmstrip"), extra=58+36+30+(document.querySelector(".tut-wrap")?0:0);   // header + stage padding + breathing room
   const v=Math.round(ctl+extra);
   if(Math.abs((fitVideo._v||0)-v)>2){fitVideo._v=v;document.documentElement.style.setProperty("--ctlh",v+"px");}
@@ -4345,6 +4767,9 @@ function mixOf(o,create){
   }
   return o.mix||null;
 }
+function musicZone(o){const m=o&&o.mix;
+  if(m&&m.music&&m.music.own){const tr=o.trim||null;return tr?[+tr[0],+tr[1]]:null;}   // your own track: the whole kept clip, body included
+  return hmZone(o);}
 function mixActive(m){return !!m&&(!!(m.music&&!m.music.mute)||(!m.sfxMute&&m.sfx.some(s=>!s.mute))||!!m.orig.mute||Math.abs((m.orig.vol??1)-1)>0.001);}
 function mixSetMusic(o,t){
   const m=mixOf(o,true), p=m.music;
@@ -4367,7 +4792,7 @@ async function mixRun(o){
     laneBusy(true);
     try{
       const r=await fetch(API+"/api/audio/mix",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-        file_id:fileId,base:m.base,zone:hmZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
+        file_id:fileId,base:m.base,zone:musicZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
         music:(m.music&&!m.music.mute)?{name:m.music.name,volume:m.music.volume,duck:m.music.duck,strip:m.music.strip,sfx:m.music.sfx||""}:null,
         sfx:m.sfxMute?[]:m.sfx.filter(s=>!s.mute).map(s=>({name:s.name,at:s.at,volume:s.volume}))})});
       const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"mix failed"));
@@ -4406,8 +4831,8 @@ function drawLanes(){
   document.querySelectorAll(".lbody[data-lane]").forEach(b=>b.classList.toggle("sel",!!(_laneSel&&_laneSel.kind===b.dataset.lane&&_laneSel.kind!=="sfx")));
   // ♪ music: one block over its zone
   const mb=$("laneMusicBody");
-  if(m&&m.music){const z=hmZone(o)||[0,dur], a=z[0], e=Math.min(dur,z[1]);
-    mb.innerHTML="<div class='lblk music"+(_laneSel&&_laneSel.kind==="music"?" sel":"")+"' data-blk='music' style='left:"+pct(a)+"%;width:"+Math.max(0.5,pct(e)-pct(a))+"%' title='Клік — налаштування музики'>♪ "+esc(m.music.label)+"<span class='lx' data-x='music' title='Прибрати музику'>✕</span></div>";}
+  if(m&&m.music){const z=musicZone(o)||[0,dur], a=z[0], e=Math.min(dur,z[1]);
+    mb.innerHTML="<div class='lblk music"+(_laneSel&&_laneSel.kind==="music"?" sel":"")+"' data-blk='music' style='left:"+pct(a)+"%;width:"+Math.max(0.5,pct(e)-pct(a))+"%' title='Клік — налаштування музики · правий клік — меню'>"+(m.music.own?"🎵 ":"♪ ")+esc(m.music.label)+"<span class='lx' data-x='music' title='Прибрати музику'>✕</span></div>";}
   else mb.innerHTML="<div class='lempty'>Немає музики · <b data-go='music'>♪ Generate</b>&nbsp;у Hook music зліва — вона ляже сюди</div>";
   // 🔊 sfx blocks
   const sb=$("laneSfxBody"), list=(m&&m.sfx)||[];
@@ -4415,15 +4840,19 @@ function drawLanes(){
     +(_laneSel&&_laneSel.kind==="add"?"<div class='lblk sfx' style='left:"+pct(_laneSel.at)+"%;width:6px;opacity:.6;pointer-events:none'></div>":"")
     :"<div class='lempty'>"+(FOLEY_ON?"Потягни по доріжці — авто-звуки під картинку шматка · ":"")+"Подвійний клік — звук у цьому місці (🎙 можна надиктувати) · або ＋</div>";
   if(_laneSel&&_laneSel.kind==="foley")sb.innerHTML+="<div class='lblk' style='left:"+pct(_laneSel.a)+"%;width:"+Math.max(0.5,pct(_laneSel.b)-pct(_laneSel.a))+"%;background:rgba(251,146,60,.25);border:1px dashed #fb923c;pointer-events:none'></div>";
+  // 2.0: Music / SFX lanes only when something is on them (or you're adding a sound)
+  const hasMu=!!(m&&m.music), hasFx=!!(m&&m.sfx.length)||!!(_laneSel&&(_laneSel.kind==="add"||_laneSel.kind==="foley"));
+  $("laneMusic").style.display=hasMu?"":"none"; $("laneSfx").style.display=hasFx?"":"none";
+  if($("addMusicBtn"))$("addMusicBtn").style.display=hasMu?"none":"";
   drawWave(o);
   renderLaneEdit();
   // the music follows the trim / body: when its zone moves, re-mix (debounced)
-  if(m&&m.music&&!m.music.mute){const k=JSON.stringify(hmZone(o));const was=_zoneKey.get(m);_zoneKey.set(m,k);if(was!=null&&was!==k)mixSoon(o,700);}
+  if(m&&m.music&&!m.music.mute){const k=JSON.stringify(musicZone(o));const was=_zoneKey.get(m);_zoneKey.set(m,k);if(was!=null&&was!==k)mixSoon(o,700);}
 }
 async function drawWave(o){
   const cv=$("waveOrig"); if(!cv||!o||!fileId)return;
   const clip=(o.mix&&o.mix.base)||o.clip; if(!clip)return;
-  const w=Math.max(100,Math.round(cv.clientWidth)), hh=Math.max(10,cv.clientHeight), dpr=window.devicePixelRatio||1, n=Math.round(w/2);
+  const w=Math.max(100,Math.min(Math.floor(16000/(window.devicePixelRatio||1)),Math.round(cv.clientWidth))), hh=Math.max(10,cv.clientHeight), dpr=window.devicePixelRatio||1, n=Math.round(w/2);
   const key=clip+"|"+n;
   if(!_peaks.has(key)){_peaks.set(key,null);
     try{const r=await fetch(API+"/api/waveform?file_id="+encodeURIComponent(fileId)+"&clip="+encodeURIComponent(clip)+"&n="+n);const d=await r.json();_peaks.set(key,r.ok?d.peaks:[]);}catch(_){_peaks.set(key,[]);}
@@ -4517,7 +4946,7 @@ async function laneStems(){
   const o=mixHolder(), m=o&&o.mix; if(!m){setStatus("Немає шарів звуку на цьому кліпі.","");return;}
   busyStart("⬇ Готую stems (голос · музика · SFX)…");
   try{const r=await fetch(API+"/api/audio/stems",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-      file_id:fileId,base:m.base,zone:hmZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
+      file_id:fileId,base:m.base,zone:musicZone(o),base_volume:m.orig.mute?0:(m.orig.vol??1),
       music:m.music?{name:m.music.name,volume:m.music.volume,duck:m.music.duck,strip:m.music.strip}:null,
       sfx:m.sfx.filter(x=>!x.mute).map(x=>({name:x.name,at:x.at,volume:x.volume}))})});
     const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"stems failed"));
@@ -4566,8 +4995,9 @@ function laneMute(k){
     laneSelect({kind:"foley",a:Math.max(0,z[0]),b:Math.min(video.duration||z[1],z[1]),text:""});};
   let drag=null;
   L.addEventListener("mousedown",e=>{
+    if(e.button===2)return;
     const body=e.target.closest&&e.target.closest(".lbody[data-lane]"); if(!body)return;
-    const go=e.target.closest("[data-go]"); if(go){e.preventDefault();const g=$("grpHookMusic");if(g){g.open=true;g.scrollIntoView({behavior:"smooth",block:"start"});}return;}
+    const go=e.target.closest("[data-go]"); if(go){e.preventDefault();openHookMusic();return;}
     const x=e.target.closest("[data-x]"); if(x){e.preventDefault();e.stopPropagation();laneDelete({kind:x.dataset.x,i:+x.dataset.i});return;}
     const blk=e.target.closest(".lblk[data-blk]");
     if(blk&&blk.dataset.blk==="sfx"){const i=+blk.dataset.i, m=mixHolder().mix;
@@ -4581,11 +5011,9 @@ function laneMute(k){
         if(!rng){if(videoLoaded)video.currentTime=t0;return;}
         if(_laneSel&&_laneSel.kind==="foley"&&_laneSel.b-_laneSel.a<0.5){_laneSel=null;drawLanes();setStatus("Шматок закороткий — потягни ширше (від 0.5 с).","");}};
       window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up); e.preventDefault(); return;}
-    // empty lane: scrub the playhead (and select the lane)
-    if(videoLoaded){video.currentTime=laneT(e,body);}
+    // empty lane: select it (the playhead moves only from the ruler / its own head — like Premiere)
     if(body.dataset.lane==="orig")laneSelect({kind:"orig"});
-    const mv=ev=>{if(videoLoaded)video.currentTime=laneT(ev,body);}, up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};
-    window.addEventListener("mousemove",mv); window.addEventListener("mouseup",up);
+    else if(_laneSel&&_laneSel.kind!=="add")laneSelect(null);
   });
   window.addEventListener("mousemove",e=>{if(!drag)return; const r=drag.body.getBoundingClientRect(), dur=video.duration||1;
     const dt=(e.clientX-drag.x0)/r.width*dur; if(Math.abs(e.clientX-drag.x0)>3)drag.moved=true; if(!drag.moved)return;
@@ -4604,6 +5032,325 @@ function laneMute(k){
   video.addEventListener("play",()=>{["sfxAudio","hmAudio"].forEach(id=>{const a=$(id);if(a&&!a.paused)a.pause();});});
   window.addEventListener("resize",()=>{clearTimeout(wireLanes._r);wireLanes._r=setTimeout(drawLanes,150);});
 })();
+// ======================= 2.0 · timeline step 1 =======================
+// ↖ select / ✂ blade tools, splits → pieces (delete a piece / make parts), right-click menus on
+// every lane and block, ⟳ Repeat ×N, 🎵 your own music file, Export ▾. Native-feeling: what you'd
+// try without reading a guide (right-click, V / C keys, Delete) just works.
+let _tlTool="sel";
+// ✂ Split = a cut AT THE PLAYHEAD (like Premiere's Add Edit): you see the frame you split on.
+function splitAtPlayhead(){if(!videoLoaded)return; addSplit((curFrame()+0)/fps());}
+function clearSplits(){const o=cutHolder(); if(!o||!(o.splits||[]).length)return; o.splits=[]; const v=variants[activeVar]; if(v&&v!==o)v.splits=o.splits; drawSplits(); setStatus("↺ Розрізи прибрано.","ok");}
+function removeSplit(t){const o=cutHolder(); if(!o||!o.splits)return; o.splits=o.splits.filter(x=>x!==t); const v=variants[activeVar]; if(v&&v!==o)v.splits=o.splits; drawSplits(); setStatus("↺ Розріз "+tc(t)+" прибрано.","ok");}
+function setTool(t){_tlTool=t;document.querySelectorAll("#tlTools .ttool").forEach(b=>b.classList.toggle("on",b.dataset.tool===t));
+  const tb=$("trimBar"); if(tb)tb.classList.toggle("blade",t==="blade");
+  setStatus(t==="blade"?"✂ Лезо: клік по картинці — розріз. Правий клік по шматку — видалити або зробити частиною. V — назад до вибору.":"↖ Вибір: клік — плейхед, тягни [ ] — трім, правий клік — меню.","");}
+function splitsOf(){const o=cutHolder();return (o&&o.splits)||[];}
+function addSplit(t){const o=cutHolder(); if(!o||!videoLoaded)return; const dur=video.duration||0;
+  t=+((Math.round(t*fps()))/fps()).toFixed(3); if(t<=0.05||t>=dur-0.05)return;
+  const s=(o.splits=o.splits||[]); if(s.some(x=>Math.abs(x-t)<1/fps()))return; s.push(t); s.sort((a,b)=>a-b);
+  const v=variants[activeVar]; if(v&&v!==o)v.splits=s; drawSplits();
+  setStatus("✂ Розріз на "+tc(t)+" · шматків: "+(s.length+1)+". Правий клік по шматку — ✕ видалити / ⧉ частина.","ok");}
+function pieces(){const dur=video.duration||0, s=splitsOf(); const pts=[0].concat(s,[dur]); const out=[];for(let i=0;i<pts.length-1;i++)out.push([pts[i],pts[i+1]]);return out;}
+function pieceAt(t){return pieces().find(([a,b])=>t>=a&&t<b)||null;}
+function drawSplits(){
+  const bar=$("trimBar"),dur=video.duration||0; if(!bar)return;
+  let box=$("trimSplits"); if(!box){box=document.createElement("div");box.id="trimSplits";bar.appendChild(box);}
+  box.innerHTML=dur?splitsOf().map(t=>"<i data-split='"+t+"' style='left:"+(t/dur*100)+"%' title='Розріз "+tc(t)+" · подвійний клік — прибрати · правий клік — меню'></i>").join(""):"";
+  box.querySelectorAll("[data-split]").forEach(el=>{el.ondblclick=e=>{e.preventDefault();e.stopPropagation();removeSplit(+el.dataset.split);};});
+  const cs=$("clrSplits"); if(cs){const n=splitsOf().length; cs.style.display=n?"":"none"; cs.querySelector("small").textContent=n+" ✕";}
+  const hl=$("trimPiece"); if(hl&&!hl._keep)hl.style.display="none";
+  if(typeof _selPiece!=="undefined"&&_selPiece&&pieces().length<2){_selPiece=null;if(hl){hl._keep=false;hl.style.display="none";}}
+}
+function hlPiece(p){let e=$("trimPiece"); const bar=$("trimBar"),dur=video.duration||0; if(!bar||!dur)return;
+  if(!e){e=document.createElement("div");e.id="trimPiece";bar.appendChild(e);}
+  if(!p){e.style.display="none";e._keep=false;return;} e._keep=true; e.style.display="block"; e.style.left=(p[0]/dur*100)+"%"; e.style.width=((p[1]-p[0])/dur*100)+"%";}
+// ---------- context menu ----------
+function ctxMenu(ev,items,onClose){
+  ev.preventDefault(); ev.stopPropagation();
+  const old=$("ctxm"); if(old)old.remove();
+  const p=document.createElement("div");p.id="ctxm";p.className="tpop ctxm";
+  items.filter(Boolean).forEach(it=>{if(it==="-"){const s=document.createElement("div");s.className="tsep";p.appendChild(s);return;}
+    if(it.head){const s=document.createElement("div");s.className="chead";s.textContent=it.head;p.appendChild(s);return;}
+    const b=document.createElement("button");b.type="button";b.innerHTML=it.label+(it.key?"<span class='ckey'>"+it.key+"</span>":"");if(it.title)b.title=it.title;
+    if(it.disabled){b.disabled=true;} b.onclick=()=>{close();it.on();};p.appendChild(b);});
+  document.body.appendChild(p);
+  p.style.left=Math.max(6,Math.min(ev.clientX,innerWidth-p.offsetWidth-8))+"px";
+  p.style.top=Math.max(6,Math.min(ev.clientY,innerHeight-p.offsetHeight-8))+"px";
+  function close(){p.remove();document.removeEventListener("pointerdown",off,true);document.removeEventListener("keydown",esc,true);if(onClose)onClose();}
+  function off(e){if(!p.contains(e.target))close();}
+  function esc(e){if(e.key==="Escape"){e.preventDefault();close();}}
+  setTimeout(()=>{document.addEventListener("pointerdown",off,true);document.addEventListener("keydown",esc,true);},0);
+}
+function dlUrl(url,name){const a=document.createElement("a");a.href=API+url;a.download=name||url.split("/").pop();document.body.appendChild(a);a.click();a.remove();}
+async function audioAsIs(clip,zone,label){
+  try{await ensureSessionClip();}catch(e){setStatus("⬇ "+e.message,"err");return;}
+  busyStart("⬇ Готую звук…");
+  try{const r=await fetch(API+"/api/audio/extract_music",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,clip,zone,separate:false})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"audio failed"));
+    dlUrl(d.audio,(d.name||"clip")+"_"+(label||"audio")+".mp3"); busyDone("Готово"); setStatus("⬇ Звук"+(zone?" ("+tc(zone[0])+"–"+tc(zone[1])+")":"")+" — скачано. FFmpeg, без кредитів.","ok");
+  }catch(e){busyStop();setStatus("⬇ "+e.message,"err");}
+}
+const trimZoneNow=()=>{const d=video.duration||0,a=pf($("trimIn").value,0),b=pf($("trimOut").value,d)||d;return (a>0.05||b<d-0.05)?[+a.toFixed(3),+b.toFixed(3)]:null;};
+// ---------- ⟳ Repeat ×N ----------
+async function doRepeat(n){
+  n=Math.max(2,Math.min(20,parseInt(n,10)||0)); if(!n)return;
+  try{await ensureSessionClip();}catch(e){setStatus("Repeat: "+e.message,"err");return;}
+  const v=variants[activeVar], h=openHookRef(); if(!v||!v.clip||!fileId)return;
+  const _mo=mixHolder(), _mm=mixUnwrap(_mo);
+  busyStart("⟳ Повторюю кліп ×"+n+"…");
+  try{const r=await fetch(API+"/api/repeat",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:v.clip,n,words:realWords||[],orig_words:origWordsNow()||[]})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"repeat failed"));
+    const before=cutSnapshot(v,h), targets=rvTargets(v.clip);
+    before.label="⟳ Repeat ×"+d.n; before.undoName="repeat";
+    const L=d.loop;
+    targets.forEach(o=>{pushUndo(o,before);o.clip=d.clip;o.videoUrl=API+d.url;
+      o.origWords=(d.orig_words||[]).map(w=>({...w}));
+      if(o.cuts&&o.cuts.length){const c=o.cuts.filter(t=>t<L);o.cuts=[].concat(...Array.from({length:d.n},(_,i)=>c.map(t=>+(t+i*L).toFixed(3))));}
+      if("trim" in o)o.trim=null; if(o.splits)o.splits=[]; if(o.body!=null&&o.body>=L)o.body=null;
+      if(o!==v&&o!==h&&("words" in o))o.words=(d.words||[]).map(w=>({...w}));});
+    if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);
+    cutLoadVideo(API+d.url); commitWords((d.words||[]).map(w=>({...w})));
+    if(v.cuts)_syncCuts(v.cuts);
+    if(typeof renderHookStrip==="function")renderHookStrip();
+    busyDone("Повторено ×"+d.n);
+    setStatus("⟳ Кліп ×"+d.n+" ("+tc(L*d.n)+"). Свою музику — ＋ Own audio під доріжками. ↩ Undo repeat — у History.","ok");
+  }catch(e){busyStop();setStatus("Repeat: "+e.message,"err");}
+  if(_mm)mixRebase(_mo);
+  if(typeof renderHistory==="function")renderHistory();
+}
+function askRepeat(){const n=prompt("Скільки разів повторити кліп? (2–20)","4"); if(n)doRepeat(n);}
+// ---------- 🎵 own music file on the Music lane ----------
+function pickOwnMusic(){let inp=$("ownMusicIn");
+  if(!inp){inp=document.createElement("input");inp.type="file";inp.id="ownMusicIn";inp.accept="audio/*,.mp3,.wav,.m4a,.aac,.aif,.aiff,.ogg";inp.hidden=true;document.body.appendChild(inp);
+    inp.onchange=async e=>{const f=e.target.files&&e.target.files[0]; e.target.value=""; if(f)await addOwnMusic(f);};}
+  inp.click();}
+async function addOwnMusic(f){
+  try{await ensureSessionClip();}catch(e){setStatus("Music: "+e.message,"err");return;}
+  const o=mixHolder(); if(!o)return;
+  busyStart("🎵 Кладу «"+f.name+"» на доріжку Music…");
+  try{const nm="own_"+Date.now().toString(36)+"_"+(f.name||"music.mp3").replace(/[^\w.\-]+/g,"_");
+    const fd=new FormData();fd.append("file",new File([f],nm,{type:f.type||"audio/mpeg"}));fd.append("file_id",fileId||"");
+    const r=await fetch(API+"/api/upload_clip",{method:"POST",body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||"upload failed");
+    const m=mixOf(o,true), p=m.music;
+    m.music={name:d.name,url:"/clip/"+fileId+"/"+d.name,label:f.name.replace(/\.[^.]+$/,""),own:true,
+      volume:p&&p.own?p.volume:0.8,duck:p&&p.own?p.duck:false,strip:false,mute:false};
+    if(!m.orig.mute&&!m.music.strip)setStatus("","");
+    busyDone("Музика на доріжці"); drawLanes(); await mixRun(o);
+    setStatus("🎵 «"+f.name+"» на доріжці Music від початку кліпу"+(m.orig.mute?"":" · звук кліпу теж грає — заглуши його 🔇 (правий клік по Clip audio → Mute), якщо треба тільки твоя музика")+".","ok");
+  }catch(e){busyStop();setStatus("Music: "+e.message,"err");}
+}
+// ---------- ⋯ More (header): what used to crowd the top bar ----------
+function moreMenu(ev){
+  const vis=id=>{const e=$(id);return !!(e&&e.style.display!=="none"&&!e.disabled);};
+  ctxMenu(ev,[{head:"More"},
+    {label:"⚙ Normalize for the board",title:"Підготувати кліп до збірки без титрів (швидке склеювання на дошці)",disabled:!vis("normalizeBtn"),on:()=>$("normalizeBtn").click()},
+    {label:"⬇ SRT",title:"Титри файлом .srt",disabled:!vis("srtBtn"),on:()=>$("srtBtn").click()},
+    {label:"→ LOC",title:"Відправити кліп у локалізації",disabled:!vis("sLocBtn"),on:()=>$("sLocBtn").click()}]);
+}
+// ---------- Export ▾ ----------
+function exportMenu(ev){
+  const o=mixHolder(), hasWords=!!(realWords&&realWords.length)&&!capsOffNow();
+  ctxMenu(ev,[{head:"Export"},
+    {label:"🎬 Video",title:"Відео з титрами, тайтлами і звуком доріжок",on:()=>doExport()},
+    {label:"🔊 Audio only",title:"Звук, як у відео: голос + музика + SFX (зона тріму). FFmpeg, без кредитів",on:()=>audioAsIs(o&&o.clip,trimZoneNow(),"audio")},
+    {label:"🎚 Stems — voice · music · SFX",title:"Окремі WAV на всю довжину кліпу для AE",disabled:!(o&&o.mix),on:()=>laneStems()},
+    {label:"📝 SRT",title:"Титри файлом .srt",disabled:!hasWords,on:()=>downloadSrt()}]);
+}
+// ---------- right-click on the lanes ----------
+function tlContext(ev){
+  const body=ev.target.closest&&ev.target.closest(".lbody[data-lane], #trimBar"); if(!body)return;
+  if(!videoLoaded){return;}
+  const o=mixHolder(), m=o&&o.mix, isPic=body.id==="trimBar"||body.querySelector&&body.querySelector("#trimBar")&&!body.dataset.lane;
+  const bar=$("trimBar"), r=(isPic?bar:body).getBoundingClientRect(), dur=video.duration||0, t=Math.max(0,Math.min(dur,(ev.clientX-r.left)/r.width*dur));
+  const lane=isPic?"pic":body.dataset.lane;
+  if(lane==="pic"){
+    const pc=pieceAt(t), np=pieces().length, near=splitsOf().find(x=>Math.abs(x-t)<=Math.max(1/fps()*3,dur*0.006));
+    if(pc&&np>1)hlPiece(pc);
+    ctxMenu(ev,[{head:"Picture · "+tc(t)},
+      {label:"✂ Split at playhead",key:"C",on:splitAtPlayhead},
+      np>1?{label:"✕ Delete this piece ("+tc(pc[0])+"–"+tc(pc[1])+")",title:"Вирізати шматок: відео + звук, титри зсуваються",on:()=>deletePiece(pc)}:null,
+      np>1?{label:"⧉ Make part from this piece",on:()=>partFromPiece(pc)}:null,
+      np>1?{label:"⧉ Make parts from all "+np+" pieces",on:()=>partsFromAll()}:null,
+      near!=null?{label:"↺ Remove this split",on:()=>{const o2=cutHolder();o2.splits=o2.splits.filter(x=>x!==near);drawSplits();}}:null,
+      np>1?{label:"↺ Clear all splits",on:()=>{const o2=cutHolder();o2.splits=[];drawSplits();}}:null,
+      "-",
+      {label:"⇤ Set In here",key:"I",on:()=>{video.currentTime=t;setTrimFromPlayhead("in");}},
+      {label:"Set Out here ⇥",key:"O",on:()=>{video.currentTime=t;setTrimFromPlayhead("out");}},
+      "-",
+      {label:(m&&m.orig.mute)?"🔊 Unmute clip audio":"🔇 Mute clip audio",on:()=>laneMute("orig")}],()=>hlPiece(null));
+    return;}
+  if(lane==="orig"){
+    ctxMenu(ev,[{head:"Clip audio"},
+      {label:(m&&m.orig.mute)?"🔊 Unmute":"🔇 Mute",on:()=>laneMute("orig")},
+      "-",
+      {label:"⬇ Download audio (as is)",title:"FFmpeg, безкоштовно · зона тріму, якщо є",on:()=>audioAsIs((m&&m.base)||(o&&o.clip),trimZoneNow(),"audio")},
+      {label:"⬇ Music only — no voice",title:"ElevenLabs Stem Separation (кредити) — коли в кліпі є голос",on:()=>laneExtract("music")},
+      {label:"⬇ Voice only",title:"ElevenLabs Stem Separation (кредити)",on:()=>laneExtract("voice")},
+      "-",{label:"Volume…",on:()=>laneSelect({kind:"orig"})}]);
+    return;}
+  if(lane==="music"){
+    const onBlk=ev.target.closest(".lblk[data-blk='music']");
+    if(onBlk&&m&&m.music){
+      ctxMenu(ev,[{head:(m.music.own?"🎵 ":"♪ ")+m.music.label},
+        {label:"▶ Play track alone",on:()=>{const a=$("sfxAudio");video.pause();a.src=API+m.music.url;a.volume=0.8;a.play().catch(()=>{});}},
+        {label:"⬇ Download track",on:()=>dlUrl(m.music.url,m.music.label.replace(/[^\w.\-]+/g,"_")+".mp3")},
+        {label:m.music.mute?"🔊 Unmute":"🔇 Mute",on:()=>laneMute("music")},
+        !m.music.own?{label:"⇄ Other take…",title:"Версії — у Hook music зліва",on:()=>{openHookMusic();}}:null,
+        {label:"🎵 Replace with own file…",on:pickOwnMusic},
+        {label:"Volume · duck · old music…",on:()=>laneSelect({kind:"music"})},
+        "-",{label:"✕ Remove music",on:()=>laneDelete({kind:"music"})}]);
+    }else ctxMenu(ev,[{head:"Music"},{label:"♪ Generate music…",on:()=>{openHookMusic();}},{label:"🎵 Add own audio file…",on:pickOwnMusic}]);
+    return;}
+  if(lane==="sfx"){
+    const blk=ev.target.closest(".lblk[data-blk='sfx']");
+    if(blk&&m&&m.sfx[+blk.dataset.i]){const i=+blk.dataset.i, x=m.sfx[i];
+      ctxMenu(ev,[{head:"🔊 "+x.label+" · "+tc(x.at)},
+        {label:"▶ Play solo",on:()=>{const a=$("sfxAudio");video.pause();a.src=API+x.url;a.volume=Math.min(1,x.volume??0.9);a.play().catch(()=>{});}},
+        {label:"↻ Another version",on:()=>laneAgain(i)},
+        {label:"Volume…",on:()=>laneSelect({kind:"sfx",i})},
+        {label:"⬇ Download",on:()=>dlUrl(x.url,x.label.replace(/[^\w.\-]+/g,"_")+".mp3")},
+        "-",{label:"✕ Delete",key:"Del",on:()=>laneDelete({kind:"sfx",i})}]);
+    }else ctxMenu(ev,[{head:"SFX · "+tc(t)},{label:"＋ Sound here…",on:()=>laneSelect({kind:"add",at:t})},
+      {label:(m&&m.sfxMute)?"🔊 Unmute all SFX":"🔇 Mute all SFX",disabled:!(m&&m.sfx.length),on:()=>laneMute("sfx")}]);
+  }
+}
+let _selPiece=null;
+function selectPieceAt(t){const ps=pieces();
+  if(ps.length<2){_selPiece=null;hlPiece(null);return;}
+  const p=pieceAt(t); if(_selPiece&&p&&_selPiece[0]===p[0]&&_selPiece[1]===p[1]){_selPiece=null;hlPiece(null);return;}
+  _selPiece=p; hlPiece(p); if(p)setStatus("Шматок "+tc(p[0])+"–"+tc(p[1])+" вибрано · Delete — видалити · правий клік — ще дії.","");}
+document.addEventListener("keydown",e=>{if(!_selPiece)return; const tg=e.target,tag=(tg&&tg.tagName)||"";
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
+  if(e.key==="Escape"){_selPiece=null;hlPiece(null);return;}
+  if((e.key==="Delete"||e.key==="Backspace")&&!(_laneSel&&_laneSel.kind==="sfx")){e.preventDefault();const p=_selPiece;_selPiece=null;deletePiece(p);}});
+async function deletePiece(pc){
+  if(!pc)return; hlPiece(null);
+  await doCut([[pc[0],pc[1]]],false,{label:"✂ Delete piece "+tc(pc[1]-pc[0])+" @ "+tc(pc[0])});
+  drawSplits();   // splits after the piece moved with the cut (cutApplyTimes)
+}
+async function partFromPiece(pc){if(!pc)return; hlPiece(null); $("trimIn").value=pc[0];$("trimOut").value=pc[1];writeTrim();drawTrimBar(); await newPart();}
+async function partsFromAll(){const ps=pieces(); for(const pc of ps){$("trimIn").value=pc[0];$("trimOut").value=pc[1];writeTrim();drawTrimBar(); await newPart();}
+  const o=cutHolder(); if(o)o.splits=[]; drawSplits(); setStatus("⧉ "+ps.length+" частин під проектом у Projects.","ok");}
+(function wireV2(){
+  const T=$("tlTools");
+  const D=$("trimRow"); if(D)D.addEventListener("contextmenu",tlContext);
+  document.addEventListener("keydown",e=>{const tg=e.target, tag=(tg&&tg.tagName)||"";
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
+    if(currentMode!=="edit"||!videoLoaded||e.metaKey||e.ctrlKey||e.altKey)return;
+    if(e.code==="KeyC"){e.preventDefault();splitAtPlayhead();}});
+  if($("addOwnBtn"))$("addOwnBtn").onclick=pickOwnMusic;
+  if($("moreBtn"))$("moreBtn").onclick=moreMenu;
+  if($("addMusicBtn"))$("addMusicBtn").onclick=()=>{openHookMusic();setStatus("♪ Вибери настрій і Generate — трек ляже на доріжку Music.","");};
+  if($("addSfxBtn"))$("addSfxBtn").onclick=()=>laneSelect({kind:"add",at:curFrame()/fps()});
+})();
+// ======================= /2.0 step 1 =======================
+// ======================= 2.0 step 3 · 🗣 voices → caption style =======================
+// Scribe tells who speaks when (cached per clip). Each voice gets a colour, a name and — if you
+// want — its own caption preset; the Body (after BODY ▸) can have its own too. Under the hood these
+// are the same time-based style regions every render already uses (preview = render). Priority:
+// a phrase you styled by hand > Body > voice > the base style. Replaces "Style regions".
+const VCOL=["#2dd4bf","#f472b6","#fbbf24","#60a5fa","#a78bfa","#fb923c"];
+function voicesOf(){const o=(typeof cutHolder==="function")?cutHolder():null;return (o&&o.voices)||null;}
+function presetNames(){return [...Object.keys(savedStyles||{}),...Object.keys((typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES)||{})].filter((x,i,a)=>a.indexOf(x)===i);}
+function voiceForRange(V,a,b){
+  if(!V||!V.spans||!V.spans.length)return null;
+  const fx=V.fix&&V.fix[(+a).toFixed(2)]; if(fx)return fx;
+  const acc={}; V.spans.forEach(([s,e,id])=>{const ov=Math.min(b,e)-Math.max(a,s); if(ov>0)acc[id]=(acc[id]||0)+ov;});
+  let best=null,bv=0; Object.keys(acc).forEach(k=>{if(acc[k]>bv){bv=acc[k];best=k;}});
+  if(best)return best;
+  let near=null,nd=1e9; V.spans.forEach(([s,e,id])=>{const d=Math.min(Math.abs(s-a),Math.abs(e-a)); if(d<nd){nd=d;near=id;}}); return near;}
+function sentenceVoices(words,V){   // [{start,end,voice}] per sentence
+  if(!V||!words||!words.length)return [];
+  return splitSentences(words).map(r=>{const ws=words.slice(r[0],r[1]); const a=+ws[0].start, b=+ws[ws.length-1].end; return {start:a,end:b,voice:voiceForRange(V,a,b)};});}
+let _effCache={k:null,t:0,v:null};
+function effOverrides(v,words,holder){
+  v=v||variants[activeVar]; words=words||realWords||(v&&v.words)||[]; holder=holder||((typeof cutHolder==="function")?cutHolder():null);
+  const manual=(v&&v.phraseStyles)||[], V=holder&&holder.voices;
+  const useV=!!(V&&V.on&&V.list&&V.list.some(x=>x.style)), useB=!!(V&&V.body&&V.body.on&&V.body.style&&holder&&holder.body!=null);
+  if(!useV&&!useB)return manual;
+  const key=JSON.stringify([V,holder&&holder.body,manual.length,manual.map(m=>[m.start,m.end]),words.length,words.length?[words[0].start,words[words.length-1].end]:0]);
+  const now=performance.now(); if(_effCache.k===key&&now-_effCache.t<400)return _effCache.v;
+  const layers=[];
+  manual.forEach(m=>layers.push({start:+m.start,end:+m.end,ctrl:m.ctrl,p:3}));
+  if(useB)layers.push({start:+holder.body,end:1e6,ctrl:presetToCtrl(V.body.style),p:2});
+  if(useV){const sv=sentenceVoices(words,V);
+    sv.forEach((s,i)=>{const it=V.list.find(x=>x.id===s.voice); if(!it||!it.style)return;
+      const end=(i+1<sv.length)?sv[i+1].start:1e6; layers.push({start:s.start,end,ctrl:presetToCtrl(it.style),p:1});});}
+  // flatten: every slice of time takes the highest-priority layer that covers it
+  const pts=[...new Set(layers.flatMap(l=>[l.start,l.end]).map(x=>+(+x).toFixed(3)))].sort((a,b)=>a-b);
+  const out=[];
+  for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],mid=(a+b)/2;
+    const L=layers.filter(l=>mid>=l.start&&mid<l.end).sort((x,y)=>y.p-x.p)[0]; if(!L)continue;
+    const last=out[out.length-1]; if(last&&last.ctrl===L.ctrl&&Math.abs(last.end-a)<1e-6)last.end=b; else out.push({start:a,end:b,ctrl:L.ctrl});}
+  _effCache={k:key,t:now,v:out}; return out;
+}
+// o = the hook / clip holder; quiet = after a Scribe transcribe (the diarization is already cached → free)
+async function voicesFor(o,src,quiet){
+  const r=await fetch(API+"/api/voices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({file_id:fileId,clip:src})});
+  const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"voices failed"));
+  const old=o.voices;
+  o.voices={on:old?old.on!==false:true,spans:d.spans||[],fix:{},body:(old&&old.body)||{on:false,style:""},
+    list:(d.speakers||[]).map((s,i)=>{const prev=old&&old.list&&old.list.find(x=>x.id===s.id);
+      return {id:s.id,name:prev?prev.name:("Voice "+(i+1)),color:VCOL[i%VCOL.length],style:prev?prev.style:"",hz:s.hz,guess:s.guess};})};
+  const v=variants[activeVar]; if(v&&v!==o&&(o===cutHolder()))v.voices=o.voices;
+  _effCache.k=null;
+  if(o===cutHolder()){renderVoices(); if(typeof renderSentsView==="function")renderSentsView(true); if(typeof scheduleExact==="function")scheduleExact();}
+  if(quiet&&o.voices.list.length>1&&o===cutHolder())setStatus("🗣 Scribe знайшов "+o.voices.list.length+" голоси — вони вже в Sentences. Стиль на голос — у картці Voices.","ok");
+  return o.voices;
+}
+async function detectVoices(){
+  try{await ensureSessionClip();}catch(e){setStatus("🗣 "+e.message,"err");return;}
+  const o=cutHolder(); if(!o)return; const src=(o.mix&&o.mix.base)||o.clip;
+  busyStart("🗣 Шукаю голоси (ElevenLabs Scribe)…");
+  try{const V=await voicesFor(o,src,false);
+    busyDone("Голоси знайдено"); setStatus("🗣 Голосів: "+V.list.length+". Дай кожному свій стиль титрів у картці Voices — і подивись у Sentences.","ok");
+  }catch(e){busyStop();setStatus("🗣 "+e.message,"err");}
+}
+function renderVoices(){
+  let card=$("voicesCard");
+  if(!card){const pane=document.querySelector(".ipane[data-ip='text']")||$("quickPanel"); if(!pane)return;
+    card=document.createElement("div");card.id="voicesCard";card.className="vcard";
+    const tr=$("grpTranscribe"); if(tr&&tr.parentElement===pane)tr.insertAdjacentElement("afterend",card); else pane.appendChild(card);}
+  if(card.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;
+  const o=cutHolder(), V=o&&o.voices, esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  const opts=cur=>"<option value=''>— base style —</option>"+presetNames().map(n=>"<option value='"+esc(n)+"'"+(n===cur?" selected":"")+">"+((savedStyles&&savedStyles[n]&&!(officialNames&&officialNames.has(n)))?"★ ":"")+esc(n)+"</option>").join("");
+  if(!V||!V.list||!V.list.length){
+    card.innerHTML="<div class='vhead'><b>🗣 Voices</b><span class='vhint'>різні голоси — різні титри</span><button type='button' class='tmini' id='vDetect'>🔍 Detect voices</button></div>"
+      +"<div class='vhint'>Транскрайб через <b>Scribe</b> знаходить голоси сам, без зайвих кредитів. Після Whisper — 🔍 Detect voices (один запит у Scribe на кліп). Тоді кожному голосу — свій стиль, і видно в Sentences, хто що каже.</div>"
+      +bodyRow(o,V,opts,esc);
+  }else{
+    const sv=sentenceVoices(realWords||[],V), cnt=id=>sv.filter(s=>s.voice===id).length;
+    card.innerHTML="<div class='vhead'><b>🗣 Voices · "+V.list.length+"</b><span class='vhint'>Style by voice</span><label class='switch'><input type='checkbox' id='vOn'"+(V.on!==false?" checked":"")+"><span class='slider'></span></label></div>"
+      +V.list.map((x,i)=>"<div class='vrow"+(V.on===false?" off":"")+"'><span class='vdot' style='background:"+x.color+"'></span>"
+        +"<input class='vname' data-vn='"+i+"' value='"+esc(x.name)+"' title='Назви як зручно: Hero, Mom, Narrator'>"
+        +"<span class='vg' title='"+(x.hz?("Здогадка за висотою голосу: ~"+Math.round(x.hz)+" Hz. Scribe стать не визначає."):"Висоту голосу не визначено")+"'>"+(x.guess==="male"?"♂":x.guess==="female"?"♀":"·")+(x.hz?" "+Math.round(x.hz):"")+"</span>"
+        +"<span class='vc' title='реплік'>"+cnt(x.id)+"</span>"
+        +"<select data-vs='"+i+"'>"+opts(x.style)+"</select></div>").join("")
+      +bodyRow(o,V,opts,esc)
+      +"<div class='vhint'>Не той голос у репліки — клікни кольорову мітку в Sentences. Окрема фраза — свій стиль, як і раніше (Style → per phrase). <span class='vlink' id='vDetect'>↻ re-detect</span></div>";
+  }
+  const vd=$("vDetect"); if(vd)vd.onclick=detectVoices;
+  if($("vOn"))$("vOn").onchange=e=>{V.on=e.target.checked;voicesChanged();};
+  card.querySelectorAll("[data-vn]").forEach(inp=>{inp.oninput=e=>{V.list[+inp.dataset.vn].name=e.target.value;};inp.onchange=()=>voicesChanged();});
+  card.querySelectorAll("[data-vs]").forEach(s=>s.onchange=()=>{V.list[+s.dataset.vs].style=s.value;voicesChanged();});
+  const bo=$("vBodyOn"), bs=$("vBodyStyle");
+  if(bo)bo.onchange=e=>{const oo=cutHolder(); oo.voices=oo.voices||{on:true,list:[],spans:[],fix:{},body:{on:false,style:""}}; oo.voices.body.on=e.target.checked; const v=variants[activeVar];if(v&&v!==oo)v.voices=oo.voices; voicesChanged();};
+  if(bs)bs.onchange=e=>{const oo=cutHolder(); oo.voices=oo.voices||{on:true,list:[],spans:[],fix:{},body:{on:false,style:""}}; oo.voices.body.style=e.target.value; oo.voices.body.on=!!e.target.value; const v=variants[activeVar];if(v&&v!==oo)v.voices=oo.voices; voicesChanged();};
+}
+function bodyRow(o,V,opts,esc){
+  const B=(V&&V.body)||{on:false,style:""}, has=!!(o&&o.body!=null);
+  return "<div class='vrow vbody"+(has?"":" off")+"'><span class='vdot' style='background:#38bdf8;border-radius:2px'></span><span class='vbl'>Body "+(has?"(з "+tc(o.body)+")":"— постав BODY ▸ на таймлайні")+"</span>"
+    +"<label class='switch' title='Окремий стиль титрів для боді'><input type='checkbox' id='vBodyOn'"+(B.on?" checked":"")+(has?"":" disabled")+"><span class='slider'></span></label>"
+    +"<select id='vBodyStyle'"+(has?"":" disabled")+">"+opts(B.style)+"</select></div>";
+}
+function voicesChanged(){_effCache.k=null; renderVoices(); if(typeof renderSentsView==="function")renderSentsView(true);
+  if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact(); if(typeof saveActiveHook==="function")try{saveActiveHook();}catch(_){}}
+function cycleSentVoice(k){const V=voicesOf(); if(!V||!V.list.length)return; const inf=sentInfo(k); if(!inf)return;
+  const cur=voiceForRange(V,inf.start,inf.end), i=V.list.findIndex(x=>x.id===cur), nx=V.list[(i+1)%V.list.length].id;
+  V.fix=V.fix||{}; V.fix[(+inf.start).toFixed(2)]=nx; voicesChanged();
+  setStatus("🗣 Речення «"+inf.text.slice(0,40)+"» → "+V.list.find(x=>x.id===nx).name+".","ok");}
+// ======================= /step 3 =======================
 function updateWordHighlight(){
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
@@ -4696,6 +5443,7 @@ $("transcribeBtn").onclick=async()=>{
     if(typeof setLangSticker==="function")setLangSticker(d.language);
     setStatus("Транскрибовано "+realWords.length+" слів ("+(d.language||"")+").","ok");busyDone("Транскрибовано");
     $("renderBtn").disabled=false;if($("localizeBtn"))$("localizeBtn").disabled=false;
+    if(d.voices&&typeof voicesFor==="function"){const _o=cutHolder(); if(_o)voicesFor(_o,(_o.mix&&_o.mix.base)||_o.clip,true);}   // 🗣 Scribe already split the voices — free
   }catch(e){setStatus("Transcription error: "+e.message,"err");busyStop();}
   $("transcribeBtn").disabled=false;
   updateEditButtons();   // words exist now → the Transcribe CTA stops pulsing
@@ -4716,7 +5464,7 @@ async function downloadSrt(){
   const b=$("srtBtn");if(b)b.disabled=true;
   try{
     const baseEng=toEngineStyle(readControls());
-    const regions=buildStyleRegions(baseEng,(v.phraseStyles||[]))||[{start:0,end:null,style:baseEng}];
+    const regions=buildStyleRegions(baseEng,(typeof effOverrides==="function")?effOverrides(v):(v.phraseStyles||[]))||[{start:0,end:null,style:baseEng}];
     const r=await fetch(API+"/api/srt",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({words,regions,base_style:baseEng,cuts:v.cuts||null,lang:capLang(),
         duration:(video&&video.duration)||0,trim:v.trim||null,
@@ -4753,7 +5501,8 @@ async function sendToCompose(target){
     const hook={name:(l==="en"?"original":v.clip.replace(/\.[^.]+$/,"")),lang:l,clip:v.clip,trim:v.trim||null,src:"edit",videoUrl:v.videoUrl||null};
     if(v.overlays&&v.overlays.length)hook.overlays=v.overlays.map(o=>({name:o.name,x:o.x,y:o.y,w:o.w,angle:o.angle||0,in:(o.in!=null?o.in:null),out:(o.out!=null?o.out:null)}));
     if(v.words&&v.words.length&&!v.capsOff){hook.words=v.words;hook.ctrl=v.style||null;if(v.style)hook.style=toEngineStyle(v.style);}  // carry words + ctrl so LOC shows a real thumbnail
-    if(v.words&&v.words.length&&!v.capsOff&&v.style&&v.phraseStyles&&v.phraseStyles.length){const _reg=buildStyleRegions(toEngineStyle(v.style),v.phraseStyles);if(_reg)hook.regions=_reg;}  // #10 per-phrase overrides travel to the bake
+    {const _ov=(typeof effOverrides==="function")?effOverrides(v,v.words):(v.phraseStyles||[]);
+     if(v.words&&v.words.length&&!v.capsOff&&v.style&&_ov&&_ov.length){const _reg=buildStyleRegions(toEngineStyle(v.style),_ov);if(_reg)hook.regions=_reg;}}  // #10 per-phrase overrides travel to the bake
     if(v.capIn!=null)hook.cap_in=v.capIn;if(v.capOut!=null)hook.cap_out=v.capOut;   // caption in/out window
     if(v.cuts&&v.cuts.length)hook.cuts=v.cuts;   // scene cuts travel with the hook
     if(titles.length){hook.titles=cloneTitles();hook.titlesOn=titlesOn();}   // this clip's own titles travel with it
@@ -4773,7 +5522,7 @@ async function doExport(){
       fileId=d.file_id;v.clip=d.name;}catch(e){setStatus("Upload failed: "+e.message,"err");return;}
   }
   const baseEng=toEngineStyle(readControls());
-  const regions=buildStyleRegions(baseEng,(v.phraseStyles||[]))||[{start:0,end:null,style:baseEng}];
+  const regions=buildStyleRegions(baseEng,(typeof effOverrides==="function")?effOverrides(v):(v.phraseStyles||[]))||[{start:0,end:null,style:baseEng}];
   const words=capsOffNow()?[]:((v.words&&v.words.length)?v.words:null);   // [] = no captions at all (OFF); same single source as the preview/layout (incl. Words-tab edits + breaks) → render matches
   const eb=$("exportBtn"); if(eb)eb.disabled=true;
   setStatus("Exporting "+ratio+" … (ffmpeg)","",true);busyStart("Експортую відео…");
@@ -4819,7 +5568,7 @@ async function doNormalize(){
   if(nb)nb.disabled=false;
 }
 $("normalizeBtn").onclick=doNormalize;
-$("exportBtn").onclick=doExport;
+$("exportBtn").onclick=ev=>(typeof exportMenu==="function"?exportMenu(ev):doExport());
 $("renderBtn").onclick=sendToCompose;
 
 // ---------- localize: STAGE 1 dub (clean clip + editable text), STAGE 2 render ----------
@@ -4857,7 +5606,7 @@ function remapWords(text, stored){
   const pairs=[]; {let i=0,j=0;
     while(i<n&&j<m){ if(A[i]===B[j]){pairs.push([i,j]);i++;j++;} else if(dp[i+1][j]>=dp[i][j+1]) i++; else j++; }}
   const out=toks.map(t=>({word:t,start:null,end:null,brk:null}));
-  pairs.forEach(([a,b])=>{const w=stored[b];out[a].start=+w.start;out[a].end=+w.end;out[a].brk=w.brk||null;if(w.manual)out[a].manual=true;});
+  pairs.forEach(([a,b])=>{const w=stored[b];out[a].start=+w.start;out[a].end=+w.end;out[a].brk=w.brk||null;if(w.manual)out[a].manual=true;if(w.accent)out[a].accent=true;});
   // spread new words over [s,e], longer words get proportionally more time
   const spread=(ns,ne,s,e)=>{let tot=0;for(let k=ns;k<ne;k++)tot+=Math.max(1,toks[k].length);
     let t=s;for(let k=ns;k<ne;k++){const d=(e-s)*Math.max(1,toks[k].length)/tot;out[k].start=t;out[k].end=t+d;t+=d;}};
@@ -4869,7 +5618,7 @@ function remapWords(text, stored){
     const nCnt=ne-ns, oCnt=oe-os;
     if(nCnt<=0)continue;                              // pure deletion: nothing to place
     if(oCnt>0){                                       // replacement
-      if(nCnt===oCnt){for(let k=0;k<nCnt;k++){const w=stored[os+k];out[ns+k].start=+w.start;out[ns+k].end=+w.end;out[ns+k].brk=w.brk||null;if(w.manual)out[ns+k].manual=true;}continue;}
+      if(nCnt===oCnt){for(let k=0;k<nCnt;k++){const w=stored[os+k];out[ns+k].start=+w.start;out[ns+k].end=+w.end;out[ns+k].brk=w.brk||null;if(w.manual)out[ns+k].manual=true;if(w.accent)out[ns+k].accent=true;}continue;}
       const s0=+stored[os].start, e0=+stored[oe-1].end;
       spread(ns,ne,s0,Math.max(e0,s0+0.08*nCnt));continue;
     }
@@ -4934,7 +5683,7 @@ function buildVarTabs(){
 const filmVideos={};
 function drawThumbCaption(ctx,W,H,s,words,t){
   if(!s)return;
-  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode,capLang(),null,!!s.punct);
+  const events=buildEvents(ctx._dur||4,s.maxChars||15,s.maxLines||2,words,s.wrapMode,capLang(),null,s.punct);
   if(!events.length)return;
   const ev=events.find(e=>t>=e.start&&t<e.end)||events[0];if(!ev)return;
   const scale=W/1080,fs=(s.fontSize||80)*scale;ctx.font=fs+"px '"+(s.fontFamily||"Arial")+"'";ctx.textBaseline="top";
@@ -5366,6 +6115,7 @@ function setMode(m){
   $("actEdit").style.display=edit?"flex":"none";
   $("actAsm").style.display=asm?"flex":"none";
   $("panelContent").scrollTop=0;
+  document.body.classList.toggle("edit2",edit&&document.body.classList.contains("ins2"));   // 2.0: Edit has no left sidebar
   $("batchStage").style.display=asm?"block":"none";
   $("locStage").style.display=loc?"block":"none";
   $("editStage").style.display=edit?"grid":"none";
@@ -5813,7 +6563,8 @@ function buildDock(){
   const sc=$("applyScope"); if(sc){const l=sc.querySelector("span");if(l)l.remove();}
   D.insertBefore(top,D.firstChild);
   // ruler (above the Picture lane)
-  const L=$("lanes"); const ru=mk("div","lane lruler","<div class='lhead'></div><div class='lbody' id='tlRuler'></div>"); L.insertBefore(ru,L.firstChild);
+  const L=$("lanes"); const ru=mk("div","lane lruler","<div class='lhead'><span class='rlbl'>⇠ scrub ⇢</span></div><div class='lbody' id='tlRuler' title='Клік або тягни — перемотка (як у Premiere). Плейхед можна тягнути й за білу голівку. Cmd + тягни — зі звуком. Alt + колесо — масштаб.'></div>"); L.insertBefore(ru,L.firstChild);
+  ru.querySelector("#tlRuler").addEventListener("pointerdown",e=>{if(e.button===2)return;scrubDrag(e);});
   // bottom bar: clip tools | history
   const bot=mk("div","dockBar dockBot"); bot.id="dockBot";
   bot.appendChild(grp("Clip",["tbCuts","tbBody","tbPart","tbRegen","tbStatus"],"dtools"));
@@ -5825,6 +6576,76 @@ function buildDock(){
   document.querySelectorAll("#trimRow .dockFoot").forEach(e=>e.style.display="none");
   const tr=$("transport"); if(tr)tr.classList.add("slim");
   wireDockJumps();
+  // ---- 2.0: compact, centred — tools left · timeline · clip actions right ----
+  const cutG=top.querySelector(".dcut"); if(cutG){cutG.style.display="none";}   // ✂ blade + right-click replace From / To
+  const grid=mk("div","tlGrid"), left=mk("div","tlTools"), main=mk("div","tlMain"), right=mk("div","tlActs");
+  left.id="tlTools";
+  left.innerHTML="<button type='button' class='ttool' id='splitBtn' title='Розріз там, де стоїть плейхед (клавіша C). Правий клік по шматку — видалити / зробити частиною'>✂<small>C</small></button>"
+    +"<button type='button' class='ttool' id='clrSplits' style='display:none' title='Прибрати всі розрізи (окремий — подвійний клік по ньому)'>↺<small>0 ✕</small></button>"
+    +"<div class='tzoom'><button type='button' id='zoomBtn' title='Масштаб таймлайну: Alt + колесо (або щипок на трекпаді) біля курсора · = / − · \\ — весь кліп'>1×</button>"
+    +"<button type='button' id='bigBtn' title='Великий таймлайн: вищі доріжки на всю ширину'>⤢</button></div>";
+  [...D.childNodes].forEach(n=>{if(n.nodeType===1&&!["trimIn","trimOut","trimPlayIn","trimPlayOut","trimAll","cutUndo"].includes(n.id)&&!n.classList.contains("dockFoot"))main.appendChild(n);});
+  const rb=mk("button","tchip rep","<span class='tdot'></span>⟳ Repeat ×N"); rb.type="button"; rb.id="repeatBtn"; rb.title="Повторити кліп кілька разів (зацикленa анімація)";
+  const q=id=>main.querySelector("#"+id)||$(id);   // main is not in the document yet — getElementById can't see into it
+  ["tbCuts","tbBody","tbPart","tbRegen"].forEach(id=>{const e=q(id);if(e)right.appendChild(e);});   // ⟳ Repeat → Assemble (hook ×N), not here
+  if(q("tbStatus"))right.appendChild(q("tbStatus"));
+  const dt=bot.querySelector(".dtools"); if(dt)dt.remove();
+  grid.appendChild(left); grid.appendChild(main); grid.appendChild(right); D.insertBefore(grid,D.firstChild); D.classList.add("v2dock");
+  left.querySelector("#splitBtn").onclick=splitAtPlayhead; left.querySelector("#clrSplits").onclick=clearSplits;
+  left.querySelector("#zoomBtn").onclick=ev=>ctxMenu(ev,[{head:"🔍 Timeline zoom"},{label:"Fit — весь кліп",key:"\\",on:()=>tlSetZoom(1)},
+    {label:"2×",on:()=>tlSetZoom(2)},{label:"4×",on:()=>tlSetZoom(4)},{label:"8×",on:()=>tlSetZoom(8)},{label:"16×",on:()=>tlSetZoom(16)}]);
+  left.querySelector("#bigBtn").onclick=()=>tlBig(!D.classList.contains("big"));
+  tlWireZoom(); try{if(localStorage.getItem("cs_tlBig")==="1")tlBig(true);}catch(_){}
+  rb.onclick=ev=>ctxMenu(ev,[{head:"⟳ Repeat the clip"},{label:"×2",on:()=>doRepeat(2)},{label:"×3",on:()=>doRepeat(3)},{label:"×4",on:()=>doRepeat(4)},{label:"×N…",on:askRepeat}]);
+  const eb=$("exportBtn"); if(eb&&!/▾/.test(eb.textContent))eb.textContent=eb.textContent.trim()+" ▾";
+}
+// ---------- 🔍 timeline zoom (2.0) ----------
+// --zw = width of the lane bodies in px. Everything on the lanes is in %, and every hit-test uses the
+// element's own rect, so zoom is just "make the bodies wider and scroll them together".
+var _tlZoom=1, _tlLastT=-1, _tlRd=0;
+function tlLH(){const L=$("lanes");return L?(parseFloat(getComputedStyle(L).getPropertyValue("--lh"))||118):118;}
+function tlSetZoom(z,anchorX){
+  const L=$("lanes"), dur=video.duration||0; if(!L)return;
+  z=Math.max(1,Math.min(16,+z||1)); if(z<1.04)z=1;
+  const lh=tlLH(), r=L.getBoundingClientRect(), vis=Math.max(50,L.clientWidth-lh);
+  const ax=(anchorX!=null)?anchorX:(r.left+lh+vis/2);
+  const t=(anchorX!=null&&dur)?xToTime(anchorX):(video.currentTime||0);
+  _tlZoom=z;
+  if(z===1){L.classList.remove("zoomed");L.style.removeProperty("--zw");L.scrollLeft=0;}
+  else{L.classList.add("zoomed");L.style.setProperty("--zw",Math.round(vis*z)+"px");
+    if(dur)L.scrollLeft=Math.max(0,lh+t/dur*vis*z-(ax-r.left));}
+  _tlLastT=video.currentTime||0;
+  const b=$("zoomBtn"); if(b){b.textContent=(z===1?"1":(z<10?z.toFixed(z%1?1:0):Math.round(z)))+"×";b.classList.toggle("on",z>1);}
+  if(typeof drawTrimBar==="function")drawTrimBar();
+  clearTimeout(_tlRd); _tlRd=setTimeout(()=>{if(typeof drawLanes==="function")drawLanes();},180);   // waveform at the new width
+}
+// keep the playhead in view when it moves (play, ⟨ ⟩, jumps) — never fight your own scrolling
+function tlFollow(t,dur){
+  if(Math.abs(t-_tlLastT)<1e-4)return; _tlLastT=t;
+  const L=$("lanes"); if(!L||!dur||L._scrub)return;
+  const lh=tlLH(), vis=L.clientWidth-lh, zw=vis*_tlZoom, x=t/dur*zw, a=L.scrollLeft, b=a+vis;
+  if(x<a||x>b-10)L.scrollLeft=Math.max(0,x-(video.paused?vis/2:vis*0.08));
+}
+function tlBig(on){
+  const D=$("trimRow"); if(!D)return; D.classList.toggle("big",!!on);
+  const b=$("bigBtn"); if(b)b.classList.toggle("on",!!on);
+  try{localStorage.setItem("cs_tlBig",on?"1":"0");}catch(_){}
+  requestAnimationFrame(()=>{tlSetZoom(_tlZoom);if(typeof fitVideo==="function")try{fitVideo();}catch(_){}});
+}
+function tlWireZoom(){
+  const L=$("lanes"); if(!L||L._zw)return; L._zw=1;
+  L.addEventListener("wheel",e=>{
+    if(e.altKey||e.ctrlKey){e.preventDefault();   // Alt + wheel, or a trackpad pinch (ctrlKey)
+      const d=e.deltaY||e.deltaX; tlSetZoom(_tlZoom*Math.exp(-d*(e.ctrlKey?0.01:0.0025)),e.clientX);return;}
+    if(_tlZoom>1&&Math.abs(e.deltaY)>Math.abs(e.deltaX)&&!e.shiftKey){e.preventDefault();L.scrollLeft+=e.deltaY;}   // plain wheel scrolls the time, like Premiere
+  },{passive:false});
+  document.addEventListener("keydown",e=>{const tg=e.target,tag=(tg&&tg.tagName)||"";
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(tg&&tg.isContentEditable))return;
+    if(currentMode!=="edit"||!videoLoaded||e.metaKey||e.ctrlKey||e.altKey)return;
+    if(e.code==="Equal"||e.code==="NumpadAdd"){e.preventDefault();tlSetZoom(_tlZoom*2);}
+    else if(e.code==="Minus"||e.code==="NumpadSubtract"){e.preventDefault();tlSetZoom(_tlZoom/2);}
+    else if(e.code==="Backslash"){e.preventDefault();tlSetZoom(1);}});
+  window.addEventListener("resize",()=>{if(_tlZoom>1)tlSetZoom(_tlZoom);});
 }
 function wireDockJumps(){
   [["trimInLbl",()=>pf($("trimIn").value,0)],["trimOutLbl",()=>Math.max(0,(pf($("trimOut").value,video.duration||0)||0)-1/fps())]].forEach(([id,f])=>{const e=$(id);
@@ -5836,9 +6657,10 @@ function wireDockJumps(){
 function drawRuler(){
   const R=$("tlRuler"), dur=video.duration||0; if(!R||!dur)return;
   const w=R.clientWidth||1, k=dur+"|"+w; if(R._k===k)return; R._k=k;
-  const steps=[0.5,1,2,5,10,15,30,60], minPx=70; const step=steps.find(s=>s/dur*w>=minPx)||120;
-  let h=""; for(let t=0;t<=dur+1e-6;t+=step){const x=t/dur*100;h+="<i style='left:"+x+"%'></i><b style='left:"+x+"%'>"+(dur>=60?Math.floor(t/60)+":"+String(Math.round(t%60)).padStart(2,"0"):(+t.toFixed(1))+"s")+"</b>";}
-  for(let t=step/2;t<dur;t+=step)h+="<u style='left:"+(t/dur*100)+"%'></u>";
+  const steps=[0.1,0.2,0.5,1,2,5,10,15,30,60], minPx=70; const step=steps.find(s=>s/dur*w>=minPx)||120;   // 🔍 zoomed in → down to 0.1 s
+  const lbl=t=>(dur>=60&&step>=1)?Math.floor(t/60)+":"+String(Math.round(t%60)).padStart(2,"0"):(+t.toFixed(2))+"s";
+  let h=""; for(let i=0,t=0;t<=dur+1e-6;t=++i*step){const x=t/dur*100;h+="<i style='left:"+x+"%'></i><b style='left:"+x+"%'>"+lbl(t)+"</b>";}
+  for(let i=0,t=step/2;t<dur;t=step/2+(++i)*step)h+="<u style='left:"+(t/dur*100)+"%'></u>";
   R.innerHTML=h;
 }
 function buildStudioLayout(){
@@ -5864,9 +6686,88 @@ function buildStudioLayout(){
   const ptb=$("packTranscribeBtn");
   if(ptb&&tb){ptb.style.width="100%";ptb.style.margin="6px 0 0";ptb.className="go";tb.insertAdjacentElement("beforebegin",ptb);ptb.onclick=transcribePack;}
   qp.addEventListener("input",()=>{saveLastStyle();scheduleExact();});qp.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
-  qp.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("button,.switch,label"))setTimeout(()=>{saveLastStyle();scheduleExact();},0);});
+  // segmented buttons (AA / Aa, align…), header switches and presets change the style by CLICK, with
+  // no input event — refresh the exact frame for those too (debounced inside scheduleExact)
+  qp.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("button,.preset,.switch,label"))setTimeout(()=>{saveLastStyle();scheduleExact();},0);});
+  buildInspector();
   initGrpAccordion();
 }
+// ---------- 2.0 step 2: ONE inspector on the right, with tabs ----------
+// Text (captions on/off, transcribe, smart captions) · Style (presets + every caption-style group,
+// folded) · Titles (titles, stickers) · Sound (hook music). The left sidebar is gone in Edit — the
+// video and the timeline get its width. Elements are MOVED (ids, handlers, state stay).
+const INS_TABS=[["style","Style"],["titles","Titles"],["sound","Sound"]];   // Text lives in the LEFT panel (2.0)
+function buildInspector(){
+  const qp=$("quickPanel"); if(!qp||$("insTabs"))return;
+  const mk=(tag,cls,html)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e;};
+  const bar=mk("div","itabs"); bar.id="insTabs";
+  bar.innerHTML=INS_TABS.map(([k,l])=>"<button type='button' data-it='"+k+"'>"+l+"<i class='idot'></i></button>").join("");
+  const panes={}; INS_TABS.concat([["text","Text"]]).forEach(([k])=>{panes[k]=mk("div","ipane");panes[k].dataset.ip=k;});
+  // Text
+  [...qp.children].forEach(c=>{if(c.id==="grpBaseText")return; panes.text.appendChild(c);});
+  // Style: presets first, then base text, then every style group of the old left sidebar
+  const ez=document.querySelector(".editzone");
+  const pre=mk("div","ipresets"); pre.appendChild(mk("div","ilbl","Presets"));
+  const acts=mk("div","ipreacts"); ["saveStyleBtn2","copyAllBtn"].forEach(id=>{const e=$(id);if(e){e.style.cssText="";acts.appendChild(e);}}); pre.appendChild(acts);
+  if($("presetRail"))pre.appendChild($("presetRail"));
+  if(ez)[...ez.children].forEach(c=>{if(!c.classList.contains("railhead")&&c.id!=="presetRail")pre.appendChild(c);});
+  panes.style.appendChild(pre);
+  if($("grpBaseText"))panes.style.appendChild($("grpBaseText"));
+  const sec=document.querySelector("section.sec[data-sec='style']");
+  if(sec)[...sec.querySelectorAll(":scope > details.grp")].forEach(d=>{
+    const t=(d.querySelector("summary")||{}).textContent||"";
+    if(d.id==="grpHookMusic")panes.sound.appendChild(d);
+    else if(/Titles|Overlays/i.test(t))panes.titles.appendChild(d);
+    else panes.style.appendChild(d);});
+  panes.sound.appendChild(mk("div","hint","Музика й звуки лягають на доріжки таймлайну під відео: правий клік по доріжці — меню, ＋ Own audio — свій трек."));
+  qp.innerHTML=""; qp.appendChild(bar); const body=mk("div","ibody"); INS_TABS.forEach(([k])=>body.appendChild(panes[k])); qp.appendChild(body);
+  if(ez)ez.style.display="none";
+  // ---- LEFT: what is said — Projects (a pack) on top, then Text. Collapses IN PLACE to a thin rail ----
+  const L=mk("div","insleft"); L.id="insLeft";
+  L.innerHTML="<div class='ilhead'><b>Text</b><span class='ilsub'>що говорять</span><button type='button' class='ilcol' id='ilCol' title='Згорнути / розгорнути панель тексту'>‹</button></div>";
+  const lb=mk("div","ilbody"); panes.text.style.display=""; lb.appendChild(panes.text); L.appendChild(lb);
+  {const gc=$("groupCol"), pcx=$("previewCol"); if(gc&&pcx){gc.classList.add("pstrip"); pcx.insertBefore(gc,pcx.firstChild); if(typeof renderHookStrip==="function")renderHookStrip();}}   // Projects: a strip over the video, only when there is more than one clip
+  const rail=mk("button","ilrail","<span>Text ›</span>"); rail.type="button"; rail.id="ilRail"; rail.title="Розгорнути панель тексту"; L.appendChild(rail);
+  const pc=$("previewCol"); if(pc&&pc.parentElement)pc.parentElement.insertBefore(L,pc);
+  const colSet=c=>{L.classList.toggle("col",c);document.body.classList.toggle("ilcol",c);try{localStorage.setItem("cs_ilCol",c?"1":"0");}catch(_){}setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);};
+  L.querySelector("#ilCol").onclick=()=>colSet(true); rail.onclick=()=>colSet(false);
+  L.addEventListener("input",()=>{saveLastStyle();scheduleExact();}); L.addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+  colSet(true);   // Assembler always OPENS clean: both panels folded, just the video (open what you need)
+  qp.classList.add("insp");
+  bar.querySelectorAll("[data-it]").forEach(b=>b.onclick=()=>insTab(b.dataset.it));
+  const rc=mk("button","ircol","›"); rc.type="button"; rc.title="Згорнути панель"; bar.appendChild(rc);
+  const rr=mk("div","irrail"); rr.innerHTML=INS_TABS.map(([k,l])=>"<button type='button' data-ir='"+k+"' title='"+l+"'><span>"+l+"</span></button>").join("");
+  qp.appendChild(rr);
+  rc.onclick=()=>insFold(true);
+  rr.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>{insFold(false);insTab(b.dataset.ir);});
+  let last="style"; try{last=localStorage.getItem("cs_insTab")||"style";}catch(_){}
+  insTab(INS_TABS.some(x=>x[0]===last)?last:"style");
+  insFold(true);   // clean start, every time
+  document.body.classList.add("ins2");
+  setTimeout(()=>{if(typeof renderVoices==="function")renderVoices();},0);
+  // Style regions → replaced by 🗣 Voices + Body (Text tab). Hidden unless an old project still uses the split.
+  panes.style.querySelectorAll("details.grp").forEach(d=>{const sm=d.querySelector("summary [data-i18n='secStyleRegions']"); if(sm&&!splitOn)d.style.display="none";});
+  try{document.body.classList.toggle("edit2",currentMode==="edit");}catch(_){}
+  insDots();
+}
+function insFold(c){const q=$("quickPanel"); if(!q)return; q.classList.toggle("col",c); document.body.classList.toggle("ircol",c);
+  try{localStorage.setItem("cs_irCol",c?"1":"0");}catch(_){}
+  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);}
+function insTab(k){
+  const q=$("quickPanel"); if(q&&q.classList.contains("col"))insFold(false);   // asking for a tab opens the panel
+  document.querySelectorAll("#insTabs [data-it]").forEach(b=>b.classList.toggle("on",b.dataset.it===k));
+  document.querySelectorAll("#quickPanel .ipane").forEach(p=>p.style.display=p.dataset.ip===k?"":"none");   // the left Text pane is not in #quickPanel — untouched
+  try{localStorage.setItem("cs_insTab",k);}catch(_){}
+  if(k==="sound"){const g=$("grpHookMusic");if(g&&!g.open)g.open=true;}   // the only group there — open it
+  const ib=document.querySelector("#quickPanel .ibody"); if(ib)ib.scrollTop=0;
+}
+function insDots(){   // a small dot on a tab that has something switched on
+  const dot=(k,on)=>{const b=document.querySelector("#insTabs [data-it='"+k+"'] .idot");if(b)b.style.display=on?"":"none";};
+  try{dot("titles",(typeof titlesOn==="function"&&titlesOn())||!!(typeof overlays!=="undefined"&&overlays&&overlays.length));}catch(_){dot("titles",false);}
+  const o=(typeof mixHolder==="function")?mixHolder():null; dot("sound",!!(o&&o.mix&&(o.mix.music||o.mix.sfx.length)));
+  dot("style",false);
+}
+function openHookMusic(){insTab("sound");const g=$("grpHookMusic");if(g){g.open=true;setTimeout(()=>{try{g.scrollIntoView({behavior:"smooth",block:"start"});}catch(_){}},30);}}
 // Accordion: opening a section collapses its siblings in the same column, so the open one
 // always fits and nothing gets pushed off / hidden.
 function initGrpAccordion(){

@@ -716,6 +716,17 @@ def delete_style(name: str):
     return {"deleted": name, "styles": st.list_styles()}
 
 
+@app.delete("/api/styles/official/{name}")
+def delete_official_style(name: str):
+    """Remove a SHIPPED default (repo styles/) — only in the maintainer's git clone (the .app has no
+    repo to commit to). The maintainer then Commits + Pushes the removal."""
+    if not os.path.isdir(os.path.join(ROOT, ".git")):
+        raise HTTPException(403, "Стандартні пресети видаляються тільки в репозиторії (run.command)")
+    d = st.OFFICIAL_STYLES_DIR
+    ok = bool(d) and st.delete_style(name, styles_dir=d)
+    return {"deleted": name if ok else None, "official": _official_names(), "styles": st.list_styles()}
+
+
 @app.post("/api/styles/official")
 def post_official_style(body: SaveStyle):
     """Save a style into the SHIPPED defaults (repo styles/) so it becomes a permanent base
@@ -1000,6 +1011,62 @@ def api_cut(req: CutReq):
             "removed": removed, "fps": fps, "seconds": round(secs, 1),
             "words": compose.shift_words_cut(req.words, spans, fps=fps),
             "orig_words": compose.shift_words_cut(req.orig_words, spans, fps=fps)}
+
+
+# ---------- ⟳ Repeat ×N: a loop played N times (an 8-s animation → 32 s) ----------
+class RepeatReq(BaseModel):
+    file_id: str
+    clip: str
+    n: int = 2
+    words: List[dict] = []
+    orig_words: List[dict] = []
+
+
+@app.post("/api/repeat")
+def api_repeat(req: RepeatReq):
+    """The clip N times in a row → a NEW file "<name>_xN" (frame-exact, one encode); words are
+    repeated on every loop. The original stays for ↩."""
+    import re as _re, time as _t
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, f"Clip «{name}» not found in the session")
+    n = max(2, min(20, int(req.n)))
+    vdur = ffmpeg_utils.video_stream_duration(src)
+    N = ffmpeg_utils.frames_out(vdur)
+    T = N / ffmpeg_utils.FPS_OUT
+    if T * n > 600:
+        raise HTTPException(400, "Задовго: більше 10 хв після повтору.")
+    stem, ext = os.path.splitext(name)
+    stem = _re.sub(r"(_mix_[0-9a-f]{10})+$", "", stem)
+    out = f"{stem}_x{n}{ext}"
+    k = 1
+    while os.path.exists(os.path.join(sdir, out)):
+        k += 1
+        out = f"{stem}_x{n}_{k}{ext}"
+    has_a = music11.has_audio(src)
+    fc = (f"[0:v]fps={ffmpeg_utils.FPS_OUT},tpad=stop_mode=clone:stop_duration=0.2,trim=end_frame={N},setpts=PTS-STARTPTS,"
+          f"split={n}" + "".join(f"[v{i}]" for i in range(n)) + "; ")
+    if has_a:
+        fc += (f"[0:a]aformat=sample_rates=44100:channel_layouts=stereo,apad,atrim=0:{T:.6f},asetpts=PTS-STARTPTS,"
+               f"asplit={n}" + "".join(f"[a{i}]" for i in range(n)) + "; ")
+        fc += "".join(f"[v{i}][a{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=1[ov][oa]"
+        maps = ["-map", "[ov]", "-map", "[oa]", "-c:a", "aac", "-b:a", "192k"]
+    else:
+        fc += "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[ov]"
+        maps = ["-map", "[ov]"]
+    t0 = _t.time()
+    try:
+        ffmpeg_utils.run(["ffmpeg", "-y", "-i", src, "-filter_complex", fc] + maps
+                         + ffmpeg_utils.encoder_quality_args("12M") + ["-pix_fmt", "yuv420p", os.path.join(sdir, out)])
+    except Exception as e:
+        raise HTTPException(500, f"Repeat failed: {e}")
+    _log_timing("repeat", _t.time() - t0, f"x{n}")
+    rep_w = lambda ws: [dict(w, start=round(float(w["start"]) + i * T, 4), end=round(float(w["end"]) + i * T, 4))
+                        for i in range(n) for w in (ws or []) if "start" in w and "end" in w and float(w["start"]) < T]
+    return {"clip": out, "url": f"/clip/{req.file_id}/{out}", "n": n, "loop": round(T, 4), "dur_before": round(vdur, 4),
+            "words": rep_w(req.words), "orig_words": rep_w(req.orig_words)}
 
 
 # ---------- ⧉ parts: a zone of a clip becomes its own (sub-)project ----------
@@ -1555,10 +1622,40 @@ def audio_stems(req: AudioMixReq):
     return {"url": f"/clip/{req.file_id}/{os.path.basename(out_zip)}", "files": len(tmp)}
 
 
+class VoicesReq(BaseModel):
+    file_id: str
+    clip: str
+
+
+@app.post("/api/voices")
+def api_voices(req: VoicesReq):
+    """🗣 Who speaks when: ElevenLabs Scribe diarization (cached per clip, the same file re-voice
+    uses) → speaker runs + a pitch-based ♀ / ♂ guess per speaker."""
+    import requests as _rq
+    sdir = _session_dir(req.file_id)
+    name = os.path.basename(req.clip)
+    src = os.path.join(sdir, name)
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    try:
+        dw = revoice.diarize(src, _rq, cache_path=os.path.join(sdir, f"_diar_{os.path.splitext(name)[0]}.json"))
+    except revoice.RevoiceError as e:
+        raise HTTPException(400, str(e))
+    spans = revoice.speaker_spans(dw)
+    speakers = []
+    for sp in sorted({x[2] for x in spans}, key=lambda k: next(i for i, x in enumerate(spans) if x[2] == k)):
+        rs = [(a, b) for a, b, k in spans if k == sp]
+        hz = revoice.voice_pitch(src, rs)
+        speakers.append({"id": sp, "seconds": round(sum(b - a for a, b in rs), 2), "hz": hz,
+                         "guess": (None if hz is None else ("male" if hz < 160 else "female" if hz > 185 else None))})
+    return {"spans": spans, "speakers": speakers}
+
+
 class ExtractMusicReq(BaseModel):
     file_id: str
     clip: str
     zone: Optional[List[float]] = None
+    separate: bool = True          # False = only the audio as it is (FFmpeg, free)
 
 
 @app.post("/api/audio/extract_music")
@@ -1583,6 +1680,8 @@ def audio_extract_music(req: ExtractMusicReq):
         cmd = ["ffmpeg", "-y"] + (["-ss", f"{float(z[0]):.3f}", "-t", f"{float(z[1]) - float(z[0]):.3f}"] if z else []) \
             + ["-i", src, "-vn", "-ac", "2", "-ar", "44100", "-b:a", "192k", P(raw_n)]
         ffmpeg_utils.run(cmd)
+    if not req.separate:
+        return {"audio": U(raw_n), "name": stem + tag}
     if not os.path.exists(P(inst_n)):
         t0 = _t.time()
         try:
@@ -1777,6 +1876,7 @@ async def api_transcribe(
     except Exception as e:  # surface a clean message to the UI
         raise HTTPException(500, f"Transcription failed: {e}")
 
+    has_voices = _save_diar(sdir, "source.mp4", result["words"])
     result["words"] = _clean_transcript(result["words"], result.get("language"))
 
     import json
@@ -1788,6 +1888,7 @@ async def api_transcribe(
         "width": w, "height": h, "duration": dur,
         "language": result["language"],
         "words": result["words"],
+        "voices": has_voices,
     }
 
 
@@ -1815,6 +1916,19 @@ class TranscribeClipReq(BaseModel):
 
 
 TX_MARGIN = 1.0
+
+
+def _save_diar(sdir, clip_name, words):
+    """Scribe already said who speaks when (diarize in the transcribe call) → the same cache file
+    🗣 Voices and re-voice read, so detecting voices afterwards costs nothing. → True if saved."""
+    import json as _json
+    dw = [{"start": float(w["start"]), "end": float(w["end"]), "speaker": w["speaker"]}
+          for w in (words or []) if w.get("speaker") and "start" in w and "end" in w]
+    if not dw:
+        return False
+    with open(os.path.join(sdir, f"_diar_{os.path.splitext(os.path.basename(clip_name))[0]}.json"), "w") as f:
+        _json.dump(dw, f)
+    return True
 
 
 @app.post("/api/transcribe_clip")
@@ -1856,6 +1970,7 @@ def api_transcribe_clip(req: TranscribeClipReq):
         for w in result["words"]:
             w["start"] = round(float(w["start"]) + off, 3)
             w["end"] = round(float(w["end"]) + off, 3)
+    has_voices = _save_diar(sdir, clip, result["words"])
     words, fixes = result["words"], []
     if req.script:
         # The recogniser knows WHEN, the task text knows WHAT. Fix only one-for-one
@@ -1864,7 +1979,7 @@ def api_transcribe_clip(req: TranscribeClipReq):
         words, fixes = jira.align_to_script(words, req.script)
     return {"language": result["language"],
             "words": _clean_transcript(words, result.get("language")),
-            "script_fixes": fixes, "cover": [round(cover[0], 3), round(cover[1], 3)]}
+            "script_fixes": fixes, "cover": [round(cover[0], 3), round(cover[1], 3)], "voices": has_voices}
 
 
 class PreviewFrameReq(BaseModel):
@@ -1878,6 +1993,7 @@ class PreviewFrameReq(BaseModel):
     lang: str = "en"                  # language for auto-caption stopword rules
     cuts: Optional[List[float]] = None  # scene-cut times → captions don't cross a cut
     titles: Optional[list] = None      # static text overlays, so 'exact' shows them like the render
+    regions: Optional[List[dict]] = None  # per-phrase / voice / Body styles — 'exact' = render
 
 
 @app.get("/api/font_metrics")
@@ -1898,9 +2014,14 @@ def api_preview_frame(req: PreviewFrameReq):
     # caption window: nothing shown outside [cap_in, cap_out]
     if (req.cap_in is not None and req.time < req.cap_in) or (req.cap_out is not None and req.time >= req.cap_out):
         return Response(status_code=204)
-    tagged = compose.build_timeline(req.words or [], [{"start": 0, "end": None, "style": style}],
-                                    lang=(req.lang or "en"), cuts=req.cuts)
+    if req.regions:
+        regions = [{"start": float(r.get("start", 0)), "end": r.get("end"),
+                    "style": st.normalize(r.get("style") or req.style)} for r in req.regions]
+    else:
+        regions = [{"start": 0, "end": None, "style": style}]
+    tagged = compose.build_timeline(req.words or [], regions, lang=(req.lang or "en"), cuts=req.cuts)
     events = [e for e, _ in tagged]
+    ev_style = {id(e): s for e, s in tagged}
     # By default do NOT extend the last caption to the clip end — build_events already gives it a
     # readable tail (and trims at a scene cut); extending unconditionally made 'exact' hang the
     # last caption over trailing footage / the packshot. The style switch opts back in.
@@ -1922,7 +2043,8 @@ def api_preview_frame(req: PreviewFrameReq):
     tmp = tempfile.mktemp(suffix=".png")
     font = st.resolve_font(style.get("font_name"))
     if ev is not None:
-        subtitles.render_subtitle_png(ev, tmp, TW, TH, font, style, scale)
+        es = ev_style.get(id(ev)) or style   # the style of THIS caption's region
+        subtitles.render_subtitle_png(ev, tmp, TW, TH, st.resolve_font(es.get("font_name")), es, scale)
     else:
         _Img.new("RGBA", (TW, TH), (0, 0, 0, 0)).save(tmp)
     if act_titles:                                   # composite each title over the caption layer
@@ -1984,7 +2106,8 @@ def api_layout(req: LayoutReq):
         events.append({
             "start": e["start"], "end": e["end"],
             "active": e.get("active_word_index", 0), "manual": bool(e.get("manual", False)),
-            "lines": [[{"text": w.get("text", ""), "start": w.get("start", 0), "end": w.get("end", 0)}
+            "lines": [[{"text": w.get("text", ""), "start": w.get("start", 0), "end": w.get("end", 0),
+                        "accent": bool(w.get("accent"))}
                        for w in line] for line in e.get("lines", [])],
         })
     return {"events": events}

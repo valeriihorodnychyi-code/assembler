@@ -56,6 +56,27 @@ def test_scribe_language_codes_are_made_whisper_safe():
     from engine.transcribe import lang2
     assert [lang2(x) for x in ("eng", "ukr", "pt-BR", "EN", "", None, "zzz")] == ["en", "uk", "pt", "en", None, None, None]
 
+
+def test_scribe_voices_come_free_with_the_transcript():
+    """Scribe diarizes in the transcribe call → 🗣 Voices reads the cache, no second request."""
+    from engine import revoice as RV
+    fid, name = _session(6)
+    A.transcribe.transcribe = lambda path, **k: {"language": "en", "words": [
+        {"word": "Hi", "start": 0.5, "end": 0.9, "speaker": "speaker_0"},
+        {"word": "you", "start": 2.0, "end": 2.4, "speaker": "speaker_1"}]}
+    r = C.post("/api/transcribe_clip", json={"file_id": fid, "clip": name, "engine": "scribe"}).json()
+    assert r["voices"] is True
+    calls = []
+    real = RV.requests if hasattr(RV, "requests") else None
+    import requests as _rq
+    orig = _rq.post
+    _rq.post = lambda *a, **k: calls.append(1) or (_ for _ in ()).throw(AssertionError("no Scribe call expected"))
+    try:
+        v = C.post("/api/voices", json={"file_id": fid, "clip": name}).json()
+    finally:
+        _rq.post = orig
+    assert not calls and [s["id"] for s in v["speakers"]] == ["speaker_0", "speaker_1"], v
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     failed = 0

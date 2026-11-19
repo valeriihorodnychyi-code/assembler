@@ -92,6 +92,18 @@ def test_part_is_a_new_clip_of_the_zone_with_its_own_words():
     r2 = C.post("/api/part", json={"file_id": fid, "clip": name, "a": 1.0, "b": 1.1})
     assert r2.status_code == 400
 
+
+def test_repeat_plays_the_clip_n_times_and_repeats_the_words():
+    """⟳ Repeat ×3: 6 s → 18 s, frame-exact; every word appears on every loop."""
+    fid, name = _clip()
+    r = C.post("/api/repeat", json={"file_id": fid, "clip": name, "n": 3, "words": WORDS, "orig_words": WORDS})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    dur = RV.duration(os.path.join(A.WORK_ROOT, fid, d["clip"]))
+    assert abs(dur - 3 * d["loop"]) < 0.1, (dur, d["loop"])
+    assert len(d["words"]) == 3 * len(WORDS)
+    assert abs(d["words"][len(WORDS)]["start"] - (WORDS[0]["start"] + d["loop"])) < 1e-3
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     failed = 0
