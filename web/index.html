@@ -418,6 +418,7 @@
   .srow .stext{font-size:14px;line-height:1.45;color:var(--txt);outline:none;padding:2px 4px;border-radius:5px;min-height:20px;word-break:break-word}
   .srow .stext:focus{background:rgba(255,255,255,.05);box-shadow:0 0 0 1px var(--line)}
   .srow .sacts{display:flex;gap:4px}
+  .srow .stext .wnl{color:#60a5fa;font-weight:700;margin:0 2px;user-select:none}
   .srow .stext .wacc,#transcriptWords .w.wacc{color:#ff8a5c;font-weight:700}
   #transcriptWords .w.wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5);border-radius:3px}
   .srow .stext .wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5);border-radius:3px}
@@ -2532,6 +2533,15 @@ document.addEventListener("keydown",(e)=>{
   }
 });
 $("seek").oninput=e=>{if(videoLoaded)video.currentTime=(e.target.value/100)*(video.duration||0);};
+// A click on the timeline / the picture means «I'm done typing»: the caret leaves the text, so the
+// next Space plays instead of typing a space into the sentence you were editing.
+document.addEventListener("pointerdown",e=>{
+  const t=e.target; if(!t||!t.closest)return;
+  if(t.closest("input,textarea,select,[contenteditable='true']"))return;   // clicking INTO a field keeps typing
+  if(!t.closest("#trimRow,#canvas,#exactImg,video,#transport"))return;
+  const a=document.activeElement;
+  if(a&&a!==document.body&&(a.isContentEditable||a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&!/^(checkbox|radio|range|button|submit|color|file)$/i.test(a.type||""))))a.blur();
+},true);
 // ␣ Space = play / pause, ALWAYS — unless you're typing. Caught before anything else (capture), so a
 // focused button / checkbox / slider never eats it (a focused button used to get "clicked" instead).
 (function spacePlay(){
@@ -3331,7 +3341,7 @@ function parseBreaksToWords(text, base){
   for(const p of parts){ if(p===""){ if(toks.length) brkAfter[toks.length-1]=true; } else toks.push(p); }
   const mapped=remapWords(toks.join(" "), base);
   if(!mapped) return base;
-  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":null}));
+  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":(w.brk==="nl"?"nl":null)}));   // ↵ line breaks ride on their word
 }
 // Rebuild the transcript text FROM words, showing soft breaks as newlines (so reopening a
 // hook restores where the designer split).
@@ -3580,6 +3590,7 @@ function renderWordsView(){
     sp.textContent=(w.word||w.text||""); sp.title=_fmtCut(+w.start);
     box.appendChild(sp); box.appendChild(document.createTextNode(" "));
     if(w.brk==="soft") box.appendChild(document.createElement("br"));
+    else if(w.brk==="nl"){const m=document.createElement("b");m.className="wnl";m.textContent="↵";m.title="Новий рядок у титрі";m.style.cssText="color:#60a5fa;margin:0 3px";box.appendChild(m);}
   });
 }
 // click a word = seek (works while it's also editable); typing edits like the Text field
@@ -3593,7 +3604,7 @@ function renderWordsView(){
     const st=+sp.dataset.start; if(video&&videoLoaded){ try{video.currentTime=st;}catch(_){} if(video.paused){try{render(st,video.duration||0);}catch(_){}} if(typeof scheduleExact==="function")scheduleExact(); } });
   box.addEventListener("input",()=>{ // edit in-place → re-map onto word timings (same as the Text field)
     _wRng=null;   // indices shift while typing — select the phrase again after editing
-    if(realWords&&realWords.length){ realWords=parseBreaksToWords(box.innerText, realWords); if(variants[activeVar])variants[activeVar].words=realWords;
+    if(realWords&&realWords.length){ realWords=parseBreaksToWords(box.innerText.replace(/↵/g," "), realWords); if(variants[activeVar])variants[activeVar].words=realWords;
       const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords); }   // mirror edits into the Text field so BOTH tabs + export/layout use the same words
     if(typeof scheduleExact==="function")scheduleExact();
     if(typeof scheduleRevoiceBox==="function")scheduleRevoiceBox(); });
@@ -4602,6 +4613,22 @@ function drawGenLane(){
       {label:p.on?"Вимкнути (оригінальна картинка)":"Увімкнути",on:()=>genSwitch(mixHolder(),G=>{G.pieces[i].on=!G.pieces[i].on;})},
       {label:"Вимкнути всі / увімкнути всі",on:()=>$("genAll").click()}]);};});
 }
+// ↵ Enter in a sentence: the caption breaks to a new LINE after the word before the caret (press
+// again on the same spot to remove it). Same caption — not a new one (that's Enter in Words).
+function sentLineBreak(row){
+  const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return;
+  if(row.innerText.replace(/[\s↵]+/g," ").trim()!==inf.text.replace(/\s+/g," ").trim()){renderSentsView(true);setStatus("↵ Правку збережено — постав курсор і натисни Enter ще раз.","");return;}
+  const sel=window.getSelection(); if(!sel.rangeCount)return;
+  const n=sel.anchorNode, off=sel.anchorOffset, el=n&&(n.nodeType===1?n:n.parentElement);
+  let span=el&&el.closest&&el.closest("[data-wi]"), i;
+  if(span){i=+span.dataset.wi; if(n.nodeType===3&&off===0)i--;}                 // caret at the very start of a word → break before it
+  else{let p=(n.nodeType===3?n:n.childNodes[off-1]||n.childNodes[off]); while(p&&!(p.nodeType===1&&p.dataset&&p.dataset.wi!=null))p=p.previousSibling; i=p?+p.dataset.wi:-1;}
+  const r=_sentRanges[k]; if(!r||i<r[0]||i>=r[1]-1){setStatus("↵ Постав курсор між словами, де має бути новий рядок.","");return;}
+  const ws=(realWords||[]).map(w=>({...w})); const on=ws[i].brk!=="nl";
+  if(ws[i].brk==="soft"&&on){setStatus("↵ Тут уже новий титр.","");return;}
+  ws[i].brk=on?"nl":null; commitWords(ws); renderSentsView(true);
+  setStatus(on?"↵ Новий рядок після «"+(ws[i].word||"")+"» (той самий титр). Enter там само ще раз — прибрати.":"↵ Розрив рядка прибрано.","ok");
+}
 // ✦ accent words / 🎨 phrase styles, shown right in the sentence (the row text stays plain words)
 function sentWordsHTML(r,esc){
   const ws=realWords||[], ps=curPhraseStyles(), W=w=>w.word||w.text||"";
@@ -4609,7 +4636,7 @@ function sentWordsHTML(r,esc){
     const ph=ps.find(p=>+w.start>=+p.start&&+w.start<+p.end);
     const dt=dateAt(i);
     const cls=(w.accent?" wacc":"")+(ph?" wphr":"")+(dt?" wdate":""), tt=(w.accent?"✦ accent":"")+(ph?(w.accent?" · ":"")+"🎨 "+(ph.name||"style"):"")+(dt?((w.accent||ph)?" · ":"")+"📅 дата: "+dt.text:"");
-    out.push("<span data-wi='"+i+"'"+(cls?" class='"+cls.trim()+"'":"")+(tt?" title='"+esc(tt)+"'":"")+">"+esc(W(w))+"</span>");}
+    out.push("<span data-wi='"+i+"'"+(cls?" class='"+cls.trim()+"'":"")+(tt?" title='"+esc(tt)+"'":"")+">"+esc(W(w))+"</span>"+(w.brk==="nl"&&i<r[1]-1?"<b class='wnl' contenteditable='false' title='Новий рядок у титрі (Enter тут — прибрати)'>↵</b>":""));}
   return out.join(" ");
 }
 // select words in a sentence → a small bar: ✦ Accent (own colour inside the caption) · 🎨 Style (its own caption + preset)
@@ -4620,7 +4647,7 @@ function sentSelWords(){
   const row=el(sel.anchorNode)&&el(sel.anchorNode).closest(".stext"); if(!row||!box.contains(row))return null;
   if(!(el(sel.focusNode)&&el(sel.focusNode).closest(".stext")===row))return null;
   const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return null;
-  if(row.innerText.replace(/\s+/g," ").trim()!==inf.text.replace(/\s+/g," ").trim())return {k,edited:true};   // finish the edit first (Enter)
+  if(row.innerText.replace(/↵/g," ").replace(/\s+/g," ").trim()!==inf.text.replace(/\s+/g," ").trim())return {k,edited:true};   // finish the edit first (Enter)
   const idx=[...row.querySelectorAll("[data-wi]")].filter(s=>sel.containsNode(s,true)).map(s=>+s.dataset.wi);
   if(!idx.length)return null;
   return {k,i0:Math.min(...idx),i1:Math.max(...idx),rect:sel.getRangeAt(0).getBoundingClientRect()};
@@ -4723,6 +4750,8 @@ function voiceSentences(k0,k1){
       const inf=sentInfo(k); if(inf&&video&&videoLoaded){try{video.currentTime=Math.max(0,inf.start-0.05);_sentStopAt=inf.end+0.12;video.play();}catch(_){}}
       return;}
     const vb=e.target.closest&&e.target.closest("[data-svoice]"); if(vb){const k=+vb.dataset.svoice;voiceSentences(k,k+1);return;}
+    const wi=e.target.closest&&e.target.closest(".stext [data-wi]");   // click a word → the playhead jumps there (like Words)
+    if(wi&&videoLoaded&&video.paused&&window.getSelection().isCollapsed){const w=(realWords||[])[+wi.dataset.wi]; if(w){video.currentTime=Math.max(0,+w.start+0.5/fps());if(typeof scheduleExact==="function")scheduleExact();}}
     const rv=e.target.closest&&e.target.closest("[data-srevert]");
     if(rv){const inf=sentInfo(+rv.dataset.srevert); if(inf)inf.changes.slice().sort((x,y)=>y.ns-x.ns).forEach(revertSpan); renderSentsView(true); return;}
     const cb=e.target.closest&&e.target.closest("[data-scut]"); if(cb){const k=+cb.dataset.scut;cutSentences(k,k+1);return;}
@@ -4732,7 +4761,7 @@ function voiceSentences(k0,k1){
     const s=e.target.closest&&e.target.closest(".stext");
     if(s){const k=+s.dataset.k, rs=_sentRanges; if(!realWords||!rs[k])return;
       // rebuild the full text with this row replaced; other rows keep their own words (and breaks)
-      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/\s+/g," ").trim():wordsToText(realWords.slice(r[0],r[1])));
+      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/↵/g," ").replace(/\s+/g," ").trim():wordsToText(realWords.slice(r[0],r[1])));
       const full=parts.map((p,i)=>p+((i<rs.length-1&&realWords[rs[i][1]-1]&&realWords[rs[i][1]-1].brk==="soft"&&i!==k)?"\n":"")).join(" ");
       realWords=parseBreaksToWords(full,realWords); if(variants[activeVar])variants[activeVar].words=realWords;
       const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords);
@@ -4745,7 +4774,9 @@ function voiceSentences(k0,k1){
   });
   box.addEventListener("keydown",e=>{
     if(e.key==="Escape"&&_sentPick){e.preventDefault();_sentPick=null;renderSentsView(true);return;}
-    if(e.key==="Enter"&&e.target.classList&&e.target.classList.contains("stext")){e.preventDefault();e.target.blur();}   // Enter = done (line breaks belong to the Text tab)
+    if(e.key==="Enter"&&e.target.classList&&e.target.classList.contains("stext")){e.preventDefault();
+      if(e.metaKey||e.ctrlKey){e.target.blur();return;}   // Cmd+Enter = done
+      sentLineBreak(e.target);}   // Enter = ↵ new LINE inside the caption (Words: Enter = a new caption)
   });
   box.addEventListener("focusout",e=>{ if(e.target.classList&&e.target.classList.contains("stext"))setTimeout(()=>{if(!box.contains(document.activeElement)||!document.activeElement.classList.contains("stext"))renderSentsView(true);},0); });
   if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{

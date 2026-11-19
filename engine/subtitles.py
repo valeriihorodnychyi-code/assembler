@@ -284,6 +284,18 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
             # Build atomic groups first (keep_together / numbers / dates / stopwords),
             # then wrap by GROUPS so a glued unit never breaks across a line or caption.
             groups = build_groups(phrase, rules, lang=lang, pause_gap=pause_gap)
+            # ↵ a designer's line break wins over keep-together glue: split the group there
+            _g2 = []
+            for g in groups:
+                cur_g = []
+                for w in g:
+                    cur_g.append(w)
+                    if w.get("brk") == "nl":
+                        _g2.append(cur_g)
+                        cur_g = []
+                if cur_g:
+                    _g2.append(cur_g)
+            groups = _g2
             glines = []   # lines as lists OF groups
             if wrap_mode == "words":          # wrap by WORD count per line
                 line, count = [], 0
@@ -294,6 +306,9 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
                         line, count = [], 0
                     line.append(g)
                     count += gw
+                    if g[-1].get("brk") == "nl":      # ↵ the designer's own line break inside the caption
+                        glines.append(line)
+                        line, count = [], 0
                 if line:
                     glines.append(line)
             else:                             # wrap by CHARS (default — guarantees width fit)
@@ -307,6 +322,9 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
                         space_len = 0
                     line.append(g)
                     line_chars += space_len + glen
+                    if g[-1].get("brk") == "nl":      # ↵ the designer's own line break inside the caption
+                        glines.append(line)
+                        line, line_chars = [], 0
                 if line:
                     glines.append(line)
             # widow control: avoid a final line with fewer than N words
