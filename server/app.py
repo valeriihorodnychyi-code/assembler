@@ -2101,6 +2101,18 @@ def _clean_transcript(words, lang=None):
         return words
 
 
+class MrtechReq(BaseModel):
+    style: dict
+    name: str = ""
+
+
+@app.post("/api/styles/mrtech")
+def api_style_mrtech(req: MrtechReq):
+    """A caption preset in MRTech's flat caption JSON (+ the extras their format doesn't have yet)."""
+    from engine import mrtech
+    return mrtech.to_mrtech(req.style, req.name)
+
+
 class TextCleanReq(BaseModel):
     words: List[dict] = []
     orig_words: List[dict] = []
