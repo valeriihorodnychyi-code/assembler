@@ -2104,13 +2104,14 @@ def _clean_transcript(words, lang=None):
 class MrtechReq(BaseModel):
     style: dict
     name: str = ""
+    clean: bool = False             # True = ONLY their 13 keys (works in their renderer as is)
 
 
 @app.post("/api/styles/mrtech")
 def api_style_mrtech(req: MrtechReq):
     """A caption preset in MRTech's flat caption JSON (+ the extras their format doesn't have yet)."""
     from engine import mrtech
-    return mrtech.to_mrtech(req.style, req.name)
+    return mrtech.to_mrtech(req.style, req.name, clean=req.clean)
 
 
 class TextCleanReq(BaseModel):

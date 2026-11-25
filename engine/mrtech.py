@@ -25,7 +25,7 @@ def _alpha(c):
     return round((c[3] if len(c) > 3 else 255) / 255.0, 2)
 
 
-def to_mrtech(style, name=""):
+def to_mrtech(style, name="", clean=False):
     s = st.normalize(style or {})
     font_file = s.get("font_name") or "Poppins-Bold.ttf"
     fs = int(s.get("font_size", 80))
@@ -49,7 +49,6 @@ def to_mrtech(style, name=""):
     ka, kp = s.get("karaoke") or {}, s.get("karaoke_plate") or {}
     sh = s.get("shadow") or {}
     out = {
-        # ---- their format ----
         "font": os.path.splitext(os.path.basename(font_file))[0],
         "align": "center",
         "color": _hex(s.get("text_color")),
@@ -58,31 +57,55 @@ def to_mrtech(style, name=""):
         "position": "bottom",
         "interline": spacing,
         "margin_top": 285,
-        "stroke_color": _hex((s.get("stroke") or {}).get("color")) if sw > 0 else None,
-        "stroke_width": sw,
+        # one outline in their format: the OUTER one if there are two (it's what you see from afar)
+        "stroke_color": (_hex((s.get("stroke_outer") or {}).get("color")) if so > 0
+                         else _hex((s.get("stroke") or {}).get("color")) if sw > 0 else None),
+        "stroke_width": so if so > 0 else sw,
         "corner_radius": int(pl.get("border_radius", 0)) if pl.get("enabled") else 0,
         "margin_bottom": max(0, mb_edge),
         "max_width_ratio": 0.82,
-        # ---- extras: what our captions also use (add one by one) ----
+    }
+    if clean:
+        return out
+    sh2 = s.get("shadow2") or {}
+    shadows = []
+    if sh.get("enabled"):
+        if sh2.get("enabled"):     # drawn first (underneath)
+            shadows.append({"color": _hex(sh2.get("color")), "opacity": _alpha(sh2.get("color")),
+                            "offset": [int(sh2.get("offset_x", 0)), int(sh2.get("offset_y", 0))], "blur": int(sh2.get("glow_blur", 0))})
+        shadows.append({"color": _hex(sh.get("color")), "opacity": _alpha(sh.get("color")),
+                        "offset": [int(sh.get("offset_x", 0)), int(sh.get("offset_y", 0))], "blur": int(sh.get("glow_blur", 0))})
+    sc = s.get("scrim") or {}
+    ps = s.get("plate_shadow") or {}
+    out["x_assembler"] = {          # everything our captions use that the 13 keys can't say — see CAPTION_SPEC.md
+        "spec": "assembler-captions/1",
         "name": name,
-        "frame": [W, H],                                      # px above are for this frame size
-        "text_case": s.get("text_case") or "none",            # uppercase · lowercase · none
-        "max_lines": lines,                                   # lines on screen at once
-        "max_words_per_line": int(s.get("words_per_line", 3)) if words_mode else None,
-        "max_chars_per_line": None if words_mode else int(s.get("max_chars_per_line", 15)),
+        "frame": [W, H],
+        "margin_bottom_center": int(s.get("margin_bottom", 300)),
+        "text_case": s.get("text_case") or "none",
         "punctuation": {True: "all", "off": "off"}.get(s.get("punctuation"), "question_exclamation_only"),
-        "bg_opacity": _alpha(pl.get("color")) if pl.get("enabled") else None,
-        "bg_mode": (("full_width" if pl.get("full_width") else "per_line" if pl.get("per_line") else "block")
-                    if pl.get("enabled") else None),
-        "bg_padding": [int(pl.get("pad_x", 0)), int(pl.get("pad_y", 0))] if pl.get("enabled") else None,
-        "stroke_outer": {"color": _hex((s.get("stroke_outer") or {}).get("color")), "width": so} if so > 0 else None,
-        "shadow": ({"color": _hex(sh.get("color")), "offset": [int(sh.get("offset_x", 0)), int(sh.get("offset_y", 0))],
-                    "blur": int(sh.get("glow_blur", 0))} if sh.get("enabled") else None),
-        # karaoke = the word being SPOKEN right now is highlighted (needs word timestamps)
-        "karaoke": ({"enabled": True, "active_color": _hex(ka.get("active_color")),
-                     "active_bg_color": _hex(kp.get("color")) if kp.get("enabled") else None,
-                     "active_bg_padding": [int(kp.get("pad_x", 0)), int(kp.get("pad_y", 0))] if kp.get("enabled") else None,
-                     "active_bg_radius": int(kp.get("border_radius", 0)) if kp.get("enabled") else None}
-                    if ka.get("enabled") else {"enabled": False}),
+        "layout": {"max_lines": lines,
+                   "max_chars_per_line": None if words_mode else int(s.get("max_chars_per_line", 15)),
+                   "max_words_per_line": int(s.get("words_per_line", 3)) if words_mode else None,
+                   "new_caption_after_pause_s": float(s.get("sentence_pause", 0.5)),
+                   "min_last_line_words": 2, "shrink_to_fit_width_ratio": 0.92},
+        "plate": ({"mode": "full_width" if pl.get("full_width") else "per_line" if pl.get("per_line") else "block",
+                   "color": _hex(pl.get("color")), "opacity": _alpha(pl.get("color")),
+                   "padding": [int(pl.get("pad_x", 0)), int(pl.get("pad_y", 0))],
+                   "radius": int(pl.get("border_radius", 0)), "offset_y": int(s.get("box_offset_y", 0)),
+                   "shadow": ({"color": _hex(ps.get("color")), "opacity": _alpha(ps.get("color")),
+                               "offset": [int(ps.get("offset_x", 0)), int(ps.get("offset_y", 0))], "blur": int(ps.get("glow_blur", 0))}
+                              if ps.get("enabled") else None)}
+                  if pl.get("enabled") else None),
+        "stroke": {"inner": {"color": _hex((s.get("stroke") or {}).get("color")), "width": sw} if sw > 0 else None,
+                   "outer": {"color": _hex((s.get("stroke_outer") or {}).get("color")), "width": so} if so > 0 else None},
+        "shadows": shadows,
+        "scrim": ({"color": _hex(sc.get("color")), "opacity": _alpha(sc.get("color")), "padding": int(sc.get("pad", 40)),
+                   "feather": int(sc.get("feather", 70)), "fade_s": float(sc.get("fade", 0.25))} if sc.get("enabled") else None),
+        "karaoke": ({"active_color": _hex(ka.get("active_color")),
+                     "active_plate": ({"color": _hex(kp.get("color")), "opacity": _alpha(kp.get("color")),
+                                       "padding": [int(kp.get("pad_x", 0)), int(kp.get("pad_y", 0))],
+                                       "radius": int(kp.get("border_radius", 0))} if kp.get("enabled") else None)}
+                    if ka.get("enabled") else None),
     }
     return out
