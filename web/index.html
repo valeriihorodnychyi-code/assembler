@@ -408,6 +408,30 @@
   .twords .w.otrim{opacity:.28;text-decoration:line-through;text-decoration-color:rgba(255,255,255,.25)}
   .srow.otrim{opacity:.35}
   .twords .w.rng{color:#fff;background:rgba(120,110,255,.45);box-shadow:0 0 0 1px rgba(150,140,255,.7)}   /* Shift-click / double-click range — re-voiced as one phrase */
+  .tcaps{display:flex;flex-direction:column;gap:6px;max-height:460px;overflow-y:auto;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+  .tcaps .chint{color:var(--muted);font-size:12px;padding:8px}
+  .ccard{border:1px solid #2c303b;border-radius:9px;padding:5px 8px 7px;background:#191b22}
+  .ccard.cur{border-color:rgba(255,90,44,.55)}
+  .ccard.cown{border-left:3px solid #a78bfa}
+  .ccard.sedit{border-color:#a78bfa;background:rgba(167,139,250,.14);box-shadow:0 0 0 2px rgba(167,139,250,.35)}
+  .ccard .chead{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+  .ccard .ctime{font:600 10.5px/1 ui-monospace,Menlo,monospace;color:var(--muted);background:transparent;border:0;padding:3px 2px;cursor:pointer}
+  .ccard .ctime:hover{color:var(--accent)}
+  .ccard .cdur{font-size:10px;color:#5d6270}
+  .ccard .cstyle{font-size:10px;color:#c4b5fd}
+  .ccard .cbtn{font-size:11px;padding:1px 7px;background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--muted)}
+  .ccard .cbtn:hover{color:var(--txt);border-color:#4a4e5a}
+  .ccard .ctext{outline:none;font-weight:700;font-size:14px;line-height:1.35;text-align:center;padding:4px;border-radius:6px;caret-color:var(--accent)}
+  .ccard .ctext:focus{background:rgba(255,255,255,.04)}
+  .ccard .cline{min-height:1em}
+  .ccard .w{cursor:pointer;border-radius:3px}
+  .ccard .w:hover{background:rgba(255,255,255,.06)}
+  .ccard .w.wsel{box-shadow:0 0 0 1px #60a5fa}
+  .ccard .w.wacc{color:#ff8a5c}
+  .ccard .w.wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5)}
+  #capsHelp{position:fixed;z-index:4;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(22,24,31,.92);font-size:12px;line-height:1.45;color:var(--muted)}
+  .tcaps .chelp{font-size:11.5px;color:var(--muted);padding:2px 4px} .tcaps .chelp summary{cursor:pointer} .tcaps .chelp ul{margin:4px 0;padding-left:16px} .tcaps .chelp b{color:var(--txt)}
+  #capsHelp b{color:var(--txt)} #capsHelp ul{margin:6px 0 0;padding-left:16px} #capsHelp li{margin:3px 0}
   .tsents{display:flex;flex-direction:column;gap:4px;max-height:420px;overflow-y:auto;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
   .srow{border:1px solid transparent;border-radius:8px;padding:6px 6px 6px 4px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 6px;align-items:start}
   .srow:hover{background:rgba(255,255,255,.03)}
@@ -505,7 +529,7 @@
   .railhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;text-align:center;margin-bottom:8px}
   .presetrail{display:flex;flex-direction:column;gap:6px;max-height:64vh;overflow-y:auto;padding:2px}
   #presetRail .presets{grid-template-columns:1fr;gap:6px;margin-top:0}
-  .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0}
+  .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0;position:relative}
   /* only the right tools column sits under the fixed tutorial stickers, so only it steps down */
   /* 2.0 inspector */
   body.edit2 .app{grid-template-columns:1fr}
@@ -875,8 +899,8 @@
             title="Накласти поточний текст на ОРИГІНАЛЬНІ тайминги транскрайбу. Твої правки тексту лишаються, зіпсований час повертається — без нового транскрайбу. (Ручні правки часу слів теж скинуться.)">↺<span class="rtl"> Тайминги</span></button>
           <div class="seg" id="txtViewSeg">
             <button type="button" data-v="text" class="active">Text</button>
-            <button type="button" data-v="words">Words</button>
-            <button type="button" data-v="sents" title="Речення: правка й переозвучка цілими реченнями">Sentences</button>
+            <button type="button" data-v="caps" title="Титри — рівно як на екрані: розриви, акценти, стиль окремого титру">Captions</button>
+            <button type="button" data-v="sents" title="Речення — голос: переозвучка, губи, дати, вирізати">Sentences</button>
           </div></div>
         <div style="position:relative">
           <span id="langSticker" class="lang-sticker" style="display:none"></span>
@@ -884,6 +908,7 @@
           <div id="transcriptWords" class="twords" contenteditable="true" spellcheck="false" style="display:none"></div>
           <div id="datePanel" class="datepanel" style="display:none"></div>
           <div id="transcriptSents" class="tsents" style="display:none"></div>
+          <div id="transcriptCaps" class="tcaps" style="display:none"></div>
           <div id="sentBar" style="display:none"></div>
           <div id="wordTools" style="display:none;flex-direction:column;gap:6px;margin-top:6px;font-size:11.5px;color:var(--muted)">
             <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Слово: <b id="wtWord" style="color:var(--txt)">— клікни слово</b> <span id="wtTime"></span></div>
@@ -903,7 +928,7 @@
             <button type="button" data-v="qe" class="active">?! only</button>
             <button type="button" data-v="all">All</button>
           </div></div>
-        <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
+        <div class="hint">У вкладці <b>Text</b>: <b>Enter</b> (або <b>*</b>) = новий титр, <b>|</b> = новий рядок у титрі. Те саме наочно — у вкладці <b>Captions</b>.</div>
       </div>
     </details>
 
@@ -2528,7 +2553,7 @@ document.addEventListener("keydown",(e)=>{
   const k=({KeyI:"i",KeyO:"o"})[e.code]||e.key.toLowerCase();   // by the physical key: works in any keyboard layout (UA too)
   // I / O stamp the playhead into the trim (NLE muscle memory)
   if(e.key==="Escape"&&_wRng&&typeof setWordRange==="function"){e.preventDefault();setWordRange(null);return;}
-  if((e.key==="["||e.key==="]")&&txtView==="words"&&_wSel>=0){e.preventDefault();setWordEdge(e.key==="["?"start":"end");return;}
+  if((e.key==="["||e.key==="]")&&(txtView==="words"||txtView==="caps")&&_wSel>=0){e.preventDefault();setWordEdge(e.key==="["?"start":"end");return;}
   if(k==="i"&&$("trimRow")&&$("trimRow").style.display!=="none"){e.preventDefault();setTrimFromPlayhead("in");return;}
   if(k==="o"&&$("trimRow")&&$("trimRow").style.display!=="none"){e.preventDefault();setTrimFromPlayhead("out");return;}
   // Alt + ← / → nudges the ARMED trim handle by a frame (Shift = 10); plain ← / → moves the playhead
@@ -2823,6 +2848,7 @@ async function fetchLayout(){
     if(!r.ok)return; const d=await r.json(); if(seq!==_layoutSeq)return;   // superseded by a newer request
     if(key!==layoutKey())return;                                          // clip changed while we waited → don't cache it
     serverLayout=(d&&d.events)?d.events:null; _layoutKey=key;
+    if(txtView==="caps"&&typeof renderCapsView==="function")renderCapsView();
   }catch(e){/* network hiccup → keep last layout (or JS fallback) */}
 }
 async function fetchExact(){
@@ -3344,15 +3370,15 @@ $("transcript").addEventListener("input",()=>{
 function parseBreaksToWords(text, base){
   let t=String(text||"").replace(/\r/g,"").replace(/\n+/g,"  ").replace(/\*/g,"  ");
   const parts=t.split(/\s+/).filter(Boolean);
-  const toks=[], brkAfter=[];
-  for(const p of parts){ if(p===""){ if(toks.length) brkAfter[toks.length-1]=true; } else toks.push(p); }
+  const toks=[], brkAfter=[], nlAfter=[];
+  for(const p of parts){ if(p===""){ if(toks.length) brkAfter[toks.length-1]=true; } else if(p==="|"||p==="↵"){ if(toks.length) nlAfter[toks.length-1]=true; } else toks.push(p); }
   const mapped=remapWords(toks.join(" "), base);
   if(!mapped) return base;
-  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":(w.brk==="nl"?"nl":null)}));   // ↵ line breaks ride on their word
+  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":(nlAfter[i]?"nl":null)}));   // "|" in the text = ↵ a new line inside the caption
 }
 // Rebuild the transcript text FROM words, showing soft breaks as newlines (so reopening a
 // hook restores where the designer split).
-function wordsToText(ws){let out="";(ws||[]).forEach(w=>{out+=(w.word||w.text||"");out+=(w.brk==="soft")?"\n":" ";});return out.trim();}
+function wordsToText(ws){let out="";(ws||[]).forEach(w=>{out+=(w.word||w.text||"");out+=(w.brk==="soft")?"\n":(w.brk==="nl"?" | ":" ");});return out.trim();}   // "|" = a new line inside the caption
 
 // ---------- presets + custom styles ----------
 let savedStyles={};   // name -> engine-schema JSON (loaded from the shared styles/ folder)
@@ -3622,10 +3648,13 @@ $("txtViewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
   const ta=$("transcript"), box=$("transcriptWords");
   if($("wordTools"))$("wordTools").style.display=(txtView==="words")?"flex":"none";
   const sb=$("transcriptSents"); if(sb)sb.style.display=(txtView==="sents")?"flex":"none";
+  const cb=$("transcriptCaps"); if(cb)cb.style.display=(txtView==="caps")?"flex":"none";
+  if(txtView==="caps"){ if(ta)ta.style.display="none"; if(box)box.style.display="none"; renderCapsView(true); }
+  capsHelp();
   if($("sentBar"))$("sentBar").style.display="none";
   if(txtView==="sents"){ if(ta)ta.style.display="none"; if(box)box.style.display="none"; _sentPick=null; renderSentsView(true); }
   else if(txtView==="words"){ if(ta)ta.style.display="none"; if(box){box.style.display="block";renderWordsView();} }
-  else { if(ta){ if(realWords&&realWords.length)ta.value=wordsToText(realWords); ta.style.display=""; if(typeof autoGrow==="function")autoGrow(); } if(box)box.style.display="none"; }   // switching to Text → show the latest words (incl. Words-tab edits)
+  else if(txtView!=="caps"){ if(ta){ if(realWords&&realWords.length)ta.value=wordsToText(realWords); ta.style.display=""; if(typeof autoGrow==="function")autoGrow(); } if(box)box.style.display="none"; }   // switching to Text → show the latest words (incl. Words-tab edits)
 });
 function renderWordsView(){
   const box=$("transcriptWords"); if(!box)return; box.innerHTML="";
@@ -3672,6 +3701,7 @@ function commitWords(ws){
   if(variants[activeVar])variants[activeVar].words=ws;
   const h=(typeof openHookRef==="function")?openHookRef():null; if(h)h.words=ws;
   if(txtView==="words")renderWordsView();
+  else if(txtView==="caps"){const ta=$("transcript"); if(ta)ta.value=wordsToText(ws);}
   else{const ta=$("transcript"); if(ta){ta.value=wordsToText(ws); if(typeof autoGrow==="function")autoGrow();}}
   if(txtView==="sents"&&typeof renderSentsView==="function")renderSentsView();
   if(typeof invalidateLayout==="function")invalidateLayout();
@@ -4699,8 +4729,12 @@ function sentWordsHTML(r,esc){
 // select words in a sentence → a small bar: ✦ Accent (own colour inside the caption) · 🎨 Style (its own caption + preset)
 function sentSelWords(){
   const sel=window.getSelection&&window.getSelection(); if(!sel||sel.isCollapsed||!sel.rangeCount)return null;
-  const box=$("transcriptSents"); if(!box)return null;
   const el=n=>n&&(n.nodeType===1?n:n.parentElement);
+  const cap=el(sel.anchorNode)&&el(sel.anchorNode).closest(".ctext");
+  if(cap){if(!(el(sel.focusNode)&&el(sel.focusNode).closest(".ctext")===cap))return null;
+    const idx=[...cap.querySelectorAll("[data-wi]")].filter(s=>sel.containsNode(s,true)).map(s=>+s.dataset.wi); if(!idx.length)return null;
+    return {k:+cap.dataset.c,cap:true,i0:Math.min(...idx),i1:Math.max(...idx),rect:sel.getRangeAt(0).getBoundingClientRect()};}
+  const box=$("transcriptSents"); if(!box)return null;
   const row=el(sel.anchorNode)&&el(sel.anchorNode).closest(".stext"); if(!row||!box.contains(row))return null;
   if(!(el(sel.focusNode)&&el(sel.focusNode).closest(".stext")===row))return null;
   const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return null;
@@ -4718,7 +4752,7 @@ function sentToolShow(){
   if(S.edited){t.innerHTML="<span class='stnote'>Enter — зберегти правку, потім виділи слова</span>";}
   else{const ws=realWords||[], txt=ws.slice(S.i0,S.i1+1).map(w=>w.word||w.text||"").join(" ");
     const allAcc=ws.slice(S.i0,S.i1+1).every(w=>w.accent), ph=curPhraseStyles().some(p=>p.end>+ws[S.i0].start&&p.start<=+ws[S.i1].start);
-    t.innerHTML="<button type='button' id='stAcc' title='Ці слова — своїм виглядом усередині того самого титру. Як саме виглядають: Style → ✦ Accent'>"+(allAcc?"✦ Прибрати акцент":"✦ Accent")+"</button>"
+    t.innerHTML="<button type='button' id='stAcc' title='Ці слова — своїм виглядом усередині того самого титру. Як саме виглядають: Style → ✦ Accent'>"+(allAcc?"✦ Прибрати виділення":"✦ Виділити слова")+"</button>"
       +"<button type='button' id='stSty' title='Ця фраза — ОКРЕМИМ титром у вибраному пресеті (свій розмір, регістр, позиція)'>🎨 Окремий титр ▾</button>"
       +(ph?"<button type='button' id='stStyX' title='Прибрати окремий стиль фрази'>✕ стиль</button>":"")
       +"<span class='stnote'>«"+String(txt).replace(/</g,"&lt;").slice(0,40)+"»</span>";
@@ -4761,19 +4795,26 @@ function sentRec(k,create){
     m={start:+a.toFixed(3),end:+b.toFixed(3),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
   return m;
 }
-function sentEditStart(k,presetName){
+function recFor(a,b,create){
+  const arr=curPhraseStyles();
+  let m=arr.find(x=>Math.abs(x.start-a)<0.02&&Math.abs(x.end-b)<0.05);
+  if(!m&&create){for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);
+    m={start:+a.toFixed(3),end:+b.toFixed(3),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
+  return m;
+}
+function sentEditStart(k,presetName,capRange){
   if(_sentEdit)sentEditDone();
-  const m=sentRec(k,true); if(!m)return;
+  const m=capRange?recFor(capRange[0],capRange[1],true):sentRec(k,true); if(!m)return;
   if(m.ctrl&&!m.diff){m.diff=ctrlDiff(m.ctrl,readPanel());delete m.ctrl;}   // old snapshot → a diff against today's base
   if(presetName!==undefined){m.name=presetName||null;m.diff={};}
   const base=readPanel();
-  _sentEdit={rec:m,base,k};
+  _sentEdit={rec:m,base,k,cap:!!capRange};
   writeControls({...phraseStart(m,base),...(m.diff||{})});
   if(typeof insTab==="function")insTab("style");
-  sentEditBanner(); renderSentsView(true);
+  sentEditBanner(); if(capRange)renderCapsView(true); else renderSentsView(true);
   if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
-  const inf=sentInfo(k); if(inf&&videoLoaded){try{video.currentTime=inf.start+0.05;}catch(_){}}
-  setStatus("✎ Редагуєш стиль речення "+(k+1)+" — усі налаштування Style діють тільки на нього. ✓ Готово — назад до всіх.","ok");
+  const t0=capRange?capRange[0]:(sentInfo(k)||{}).start; if(t0!=null&&videoLoaded){try{video.currentTime=t0+0.05;}catch(_){}}
+  setStatus("✎ Редагуєш стиль "+(capRange?"титру ":"речення ")+(k+1)+" — усі налаштування Style діють тільки на нього. ✓ Готово — назад до всіх.","ok");
 }
 function sentEditDone(reset){
   const E=_sentEdit; if(!E)return;
@@ -4783,7 +4824,7 @@ function sentEditDone(reset){
   const arr=curPhraseStyles();
   if(reset||(!m.name&&!Object.keys(m.diff).length)){const i=arr.indexOf(m); if(i>=0)arr.splice(i,1);}
   writeControls(E.base); _effCache={k:"",t:0,v:null};
-  sentEditBanner(); renderSentsView(true);
+  sentEditBanner(); if(txtView==="caps")renderCapsView(true); else renderSentsView(true);
   if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
   if(typeof saveProjectSoon==="function")saveProjectSoon();
   setStatus(reset?"↺ Речення знову в стилі титрів.":("✓ Стиль речення збережено ("+(Object.keys(m.diff).length||"без")+" змін"+(m.name?", з пресету «"+m.name+"»":"")+")."),"ok");
@@ -4793,8 +4834,8 @@ function sentEditBanner(){
   let b=$("sentEditBar");
   if(!_sentEdit){if(b)b.remove(); document.body.classList.remove("sentedit"); return;}
   if(!b){b=document.createElement("div");b.id="sentEditBar";pane.insertBefore(b,pane.firstChild);}
-  const inf=sentInfo(_sentEdit.k)||{text:""};
-  b.innerHTML="<div><b>✎ Редагуєш речення "+(_sentEdit.k+1)+"</b>"+(_sentEdit.rec.name?" · з пресету «"+String(_sentEdit.rec.name).replace(/</g,"&lt;")+"»":"")+"<br><span>«"+String(inf.text).replace(/</g,"&lt;").slice(0,60)+"»</span></div>"
+  const inf=_sentEdit.cap?{text:capText(_sentEdit.k)}:(sentInfo(_sentEdit.k)||{text:""});
+  b.innerHTML="<div><b>✎ Редагуєш "+(_sentEdit.cap?"титр ":"речення ")+(_sentEdit.k+1)+"</b>"+(_sentEdit.rec.name?" · з пресету «"+String(_sentEdit.rec.name).replace(/</g,"&lt;")+"»":"")+"<br><span>«"+String(inf.text).replace(/</g,"&lt;").slice(0,60)+"»</span></div>"
     +"<button type='button' id='seDone' class='primary'>✓ Готово</button><button type='button' id='seReset' class='ghost' title='Прибрати свій стиль речення'>↺ Як у всіх</button>";
   document.body.classList.add("sentedit");
   $("seDone").onclick=()=>sentEditDone(false); $("seReset").onclick=()=>sentEditDone(true);
@@ -4816,17 +4857,156 @@ function sentContext(e){
   const wEl=e.target.closest("[data-wi]"), wi=wEl?+wEl.dataset.wi:-1;
   const m=sentRec(k,false);
   const what=sel?"«"+ws.slice(i0,i1+1).map(w=>w.word).join(" ").slice(0,30)+"»":"речення "+(k+1);
-  ctxMenu(e,[{head:what},
-    {label:(allAcc?"✦ Прибрати акцент":"✦ Акцент")+(sel?"":" — усе речення"),on:()=>sentAccent(i0,i1,!allAcc)},
-    {label:"✎ Стиль цього речення…",title:"Праві вкладки Style редагують тільки це речення",on:()=>sentEditStart(k)},
-    {label:"🎨 Почати з пресету ▸",on:()=>setTimeout(()=>ctxMenu(e,[{head:"Стиль речення з пресету"}].concat(presetNames().map(n=>({label:String(n).replace(/</g,"&lt;"),on:()=>sentEditStart(k,n)})))),0)},
-    m?{label:"↺ Стиль як у всіх",on:()=>{const arr=curPhraseStyles(),i=arr.indexOf(m); if(i>=0)arr.splice(i,1); _effCache={k:"",t:0,v:null}; renderSentsView(true); if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();}}:null,
-    (wi>=r[0]&&wi<r[1]-1)?{label:ws[wi].brk==="nl"?"↵ Прибрати розрив після «"+ws[wi].word+"»":"↵ Новий рядок після «"+ws[wi].word+"»",on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="nl"?null:"nl";commitWords(W2);renderSentsView(true);}}:null,
-    "-",
+  ctxMenu(e,[{head:what+" · голос"},
     {label:"▶ Програти",on:()=>{if(videoLoaded){video.currentTime=Math.max(0,inf.start-0.05);_sentStopAt=inf.end+0.12;video.play();}}},
     {label:"🎙 Переозвучити речення",on:()=>voiceSentences(k,k+1)},
-    {label:"✂ Вирізати речення",on:()=>cutSentences(k,k+1)}]);
+    {label:"✂ Вирізати речення",on:()=>cutSentences(k,k+1)},
+    "-",{label:"Розриви, виділення, стиль титру → вкладка Captions",on:()=>document.querySelector("#txtViewSeg button[data-v=caps]").click()}]);
 }
+// ======================= Captions tab: the captions exactly as on screen =======================
+// One card = one caption from the SAME layout the render uses (server /api/layout). The text is
+// not typed here (Text / Sentences are for that) — here you shape what's on screen: ↵ line breaks,
+// new captions, merging, highlighted words, a caption's own style, word timing [ / ].
+var _caps=[], _capsSig="", _capsCaret=null;
+function capsList(){
+  const L=serverLayout, ws=realWords||[]; if(!L||!ws.length)return [];
+  const idx=new Map(); ws.forEach((w,i)=>{const k=(+w.start).toFixed(2); if(!idx.has(k))idx.set(k,i);});
+  const caps=[]; let last=null;
+  for(const e of L){const fw=[].concat(...(e.lines||[])); if(!fw.length)continue; const key=(+fw[0].start).toFixed(3);
+    if(!last||last.key!==key){last={key,a:+fw[0].start,b:+e.end,lines:e.lines.map(l=>l.map(w=>({text:w.text,start:+w.start,accent:!!w.accent,i:idx.has((+w.start).toFixed(2))?idx.get((+w.start).toFixed(2)):-1})))};caps.push(last);}
+    else last.b=Math.max(last.b,+e.end);}
+  caps.forEach((c,k)=>{c.next=caps[k+1]?caps[k+1].a:c.b+0.05; c.words=[].concat(...c.lines).filter(w=>w.i>=0);});
+  return caps;
+}
+function capText(k){const c=_caps[k]; return c?c.lines.map(l=>l.map(w=>w.text).join(" ")).join(" / "):"";}
+function capRec(k){const c=_caps[k]; return c?recFor(c.a,c.next,false):null;}
+function renderCapsView(force){
+  const box=$("transcriptCaps"); if(!box||txtView!=="caps")return;
+  if(!realWords||!realWords.length){box.innerHTML="<div class='chint'>Спершу ① Transcribe — тут з'являться титри рівно як на екрані.</div>";capsHelp();return;}
+  if(!serverLayout||_layoutKey!==layoutKey()){box.innerHTML="<div class='chint'>Будую титри…</div>"; if(typeof fetchLayout==="function")fetchLayout(); return;}
+  const caps=capsList(), sig=JSON.stringify(caps.map(c=>[c.a,c.lines.map(l=>l.map(w=>w.text+(w.accent?"*":"")))]))+"|"+JSON.stringify(curPhraseStyles().map(m=>[m.start,m.name||"",m.diff||0]))+(_sentEdit?_sentEdit.k:"");
+  const focused=box.contains(document.activeElement);
+  if(!force&&sig===_capsSig)return;
+  _caps=caps; _capsSig=sig;
+  const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  const st=box.scrollTop;
+  box.innerHTML="<details class='chelp'><summary>ⓘ Як це працює</summary>"+CAPS_HELP.replace(/^<b>[^<]*<\/b>/,"")+"</details>"+caps.map((c,k)=>{const m=recFor(c.a,c.next,false), ed=_sentEdit&&_sentEdit.cap&&_sentEdit.rec===m&&m;
+    return "<div class='ccard"+(m?" cown":"")+(ed?" sedit":"")+"' data-c='"+k+"' data-a='"+c.a+"' data-b='"+c.b+"'>"
+      +"<div class='chead'><button type='button' class='ctime' data-cgo='"+k+"' title='Програти цей титр'>"+_fmtT(c.a)+" ▶</button><span class='cdur'>"+(c.b-c.a).toFixed(1)+" с</span>"
+      +(m?"<span class='cstyle' title='У титру свій стиль'>🎨 "+esc(m.name||"свій")+"</span>":"")+"<span style='flex:1'></span>"
+      +(k<caps.length-1?"<button type='button' class='cbtn' data-cmerge='"+k+"' title='⊕ Злити з наступним титром'>⊕</button>":"")
+      +"<button type='button' class='cbtn' data-cmenu='"+k+"' title='Дії з титром'>⋯</button></div>"
+      +"<div class='ctext' contenteditable='true' spellcheck='false' data-c='"+k+"'>"
+      +c.lines.map(l=>"<div class='cline'>"+l.map(w=>{const dt=w.i>=0&&typeof dateAt==="function"&&dateAt(w.i);
+          return "<span data-wi='"+w.i+"' class='w"+(w.accent?" wacc":"")+(dt?" wdate":"")+(w.i===_wSel?" wsel":"")+"'>"+esc(w.text)+"</span>";}).join(" ")+"</div>").join("")
+      +"</div></div>";}).join("")||"<div class='chint'>Титрів поки нема.</div>";
+  box.scrollTop=st;
+  if(_capsCaret!=null){const sp=box.querySelector("[data-wi='"+_capsCaret+"']"); _capsCaret=null;
+    if(sp){const card=sp.closest(".ctext"); card.focus(); const r=document.createRange(); r.setStart(sp.firstChild||sp,0); r.collapse(true); const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);}}
+  else if(focused){/* the caret was lost by the rebuild — leave focus on the box */}
+  capsHelp();
+}
+// the word BEFORE the caret (a break goes after it) — inside one caption card
+function capCaretWord(card){
+  const sel=window.getSelection(); if(!sel.rangeCount)return -1;
+  const n=sel.anchorNode, off=sel.anchorOffset, el=n&&(n.nodeType===1?n:n.parentElement);
+  if(!card.contains(el))return -1;
+  const spans=[...card.querySelectorAll("[data-wi]")];
+  const sp=el.closest&&el.closest("[data-wi]");
+  if(sp){const j=spans.indexOf(sp); return (n.nodeType===3&&off===0)?j-1:j;}
+  // caret between spans / at a line start: the last span that comes before the caret
+  const r=sel.getRangeAt(0); let j=-1;
+  spans.forEach((x,q)=>{const rr=document.createRange(); rr.selectNode(x); if(rr.compareBoundaryPoints(Range.END_TO_START,r)<=0)j=q;});
+  return j;
+}
+function capBreak(card,kind){
+  const k=+card.dataset.c, c=_caps[k]; if(!c)return;
+  const spans=[...card.querySelectorAll("[data-wi]")], j=capCaretWord(card);
+  if(j<0||j>=spans.length-1){setStatus(kind==="nl"?"↵ Постав курсор між словами — там почнеться новий рядок.":"✂ Постав курсор між словами — там почнеться новий титр.","");return;}
+  const i=+spans[j].dataset.wi; if(i<0)return;
+  const ws=(realWords||[]).map(w=>({...w})), on=ws[i].brk!==kind;
+  ws[i].brk=on?kind:null; _capsCaret=+spans[j+1].dataset.wi;
+  commitWords(ws);
+  setStatus(kind==="nl"?(on?"↵ Новий рядок після «"+ws[i].word+"». Enter там само ще раз — прибрати.":"↵ Розрив рядка прибрано."):(on?"✂ Новий титр з «"+(ws[i+1]||{}).word+"». Shift+Enter там само — злити назад.":"Титри злито."),"ok");
+}
+function capMerge(k){
+  const c=_caps[k], n=_caps[k+1]; if(!c||!n)return;
+  const lw=c.words[c.words.length-1]; if(!lw)return;
+  const ws=(realWords||[]).map(w=>({...w})), w=ws[lw.i], nx=ws[lw.i+1];
+  if(w&&w.brk==="soft"){w.brk=null; commitWords(ws); setStatus("⊕ Злито з наступним титром.","ok"); return;}
+  const end=/[.!?…]["»”']?$/.test(w&&w.word||"");
+  const pause=nx?(+nx.start-(+w.end)):0;
+  setStatus("⊕ Тут розрив автоматичний: "+(end?"кінець речення":pause>0.5?"пауза "+pause.toFixed(1)+" с":"титр не влазить у ліміт стилю (символів у рядку × рядків)")+". "+(end||pause>0.5?"Титри не змішують сусідні речення.":"Зменш шрифт або збільш «символів у рядку» для цього титру: правий клік → ✎ Стиль цього титру."),"");
+}
+function capContext(e,kForce){
+  const card=e.target.closest&&e.target.closest(".ccard"); const k=kForce!=null?kForce:(card?+card.dataset.c:-1), c=_caps[k]; if(!c)return;
+  e.preventDefault();
+  const S=sentSelWords(), sel=S&&S.cap&&S.k===k?S:null, ws=realWords||[];
+  const wEl=e.target.closest&&e.target.closest("[data-wi]"), wi=wEl?+wEl.dataset.wi:-1;
+  const i0=sel?sel.i0:wi, i1=sel?sel.i1:wi;
+  const m=capRec(k), lastI=c.words.length?c.words[c.words.length-1].i:-1;
+  const acc=i0>=0&&ws.slice(i0,i1+1).every(w=>w.accent);
+  ctxMenu(e,[{head:"Титр "+(k+1)+" · «"+capText(k).slice(0,32)+"»"},
+    i0>=0?{label:(acc?"✦ Прибрати виділення":"✦ Виділити")+" «"+ws.slice(i0,i1+1).map(w=>w.word).join(" ").slice(0,24)+"»",on:()=>sentAccent(i0,i1,!acc)}:null,
+    {label:"✎ Стиль цього титру…",title:"Праві вкладки Style редагують тільки цей титр",on:()=>sentEditStart(k,undefined,[c.a,c.next])},
+    {label:"🎨 Стиль з пресету ▸",on:()=>setTimeout(()=>ctxMenu(e,[{head:"Титр "+(k+1)+" у стилі"}].concat(presetNames().map(n=>({label:String(n).replace(/</g,"&lt;"),on:()=>sentEditStart(k,n,[c.a,c.next])})))),0)},
+    m?{label:"↺ Стиль як у всіх",on:()=>{const arr=curPhraseStyles(),i=arr.indexOf(m); if(i>=0)arr.splice(i,1); _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();}}:null,
+    "-",
+    (wi>=0&&wi!==lastI)?{label:(ws[wi].brk==="nl"?"↵ Прибрати розрив після «":"↵ Новий рядок після «")+ws[wi].word+"»",on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="nl"?null:"nl";commitWords(W2);}}:null,
+    (wi>=0&&wi!==lastI)?{label:(ws[wi].brk==="soft"?"⊕ Злити тут назад":"✂ Новий титр після «"+ws[wi].word+"»"),on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="soft"?null:"soft";commitWords(W2);}}:null,
+    k<_caps.length-1?{label:"⊕ Злити з наступним",on:()=>capMerge(k)}:null,
+    {label:"▶ Програти титр",on:()=>{if(videoLoaded){video.currentTime=Math.max(0,c.a);_sentStopAt=c.b;video.play();}}}]);
+}
+(function wireCaps(){
+  const box=$("transcriptCaps"); if(!box)return;
+  box.addEventListener("contextmenu",e=>{if(e.target.closest(".ccard"))capContext(e);});
+  box.addEventListener("click",e=>{
+    const go=e.target.closest("[data-cgo]"); if(go){const c=_caps[+go.dataset.cgo]; if(c&&videoLoaded){video.currentTime=Math.max(0,c.a);_sentStopAt=c.b;video.play();} return;}
+    const mg=e.target.closest("[data-cmerge]"); if(mg){capMerge(+mg.dataset.cmerge);return;}
+    const mn=e.target.closest("[data-cmenu]"); if(mn){capContext(e,+mn.dataset.cmenu);return;}
+    const sp=e.target.closest(".ctext [data-wi]"); if(sp&&window.getSelection().isCollapsed){const i=+sp.dataset.wi; if(i<0)return;
+      _wSel=i; box.querySelectorAll(".wsel").forEach(x=>x.classList.remove("wsel")); sp.classList.add("wsel");
+      const w=(realWords||[])[i]; if(w&&videoLoaded){if(!video.paused)video.pause(); video.currentTime=Math.max(0,+w.start+0.5/fps()); if(typeof scheduleExact==="function")scheduleExact();}
+      if(typeof updateWordTools==="function")updateWordTools();}
+  });
+  box.addEventListener("keydown",e=>{
+    const card=e.target.closest&&e.target.closest(".ctext"); if(!card)return;
+    if(e.key==="Enter"){e.preventDefault(); capBreak(card,e.shiftKey?"soft":"nl"); return;}
+    if(e.key==="["||e.key==="]"){e.preventDefault(); const spans=[...card.querySelectorAll("[data-wi]")], j=capCaretWord(card), i=_wSel>=0?_wSel:(j>=0?+spans[j].dataset.wi:-1);
+      if(i>=0){_wSel=i; setWordEdge(e.key==="["?"start":"end");} return;}
+    if(e.key==="Escape"){card.blur();return;}
+    if(/^(Arrow|Home|End|PageUp|PageDown|Tab|Shift|Alt|Meta|Control)/.test(e.key))return;
+    if((e.metaKey||e.ctrlKey)&&/^[acz]$/i.test(e.key))return;   // copy / select all / undo stay
+    e.preventDefault();
+    if(!window._capsTypeTold){window._capsTypeTold=1;setStatus("Тут титри як на екрані: Enter — новий рядок, Shift+Enter — новий титр, правий клік — ще. Сам текст правиться в Text або Sentences.","");}
+  });
+  ["paste","drop","cut","beforeinput"].forEach(ev=>box.addEventListener(ev,e=>{if(e.target.closest&&e.target.closest(".ctext"))e.preventDefault();}));
+})();
+// the cheat-sheet lives in the empty space right of the picture while Captions is open
+function capsHelp(){
+  const pc=$("previewCol"); if(!pc)return;
+  let h=$("capsHelp");
+  if(txtView!=="caps"){if(h)h.style.display="none";return;}
+  if(!h){h=document.createElement("div");h.id="capsHelp";pc.appendChild(h);
+    h.innerHTML=CAPS_HELP;}
+  // the empty space between the picture and the right panel (or the window edge)
+  const cv=$("canvas"), vr=cv?cv.getBoundingClientRect():null, qp=$("quickPanel"), qr=qp?qp.getBoundingClientRect():null;
+  // free space: between the picture and the right panel, or right of the (folded) panel to the window edge
+  const gaps=vr?[[vr.right, qr&&qr.left>vr.right?qr.left:window.innerWidth],[qr?qr.right:window.innerWidth, window.innerWidth]]:[];
+  const g=gaps.map(([a,b])=>[a,b-a]).sort((x,y)=>y[1]-x[1])[0]||[0,0], room=g[1];
+  h.style.display=room>=300?"":"none";
+  if(room>=300){h.style.left=(g[0]+28)+"px"; h.style.top=(vr.top+8)+"px"; h.style.maxWidth=Math.min(340,room-56)+"px";}
+  const inl=document.querySelector("#transcriptCaps .chelp"); if(inl)inl.style.display=room>=300?"none":"";   // no room on the right → the same help folded inside the list
+}
+const CAPS_HELP="<b>Captions — титри як на екрані</b><ul>"
+      +"<li><b>Одна картка = один титр</b>, рівно як у кадрі: його рядки, час і стиль.</li>"
+      +"<li><b>Enter</b> — новий рядок у цьому титрі.</li>"
+      +"<li><b>Shift+Enter</b> — розрізати на два титри в цьому місці.</li>"
+      +"<li><b>⊕</b> — злити з наступним (якщо влазить у ліміт рядків стилю).</li>"
+      +"<li><b>Правий клік</b>: ✦ виділити слова · ✎ стиль цього титру · 🎨 з пресету · ↺ як у всіх.</li>"
+      +"<li><b>Клік по слову</b> — плейхед туди; <b>[ / ]</b> — початок / кінець слова на кадр плейхеда.</li>"
+      +"<li>Сам текст — у <b>Text</b>, голос (🎙 👄 📅) — у <b>Sentences</b>.</li></ul>";
+window.addEventListener("resize",()=>{clearTimeout(window._chT);window._chT=setTimeout(capsHelp,200);});
 function sentPhraseStyle(i0,i1,name){
   const ws=realWords||[]; if(!ws[i0]||!ws[i1])return;
   const a=+ws[i0].start, b=ws[i1+1]?Math.max(+ws[i1].start+0.001,+ws[i1+1].start-0.0005):+ws[i1].end+0.05;
@@ -4839,10 +5019,11 @@ function sentPhraseStyle(i0,i1,name){
   if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
   if(typeof saveProjectSoon==="function")saveProjectSoon();
   renderSentsView(true);
+  if(txtView==="caps")renderCapsView(true);
   setStatus(name?"🎨 «"+ws.slice(i0,i1+1).map(w=>w.word||w.text).join(" ")+"» — окремий титр у стилі "+name+".":"🎨 Окремий стиль фрази прибрано.","ok");
 }
 window.addEventListener("scroll",e=>{const t=$("sentTool");if(t&&t.style.display!=="none"&&!t.contains(e.target))sentToolHide();},true);
-document.addEventListener("selectionchange",()=>{clearTimeout(window._stT);window._stT=setTimeout(()=>{if(txtView==="sents")sentToolShow();else sentToolHide();},120);});
+document.addEventListener("selectionchange",()=>{clearTimeout(window._stT);window._stT=setTimeout(()=>{if(txtView==="caps")sentToolShow();else sentToolHide();},120);});
 function renderSentBar(canVoice){
   const bar=$("sentBar"); if(!bar)return;
   const _st=rvUndoStack(), undo=!!(_st&&_st.length&&_st[_st.length-1].kind==="revoice"), n=_sentPick?(_sentPick[1]-_sentPick[0]):0;
@@ -4914,7 +5095,7 @@ function voiceSentences(k0,k1){
       // every other row's own words. (Using the live words with row ranges from before a new full
       // stop split a sentence duplicated words — "challenge. challenge. challenge.")
       const B=S0.words;
-      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/↵/g," ").replace(/\s+/g," ").trim():wordsToText(B.slice(r[0],r[1])));
+      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/↵/g," | ").replace(/\s+/g," ").trim():wordsToText(B.slice(r[0],r[1])));
       const full=parts.map((p,i)=>p+((i<rs.length-1&&B[rs[i][1]-1]&&B[rs[i][1]-1].brk==="soft"&&i!==k)?"\n":"")).join(" ");
       realWords=parseBreaksToWords(full,B); if(variants[activeVar])variants[activeVar].words=realWords;
       const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords);
@@ -4928,8 +5109,8 @@ function voiceSentences(k0,k1){
   box.addEventListener("keydown",e=>{
     if(e.key==="Escape"&&_sentPick){e.preventDefault();_sentPick=null;renderSentsView(true);return;}
     if(e.key==="Enter"&&e.target.classList&&e.target.classList.contains("stext")){e.preventDefault();
-      if(e.metaKey||e.ctrlKey){e.target.blur();return;}   // Cmd+Enter = done
-      sentLineBreak(e.target);}   // Enter = ↵ new LINE inside the caption (Words: Enter = a new caption)
+      e.target.blur();
+      if(!window._capsTold){window._capsTold=1;setStatus("Розриви рядків і титрів тепер у вкладці Captions — там видно титри рівно як на екрані.","");}}
   });
   box.addEventListener("focusout",e=>{ if(e.target.classList&&e.target.classList.contains("stext"))setTimeout(()=>{if(!box.contains(document.activeElement)||!document.activeElement.classList.contains("stext"))renderSentsView(true);},0); });
   if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{
@@ -5891,6 +6072,7 @@ function cycleSentVoice(k){const V=voicesOf(); if(!V||!V.list.length)return; con
   setStatus("🗣 Речення «"+inf.text.slice(0,40)+"» → "+V.list.find(x=>x.id===nx).name+".","ok");}
 // ======================= /step 3 =======================
 function updateWordHighlight(){
+  if(txtView==="caps"){const t=video&&video.currentTime||0; document.querySelectorAll("#transcriptCaps .ccard").forEach(c=>c.classList.toggle("cur",t>=+c.dataset.a&&t<+c.dataset.b)); return;}
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
   const focused=(document.activeElement===box);
@@ -7291,7 +7473,7 @@ function buildInspector(){
 }
 function insFold(c){const q=$("quickPanel"); if(!q)return; q.classList.toggle("col",c); document.body.classList.toggle("ircol",c);
   try{localStorage.setItem("cs_irCol",c?"1":"0");}catch(_){}
-  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);}
+  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();if(typeof capsHelp==="function")capsHelp();},320);}
 function insTab(k){
   const q=$("quickPanel"); if(q&&q.classList.contains("col"))insFold(false);   // asking for a tab opens the panel
   document.querySelectorAll("#insTabs [data-it]").forEach(b=>b.classList.toggle("on",b.dataset.it===k));
