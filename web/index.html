@@ -4931,6 +4931,7 @@ function capBreak(card,kind){
   const i=+spans[j].dataset.wi; if(i<0)return;
   const ws=(realWords||[]).map(w=>({...w})), on=ws[i].brk!==kind;
   ws[i].brk=on?kind:null; _capsCaret=+spans[j+1].dataset.wi;
+  if(kind==="soft"&&on&&ws[i+1])unmergeAt(+ws[i+1].start);
   commitWords(ws);
   setStatus(kind==="nl"?(on?"↵ Новий рядок після «"+ws[i].word+"». Enter там само ще раз — прибрати.":"↵ Розрив рядка прибрано."):(on?"✂ Новий титр з «"+(ws[i+1]||{}).word+"». Shift+Enter там само — злити назад.":"Титри злито."),"ok");
 }
@@ -4943,26 +4944,46 @@ function capMerge(k){
   if(lines>4){setStatus("⊕ Разом вийшло б "+lines+" рядків — забагато для одного титру.","");return;}
   const end=/[.!?…]["»”']?$/.test(w&&w.word||""), pause=nx?(+nx.start-(+w.end)):0;
   if(end||pause>0.5){   // split by a sentence end / a pause → the designer says «together anyway»
-    w.brk="join"; commitWords(ws);
-    const maxL=+((capRec(k)&&capRec(k).diff&&capRec(k).diff.maxLines)||readControls().maxLines||2);
-    if(lines<=maxL){setStatus("⊕ Злито"+(end?" через кінець речення":" через паузу "+pause.toFixed(1)+" с")+". Розділити знову — Shift+Enter між ними.","ok");return;}
-    setTimeout(()=>capMergeLines(c.a,lines),400);   // and room for all the lines once the new layout is in
+    w.brk="join";
+    const mine=capRec(k), theirs=capRec(k+1);
+    const maxL=+((mine&&mine.diff&&mine.diff.maxLines)||readControls().maxLines||2);
+    if(lines>maxL||mine||theirs){   // own styles / more lines → one region over both, or the region edge would split them again
+      const diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
+      const arr=curPhraseStyles(); [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
+      mergeRec(c,n,mine,theirs,diff,name,Math.max(lines,maxL)); _effCache={k:"",t:0,v:null};}
+    commitWords(ws);
+    setStatus("⊕ Злито"+(end?" через кінець речення":" через паузу "+pause.toFixed(1)+" с")+". Розділити знову — Shift+Enter між ними.","ok");
     return;}
   // the next caption only exists because this one hit the style's line limit → give THESE two
   // captions room for all their lines (their own style: more lines), so they become one
   const mine=capRec(k), theirs=capRec(k+1), diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
   const arr=curPhraseStyles();
   [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
-  const m=recFor(c.a,n.next,true); m.diff={...diff,maxLines:lines}; if(name)m.name=name;
+  const m=mergeRec(c,n,mine,theirs,diff,name,lines);
   _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
   if(typeof saveProjectSoon==="function")saveProjectSoon();
   setStatus("⊕ Злито: один титр на "+lines+" рядки. Повернути — правий клік → ↺ Стиль як у всіх.","ok");
+}
+// a merged pair keeps what each caption had, so splitting it again gives each its own style back
+// (instead of the first caption's look spreading over the second one — «everything went UPPERCASE»)
+function mergeRec(c,n,mine,theirs,diff,name,lines){
+  const snap=(x,a,b)=>({start:a,end:b,diff:x&&x.diff?{...x.diff}:null,name:x&&x.name||null,parts:x&&x.parts||null});
+  const m=recFor(c.a,n.next,true); m.diff={...diff,maxLines:lines}; if(name)m.name=name;
+  m.parts=[].concat(mine&&mine.parts?mine.parts:[snap(mine,fl3(c.a),fl3(n.a-0.0005))], theirs&&theirs.parts?theirs.parts:[snap(theirs,fl3(n.a),fl3(n.next-0.0005))]);
+  return m;
+}
+// a new caption (Shift+Enter) inside a merged pair → undo the merge there: the parts get their own styles back
+function unmergeAt(t){
+  const arr=curPhraseStyles(), m=arr.find(x=>x.parts&&t>x.start&&t<x.end); if(!m)return false;
+  arr.splice(arr.indexOf(m),1);
+  m.parts.forEach(p=>{if(p.diff&&Object.keys(p.diff).length||p.name||p.parts){const q={start:p.start,end:p.end,diff:p.diff||{}}; if(p.name)q.name=p.name; if(p.parts)q.parts=p.parts; arr.push(q);}});
+  arr.sort((x,y)=>x.start-y.start); _effCache={k:"",t:0,v:null}; return true;
 }
 function capMergeLines(a,lines){
   const k=_caps.findIndex(c=>Math.abs(c.a-a)<0.01); const c=_caps[k], n=_caps[k+1]; if(!c||!n)return;
   const mine=capRec(k), theirs=capRec(k+1), diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
   const arr=curPhraseStyles(); [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
-  const m=recFor(c.a,n.next,true); m.diff={...diff,maxLines:lines}; if(name)m.name=name;
+  const m=mergeRec(c,n,mine,theirs,diff,name,lines);
   _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
   setStatus("⊕ Злито: один титр на "+lines+" рядки. Розділити — Shift+Enter між ними або ↺ у правому кліку.","ok");
 }
@@ -4981,7 +5002,7 @@ function capContext(e,kForce){
     m?{label:"↺ Стиль як у всіх",on:()=>{const arr=curPhraseStyles(),i=arr.indexOf(m); if(i>=0)arr.splice(i,1); _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();}}:null,
     "-",
     (wi>=0&&wi!==lastI)?{label:(ws[wi].brk==="nl"?"↵ Прибрати розрив після «":"↵ Новий рядок після «")+ws[wi].word+"»",on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="nl"?null:"nl";commitWords(W2);}}:null,
-    (wi>=0&&wi!==lastI)?{label:(ws[wi].brk==="soft"?"⊕ Злити тут назад":"✂ Новий титр після «"+ws[wi].word+"»"),on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="soft"?null:"soft";commitWords(W2);}}:null,
+    (wi>=0&&wi!==lastI)?{label:(ws[wi].brk==="soft"?"⊕ Злити тут назад":"✂ Новий титр після «"+ws[wi].word+"»"),on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="soft"?null:"soft"; if(W2[wi].brk==="soft"&&W2[wi+1])unmergeAt(+W2[wi+1].start); commitWords(W2);}}:null,
     k<_caps.length-1?{label:"⊕ Злити з наступним",on:()=>capMerge(k)}:null,
     {label:"▶ Програти титр",on:()=>{if(videoLoaded){video.currentTime=Math.max(0,c.a);_sentStopAt=c.b;video.play();}}}]);
 }
