@@ -52,6 +52,26 @@ def build_timeline(words, regions, lang="en", cuts=None):
         for e in evs:
             tagged.append((e, style))
     tagged.sort(key=lambda es: es[0]["start"])
+    # A region (a caption / sentence / voice with its own style) is laid out on its own, so its LAST
+    # caption used to end as if the clip ended there — it vanished early instead of holding until the
+    # next caption. Bridge region boundaries exactly like captions inside one region.
+    cl = sorted(float(c) for c in (cuts or []))
+    for k in range(len(tagged) - 1):
+        e = tagged[k][0]
+        nat = e.pop("_nat_end", None)
+        if nat is None:
+            continue
+        nxt = float(tagged[k + 1][0]["start"])
+        gap = nxt - float(nat)
+        end = nxt if gap <= 1.5 else min(nxt, float(nat) + 0.4)
+        for c in cl:                                  # never across a scene cut
+            if e["start"] < c < end:
+                end = c
+                break
+        if end > e["start"]:
+            e["end"] = end
+    if tagged:
+        tagged[-1][0].pop("_nat_end", None)
     return tagged
 
 

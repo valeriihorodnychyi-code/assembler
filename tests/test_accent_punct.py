@@ -73,6 +73,17 @@ def test_accent_look_font_size_plate_italic_and_karaoke_leaves_it():
     assert w_acc > (im2.getbbox()[2] - im2.getbbox()[0]), "130 % accent must widen the line"
 
 
+def test_a_caption_with_its_own_style_holds_until_the_next_one():
+    """A region's last caption used to end as if the clip ended — it vanished before the next caption."""
+    ws = [{"word": w, "start": t, "end": t + 0.3} for w, t in (("This", 0.3), ("Monday", 0.66), ("we", 1.02), ("start", 2.3), ("now", 2.66))]
+    b, big = st.normalize({}), st.normalize({"font_size": 120})
+    one = compose.build_timeline(ws, [{"start": 0, "end": None, "style": b}])
+    two = compose.build_timeline(ws, [{"start": 0, "end": 2.0, "style": big}, {"start": 2.0, "end": None, "style": b}])
+    end_we = lambda t: next(e["end"] for e, _ in t if [w["text"] for l in e["lines"] for w in l][e["active_word_index"]] == "WE")
+    assert abs(end_we(one) - 2.3) < 1e-6 and abs(end_we(two) - 2.3) < 1e-6
+    assert not any("_nat_end" in e for e, _ in two)
+
+
 if __name__ == "__main__":
     for n, f in list(globals().items()):
         if n.startswith("test_"):

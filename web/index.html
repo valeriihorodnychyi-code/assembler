@@ -411,7 +411,8 @@
   .tcaps{display:flex;flex-direction:column;gap:6px;max-height:460px;overflow-y:auto;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
   .tcaps .chint{color:var(--muted);font-size:12px;padding:8px}
   .ccard{border:1px solid #2c303b;border-radius:9px;padding:5px 8px 7px;background:#191b22}
-  .ccard.cur{border-color:rgba(255,90,44,.55)}
+  .ccard.cur{border-color:#4b5262;background:#1d2029}   /* the caption on screen now — subtle, not a selection */
+  .ccard .cbtn:focus,.ccard .ctime:focus{outline:none}
   .ccard.cown{border-left:3px solid #a78bfa}
   .ccard.sedit{border-color:#a78bfa;background:rgba(167,139,250,.14);box-shadow:0 0 0 2px rgba(167,139,250,.35)}
   .ccard .chead{display:flex;align-items:center;gap:6px;margin-bottom:3px}
@@ -430,7 +431,7 @@
   .ccard .w.wacc{color:#ff8a5c}
   .ccard .w.wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5)}
   #capsHelp{position:fixed;z-index:4;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(22,24,31,.92);font-size:12px;line-height:1.45;color:var(--muted)}
-  .tcaps .chelp{font-size:11.5px;color:var(--muted);padding:2px 4px} .tcaps .chelp summary{cursor:pointer} .tcaps .chelp ul{margin:4px 0;padding-left:16px} .tcaps .chelp b{color:var(--txt)}
+  .tcaps .chelp{font-size:10.5px;line-height:1.5;color:var(--muted);padding:2px 4px 4px} .tcaps .chelp b{color:#b9bdc8;font-weight:600}
   #capsHelp b{color:var(--txt)} #capsHelp ul{margin:6px 0 0;padding-left:16px} #capsHelp li{margin:3px 0}
   .tsents{display:flex;flex-direction:column;gap:4px;max-height:420px;overflow-y:auto;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
   .srow{border:1px solid transparent;border-radius:8px;padding:6px 6px 6px 4px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 6px;align-items:start}
@@ -4792,14 +4793,15 @@ function sentRec(k,create){
   const arr=curPhraseStyles();
   let m=arr.find(x=>Math.abs(x.start-a)<0.02&&Math.abs(x.end-b)<0.05);
   if(!m&&create){for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);
-    m={start:+a.toFixed(3),end:+b.toFixed(3),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
+    m={start:fl3(a),end:fl3(b-0.0005),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
   return m;
 }
+const fl3=x=>Math.floor((+x+1e-9)*1000)/1000;   // region edges just BELOW a word start (3.1799… must not land in the region that ends at 3.18)
 function recFor(a,b,create){
   const arr=curPhraseStyles();
   let m=arr.find(x=>Math.abs(x.start-a)<0.02&&Math.abs(x.end-b)<0.05);
   if(!m&&create){for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);
-    m={start:+a.toFixed(3),end:+b.toFixed(3),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
+    m={start:fl3(a),end:fl3(b-0.0005),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
   return m;
 }
 function sentEditStart(k,presetName,capRange){
@@ -4890,7 +4892,7 @@ function renderCapsView(force){
   _caps=caps; _capsSig=sig;
   const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   const st=box.scrollTop;
-  box.innerHTML="<details class='chelp'><summary>ⓘ Як це працює</summary>"+CAPS_HELP.replace(/^<b>[^<]*<\/b>/,"")+"</details>"+caps.map((c,k)=>{const m=recFor(c.a,c.next,false), ed=_sentEdit&&_sentEdit.cap&&_sentEdit.rec===m&&m;
+  box.innerHTML="<div class='chelp'>"+CAPS_HELP_SHORT+"</div>"+caps.map((c,k)=>{const m=recFor(c.a,c.next,false), ed=_sentEdit&&_sentEdit.cap&&_sentEdit.rec===m&&m;
     return "<div class='ccard"+(m?" cown":"")+(ed?" sedit":"")+"' data-c='"+k+"' data-a='"+c.a+"' data-b='"+c.b+"'>"
       +"<div class='chead'><button type='button' class='ctime' data-cgo='"+k+"' title='Програти цей титр'>"+_fmtT(c.a)+" ▶</button><span class='cdur'>"+(c.b-c.a).toFixed(1)+" с</span>"
       +(m?"<span class='cstyle' title='У титру свій стиль'>🎨 "+esc(m.name||"свій")+"</span>":"")+"<span style='flex:1'></span>"
@@ -4936,7 +4938,18 @@ function capMerge(k){
   if(w&&w.brk==="soft"){w.brk=null; commitWords(ws); setStatus("⊕ Злито з наступним титром.","ok"); return;}
   const end=/[.!?…]["»”']?$/.test(w&&w.word||"");
   const pause=nx?(+nx.start-(+w.end)):0;
-  setStatus("⊕ Тут розрив автоматичний: "+(end?"кінець речення":pause>0.5?"пауза "+pause.toFixed(1)+" с":"титр не влазить у ліміт стилю (символів у рядку × рядків)")+". "+(end||pause>0.5?"Титри не змішують сусідні речення.":"Зменш шрифт або збільш «символів у рядку» для цього титру: правий клік → ✎ Стиль цього титру."),"");
+  if(end||pause>0.5){setStatus("⊕ Ці титри не зливаються: між ними "+(end?"кінець речення":"пауза "+pause.toFixed(1)+" с")+" — титр ніколи не змішує сусідні речення. Можна прибрати крапку в Text, тоді злиються.","");return;}
+  // the next caption only exists because this one hit the style's line limit → give THESE two
+  // captions room for all their lines (their own style: more lines), so they become one
+  const lines=c.lines.length+n.lines.length;
+  if(lines>4){setStatus("⊕ Разом вийшло б "+lines+" рядків — забагато для одного титру.","");return;}
+  const mine=capRec(k), theirs=capRec(k+1), diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
+  const arr=curPhraseStyles();
+  [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
+  const m=recFor(c.a,n.next,true); m.diff={...diff,maxLines:lines}; if(name)m.name=name;
+  _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
+  if(typeof saveProjectSoon==="function")saveProjectSoon();
+  setStatus("⊕ Злито: один титр на "+lines+" рядки. Повернути — правий клік → ↺ Стиль як у всіх.","ok");
 }
 function capContext(e,kForce){
   const card=e.target.closest&&e.target.closest(".ccard"); const k=kForce!=null?kForce:(card?+card.dataset.c:-1), c=_caps[k]; if(!c)return;
@@ -4962,8 +4975,8 @@ function capContext(e,kForce){
   box.addEventListener("contextmenu",e=>{if(e.target.closest(".ccard"))capContext(e);});
   box.addEventListener("click",e=>{
     const go=e.target.closest("[data-cgo]"); if(go){const c=_caps[+go.dataset.cgo]; if(c&&videoLoaded){video.currentTime=Math.max(0,c.a);_sentStopAt=c.b;video.play();} return;}
-    const mg=e.target.closest("[data-cmerge]"); if(mg){capMerge(+mg.dataset.cmerge);return;}
-    const mn=e.target.closest("[data-cmenu]"); if(mn){capContext(e,+mn.dataset.cmenu);return;}
+    const mg=e.target.closest("[data-cmerge]"); if(mg){mg.blur();capMerge(+mg.dataset.cmerge);return;}
+    const mn=e.target.closest("[data-cmenu]"); if(mn){mn.blur();capContext(e,+mn.dataset.cmenu);return;}
     const sp=e.target.closest(".ctext [data-wi]"); if(sp&&window.getSelection().isCollapsed){const i=+sp.dataset.wi; if(i<0)return;
       _wSel=i; box.querySelectorAll(".wsel").forEach(x=>x.classList.remove("wsel")); sp.classList.add("wsel");
       const w=(realWords||[])[i]; if(w&&videoLoaded){if(!video.paused)video.pause(); video.currentTime=Math.max(0,+w.start+0.5/fps()); if(typeof scheduleExact==="function")scheduleExact();}
@@ -4983,21 +4996,8 @@ function capContext(e,kForce){
   ["paste","drop","cut","beforeinput"].forEach(ev=>box.addEventListener(ev,e=>{if(e.target.closest&&e.target.closest(".ctext"))e.preventDefault();}));
 })();
 // the cheat-sheet lives in the empty space right of the picture while Captions is open
-function capsHelp(){
-  const pc=$("previewCol"); if(!pc)return;
-  let h=$("capsHelp");
-  if(txtView!=="caps"){if(h)h.style.display="none";return;}
-  if(!h){h=document.createElement("div");h.id="capsHelp";pc.appendChild(h);
-    h.innerHTML=CAPS_HELP;}
-  // the empty space between the picture and the right panel (or the window edge)
-  const cv=$("canvas"), vr=cv?cv.getBoundingClientRect():null, qp=$("quickPanel"), qr=qp?qp.getBoundingClientRect():null;
-  // free space: between the picture and the right panel, or right of the (folded) panel to the window edge
-  const gaps=vr?[[vr.right, qr&&qr.left>vr.right?qr.left:window.innerWidth],[qr?qr.right:window.innerWidth, window.innerWidth]]:[];
-  const g=gaps.map(([a,b])=>[a,b-a]).sort((x,y)=>y[1]-x[1])[0]||[0,0], room=g[1];
-  h.style.display=room>=300?"":"none";
-  if(room>=300){h.style.left=(g[0]+28)+"px"; h.style.top=(vr.top+8)+"px"; h.style.maxWidth=Math.min(340,room-56)+"px";}
-  const inl=document.querySelector("#transcriptCaps .chelp"); if(inl)inl.style.display=room>=300?"none":"";   // no room on the right → the same help folded inside the list
-}
+const CAPS_HELP_SHORT="<b>Enter</b> — новий рядок · <b>Shift+Enter</b> — новий титр · <b>⊕</b> — злити з наступним · <b>правий клік</b> — ✦ виділити слова, ✎ стиль титру, 🎨 пресет, ↺ · <b>клік по слову</b> — плейхед, <b>[ / ]</b> — початок / кінець слова. Текст — у Text, голос — у Sentences.";
+function capsHelp(){const h=$("capsHelp"); if(h)h.style.display="none";}   // the help now sits at the top of the Captions list (left)
 const CAPS_HELP="<b>Captions — титри як на екрані</b><ul>"
       +"<li><b>Одна картка = один титр</b>, рівно як у кадрі: його рядки, час і стиль.</li>"
       +"<li><b>Enter</b> — новий рядок у цьому титрі.</li>"

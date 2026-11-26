@@ -374,6 +374,7 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     # real scene cut (below) can trim it further.
     if events:
         L = events[-1]
+        L["_nat_end"] = L["end"]       # build_timeline re-bridges it to the NEXT region's first caption
         L["end"] = min(L["end"], L["start"] + HOLD_MAX)
         if L["end"] <= L["start"]:
             L["end"] = L["start"] + 0.4
