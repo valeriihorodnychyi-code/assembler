@@ -413,6 +413,9 @@
   .ccard{border:1px solid #2c303b;border-radius:9px;padding:5px 8px 7px;background:#191b22}
   .ccard.cur{border-color:#4b5262;background:#1d2029}   /* the caption on screen now — subtle, not a selection */
   .ccard .cbtn:focus,.ccard .ctime:focus{outline:none}
+  .ccard{cursor:pointer} .ccard .ctext{cursor:text}
+  .ccard.csel{border-color:#60a5fa;box-shadow:0 0 0 1px #60a5fa}
+  .ccard .cbtn.cmerge{font-size:10.5px}
   .ccard.cown{border-left:3px solid #a78bfa}
   .ccard.sedit{border-color:#a78bfa;background:rgba(167,139,250,.14);box-shadow:0 0 0 2px rgba(167,139,250,.35)}
   .ccard .chead{display:flex;align-items:center;gap:6px;margin-bottom:3px}
@@ -3375,7 +3378,7 @@ function parseBreaksToWords(text, base){
   for(const p of parts){ if(p===""){ if(toks.length) brkAfter[toks.length-1]=true; } else if(p==="|"||p==="↵"){ if(toks.length) nlAfter[toks.length-1]=true; } else toks.push(p); }
   const mapped=remapWords(toks.join(" "), base);
   if(!mapped) return base;
-  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":(nlAfter[i]?"nl":null)}));   // "|" in the text = ↵ a new line inside the caption
+  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":(nlAfter[i]?"nl":(w.brk==="join"?"join":null))}));   // "|" in the text = ↵ a new line inside the caption
 }
 // Rebuild the transcript text FROM words, showing soft breaks as newlines (so reopening a
 // hook restores where the designer split).
@@ -4869,7 +4872,7 @@ function sentContext(e){
 // One card = one caption from the SAME layout the render uses (server /api/layout). The text is
 // not typed here (Text / Sentences are for that) — here you shape what's on screen: ↵ line breaks,
 // new captions, merging, highlighted words, a caption's own style, word timing [ / ].
-var _caps=[], _capsSig="", _capsCaret=null;
+var _caps=[], _capsSig="", _capsCaret=null, _capSel=-1;
 function capsList(){
   const L=serverLayout, ws=realWords||[]; if(!L||!ws.length)return [];
   const idx=new Map(); ws.forEach((w,i)=>{const k=(+w.start).toFixed(2); if(!idx.has(k))idx.set(k,i);});
@@ -4893,10 +4896,10 @@ function renderCapsView(force){
   const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   const st=box.scrollTop;
   box.innerHTML="<div class='chelp'>"+CAPS_HELP_SHORT+"</div>"+caps.map((c,k)=>{const m=recFor(c.a,c.next,false), ed=_sentEdit&&_sentEdit.cap&&_sentEdit.rec===m&&m;
-    return "<div class='ccard"+(m?" cown":"")+(ed?" sedit":"")+"' data-c='"+k+"' data-a='"+c.a+"' data-b='"+c.b+"'>"
+    return "<div class='ccard"+(m?" cown":"")+(ed?" sedit":"")+(k===_capSel?" csel":"")+"' data-c='"+k+"' data-a='"+c.a+"' data-b='"+c.b+"'>"
       +"<div class='chead'><button type='button' class='ctime' data-cgo='"+k+"' title='Програти цей титр'>"+_fmtT(c.a)+" ▶</button><span class='cdur'>"+(c.b-c.a).toFixed(1)+" с</span>"
       +(m?"<span class='cstyle' title='У титру свій стиль'>🎨 "+esc(m.name||"свій")+"</span>":"")+"<span style='flex:1'></span>"
-      +(k<caps.length-1?"<button type='button' class='cbtn' data-cmerge='"+k+"' title='⊕ Злити з наступним титром'>⊕</button>":"")
+      +(k<caps.length-1?"<button type='button' class='cbtn cmerge' data-cmerge='"+k+"' title='Злити цей титр з наступним в один'>⊕ злити ↓</button>":"")
       +"<button type='button' class='cbtn' data-cmenu='"+k+"' title='Дії з титром'>⋯</button></div>"
       +"<div class='ctext' contenteditable='true' spellcheck='false' data-c='"+k+"'>"
       +c.lines.map(l=>"<div class='cline'>"+l.map(w=>{const dt=w.i>=0&&typeof dateAt==="function"&&dateAt(w.i);
@@ -4936,13 +4939,17 @@ function capMerge(k){
   const lw=c.words[c.words.length-1]; if(!lw)return;
   const ws=(realWords||[]).map(w=>({...w})), w=ws[lw.i], nx=ws[lw.i+1];
   if(w&&w.brk==="soft"){w.brk=null; commitWords(ws); setStatus("⊕ Злито з наступним титром.","ok"); return;}
-  const end=/[.!?…]["»”']?$/.test(w&&w.word||"");
-  const pause=nx?(+nx.start-(+w.end)):0;
-  if(end||pause>0.5){setStatus("⊕ Ці титри не зливаються: між ними "+(end?"кінець речення":"пауза "+pause.toFixed(1)+" с")+" — титр ніколи не змішує сусідні речення. Можна прибрати крапку в Text, тоді злиються.","");return;}
-  // the next caption only exists because this one hit the style's line limit → give THESE two
-  // captions room for all their lines (their own style: more lines), so they become one
   const lines=c.lines.length+n.lines.length;
   if(lines>4){setStatus("⊕ Разом вийшло б "+lines+" рядків — забагато для одного титру.","");return;}
+  const end=/[.!?…]["»”']?$/.test(w&&w.word||""), pause=nx?(+nx.start-(+w.end)):0;
+  if(end||pause>0.5){   // split by a sentence end / a pause → the designer says «together anyway»
+    w.brk="join"; commitWords(ws);
+    const maxL=+((capRec(k)&&capRec(k).diff&&capRec(k).diff.maxLines)||readControls().maxLines||2);
+    if(lines<=maxL){setStatus("⊕ Злито"+(end?" через кінець речення":" через паузу "+pause.toFixed(1)+" с")+". Розділити знову — Shift+Enter між ними.","ok");return;}
+    setTimeout(()=>capMergeLines(c.a,lines),400);   // and room for all the lines once the new layout is in
+    return;}
+  // the next caption only exists because this one hit the style's line limit → give THESE two
+  // captions room for all their lines (their own style: more lines), so they become one
   const mine=capRec(k), theirs=capRec(k+1), diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
   const arr=curPhraseStyles();
   [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
@@ -4950,6 +4957,14 @@ function capMerge(k){
   _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
   if(typeof saveProjectSoon==="function")saveProjectSoon();
   setStatus("⊕ Злито: один титр на "+lines+" рядки. Повернути — правий клік → ↺ Стиль як у всіх.","ok");
+}
+function capMergeLines(a,lines){
+  const k=_caps.findIndex(c=>Math.abs(c.a-a)<0.01); const c=_caps[k], n=_caps[k+1]; if(!c||!n)return;
+  const mine=capRec(k), theirs=capRec(k+1), diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
+  const arr=curPhraseStyles(); [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
+  const m=recFor(c.a,n.next,true); m.diff={...diff,maxLines:lines}; if(name)m.name=name;
+  _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
+  setStatus("⊕ Злито: один титр на "+lines+" рядки. Розділити — Shift+Enter між ними або ↺ у правому кліку.","ok");
 }
 function capContext(e,kForce){
   const card=e.target.closest&&e.target.closest(".ccard"); const k=kForce!=null?kForce:(card?+card.dataset.c:-1), c=_caps[k]; if(!c)return;
@@ -4977,6 +4992,12 @@ function capContext(e,kForce){
     const go=e.target.closest("[data-cgo]"); if(go){const c=_caps[+go.dataset.cgo]; if(c&&videoLoaded){video.currentTime=Math.max(0,c.a);_sentStopAt=c.b;video.play();} return;}
     const mg=e.target.closest("[data-cmerge]"); if(mg){mg.blur();capMerge(+mg.dataset.cmerge);return;}
     const mn=e.target.closest("[data-cmenu]"); if(mn){mn.blur();capContext(e,+mn.dataset.cmenu);return;}
+    const card=e.target.closest(".ccard");
+    if(card&&!e.target.closest("[data-wi]")&&window.getSelection().isCollapsed){   // a click on the card's free space = select this caption
+      box.querySelectorAll(".ccard.csel").forEach(x=>x.classList.remove("csel")); card.classList.add("csel"); _capSel=+card.dataset.c;
+      const c=_caps[_capSel]; if(c&&videoLoaded){if(!video.paused)video.pause(); video.currentTime=c.a+0.5/fps(); if(typeof scheduleExact==="function")scheduleExact();}
+      const ct=card.querySelector(".ctext"); if(ct&&!e.target.closest(".ctext"))ct.focus({preventScroll:true});
+      return;}
     const sp=e.target.closest(".ctext [data-wi]"); if(sp&&window.getSelection().isCollapsed){const i=+sp.dataset.wi; if(i<0)return;
       _wSel=i; box.querySelectorAll(".wsel").forEach(x=>x.classList.remove("wsel")); sp.classList.add("wsel");
       const w=(realWords||[])[i]; if(w&&videoLoaded){if(!video.paused)video.pause(); video.currentTime=Math.max(0,+w.start+0.5/fps()); if(typeof scheduleExact==="function")scheduleExact();}
@@ -4996,7 +5017,7 @@ function capContext(e,kForce){
   ["paste","drop","cut","beforeinput"].forEach(ev=>box.addEventListener(ev,e=>{if(e.target.closest&&e.target.closest(".ctext"))e.preventDefault();}));
 })();
 // the cheat-sheet lives in the empty space right of the picture while Captions is open
-const CAPS_HELP_SHORT="<b>Enter</b> — новий рядок · <b>Shift+Enter</b> — новий титр · <b>⊕</b> — злити з наступним · <b>правий клік</b> — ✦ виділити слова, ✎ стиль титру, 🎨 пресет, ↺ · <b>клік по слову</b> — плейхед, <b>[ / ]</b> — початок / кінець слова. Текст — у Text, голос — у Sentences.";
+const CAPS_HELP_SHORT="<b>Клік по картці</b> — вибрати титр · <b>Enter</b> — новий рядок · <b>Shift+Enter</b> — новий титр · <b>⊕ злити ↓</b> — з наступним в один · <b>правий клік</b> — ✦ виділити слова, ✎ стиль титру, 🎨 пресет, ↺ · <b>клік по слову</b> — плейхед, <b>[ / ]</b> — початок / кінець слова. Текст — у Text, голос — у Sentences.";
 function capsHelp(){const h=$("capsHelp"); if(h)h.style.display="none";}   // the help now sits at the top of the Captions list (left)
 const CAPS_HELP="<b>Captions — титри як на екрані</b><ul>"
       +"<li><b>Одна картка = один титр</b>, рівно як у кадрі: його рядки, час і стиль.</li>"

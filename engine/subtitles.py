@@ -271,9 +271,9 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
         for w in clean:
             if cur:
                 prev = cur[-1]
-                if (prev["ends_sentence"] or prev.get("brk") == "soft"
+                if prev.get("brk") != "join" and (prev["ends_sentence"] or prev.get("brk") == "soft"
                         or (w["start"] - prev["end"]) > pause_gap
-                        or _cut_between(prev["start"], w["start"])):
+                        or _cut_between(prev["start"], w["start"])):   # "join" = the designer merged across it
                     phrases.append(cur)
                     cur = []
             cur.append(w)

@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-26** — Captions: merge across pauses / sentence ends, «⊕ злити ↓» label, click a card to select it (2.0.1-b14)
 - **2026-11-26** — Fix: styled caption vanished early; ⊕ merge across the line limit; subtle 'on screen' mark; help on the left (2.0.1-b13)
 - **2026-11-26** — Captions tab (cards = on-screen captions: breaks, merge, highlight, per-caption style, [ / ]); Sentences = voice only; «|» line break in Text (2.0.1-b12)
 - **2026-11-26** — Fix: Sentences duplicated words after a new full stop + Enter (2.0.1-b11)
