@@ -5,6 +5,7 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-26** — Sentences right-click menu; ✎ per-sentence style via the Style tab (diff-based, follows the base); 💾 save changes into the preset (2.0.1-b10)
 - **2026-11-25** — MRTech export: clean 13-key file or + x_assembler block (2.0.1-b9)
 - **2026-11-24** — ⬇ MRTech JSON export for caption presets (2.0.1-b8)
 - **2026-11-19** — 👄 Lip-sync after ElevenLabs (Sync Lipsync-2-Pro); Seedance changes sound + picture by default (Keep original audio OFF); 📅 Dates: 3 modes (2.0.1-b7)

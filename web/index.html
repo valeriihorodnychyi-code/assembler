@@ -418,6 +418,12 @@
   .srow .stext{font-size:14px;line-height:1.45;color:var(--txt);outline:none;padding:2px 4px;border-radius:5px;min-height:20px;word-break:break-word}
   .srow .stext:focus{background:rgba(255,255,255,.05);box-shadow:0 0 0 1px var(--line)}
   .srow .sacts{display:flex;gap:4px}
+  .srow.sedit{border-color:#a78bfa!important;background:rgba(167,139,250,.14);box-shadow:0 0 0 2px rgba(167,139,250,.35)}
+  .srow.sown .stime::after{content:" 🎨";font-size:9px}
+  #sentEditBar{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;padding:9px 10px;margin:0 0 8px;border:1px solid #a78bfa;border-radius:10px;background:#221d3a;font-size:12px}
+  #sentEditBar div{flex:1;min-width:0} #sentEditBar span{color:#c4b5fd;font-size:11px}
+  #sentEditBar button{font-size:11px;padding:5px 10px;white-space:nowrap}
+  body.sentedit #quickPanel .ipane[data-ip='style']{box-shadow:inset 3px 0 0 #a78bfa}
   .srow .stext .wnl{color:#60a5fa;font-weight:700;margin:0 2px;user-select:none}
   .srow .stext .wacc,#transcriptWords .w.wacc{color:#ff8a5c;font-weight:700}
   #transcriptWords .w.wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5);border-radius:3px}
@@ -1540,7 +1546,8 @@ $("settingsSave").onclick=async()=>{
   }catch(e){setStatus("Save failed: "+e.message,"err");}
 };
 
-function readControls(){
+function readControls(){return _sentEdit?{..._sentEdit.base}:readPanel();}
+function readPanel(){
   return {fontFamily:$("fontFamily").value,fontSize:+$("fontSize").value,textColor:$("textColor").value,textCase:$("textCase").value,wrapMode:$("wrapMode").value,maxChars:+$("maxChars").value,maxLines:+$("maxLines").value,marginBottom:+$("marginBottom").value,lineSpacing:+$("lineSpacing").value,
     strokeW:+$("strokeW").value,strokeColor:$("strokeColor").value,strokeOuterW:+$("strokeOuterW").value,strokeOuterColor:$("strokeOuterColor").value,
     shadowOn:$("shadowOn").checked,shX:+$("shX").value,shY:+$("shY").value,shBlur:+$("shBlur").value,shColor:$("shColor").value,
@@ -3226,8 +3233,8 @@ video.addEventListener("play",()=>{if(exactOn)hideExact();});
 video.addEventListener("seeking",()=>{if(exactOn)hideExact();});
 video.addEventListener("seeked",scheduleExact);
 video.addEventListener("pause",scheduleExact);
-$("panelContent").addEventListener("input",()=>{saveLastStyle();scheduleExact();});
-$("panelContent").addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+$("panelContent").addEventListener("input",()=>{saveLastStyle();scheduleExact();presetDirtyCheck();});
+$("panelContent").addEventListener("change",()=>{saveLastStyle();scheduleExact();presetDirtyCheck();});
 
 // ---------- fonts ----------
 // register a font file from the server so the canvas preview uses the SAME file the engine renders with
@@ -3351,7 +3358,33 @@ function wordsToText(ws){let out="";(ws||[]).forEach(w=>{out+=(w.word||w.text||"
 let savedStyles={};   // name -> engine-schema JSON (loaded from the shared styles/ folder)
 let officialNames=new Set();   // names that ship with the code (repo styles/) → shown WITHOUT a ★, not deletable
 let IS_MAINTAINER=false;       // true only in the git-clone dev run (run.command from the repo); gates the 'Save as app default' button
-function markPreset(b){document.querySelectorAll(".preset").forEach(p=>p.classList.remove("active"));if(b)b.classList.add("active");}
+function markPreset(b){document.querySelectorAll(".preset").forEach(p=>p.classList.remove("active"));if(b)b.classList.add("active");
+  window._activePreset=(b&&b.dataset.pname)||null; setTimeout(presetDirtyCheck,0);}
+// 💾 save what you changed straight into the preset you're on (no «duplicate → rename» dance)
+function presetEngine(name){return (savedStyles&&savedStyles[name])||((typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES)||{})[name]||null;}
+function presetDirty(name){const e=presetEngine(name); if(!e)return false;
+  try{return Object.keys(ctrlDiff(readPanel(),{...readPanel(),...fromEngineStyle(e)})).length>0;}catch(_){return false;}}
+function presetDirtyCheck(){
+  let b=$("savePresetChanges"), anchor=$("saveStyleBtn2"); const n=window._activePreset;
+  if(!anchor)return;
+  if(!b){b=document.createElement("button");b.type="button";b.id="savePresetChanges";b.className="go";b.style.cssText="margin-left:6px";anchor.insertAdjacentElement("afterend",b);
+    b.onclick=()=>savePresetChanges(window._activePreset);}
+  const show=!!(n&&!_sentEdit&&presetDirty(n));
+  b.style.display=show?"":"none"; if(show)b.textContent="💾 Зберегти в «"+n+"»";
+}
+async function savePresetChanges(name){
+  if(!name)return; const k=presetKind(name), style=toEngineStyle(readPanel());
+  let url="/api/styles", nm=name;
+  if(k==="official"){ if(IS_MAINTAINER){if(!confirm("Перезаписати СТАНДАРТНИЙ пресет «"+name+"» у styles/? Після Commit + Push зміниться в усієї команди."))return; url="/api/styles/official";}
+    else{nm=(prompt("«"+name+"» — стандартний пресет команди. Зберегти твою версію як новий пресет ★:",name+" (мій)")||"").trim(); if(!nm)return;}}
+  else if(k==="builtin"){nm=(prompt("«"+name+"» вбудований. Зберегти як новий пресет ★:",name+" (мій)")||"").trim(); if(!nm)return;}
+  try{const r=await fetch(API+url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:nm,style})});
+    if(!r.ok)throw new Error("save failed"); await loadSavedStyles();
+    const card=[...document.querySelectorAll("#presets .preset")].find(x=>x.dataset.pname===nm); if(card)markPreset(card);
+    _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
+    setStatus("💾 «"+nm+"» оновлено"+(k==="official"&&IS_MAINTAINER?" у styles/ — тепер Commit + Push.":". Речення й голоси з цим пресетом теж оновились."),"ok");
+  }catch(e){setStatus("Save: "+e.message,"err");}
+}
 function applyPreset(name){const p={...PRESETS[name]};delete p.fontFamily;/* keep chosen font */["shadowOn","plateOn","kpOn","karaokeOn"].forEach(id=>{$(id).checked=false;});writeControls(p);}
 // inverse of toEngineStyle: engine JSON -> UI controls (so a loaded style fills the editor)
 function fromEngineStyle(e){
@@ -3426,6 +3459,7 @@ function presetMenu(ev,name){
   ctxMenu(ev,[{head:name+(k==="custom"?" · ★ свій":k==="official"?" · стандартний":" · вбудований")},
     {label:"✓ Apply",on:()=>{const c=[...document.querySelectorAll("#presets .preset")].find(x=>x.dataset.pname===name);if(c)c.click();}},
     k==="custom"?{label:"✎ Rename…",on:()=>renamePreset(name)}:null,
+    {label:"💾 Зберегти поточні налаштування сюди",title:"Записати те, що зараз на панелі Style, у цей пресет",on:()=>savePresetChanges(name)},
     {label:"⧉ Duplicate…",title:"Копія як твій пресет ★ — далі можна правити",on:()=>duplicatePreset(name)},
     {label:"⬇ MRTech JSON",title:"Тільки їхні 13 полів — працює в їхньому рендері як є",on:()=>exportMrtech(name,true)},
     {label:"⬇ MRTech JSON + наші поля",title:"Їхні 13 полів + блок x_assembler (регістр, рядки, плашки, подвійна обводка, тіні, karaoke) — див. CAPTION_SPEC.md",on:()=>exportMrtech(name,false)},
@@ -4406,7 +4440,8 @@ function renderSentsView(force){
     const pick=_sentPick&&k>=_sentPick[0]&&k<_sentPick[1];
     const _tr=(variants[activeVar]||{}).trim, _out=!!(_tr&&(inf.end<=_tr[0]||inf.start>=_tr[1]));
     const _V=(typeof voicesOf==="function")?voicesOf():null, _vid=_V&&_V.list&&_V.list.length?voiceForRange(_V,inf.start,inf.end):null, _vo=_vid&&_V.list.find(x=>x.id===_vid);
-    return "<div class='srow"+(pick?" pick":"")+(_out?" otrim":"")+"' data-k='"+k+"' "+(_out?"title='Поза трімом — у креатив не потрапить'":"")+(_vo?" style='border-left:3px solid "+_vo.color+"'":"")+">"
+    const _own=curPhraseStyles().some(m=>Math.abs(m.start-inf.start)<0.06||(inf.start>=m.start&&inf.start<m.end));
+    return "<div class='srow"+(pick?" pick":"")+(_out?" otrim":"")+(_sentEdit&&_sentEdit.k===k?" sedit":"")+(_own?" sown":"")+"' data-k='"+k+"' "+(_out?"title='Поза трімом — у креатив не потрапить'":"")+(_vo?" style='border-left:3px solid "+_vo.color+"'":"")+">"
       +"<div class='scol'><button type='button' class='stime' data-sk='"+k+"' title='Клік — програти речення · Shift+клік — виділити кілька речень, щоб озвучити однією фразою'>"+_fmtT(inf.start)+" <span>▶</span></button>"
       +(_vo?"<button type='button' class='svoicech' data-svch='"+k+"' style='color:"+_vo.color+";border-color:"+_vo.color+"66;background:"+_vo.color+"1f' title='Хто говорить — клік, щоб змінити"+(_vo.style?" · стиль: "+esc(_vo.style):"")+"'>"+esc(_vo.name)+"</button>":"")+"</div>"
       +"<div class='stext' contenteditable='true' spellcheck='false' data-k='"+k+"'>"+sentWordsHTML(r,esc)+"</div>"
@@ -4703,12 +4738,101 @@ function sentAccent(i0,i1,on){
   commitWords(ws); if(txtView==="sents")renderSentsView(true);
   setStatus(on?"✦ Акцент. Як він виглядає — Style → ✦ Accent (колір, шрифт, italic, розмір, обведення, тінь, плашка).":"✦ Акцент прибрано.","ok");
 }
+// ---------- ✎ Sentence style: one caption, edited with ALL the Style controls ----------
+// A sentence keeps only what you CHANGED (diff) on top of the caption style (and, optionally, a
+// preset's look) — change the base later and the sentence follows, except for its own changes.
+var _sentEdit=null;   // {rec, base, k} while the Style tab edits one sentence
+const SE_SKIP=new Set(["holdLast","scrimFade"]);            // clip-wide settings: not per sentence
+const SE_POS=["marginBottom","boxOffsetY"];                 // position: from the caption style unless asked
+function presetLook(name,withPos){const c=presetToCtrl(name),o={...c}; if(!withPos)SE_POS.forEach(k=>delete o[k]); SE_SKIP.forEach(k=>delete o[k]); return o;}
+function phraseStart(m,base){base=base||readControls(); return m.name?{...base,...presetLook(m.name,m.presetPos)}:{...base};}
+function phraseCtrl(m){
+  if(_sentEdit&&_sentEdit.rec===m)return {...readPanel(),...Object.fromEntries([...SE_SKIP].map(k=>[k,_sentEdit.base[k]]))};   // live while editing
+  if(m.diff||m.name)return {...phraseStart(m),...(m.diff||{})};
+  return m.ctrl||readControls();   // an old project: a full snapshot
+}
+function ctrlDiff(a,b){const d={}; Object.keys(a).forEach(k=>{if(!SE_SKIP.has(k)&&JSON.stringify(a[k])!==JSON.stringify(b[k]))d[k]=a[k];}); return d;}
+function sentRec(k,create){
+  const r=_sentRanges[k], ws=realWords||[]; if(!r||!ws[r[0]])return null;
+  const a=+ws[r[0]].start, b=ws[r[1]]?Math.max(+ws[r[1]-1].start+0.001,+ws[r[1]].start-0.0005):+ws[r[1]-1].end+0.05;
+  const arr=curPhraseStyles();
+  let m=arr.find(x=>Math.abs(x.start-a)<0.02&&Math.abs(x.end-b)<0.05);
+  if(!m&&create){for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);
+    m={start:+a.toFixed(3),end:+b.toFixed(3),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
+  return m;
+}
+function sentEditStart(k,presetName){
+  if(_sentEdit)sentEditDone();
+  const m=sentRec(k,true); if(!m)return;
+  if(m.ctrl&&!m.diff){m.diff=ctrlDiff(m.ctrl,readPanel());delete m.ctrl;}   // old snapshot → a diff against today's base
+  if(presetName!==undefined){m.name=presetName||null;m.diff={};}
+  const base=readPanel();
+  _sentEdit={rec:m,base,k};
+  writeControls({...phraseStart(m,base),...(m.diff||{})});
+  if(typeof insTab==="function")insTab("style");
+  sentEditBanner(); renderSentsView(true);
+  if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
+  const inf=sentInfo(k); if(inf&&videoLoaded){try{video.currentTime=inf.start+0.05;}catch(_){}}
+  setStatus("✎ Редагуєш стиль речення "+(k+1)+" — усі налаштування Style діють тільки на нього. ✓ Готово — назад до всіх.","ok");
+}
+function sentEditDone(reset){
+  const E=_sentEdit; if(!E)return;
+  const m=E.rec, start=phraseStart(m,E.base);
+  m.diff=ctrlDiff(readPanel(),start);
+  _sentEdit=null;
+  const arr=curPhraseStyles();
+  if(reset||(!m.name&&!Object.keys(m.diff).length)){const i=arr.indexOf(m); if(i>=0)arr.splice(i,1);}
+  writeControls(E.base); _effCache={k:"",t:0,v:null};
+  sentEditBanner(); renderSentsView(true);
+  if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
+  if(typeof saveProjectSoon==="function")saveProjectSoon();
+  setStatus(reset?"↺ Речення знову в стилі титрів.":("✓ Стиль речення збережено ("+(Object.keys(m.diff).length||"без")+" змін"+(m.name?", з пресету «"+m.name+"»":"")+")."),"ok");
+}
+function sentEditBanner(){
+  const pane=document.querySelector("#quickPanel .ipane[data-ip='style']")||$("panelContent"); if(!pane)return;
+  let b=$("sentEditBar");
+  if(!_sentEdit){if(b)b.remove(); document.body.classList.remove("sentedit"); return;}
+  if(!b){b=document.createElement("div");b.id="sentEditBar";pane.insertBefore(b,pane.firstChild);}
+  const inf=sentInfo(_sentEdit.k)||{text:""};
+  b.innerHTML="<div><b>✎ Редагуєш речення "+(_sentEdit.k+1)+"</b>"+(_sentEdit.rec.name?" · з пресету «"+String(_sentEdit.rec.name).replace(/</g,"&lt;")+"»":"")+"<br><span>«"+String(inf.text).replace(/</g,"&lt;").slice(0,60)+"»</span></div>"
+    +"<button type='button' id='seDone' class='primary'>✓ Готово</button><button type='button' id='seReset' class='ghost' title='Прибрати свій стиль речення'>↺ Як у всіх</button>";
+  document.body.classList.add("sentedit");
+  $("seDone").onclick=()=>sentEditDone(false); $("seReset").onclick=()=>sentEditDone(true);
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&_sentEdit&&!(e.target&&e.target.closest&&e.target.closest("input,textarea,[contenteditable='true']")))sentEditDone(false);});
+// while editing, every panel change re-lays the caption (the server layout uses the regions too)
+["input","change"].forEach(ev=>document.addEventListener(ev,e=>{if(!(e.target&&e.target.closest&&e.target.closest("#panelContent,#quickPanel")))return;
+  if(_sentEdit){if(typeof scheduleLayout==="function")scheduleLayout();}
+  clearTimeout(window._pdT); window._pdT=setTimeout(()=>{if(typeof presetDirtyCheck==="function")presetDirtyCheck();},150);},true));
+// right-click a sentence (or the words you selected) → everything you can do with it
+function sentContext(e){
+  const row=e.target.closest&&e.target.closest(".srow"); if(!row)return;
+  e.preventDefault();
+  const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return;
+  const S=sentSelWords(), sel=S&&!S.edited&&S.k===k?S:null;
+  const ws=realWords||[], r=_sentRanges[k];
+  const i0=sel?sel.i0:r[0], i1=sel?sel.i1:r[1]-1;
+  const allAcc=ws.slice(i0,i1+1).every(w=>w.accent);
+  const wEl=e.target.closest("[data-wi]"), wi=wEl?+wEl.dataset.wi:-1;
+  const m=sentRec(k,false);
+  const what=sel?"«"+ws.slice(i0,i1+1).map(w=>w.word).join(" ").slice(0,30)+"»":"речення "+(k+1);
+  ctxMenu(e,[{head:what},
+    {label:(allAcc?"✦ Прибрати акцент":"✦ Акцент")+(sel?"":" — усе речення"),on:()=>sentAccent(i0,i1,!allAcc)},
+    {label:"✎ Стиль цього речення…",title:"Праві вкладки Style редагують тільки це речення",on:()=>sentEditStart(k)},
+    {label:"🎨 Почати з пресету ▸",on:()=>setTimeout(()=>ctxMenu(e,[{head:"Стиль речення з пресету"}].concat(presetNames().map(n=>({label:String(n).replace(/</g,"&lt;"),on:()=>sentEditStart(k,n)})))),0)},
+    m?{label:"↺ Стиль як у всіх",on:()=>{const arr=curPhraseStyles(),i=arr.indexOf(m); if(i>=0)arr.splice(i,1); _effCache={k:"",t:0,v:null}; renderSentsView(true); if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();}}:null,
+    (wi>=r[0]&&wi<r[1]-1)?{label:ws[wi].brk==="nl"?"↵ Прибрати розрив після «"+ws[wi].word+"»":"↵ Новий рядок після «"+ws[wi].word+"»",on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="nl"?null:"nl";commitWords(W2);renderSentsView(true);}}:null,
+    "-",
+    {label:"▶ Програти",on:()=>{if(videoLoaded){video.currentTime=Math.max(0,inf.start-0.05);_sentStopAt=inf.end+0.12;video.play();}}},
+    {label:"🎙 Переозвучити речення",on:()=>voiceSentences(k,k+1)},
+    {label:"✂ Вирізати речення",on:()=>cutSentences(k,k+1)}]);
+}
 function sentPhraseStyle(i0,i1,name){
   const ws=realWords||[]; if(!ws[i0]||!ws[i1])return;
   const a=+ws[i0].start, b=ws[i1+1]?Math.max(+ws[i1].start+0.001,+ws[i1+1].start-0.0005):+ws[i1].end+0.05;
   const arr=curPhraseStyles();
   for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);   // one style per word: the new one replaces what it overlaps
-  if(name)arr.push({start:+a.toFixed(3),end:+b.toFixed(3),name,ctrl:presetToCtrl(name)});
+  if(name)arr.push({start:+a.toFixed(3),end:+b.toFixed(3),name,diff:{}});   // the preset by NAME (edits to it follow), the caption's position
   arr.sort((x,y)=>x.start-y.start);
   sentToolHide(); window.getSelection().removeAllRanges();
   _effCache={k:"",t:0,v:null};
@@ -4767,6 +4891,7 @@ function voiceSentences(k0,k1){
 }
 (function wireSents(){
   const box=$("transcriptSents"); if(!box)return;
+  box.addEventListener("contextmenu",sentContext);
   box.addEventListener("click",e=>{
     const t=e.target.closest&&e.target.closest("[data-sk]");
     if(t){const k=+t.dataset.sk;
@@ -5677,11 +5802,11 @@ function sentenceVoices(words,V){   // [{start,end,voice}] per sentence
 let _effCache={k:null,t:0,v:null};
 function effOverrides(v,words,holder){
   v=v||variants[activeVar]; words=words||realWords||(v&&v.words)||[]; holder=holder||((typeof cutHolder==="function")?cutHolder():null);
-  const manual=(v&&v.phraseStyles)||[], V=holder&&holder.voices;
+  const manual=((v&&v.phraseStyles)||[]).map(m=>({start:m.start,end:m.end,ctrl:phraseCtrl(m)})), V=holder&&holder.voices;
   const useV=!!(V&&V.on&&V.list&&V.list.some(x=>x.style)), useB=!!(V&&V.body&&V.body.on&&V.body.style&&holder&&holder.body!=null);
   if(!useV&&!useB)return manual;
-  const key=JSON.stringify([V,holder&&holder.body,manual.length,manual.map(m=>[m.start,m.end]),words.length,words.length?[words[0].start,words[words.length-1].end]:0]);
-  const now=performance.now(); if(_effCache.k===key&&now-_effCache.t<400)return _effCache.v;
+  const key=JSON.stringify([V,holder&&holder.body,manual.length,((v&&v.phraseStyles)||[]).map(m=>[m.start,m.end,m.name||"",m.diff||0]),words.length,words.length?[words[0].start,words[words.length-1].end]:0]);
+  const now=performance.now(); if(!_sentEdit&&_effCache.k===key&&now-_effCache.t<400)return _effCache.v;
   const layers=[];
   manual.forEach(m=>layers.push({start:+m.start,end:+m.end,ctrl:m.ctrl,p:3}));
   if(useB)layers.push({start:+holder.body,end:1e6,ctrl:presetToCtrl(V.body.style),p:2});
