@@ -271,9 +271,9 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
         for w in clean:
             if cur:
                 prev = cur[-1]
-                if (prev["ends_sentence"] or prev.get("brk") == "soft"
+                if prev.get("brk") != "join" and (prev["ends_sentence"] or prev.get("brk") == "soft"
                         or (w["start"] - prev["end"]) > pause_gap
-                        or _cut_between(prev["start"], w["start"])):
+                        or _cut_between(prev["start"], w["start"])):   # "join" = the designer merged across it
                     phrases.append(cur)
                     cur = []
             cur.append(w)
@@ -284,6 +284,18 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
             # Build atomic groups first (keep_together / numbers / dates / stopwords),
             # then wrap by GROUPS so a glued unit never breaks across a line or caption.
             groups = build_groups(phrase, rules, lang=lang, pause_gap=pause_gap)
+            # ↵ a designer's line break wins over keep-together glue: split the group there
+            _g2 = []
+            for g in groups:
+                cur_g = []
+                for w in g:
+                    cur_g.append(w)
+                    if w.get("brk") == "nl":
+                        _g2.append(cur_g)
+                        cur_g = []
+                if cur_g:
+                    _g2.append(cur_g)
+            groups = _g2
             glines = []   # lines as lists OF groups
             if wrap_mode == "words":          # wrap by WORD count per line
                 line, count = [], 0
@@ -294,6 +306,9 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
                         line, count = [], 0
                     line.append(g)
                     count += gw
+                    if g[-1].get("brk") == "nl":      # ↵ the designer's own line break inside the caption
+                        glines.append(line)
+                        line, count = [], 0
                 if line:
                     glines.append(line)
             else:                             # wrap by CHARS (default — guarantees width fit)
@@ -307,6 +322,9 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
                         space_len = 0
                     line.append(g)
                     line_chars += space_len + glen
+                    if g[-1].get("brk") == "nl":      # ↵ the designer's own line break inside the caption
+                        glines.append(line)
+                        line, line_chars = [], 0
                 if line:
                     glines.append(line)
             # widow control: avoid a final line with fewer than N words
@@ -356,6 +374,7 @@ def build_events(words, limit, text_case="uppercase", replacements=None,
     # real scene cut (below) can trim it further.
     if events:
         L = events[-1]
+        L["_nat_end"] = L["end"]       # build_timeline re-bridges it to the NEXT region's first caption
         L["end"] = min(L["end"], L["start"] + HOLD_MAX)
         if L["end"] <= L["start"]:
             L["end"] = L["start"] + 0.4
@@ -562,17 +581,49 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         lines = event["lines"]
 
     active_idx = event["active_word_index"]
+    # ✦ ACCENT words: their own look INSIDE the caption (font, italic, size, case, colour / gradient,
+    # stroke, shadow, word plate) — the caption's layout, position and line breaks stay its own.
+    acc = style_cfg.get("accent") or {}
+    _acc_path = None
+    if acc.get("font_name"):
+        from engine import styles as _st   # lazy: styles doesn't import us, but keep the module light
+        _acc_path = _st.resolve_font(acc.get("font_name"))
+    _acc_scale = max(0.5, min(2.0, float(acc.get("scale", 1.0) or 1.0)))
+    _acc_case = acc.get("case") or ""
+    _afonts = {}
+
+    def _afont(fs):
+        k = int(max(8, fs * _acc_scale))
+        if k not in _afonts:
+            _afonts[k] = load_font(_acc_path or font_path, k)
+        return _afonts[k]
+
+    def _disp(w):
+        t = w["text"]
+        if w.get("accent"):
+            if _acc_case == "uppercase":
+                t = t.upper()
+            elif _acc_case == "lowercase":
+                t = t.lower()
+        return t
+
+    def _wf(w, f, af):
+        return af if w.get("accent") else f
+
     # shrink-to-fit: never let a caption line exceed the safe frame width (keeps long
     # keep-together phrases or a single long word from spilling past the frame edge).
     safe_w = width * 0.92
     _sp = font.getlength(" ")
-    _maxw = max((sum(font.getlength(w["text"]) for w in line) + (len(line) - 1) * _sp
+    _af0 = _afont(font_size)
+    _maxw = max((sum(_wf(w, font, _af0).getlength(_disp(w)) for w in line) + (len(line) - 1) * _sp
                  for line in lines), default=0)
     # Skip auto-shrink for MANUAL layouts (the user controls line breaks — respect their
     # size; if a line overflows they add a break). Otherwise shrink but never below 55%.
     if _maxw > safe_w > 0 and not event.get("manual"):
         font_size = max(8, int(font_size * max(safe_w / _maxw, 0.55)))
         font = load_font(font_path, font_size)
+    afont = _afont(font_size)
+    a_ascent = afont.getmetrics()[0]
     ascent, descent = font.getmetrics()
     line_height = ascent + descent
     line_spacing = int(int(style_cfg.get("line_spacing", 10)) * scale_factor)
@@ -584,7 +635,7 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
     # box nudge: moves plate/highlight boxes up(+)/down(-) without moving the text
     box_off = int(int(style_cfg.get("box_offset_y", 0)) * scale_factor)
 
-    line_widths = [sum(font.getlength(w["text"]) for w in line) + (len(line) - 1) * space_width
+    line_widths = [sum(_wf(w, font, afont).getlength(_disp(w)) for w in line) + (len(line) - 1) * space_width
                    for line in lines]
 
     # Scrim: a soft, full-width dark band behind the text so captions stay readable
@@ -607,7 +658,8 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         return
 
     word_positions, current_y, word_counter, cx = [], start_y, 0, width / 2
-    word_accent = []   # parallel to word_positions: ✦ accent words
+    word_accent = []   # parallel to word_positions (accent words live in acc_items instead)
+    acc_items = []     # ✦ (x, y, text, is_active) — drawn in their own pass, karaoke never repaints them
     # Typewriter animation: words appear one by one as they're spoken. Positions are computed from
     # the FULL caption (so the layout never shifts) but words after the active one aren't drawn —
     # this matches the preview, and costs nothing: the engine already renders one PNG per word.
@@ -621,9 +673,12 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
             else:
                 _keep = not (typewriter and word_counter > active_idx)
             if _keep:
-                word_positions.append((current_x, current_y, w["text"], _is_act))
-                word_accent.append(bool(w.get("accent")))
-            current_x += font.getlength(w["text"]) + space_width
+                if w.get("accent"):   # same baseline as the caption, its own font
+                    acc_items.append((current_x, current_y + (ascent - a_ascent), _disp(w), _is_act))
+                else:
+                    word_positions.append((current_x, current_y, w["text"], _is_act))
+                    word_accent.append(False)
+            current_x += _wf(w, font, afont).getlength(_disp(w)) + space_width
             word_counter += 1
         current_y += line_height + line_spacing
 
@@ -743,6 +798,21 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
                 (kd.rounded_rectangle(r, radius=kp_rad, fill=kp_c) if kp_rad > 0 else kd.rectangle(r, fill=kp_c))
             final_img.alpha_composite(kp_img)
 
+    acc_pl = acc.get("plate") or {}
+    if acc_items and acc_pl.get("enabled") and not text_only:   # ✦ word plate under each accent word
+        ap_c = tuple(acc_pl.get("color", [255, 255, 255, 255]))
+        ap_px = int(int(acc_pl.get("pad_x", 14)) * scale_factor)
+        ap_py = int(int(acc_pl.get("pad_y", 6)) * scale_factor)
+        ap_rad = int(int(acc_pl.get("border_radius", 10)) * scale_factor)
+        ap_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        apd = ImageDraw.Draw(ap_img)
+        for x, y, text, _a in acc_items:
+            bb = draw.textbbox((x, y), text, font=afont)
+            xr = (y + a_ascent - bb[1]) * ACCENT_ITALIC * 0.5 if acc.get("italic") else 0
+            r = [bb[0] - ap_px, bb[1] - ap_py - box_off, bb[2] + xr + ap_px, bb[3] + ap_py - box_off]
+            (apd.rounded_rectangle(r, radius=ap_rad, fill=ap_c) if ap_rad > 0 else apd.rectangle(r, fill=ap_c))
+        final_img.alpha_composite(ap_img)
+
     text_img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     td = ImageDraw.Draw(text_img)
     text_c = tuple(style_cfg["text_color"])
@@ -776,7 +846,6 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
         for x, y, text, _ in word_positions:
             td.text((x, y), text, font=font, fill=so_c, stroke_width=so_w, stroke_fill=so_c)
     grad_glyphs = []
-    accent_c = tuple((style_cfg.get("accent") or {}).get("color", [255, 90, 44, 255]))
     for _wi, (x, y, text, is_active) in enumerate(word_positions):
         use_grad = g_on_text or (g_on_active and is_active)
         if use_grad:
@@ -784,7 +853,7 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
                 td.text((x, y), text, font=font, fill=s_c, stroke_width=s_w, stroke_fill=s_c)
             grad_glyphs.append((x, y, text))
         else:
-            fill = karaoke_c if (karaoke_on and is_active) else (accent_c if word_accent[_wi] else text_c)
+            fill = karaoke_c if (karaoke_on and is_active) else text_c
             if s_w > 0:
                 td.text((x, y), text, font=font, fill=fill, stroke_width=s_w, stroke_fill=s_c)
             else:
@@ -796,7 +865,68 @@ def render_subtitle_png(event, filename, width, height, font_path, style_cfg, sc
             gmd.text((x, y), text, font=font, fill=255)
         text_img.alpha_composite(_grad_layer(gmask))
     final_img.alpha_composite(text_img)
+    if acc_items:
+        _draw_accents(final_img, acc_items, afont, a_ascent, acc, style_cfg, scale_factor, width, height,
+                      (s_w, s_c, so_w, so_c), (shadow_on, sh_x, sh_y, sh_c, sh_blur),
+                      (shadow2_on, sh2_x, sh2_y, sh2_c, sh2_blur), _grad_layer)
     final_img.save(filename)
+
+
+ACCENT_ITALIC = 0.21   # faux-italic slant (x shift per px above the baseline) — preview uses the same
+
+
+def _draw_accents(final_img, items, afont, a_ascent, acc, style_cfg, sf, width, height,
+                  base_stroke, base_sh, base_sh2, grad_layer):
+    """✦ accent words: own colour / gradient, stroke, shadow, faux italic — one layer per word."""
+    s_w, s_c, so_w, so_c = base_stroke
+    st = acc.get("stroke") or {}
+    smode = st.get("mode", "inherit")
+    if smode == "own":
+        s_w, s_c, so_w = int(int(st.get("width", 6)) * sf), tuple(st.get("color", [0, 0, 0, 255])), 0
+    elif smode == "none":
+        s_w = so_w = 0
+    sh = acc.get("shadow") or {}
+    hmode = sh.get("mode", "inherit")
+    shadows = []
+    if hmode == "inherit":
+        if base_sh2[0]:
+            shadows.append(base_sh2[1:])
+        if base_sh[0]:
+            shadows.append(base_sh[1:])
+    elif hmode == "own":
+        shadows.append((int(int(sh.get("offset_x", 0)) * sf), int(int(sh.get("offset_y", 6)) * sf),
+                        tuple(sh.get("color", [0, 0, 0, 255])), int(int(sh.get("glow_blur", 0)) * sf)))
+    color = tuple(acc.get("color", [255, 90, 44, 255]))
+    use_grad = bool(acc.get("gradient"))
+    italic = bool(acc.get("italic"))
+    for x, y, text, _act in items:
+        lay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        for ox, oy, col, blur in shadows:
+            sl = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            sw = so_w if so_w > 0 else s_w
+            ImageDraw.Draw(sl).text((x + ox, y + oy), text, font=afont, fill=col,
+                                    stroke_width=sw, stroke_fill=col)
+            if blur > 0:
+                sl = sl.filter(ImageFilter.GaussianBlur(blur))
+            lay.alpha_composite(sl)
+        d = ImageDraw.Draw(lay)
+        if so_w > 0:
+            d.text((x, y), text, font=afont, fill=so_c, stroke_width=so_w, stroke_fill=so_c)
+        if use_grad:
+            if s_w > 0:
+                d.text((x, y), text, font=afont, fill=s_c, stroke_width=s_w, stroke_fill=s_c)
+            m = Image.new("L", (width, height), 0)
+            ImageDraw.Draw(m).text((x, y), text, font=afont, fill=255)
+            lay.alpha_composite(grad_layer(m))
+        elif s_w > 0:
+            d.text((x, y), text, font=afont, fill=color, stroke_width=s_w, stroke_fill=s_c)
+        else:
+            d.text((x, y), text, font=afont, fill=color)
+        if italic:   # lean the glyphs right around their own baseline
+            yb = y + a_ascent
+            k = ACCENT_ITALIC
+            lay = lay.transform(lay.size, Image.AFFINE, (1, k, -k * yb, 0, 1, 0), resample=Image.BICUBIC)
+        final_img.alpha_composite(lay)
 
 
 def _srt_time(t):

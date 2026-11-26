@@ -138,6 +138,10 @@
   .lempty{position:absolute;inset:0;display:flex;align-items:center;padding-left:10px;font-size:11px;color:#6b7080;pointer-events:none}
   .lempty b{color:#a9a3ff;font-weight:600;pointer-events:auto;cursor:pointer}
   .lane .lbody.sel{border-color:#8a8fa0}
+  .lblk.gen{background:rgba(167,139,250,.45);border:1px solid #a78bfa;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .lblk.gen.off{background:transparent;border-style:dashed;color:#a78bfa}
+  #trimGen{position:absolute;left:0;right:0;bottom:0;height:5px;pointer-events:none;z-index:3}
+  #trimGen i{position:absolute;top:0;bottom:0;background:#a78bfa;border-radius:2px}
   #laneHead{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:rgba(255,255,255,.85);pointer-events:none;z-index:7;left:var(--lh)}
   #laneBusy{position:absolute;right:0;top:-18px;font-size:10.5px;color:#a9a3ff;display:none}
   .laneEdit{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-left:var(--lh);padding:7px 10px;border:1px solid #3a3e4a;border-radius:8px;background:#1b1d24}
@@ -404,6 +408,34 @@
   .twords .w.otrim{opacity:.28;text-decoration:line-through;text-decoration-color:rgba(255,255,255,.25)}
   .srow.otrim{opacity:.35}
   .twords .w.rng{color:#fff;background:rgba(120,110,255,.45);box-shadow:0 0 0 1px rgba(150,140,255,.7)}   /* Shift-click / double-click range — re-voiced as one phrase */
+  .tcaps{display:flex;flex-direction:column;gap:6px;max-height:460px;overflow-y:auto;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+  .tcaps .chint{color:var(--muted);font-size:12px;padding:8px}
+  .ccard{border:1px solid #2c303b;border-radius:9px;padding:5px 8px 7px;background:#191b22}
+  .ccard.cur{border-color:#4b5262;background:#1d2029}   /* the caption on screen now — subtle, not a selection */
+  .ccard .cbtn:focus,.ccard .ctime:focus{outline:none}
+  .ccard{cursor:pointer} .ccard .ctext{cursor:text}
+  .ccard.csel{border-color:#60a5fa;box-shadow:0 0 0 1px #60a5fa}
+  .ccard .cbtn.cmerge{font-size:10.5px}
+  .ccard.cown{border-left:3px solid #a78bfa}
+  .ccard.sedit{border-color:#a78bfa;background:rgba(167,139,250,.14);box-shadow:0 0 0 2px rgba(167,139,250,.35)}
+  .ccard .chead{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+  .ccard .ctime{font:600 10.5px/1 ui-monospace,Menlo,monospace;color:var(--muted);background:transparent;border:0;padding:3px 2px;cursor:pointer}
+  .ccard .ctime:hover{color:var(--accent)}
+  .ccard .cdur{font-size:10px;color:#5d6270}
+  .ccard .cstyle{font-size:10px;color:#c4b5fd}
+  .ccard .cbtn{font-size:11px;padding:1px 7px;background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--muted)}
+  .ccard .cbtn:hover{color:var(--txt);border-color:#4a4e5a}
+  .ccard .ctext{outline:none;font-weight:700;font-size:14px;line-height:1.35;text-align:center;padding:4px;border-radius:6px;caret-color:var(--accent)}
+  .ccard .ctext:focus{background:rgba(255,255,255,.04)}
+  .ccard .cline{min-height:1em}
+  .ccard .w{cursor:pointer;border-radius:3px}
+  .ccard .w:hover{background:rgba(255,255,255,.06)}
+  .ccard .w.wsel{box-shadow:0 0 0 1px #60a5fa}
+  .ccard .w.wacc{color:#ff8a5c}
+  .ccard .w.wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5)}
+  #capsHelp{position:fixed;z-index:4;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(22,24,31,.92);font-size:12px;line-height:1.45;color:var(--muted)}
+  .tcaps .chelp{font-size:10.5px;line-height:1.5;color:var(--muted);padding:2px 4px 4px} .tcaps .chelp b{color:#b9bdc8;font-weight:600}
+  #capsHelp b{color:var(--txt)} #capsHelp ul{margin:6px 0 0;padding-left:16px} #capsHelp li{margin:3px 0}
   .tsents{display:flex;flex-direction:column;gap:4px;max-height:420px;overflow-y:auto;padding:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
   .srow{border:1px solid transparent;border-radius:8px;padding:6px 6px 6px 4px;display:grid;grid-template-columns:auto 1fr auto;gap:2px 6px;align-items:start}
   .srow:hover{background:rgba(255,255,255,.03)}
@@ -414,7 +446,25 @@
   .srow .stext{font-size:14px;line-height:1.45;color:var(--txt);outline:none;padding:2px 4px;border-radius:5px;min-height:20px;word-break:break-word}
   .srow .stext:focus{background:rgba(255,255,255,.05);box-shadow:0 0 0 1px var(--line)}
   .srow .sacts{display:flex;gap:4px}
-  .srow .stext .wacc{color:#ff8a5c;font-weight:700}
+  .srow.sedit{border-color:#a78bfa!important;background:rgba(167,139,250,.14);box-shadow:0 0 0 2px rgba(167,139,250,.35)}
+  .srow.sown .stime::after{content:" 🎨";font-size:9px}
+  #sentEditBar{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;padding:9px 10px;margin:0 0 8px;border:1px solid #a78bfa;border-radius:10px;background:#221d3a;font-size:12px}
+  #sentEditBar div{flex:1;min-width:0} #sentEditBar span{color:#c4b5fd;font-size:11px}
+  #sentEditBar button{font-size:11px;padding:5px 10px;white-space:nowrap}
+  body.sentedit #quickPanel .ipane[data-ip='style']{box-shadow:inset 3px 0 0 #a78bfa}
+  .srow .stext .wnl{color:#60a5fa;font-weight:700;margin:0 2px;user-select:none}
+  .srow .stext .wacc,#transcriptWords .w.wacc{color:#ff8a5c;font-weight:700}
+  #transcriptWords .w.wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5);border-radius:3px}
+  .srow .stext .wdate{background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(250,204,21,.5);border-radius:3px}
+  .datepanel{border:1px solid rgba(250,204,21,.45);background:rgba(250,204,21,.06);border-radius:9px;padding:9px 10px;margin-bottom:8px;font-size:12px;display:flex;flex-direction:column;gap:7px}
+  .datepanel .dgroup{display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid rgba(250,204,21,.2)}
+  .datepanel .dgroup:first-of-type{border-top:0;padding-top:0}
+  .datepanel .docc{display:flex;gap:5px;flex-wrap:wrap}
+  .datepanel .docc label{display:inline-flex;align-items:center;gap:4px;border:1px solid #3a3e4a;border-radius:6px;padding:2px 6px;background:#111319;cursor:pointer;font:600 10.5px/1.4 ui-monospace,Menlo,monospace}
+  .datepanel .drow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .datepanel input[type=text]{flex:1;min-width:120px}
+  #trimDates{position:absolute;inset:0;pointer-events:none;z-index:4}
+  #trimDates i{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:#facc15;opacity:.9;border-radius:2px;pointer-events:auto;cursor:pointer}
   .srow .stext .wphr{text-decoration:underline 2px #a78bfa;text-underline-offset:3px}
   .senttool{position:fixed;z-index:60;display:none;gap:4px;align-items:center;padding:4px;background:#1d2029;border:1px solid #3a3e4a;border-radius:9px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
   .senttool button{font-size:11.5px;padding:5px 9px;border-radius:7px;background:#2a2d36;border:1px solid var(--line);color:var(--txt);white-space:nowrap}
@@ -483,7 +533,7 @@
   .railhead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;text-align:center;margin-bottom:8px}
   .presetrail{display:flex;flex-direction:column;gap:6px;max-height:64vh;overflow-y:auto;padding:2px}
   #presetRail .presets{grid-template-columns:1fr;gap:6px;margin-top:0}
-  .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0}
+  .previewcol{display:flex;flex-direction:column;align-items:center;gap:13px;min-width:0;position:relative}
   /* only the right tools column sits under the fixed tutorial stickers, so only it steps down */
   /* 2.0 inspector */
   body.edit2 .app{grid-template-columns:1fr}
@@ -853,14 +903,16 @@
             title="Накласти поточний текст на ОРИГІНАЛЬНІ тайминги транскрайбу. Твої правки тексту лишаються, зіпсований час повертається — без нового транскрайбу. (Ручні правки часу слів теж скинуться.)">↺<span class="rtl"> Тайминги</span></button>
           <div class="seg" id="txtViewSeg">
             <button type="button" data-v="text" class="active">Text</button>
-            <button type="button" data-v="words">Words</button>
-            <button type="button" data-v="sents" title="Речення: правка й переозвучка цілими реченнями">Sentences</button>
+            <button type="button" data-v="caps" title="Титри — рівно як на екрані: розриви, акценти, стиль окремого титру">Captions</button>
+            <button type="button" data-v="sents" title="Речення — голос: переозвучка, губи, дати, вирізати">Sentences</button>
           </div></div>
         <div style="position:relative">
           <span id="langSticker" class="lang-sticker" style="display:none"></span>
           <textarea id="transcript" rows="3" style="min-height:210px;max-height:360px;overflow-y:auto;resize:vertical;font-size:15px" placeholder="Subtitle text appears here after Transcribe…">YOUR HOOK GOES HERE WATCH THIS NOW</textarea>
           <div id="transcriptWords" class="twords" contenteditable="true" spellcheck="false" style="display:none"></div>
+          <div id="datePanel" class="datepanel" style="display:none"></div>
           <div id="transcriptSents" class="tsents" style="display:none"></div>
+          <div id="transcriptCaps" class="tcaps" style="display:none"></div>
           <div id="sentBar" style="display:none"></div>
           <div id="wordTools" style="display:none;flex-direction:column;gap:6px;margin-top:6px;font-size:11.5px;color:var(--muted)">
             <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Слово: <b id="wtWord" style="color:var(--txt)">— клікни слово</b> <span id="wtTime"></span></div>
@@ -880,7 +932,7 @@
             <button type="button" data-v="qe" class="active">?! only</button>
             <button type="button" data-v="all">All</button>
           </div></div>
-        <div class="hint"><b>Enter</b> (або <b>*</b>) у тексті = розрив титру на цьому місці. Невидимий у кадрі, не залежить від розкладки.</div>
+        <div class="hint">У вкладці <b>Text</b>: <b>Enter</b> (або <b>*</b>) = новий титр, <b>|</b> = новий рядок у титрі. Те саме наочно — у вкладці <b>Captions</b>.</div>
       </div>
     </details>
 
@@ -1055,11 +1107,35 @@
       </div>
     </details>
 
+    <details class="grp" id="grpAccent">
+      <summary><span>✦ Accent</span> <span class="hint" style="margin:0 6px;font-size:10.5px">слова, виділені в Sentences</span><span class="chev">›</span></summary>
+      <div class="body">
+        <div class="row"><label title="Підставити шрифт, кольори, обведення, тінь і плашку з іншого пресету. Розмір, позиція, перенос і регістр титру не міняються">Взяти вигляд з…</label><select id="accFrom"><option value="">— пресет —</option></select></div>
+        <div class="row"><label>Колір</label><input type="color" id="accentColor" value="#ff5a2c"></div>
+        <div class="row"><label title="Градієнт з групи Gradient замість кольору">Градієнт</label><label class="switch"><input type="checkbox" id="accGrad"><span class="slider"></span></label></div>
+        <div class="row"><label>Шрифт</label><select id="accFont"><option value="">як у титрі</option></select></div>
+        <div class="row"><label title="Нахил (italic). Якщо в шрифту немає курсиву, слово просто нахиляється">Italic</label><label class="switch"><input type="checkbox" id="accItalic"><span class="slider"></span></label></div>
+        <div class="row"><label>Розмір</label><input type="range" id="accScale" min="80" max="160" value="100"><span class="val" id="accScaleV">100</span></div>
+        <div class="row"><label>Регістр</label><input type="hidden" id="accCase" value="">
+          <div class="seg" id="accCaseSeg" style="flex:1.3"><button type="button" data-v="" class="active">як у титрі</button><button type="button" data-v="uppercase">AA</button><button type="button" data-v="lowercase">aa</button></div></div>
+        <div class="row"><label>Обведення</label><select id="accStroke"><option value="inherit">як у титрі</option><option value="own">своє</option><option value="none">без</option></select></div>
+        <div class="row accOwnStroke"><label>· товщина</label><input type="range" id="accStrokeW" min="0" max="20" value="6"><span class="val" id="accStrokeWV">6</span></div>
+        <div class="row accOwnStroke"><label>· колір</label><input type="color" id="accStrokeColor" value="#000000"></div>
+        <div class="row"><label>Тінь</label><select id="accShadow"><option value="inherit">як у титрі</option><option value="own">своя</option><option value="none">без</option></select></div>
+        <div class="row accOwnShadow"><label>· X / Y</label><input type="range" id="accShX" min="-30" max="30" value="0"><span class="val" id="accShXV">0</span><input type="range" id="accShY" min="-30" max="30" value="6"><span class="val" id="accShYV">6</span></div>
+        <div class="row accOwnShadow"><label>· розмиття</label><input type="range" id="accShBlur" min="0" max="30" value="0"><span class="val" id="accShBlurV">0</span></div>
+        <div class="row accOwnShadow"><label>· колір</label><input type="color" id="accShColor" value="#000000"></div>
+        <div class="row"><label>Плашка під словом</label><label class="switch"><input type="checkbox" id="accPlateOn"><span class="slider"></span></label></div>
+        <div class="row accPlate"><label>· колір</label><input type="color" id="accPlateColor" value="#ffffff"></div>
+        <div class="row accPlate"><label>· відступ X / Y</label><input type="range" id="accPlatePadX" min="0" max="40" value="14"><span class="val" id="accPlatePadXV">14</span><input type="range" id="accPlatePadY" min="0" max="30" value="6"><span class="val" id="accPlatePadYV">6</span></div>
+        <div class="row accPlate"><label>· заокруглення</label><input type="range" id="accPlateRadius" min="0" max="40" value="10"><span class="val" id="accPlateRadiusV">10</span></div>
+        <div class="hint">Karaoke акцентні слова не перефарбовує. Акцент зберігається разом із пресетом.</div>
+      </div>
+    </details>
     <details class="grp">
       <summary><span data-i18n="secKaraoke">Karaoke (word highlight)</span> <label class="switch hdrsw" title="Enable Karaoke highlight" onclick="hdrTgl(event,this)"><input type="checkbox" id="karaokeOn" checked><span class="slider"></span></label><span class="chev">›</span></summary>
       <div class="body">
         <div class="row"><label>Color</label><input type="color" id="karaokeColor" value="#ffd400"></div>
-        <div class="row"><label title="Колір слів, позначених ✦ Accent у Sentences (працює і з вимкненим karaoke)">✦ Accent words</label><input type="color" id="accentColor" value="#ff5a2c"></div>
         <div class="row"><label>Word plate</label><label class="switch"><input type="checkbox" id="kpOn"><span class="slider"></span></label></div>
         <div class="row"><label>Plate color</label><input type="color" id="kpColor" value="#ff3a22"></div>
         <div class="row"><label>Padding X</label><input type="range" id="kpPadX" min="0" max="40" value="14"><span class="val" id="kpPadXV">14</span></div>
@@ -1310,7 +1386,7 @@ let editingHook=null, packMode="orig";               // packMode: "orig" = origi
 let _packFormats=new Set();                          // formats seen in the current pack → warn if mixed
 let lastOutputs=[], lastRenderLang="en";             // most recent render (for library/assemble)
 const DIMS={"9:16":[1080,1920],"1:1":[1080,1080],"16:9":[1920,1080]};
-const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct","accentColor"];
+const STYLE_IDS=["fontFamily","fontSize","textColor","textCase","wrapMode","maxChars","maxLines","marginBottom","lineSpacing","strokeW","strokeColor","strokeOuterW","strokeOuterColor","shadowOn","shX","shY","shBlur","shColor","shadow2On","sh2X","sh2Y","sh2Blur","sh2Color","strokeOn","plateShadowOn","pshX","pshY","pshBlur","pshColor","plateOn","plateLine","plateFull","plateColor","plateAlpha","platePadX","platePadY","plateRadius","boxOffsetY","karaokeOn","karaokeColor","kpOn","kpColor","kpPadX","kpPadY","kpRadius","gradC0","gradC1","gradDir","gradText","gradActive","gradPlate","scrimOn","scrimColor","scrimAlpha","scrimFeather","scrimFade","animType","animSpeed","holdLast","punct","accentColor","accGrad","accFont","accItalic","accScale","accCase","accStroke","accStrokeW","accStrokeColor","accShadow","accShX","accShY","accShBlur","accShColor","accPlateOn","accPlateColor","accPlatePadX","accPlatePadY","accPlateRadius"];
 
 // Defaults now live as .json in the repo styles/ folder (official, no ★) + team customs (★).
 // This single hardcoded preset is only a SAFETY NET: shown when the styles folder is empty, so
@@ -1499,7 +1575,8 @@ $("settingsSave").onclick=async()=>{
   }catch(e){setStatus("Save failed: "+e.message,"err");}
 };
 
-function readControls(){
+function readControls(){return _sentEdit?{..._sentEdit.base}:readPanel();}
+function readPanel(){
   return {fontFamily:$("fontFamily").value,fontSize:+$("fontSize").value,textColor:$("textColor").value,textCase:$("textCase").value,wrapMode:$("wrapMode").value,maxChars:+$("maxChars").value,maxLines:+$("maxLines").value,marginBottom:+$("marginBottom").value,lineSpacing:+$("lineSpacing").value,
     strokeW:+$("strokeW").value,strokeColor:$("strokeColor").value,strokeOuterW:+$("strokeOuterW").value,strokeOuterColor:$("strokeOuterColor").value,
     shadowOn:$("shadowOn").checked,shX:+$("shX").value,shY:+$("shY").value,shBlur:+$("shBlur").value,shColor:$("shColor").value,
@@ -1512,11 +1589,13 @@ function readControls(){
     scrimOn:$("scrimOn").checked,scrimColor:$("scrimColor").value,scrimAlpha:+$("scrimAlpha").value,scrimFeather:+$("scrimFeather").value,scrimFade:+($("scrimFade")?$("scrimFade").value:0.25),
     animType:$("animType")?$("animType").value:"none",animSpeed:+($("animSpeed")?$("animSpeed").value:0.25),
     holdLast:$("holdLast")?$("holdLast").checked:false,
-    punct:punctMode($("punct")?$("punct").value:"qe"),accentColor:$("accentColor")?$("accentColor").value:"#ff5a2c"};
+    punct:punctMode($("punct")?$("punct").value:"qe"),accentColor:$("accentColor")?$("accentColor").value:"#ff5a2c",...readAccent()};
 }
 function writeControls(s){
   const set=(id,v)=>{const el=$(id);if(!el)return;if(el.type==="checkbox")el.checked=!!v;else el.value=v;const l=$(id+"V");if(l){if(l.tagName==="INPUT")l.value=v;else l.textContent=v;}};
+  if(typeof fillAccFont==="function")fillAccFont();
   for(const k of STYLE_IDS) if(k in s) set(k,s[k]);
+  if(typeof accUiSync==="function")accUiSync();
   if("fontFamily" in s && s.fontFamily) applyStyleFont(s.fontFamily);   // sync dropdown + customFontName + load font so preview AND render use the style's font (not a stale one)
   if($("caseSeg"))updateCaseSeg();
   if($("punct")){$("punct").value=punctMode("punct" in s?s.punct:"qe");updatePunctSeg();}
@@ -1550,7 +1629,7 @@ function toEngineStyle(s){
     plate:{enabled:s.plateOn,per_line:s.plateLine,full_width:s.plateFull,color:arr(s.plateColor,s.plateAlpha),pad_x:s.platePadX,pad_y:s.platePadY,border_radius:s.plateRadius},
     scrim:{enabled:s.scrimOn,color:arr(s.scrimColor,s.scrimAlpha),pad:40,feather:s.scrimFeather,fade:s.scrimFade},
     animation:{type:s.animType||"none",speed:s.animSpeed},hold_last:!!s.holdLast,
-    karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},accent:{color:arr(s.accentColor||"#ff5a2c")},
+    karaoke:{enabled:s.karaokeOn,active_color:arr(s.karaokeColor)},accent:accentToEngine(s,arr),
     gradient:{colors:[arr(s.gradC0),arr(s.gradC1)],direction:s.gradDir||"vertical",on_text:!!s.gradText,on_active:!!s.gradActive,on_plate:!!s.gradPlate},
     karaoke_plate:{enabled:s.kpOn,color:arr(s.kpColor),pad_x:s.kpPadX,pad_y:s.kpPadY,border_radius:s.kpRadius}};
 }
@@ -1884,13 +1963,19 @@ function render(t,dur){
   let ev=events.find(e=>t>=e.start&&t<e.end);
   if(!ev){if(_scFac>0){const r=_scrimRect||fallbackRect();paintScrim(r.y0,r.Hh,_scFac);}return;} // in a gap / pre-roll: keep the scrim, no text
   {var _fw=ev.lines.reduce((a,l)=>a.concat(l),[]); _capRange=_fw.length?[_fw[0].start,_fw[_fw.length-1].end]:[ev.start,ev.end];}   // whole caption phrase range → highlight the full phrase, not one word
-  const lines=ev.lines.map(l=>l.map(w=>({...w,disp:applyCase(w.text,s.textCase)})));
-  let fs=s.fontSize*scale;ctx.font=`${fs}px "${s.fontFamily}"`;
+  // ✦ accent words: own font / size / case — same baseline and line as the caption (= engine)
+  const aFam=(s.accFont?s.accFont.replace(/\.(ttf|otf|ttc)$/i,""):s.fontFamily), aSc=Math.max(0.5,Math.min(2,(+s.accScale||100)/100));
+  const aCase=w=>s.accCase==="uppercase"?w.toUpperCase():(s.accCase==="lowercase"?w.toLowerCase():w);
+  const lines=ev.lines.map(l=>l.map(w=>{const d=applyCase(w.text,s.textCase);return {...w,disp:w.accent?aCase(d):d};}));
+  let fs=s.fontSize*scale;
+  const bFont=()=>`${fs}px "${s.fontFamily}"`, aFont=()=>`${Math.max(8,Math.floor(fs*aSc))}px "${aFam}"`;
+  const wW=w=>{ctx.font=w.accent?aFont():bFont();const x=ctx.measureText(w.disp).width;ctx.font=bFont();return x;};
+  ctx.font=bFont();
   // shrink-to-fit: keep a caption within the safe frame width. Skip for MANUAL layouts
   // (user controls breaks) and never shrink below 55% (so the size slider still works).
   if(!ev.manual){const SAFE=W*0.92,sw=ctx.measureText(" ").width;
-   const mw=Math.max(0,...lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*sw));
-   if(mw>SAFE&&mw>0){fs=Math.max(8,Math.floor(fs*Math.max(SAFE/mw,0.55)));ctx.font=`${fs}px "${s.fontFamily}"`;}}
+   const mw=Math.max(0,...lines.map(l=>l.reduce((a,w)=>a+wW(w),0)+(l.length-1)*sw));
+   if(mw>SAFE&&mw>0){fs=Math.max(8,Math.floor(fs*Math.max(SAFE/mw,0.55)));ctx.font=bFont();}}
   ctx.textBaseline="alphabetic";
   const mkey=(customFontName||(s.fontFamily+".ttf"))+"|"+Math.round(fs);
   const em=fontMetricsCache[mkey];
@@ -1899,13 +1984,18 @@ function render(t,dur){
   else{const _m=ctx.measureText("Ag");lineH=(_m.fontBoundingBoxAscent!=null)?(_m.fontBoundingBoxAscent+_m.fontBoundingBoxDescent):fs*1.18;
        if(!em)fetchMetrics(mkey,(customFontName||(s.fontFamily+".ttf")),Math.round(fs));}
   const asc=(em&&em.ascent!=null)?em.ascent:fs*0.8;   // baseline offset to match engine glyph placement
+  const aSize=Math.max(8,Math.floor(fs*aSc)), aFile=(s.accFont||customFontName||(s.fontFamily+".ttf")), akey=aFile+"|"+aSize;
+  const aem=fontMetricsCache[akey]; if(!aem&&lines.some(l=>l.some(w=>w.accent)))fetchMetrics(akey,aFile,aSize);
+  const aasc=(aem&&aem.ascent!=null)?aem.ascent:asc*aSc;
   const lineSp=s.lineSpacing*scale;
   const totalH=lines.length*lineH+(lines.length-1)*lineSp;
   const startY=(H-s.marginBottom*scale)-totalH/2;
   const spaceW=ctx.measureText(" ").width;
-  let gi=0;const lw=lines.map(l=>l.reduce((a,w)=>a+ctx.measureText(w.disp).width,0)+(l.length-1)*spaceW);
+  let gi=0;const lw=lines.map(l=>l.reduce((a,w)=>a+wW(w),0)+(l.length-1)*spaceW);
   const pos=[];let y=startY;
-  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){pos.push({x,y,disp:w.disp,active:gi===ev.active,accent:!!w.accent,wide:ctx.measureText(w.disp).width,start:w.start});x+=ctx.measureText(w.disp).width+spaceW;gi++;}y+=lineH+lineSp;}
+  for(let li=0;li<lines.length;li++){let x=W/2-lw[li]/2;for(const w of lines[li]){const ww=wW(w);
+    pos.push({x,y:w.accent?y+(asc-aasc):y,disp:w.disp,active:gi===ev.active,accent:!!w.accent,wide:ww,start:w.start});x+=ww+spaceW;gi++;}y+=lineH+lineSp;}
+  const posB=pos.filter(p=>!p.accent), posA=pos.filter(p=>p.accent);
   const boff=(s.boxOffsetY||0)*scale;
   // --- Animated captions (BETA, preview only): each word eases in around its own spoken time ---
   // SAFETY: animation ONLY runs while the video is actually PLAYING. Paused / scrubbing / exact /
@@ -1949,16 +2039,39 @@ function render(t,dur){
     else{const m=Math.max(...lw,0);rr(W/2-m/2-px,startY-py-boff,m+px*2,totalH+py*2,rad);ctx.fill();}
     ctx.restore();}
   if(s.kpOn){ctx.save();pshadow();
-    for(const p of pos)if(p.active){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:asc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;const top=(p.y+asc)-ga;const h=ga+gd;ctx.fillStyle=s.gradPlate?capGrad():rgba(s.kpColor,255);rr(p.x-s.kpPadX*scale,top-s.kpPadY*scale-boff,p.wide+s.kpPadX*2*scale,h+s.kpPadY*2*scale,s.kpRadius*scale);ctx.fill();}
+    for(const p of posB)if(p.active){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:asc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;const top=(p.y+asc)-ga;const h=ga+gd;ctx.fillStyle=s.gradPlate?capGrad():rgba(s.kpColor,255);rr(p.x-s.kpPadX*scale,top-s.kpPadY*scale-boff,p.wide+s.kpPadX*2*scale,h+s.kpPadY*2*scale,s.kpRadius*scale);ctx.fill();}
     ctx.restore();}
-  if(s.shadowOn&&s.shadow2On){ctx.save();ctx.shadowColor=rgba(s.sh2Color,255);ctx.shadowBlur=s.sh2Blur*scale;ctx.shadowOffsetX=s.sh2X*scale;ctx.shadowOffsetY=s.sh2Y*scale;ctx.fillStyle=rgba(s.sh2Color,255);for(const p of pos)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // #11 second word shadow — gated by the master Shadow toggle, drawn UNDER the first
-  if(s.shadowOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of pos)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // word shadow — over the plate too
+  if(s.accPlateOn&&posA.length){ctx.save();ctx.font=aFont();ctx.fillStyle=rgba(s.accPlateColor||"#ffffff",255);
+    for(const p of posA){const m=ctx.measureText(p.disp);const ga=(m.actualBoundingBoxAscent!=null)?m.actualBoundingBoxAscent:aasc;const gd=(m.actualBoundingBoxDescent!=null)?m.actualBoundingBoxDescent:0;
+      const top=(p.y+aasc)-ga, xr=s.accItalic?ga*ACCENT_ITALIC*0.5:0;
+      rr(p.x-s.accPlatePadX*scale,top-s.accPlatePadY*scale-boff,p.wide+xr+s.accPlatePadX*2*scale,ga+gd+s.accPlatePadY*2*scale,s.accPlateRadius*scale);ctx.fill();}
+    ctx.font=bFont();ctx.restore();}
+  if(s.shadowOn&&s.shadow2On){ctx.save();ctx.shadowColor=rgba(s.sh2Color,255);ctx.shadowBlur=s.sh2Blur*scale;ctx.shadowOffsetX=s.sh2X*scale;ctx.shadowOffsetY=s.sh2Y*scale;ctx.fillStyle=rgba(s.sh2Color,255);for(const p of posB)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // #11 second word shadow — gated by the master Shadow toggle, drawn UNDER the first
+  if(s.shadowOn){ctx.save();ctx.shadowColor=rgba(s.shColor,255);ctx.shadowBlur=s.shBlur*scale;ctx.shadowOffsetX=s.shX*scale;ctx.shadowOffsetY=s.shY*scale;ctx.fillStyle=rgba(s.shColor,255);for(const p of posB)awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));ctx.restore();}   // word shadow — over the plate too
   if(s.strokeOn!==false){
-    if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
-    if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of pos)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
+    if(s.strokeOuterW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=s.strokeOuterW*2*scale;for(const p of posB)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
+    if(s.strokeW>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeColor,255);ctx.lineWidth=s.strokeW*2*scale;for(const p of posB)awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+asc));}
   }
-  for(const p of pos){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):(p.accent?rgba(s.accentColor||"#ff5a2c",255):rgba(s.textColor,255)));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
+  for(const p of posB){ctx.fillStyle=(s.gradText||(s.gradActive&&p.active))?capGrad():((s.karaokeOn&&p.active)?rgba(s.karaokeColor,255):rgba(s.textColor,255));awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+asc));}
+  if(posA.length){   // ✦ accent pass: own stroke / shadow / colour / italic; karaoke never repaints it
+    const so=(s.strokeOn!==false)?s.strokeOuterW:0, si=(s.strokeOn!==false)?s.strokeW:0;
+    const stOuter=s.accStroke==="inherit"?so:0, stInner=s.accStroke==="inherit"?si:(s.accStroke==="own"?+s.accStrokeW:0);
+    const stInC=s.accStroke==="own"?s.accStrokeColor:s.strokeColor;
+    const shs=s.accShadow==="inherit"?[...(s.shadowOn&&s.shadow2On?[[s.sh2X,s.sh2Y,s.sh2Blur,s.sh2Color]]:[]),...(s.shadowOn?[[s.shX,s.shY,s.shBlur,s.shColor]]:[])]
+      :(s.accShadow==="own"?[[+s.accShX,+s.accShY,+s.accShBlur,s.accShColor]]:[]);
+    ctx.font=aFont();
+    for(const p of posA){
+      ctx.save();
+      if(s.accItalic){const yb=p.y+aasc, k=ACCENT_ITALIC; ctx.transform(1,0,-k,1,k*yb,0);}
+      for(const [x,y2,b,c] of shs){ctx.save();ctx.shadowColor=rgba(c,255);ctx.shadowBlur=b*scale;ctx.shadowOffsetX=x*scale;ctx.shadowOffsetY=y2*scale;ctx.fillStyle=rgba(c,255);
+        awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+aasc));ctx.restore();}
+      if(stOuter>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(s.strokeOuterColor,255);ctx.lineWidth=stOuter*2*scale;awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+aasc));}
+      if(stInner>0){ctx.lineJoin="round";ctx.strokeStyle=rgba(stInC,255);ctx.lineWidth=stInner*2*scale;awrap(p,()=>ctx.strokeText(p.disp,p.x,p.y+aasc));}
+      ctx.fillStyle=s.accGrad?capGrad():rgba(s.accentColor||"#ff5a2c",255); awrap(p,()=>ctx.fillText(p.disp,p.x,p.y+aasc));
+      ctx.restore();}
+    ctx.font=bFont();}
 }
+const ACCENT_ITALIC=0.21;   // = engine subtitles.ACCENT_ITALIC
 function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);}
 
 const video=$("video");let videoLoaded=false,demoT=0,lastTs=0;
@@ -2444,7 +2557,7 @@ document.addEventListener("keydown",(e)=>{
   const k=({KeyI:"i",KeyO:"o"})[e.code]||e.key.toLowerCase();   // by the physical key: works in any keyboard layout (UA too)
   // I / O stamp the playhead into the trim (NLE muscle memory)
   if(e.key==="Escape"&&_wRng&&typeof setWordRange==="function"){e.preventDefault();setWordRange(null);return;}
-  if((e.key==="["||e.key==="]")&&txtView==="words"&&_wSel>=0){e.preventDefault();setWordEdge(e.key==="["?"start":"end");return;}
+  if((e.key==="["||e.key==="]")&&(txtView==="words"||txtView==="caps")&&_wSel>=0){e.preventDefault();setWordEdge(e.key==="["?"start":"end");return;}
   if(k==="i"&&$("trimRow")&&$("trimRow").style.display!=="none"){e.preventDefault();setTrimFromPlayhead("in");return;}
   if(k==="o"&&$("trimRow")&&$("trimRow").style.display!=="none"){e.preventDefault();setTrimFromPlayhead("out");return;}
   // Alt + ← / → nudges the ARMED trim handle by a frame (Shift = 10); plain ← / → moves the playhead
@@ -2456,6 +2569,15 @@ document.addEventListener("keydown",(e)=>{
   }
 });
 $("seek").oninput=e=>{if(videoLoaded)video.currentTime=(e.target.value/100)*(video.duration||0);};
+// A click on the timeline / the picture means «I'm done typing»: the caret leaves the text, so the
+// next Space plays instead of typing a space into the sentence you were editing.
+document.addEventListener("pointerdown",e=>{
+  const t=e.target; if(!t||!t.closest)return;
+  if(t.closest("input,textarea,select,[contenteditable='true']"))return;   // clicking INTO a field keeps typing
+  if(!t.closest("#trimRow,#canvas,#exactImg,video,#transport"))return;
+  const a=document.activeElement;
+  if(a&&a!==document.body&&(a.isContentEditable||a.tagName==="TEXTAREA"||(a.tagName==="INPUT"&&!/^(checkbox|radio|range|button|submit|color|file)$/i.test(a.type||""))))a.blur();
+},true);
 // ␣ Space = play / pause, ALWAYS — unless you're typing. Caught before anything else (capture), so a
 // focused button / checkbox / slider never eats it (a focused button used to get "clicked" instead).
 (function spacePlay(){
@@ -2730,6 +2852,7 @@ async function fetchLayout(){
     if(!r.ok)return; const d=await r.json(); if(seq!==_layoutSeq)return;   // superseded by a newer request
     if(key!==layoutKey())return;                                          // clip changed while we waited → don't cache it
     serverLayout=(d&&d.events)?d.events:null; _layoutKey=key;
+    if(txtView==="caps"&&typeof renderCapsView==="function")renderCapsView();
   }catch(e){/* network hiccup → keep last layout (or JS fallback) */}
 }
 async function fetchExact(){
@@ -3140,8 +3263,8 @@ video.addEventListener("play",()=>{if(exactOn)hideExact();});
 video.addEventListener("seeking",()=>{if(exactOn)hideExact();});
 video.addEventListener("seeked",scheduleExact);
 video.addEventListener("pause",scheduleExact);
-$("panelContent").addEventListener("input",()=>{saveLastStyle();scheduleExact();});
-$("panelContent").addEventListener("change",()=>{saveLastStyle();scheduleExact();});
+$("panelContent").addEventListener("input",()=>{saveLastStyle();scheduleExact();presetDirtyCheck();});
+$("panelContent").addEventListener("change",()=>{saveLastStyle();scheduleExact();presetDirtyCheck();});
 
 // ---------- fonts ----------
 // register a font file from the server so the canvas preview uses the SAME file the engine renders with
@@ -3251,21 +3374,47 @@ $("transcript").addEventListener("input",()=>{
 function parseBreaksToWords(text, base){
   let t=String(text||"").replace(/\r/g,"").replace(/\n+/g,"  ").replace(/\*/g,"  ");
   const parts=t.split(/\s+/).filter(Boolean);
-  const toks=[], brkAfter=[];
-  for(const p of parts){ if(p===""){ if(toks.length) brkAfter[toks.length-1]=true; } else toks.push(p); }
+  const toks=[], brkAfter=[], nlAfter=[];
+  for(const p of parts){ if(p===""){ if(toks.length) brkAfter[toks.length-1]=true; } else if(p==="|"||p==="↵"){ if(toks.length) nlAfter[toks.length-1]=true; } else toks.push(p); }
   const mapped=remapWords(toks.join(" "), base);
   if(!mapped) return base;
-  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":null}));
+  return mapped.map((w,i)=>({...w, brk: brkAfter[i]?"soft":(nlAfter[i]?"nl":(w.brk==="join"?"join":null))}));   // "|" in the text = ↵ a new line inside the caption
 }
 // Rebuild the transcript text FROM words, showing soft breaks as newlines (so reopening a
 // hook restores where the designer split).
-function wordsToText(ws){let out="";(ws||[]).forEach(w=>{out+=(w.word||w.text||"");out+=(w.brk==="soft")?"\n":" ";});return out.trim();}
+function wordsToText(ws){let out="";(ws||[]).forEach(w=>{out+=(w.word||w.text||"");out+=(w.brk==="soft")?"\n":(w.brk==="nl"?" | ":" ");});return out.trim();}   // "|" = a new line inside the caption
 
 // ---------- presets + custom styles ----------
 let savedStyles={};   // name -> engine-schema JSON (loaded from the shared styles/ folder)
 let officialNames=new Set();   // names that ship with the code (repo styles/) → shown WITHOUT a ★, not deletable
 let IS_MAINTAINER=false;       // true only in the git-clone dev run (run.command from the repo); gates the 'Save as app default' button
-function markPreset(b){document.querySelectorAll(".preset").forEach(p=>p.classList.remove("active"));if(b)b.classList.add("active");}
+function markPreset(b){document.querySelectorAll(".preset").forEach(p=>p.classList.remove("active"));if(b)b.classList.add("active");
+  window._activePreset=(b&&b.dataset.pname)||null; setTimeout(presetDirtyCheck,0);}
+// 💾 save what you changed straight into the preset you're on (no «duplicate → rename» dance)
+function presetEngine(name){return (savedStyles&&savedStyles[name])||((typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES)||{})[name]||null;}
+function presetDirty(name){const e=presetEngine(name); if(!e)return false;
+  try{return Object.keys(ctrlDiff(readPanel(),{...readPanel(),...fromEngineStyle(e)})).length>0;}catch(_){return false;}}
+function presetDirtyCheck(){
+  let b=$("savePresetChanges"), anchor=$("saveStyleBtn2"); const n=window._activePreset;
+  if(!anchor)return;
+  if(!b){b=document.createElement("button");b.type="button";b.id="savePresetChanges";b.className="go";b.style.cssText="margin-left:6px";anchor.insertAdjacentElement("afterend",b);
+    b.onclick=()=>savePresetChanges(window._activePreset);}
+  const show=!!(n&&!_sentEdit&&presetDirty(n));
+  b.style.display=show?"":"none"; if(show)b.textContent="💾 Зберегти в «"+n+"»";
+}
+async function savePresetChanges(name){
+  if(!name)return; const k=presetKind(name), style=toEngineStyle(readPanel());
+  let url="/api/styles", nm=name;
+  if(k==="official"){ if(IS_MAINTAINER){if(!confirm("Перезаписати СТАНДАРТНИЙ пресет «"+name+"» у styles/? Після Commit + Push зміниться в усієї команди."))return; url="/api/styles/official";}
+    else{nm=(prompt("«"+name+"» — стандартний пресет команди. Зберегти твою версію як новий пресет ★:",name+" (мій)")||"").trim(); if(!nm)return;}}
+  else if(k==="builtin"){nm=(prompt("«"+name+"» вбудований. Зберегти як новий пресет ★:",name+" (мій)")||"").trim(); if(!nm)return;}
+  try{const r=await fetch(API+url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:nm,style})});
+    if(!r.ok)throw new Error("save failed"); await loadSavedStyles();
+    const card=[...document.querySelectorAll("#presets .preset")].find(x=>x.dataset.pname===nm); if(card)markPreset(card);
+    _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
+    setStatus("💾 «"+nm+"» оновлено"+(k==="official"&&IS_MAINTAINER?" у styles/ — тепер Commit + Push.":". Речення й голоси з цим пресетом теж оновились."),"ok");
+  }catch(e){setStatus("Save: "+e.message,"err");}
+}
 function applyPreset(name){const p={...PRESETS[name]};delete p.fontFamily;/* keep chosen font */["shadowOn","plateOn","kpOn","karaokeOn"].forEach(id=>{$(id).checked=false;});writeControls(p);}
 // inverse of toEngineStyle: engine JSON -> UI controls (so a loaded style fills the editor)
 function fromEngineStyle(e){
@@ -3281,7 +3430,7 @@ function fromEngineStyle(e){
     strokeOn:(e.stroke_on!==false),
     plateShadowOn:!!(e.plate_shadow&&e.plate_shadow.enabled),pshX:+g(e.plate_shadow||{},"offset_x",0),pshY:+g(e.plate_shadow||{},"offset_y",8),pshBlur:+g(e.plate_shadow||{},"glow_blur",0),pshColor:hx((e.plate_shadow&&e.plate_shadow.color)||[0,0,0,255]),
     plateOn:!!pl.enabled,plateLine:!!pl.per_line,plateFull:!!pl.full_width,plateColor:hx(pl.color),plateAlpha:(pl.color&&pl.color[3]!=null)?pl.color[3]:160,platePadX:+g(pl,"pad_x",30),platePadY:+g(pl,"pad_y",15),plateRadius:+g(pl,"border_radius",15),
-    karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),accentColor:hx((e.accent&&e.accent.color)||[255,90,44,255]),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
+    karaokeOn:!!ka.enabled,karaokeColor:hx(ka.active_color),accentColor:hx((e.accent&&e.accent.color)||[255,90,44,255]),...accentFromEngine(e.accent||{},hx),kpOn:!!kp.enabled,kpColor:hx(kp.color),kpPadX:+g(kp,"pad_x",14),kpPadY:+g(kp,"pad_y",6),kpRadius:+g(kp,"border_radius",10),
     gradC0:hx((gr.colors&&gr.colors[0])||[255,90,44,255]),gradC1:hx((gr.colors&&gr.colors[1])||[255,212,0,255]),gradDir:gr.direction||"vertical",gradText:!!gr.on_text,gradActive:!!gr.on_active,gradPlate:!!gr.on_plate,
     scrimOn:!!(e.scrim&&e.scrim.enabled),scrimColor:hx((e.scrim&&e.scrim.color)||[0,0,0,150]),scrimAlpha:(e.scrim&&e.scrim.color&&e.scrim.color[3]!=null)?e.scrim.color[3]:150,scrimFeather:+g(e.scrim||{},"feather",70),scrimFade:+g(e.scrim||{},"fade",0.25),
     animType:(e.animation&&e.animation.type)||"none",animSpeed:+g(e.animation||{},"speed",0.25),holdLast:!!e.hold_last};
@@ -3325,12 +3474,25 @@ async function deletePresetAny(name){
     return;}
   return deleteStyle(name);
 }
+async function exportMrtech(name,clean){
+  const e=(savedStyles&&savedStyles[name])||((typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES)||{})[name]||(PRESETS[name]?toEngineStyle({...readControls(),...PRESETS[name]}):null);
+  if(!e){setStatus("MRTech: не знайшов стиль «"+name+"».","err");return;}
+  try{const r=await fetch(API+"/api/styles/mrtech",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({style:e,name,clean:!!clean})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"export failed"));
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:"application/json"}));
+    a.download=String(name).replace(/[^\w.\- ]+/g,"_").trim()+(clean?"_mrtech.json":"_mrtech_full.json"); document.body.appendChild(a); a.click(); a.remove();
+    setStatus("⬇ «"+name+"» у форматі MRTech — у Завантаженнях.","ok");
+  }catch(err){setStatus("MRTech: "+err.message,"err");}
+}
 function presetMenu(ev,name){
   const k=presetKind(name);
   ctxMenu(ev,[{head:name+(k==="custom"?" · ★ свій":k==="official"?" · стандартний":" · вбудований")},
     {label:"✓ Apply",on:()=>{const c=[...document.querySelectorAll("#presets .preset")].find(x=>x.dataset.pname===name);if(c)c.click();}},
     k==="custom"?{label:"✎ Rename…",on:()=>renamePreset(name)}:null,
+    {label:"💾 Зберегти поточні налаштування сюди",title:"Записати те, що зараз на панелі Style, у цей пресет",on:()=>savePresetChanges(name)},
     {label:"⧉ Duplicate…",title:"Копія як твій пресет ★ — далі можна правити",on:()=>duplicatePreset(name)},
+    {label:"⬇ MRTech JSON",title:"Тільки їхні 13 полів — працює в їхньому рендері як є",on:()=>exportMrtech(name,true)},
+    {label:"⬇ MRTech JSON + наші поля",title:"Їхні 13 полів + блок x_assembler (регістр, рядки, плашки, подвійна обводка, тіні, karaoke) — див. CAPTION_SPEC.md",on:()=>exportMrtech(name,false)},
     "-",
     {label:k==="builtin"||(k==="official"&&!IS_MAINTAINER)?"🙈 Hide":"✕ Delete",on:()=>deletePresetAny(name)}]);
 }
@@ -3421,6 +3583,59 @@ $("styleFileInput").onchange=e=>{const f=e.target.files[0];if(!f)return;const rd
 
 // case segmented control (buttons instead of dropdown)
 // Punctuation: "off" · "qe" (? ! stay — default) · "all". Old presets stored a bool: true = all, false = qe.
+// ---------- ✦ Accent: its own look inside the caption (engine key "accent") ----------
+const ACC_DEF={accGrad:false,accFont:"",accItalic:false,accScale:100,accCase:"",accStroke:"inherit",accStrokeW:6,accStrokeColor:"#000000",
+  accShadow:"inherit",accShX:0,accShY:6,accShBlur:0,accShColor:"#000000",accPlateOn:false,accPlateColor:"#ffffff",accPlatePadX:14,accPlatePadY:6,accPlateRadius:10};
+function readAccent(){const o={};Object.keys(ACC_DEF).forEach(k=>{const e=$(k),d=ACC_DEF[k];
+  o[k]=!e?d:(e.type==="checkbox"?e.checked:(typeof d==="number"?+e.value:e.value));});return o;}
+function accentToEngine(s,arr){const g=(k)=>(s[k]!=null?s[k]:ACC_DEF[k]);
+  return {color:arr(s.accentColor||"#ff5a2c"),gradient:!!g("accGrad"),font_name:g("accFont")||"",italic:!!g("accItalic"),scale:(+g("accScale")||100)/100,
+    case:g("accCase")||"",stroke:{mode:g("accStroke"),width:+g("accStrokeW"),color:arr(g("accStrokeColor"))},
+    shadow:{mode:g("accShadow"),offset_x:+g("accShX"),offset_y:+g("accShY"),glow_blur:+g("accShBlur"),color:arr(g("accShColor"))},
+    plate:{enabled:!!g("accPlateOn"),color:arr(g("accPlateColor")),pad_x:+g("accPlatePadX"),pad_y:+g("accPlatePadY"),border_radius:+g("accPlateRadius")}};}
+function accentFromEngine(a,hx){const st=a.stroke||{},sh=a.shadow||{},pl=a.plate||{},n=(v,d)=>(v==null?d:+v);
+  return {accGrad:!!a.gradient,accFont:a.font_name||"",accItalic:!!a.italic,accScale:Math.round(n(a.scale,1)*100),accCase:a.case||"",
+    accStroke:st.mode||"inherit",accStrokeW:n(st.width,6),accStrokeColor:hx(st.color||[0,0,0,255]),
+    accShadow:sh.mode||"inherit",accShX:n(sh.offset_x,0),accShY:n(sh.offset_y,6),accShBlur:n(sh.glow_blur,0),accShColor:hx(sh.color||[0,0,0,255]),
+    accPlateOn:!!pl.enabled,accPlateColor:hx(pl.color||[255,255,255,255]),accPlatePadX:n(pl.pad_x,14),accPlatePadY:n(pl.pad_y,6),accPlateRadius:n(pl.border_radius,10)};}
+function fillAccFont(){const sel=$("accFont"),src=$("fontSelect"); if(!sel||!src)return; const cur=sel.value;
+  if(sel.options.length<2&&src.options.length>1){sel.innerHTML="<option value=''>як у титрі</option>"+src.innerHTML;}
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;}
+function accUiSync(){
+  const v=k=>$(k)?($(k).type==="checkbox"?$(k).checked:$(k).value):"";
+  document.querySelectorAll(".accOwnStroke").forEach(r=>r.style.display=v("accStroke")==="own"?"":"none");
+  document.querySelectorAll(".accOwnShadow").forEach(r=>r.style.display=v("accShadow")==="own"?"":"none");
+  document.querySelectorAll(".accPlate").forEach(r=>r.style.display=v("accPlateOn")?"":"none");
+  if($("accCaseSeg"))$("accCaseSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===(v("accCase")||"")));
+  const f=v("accFont"); if(f&&typeof registerServerFont==="function")registerServerFont(f);
+}
+function fillAccFrom(){const sel=$("accFrom"); if(!sel)return;
+  sel.innerHTML="<option value=''>— пресет —</option>"+presetNames().map(n=>"<option>"+String(n).replace(/</g,"&lt;")+"</option>").join("");}
+// borrow the LOOK of a preset (font, colours, stroke, shadow, plate) — not its size / position / case
+function accentFrom(name){
+  const e=(savedStyles&&savedStyles[name])||((typeof BUILTIN_STYLES!=="undefined"&&BUILTIN_STYLES)||{})[name]; if(!e)return;
+  const hx=a=>a?("#"+[a[0],a[1],a[2]].map(n=>(+n).toString(16).padStart(2,"0")).join("")):"#000000";
+  const st=e.stroke||{},sh=e.shadow||{},pl=e.plate||{},kp=e.karaoke_plate||{},gr=e.gradient||{};
+  const plate=(kp.enabled?kp:(pl.enabled?pl:null));
+  const set=(id,v)=>{const el=$(id); if(!el)return; if(el.type==="checkbox")el.checked=!!v; else el.value=v; const l=$(id+"V"); if(l)l.textContent=v;};
+  set("accentColor",hx(e.text_color||[255,255,255,255])); set("accGrad",!!gr.on_text);
+  fillAccFont(); set("accFont",e.font_name||""); 
+  const sw=(e.stroke_on===false)?0:(+st.width||0);
+  set("accStroke",sw>0?"own":"none"); set("accStrokeW",sw); set("accStrokeColor",hx(st.color||[0,0,0,255]));
+  set("accShadow",sh.enabled?"own":"none"); set("accShX",+sh.offset_x||0); set("accShY",+(sh.offset_y??6)); set("accShBlur",+sh.glow_blur||0); set("accShColor",hx(sh.color||[0,0,0,255]));
+  set("accPlateOn",!!plate); if(plate){set("accPlateColor",hx(plate.color)); set("accPlatePadX",+(plate.pad_x??14)); set("accPlatePadY",+(plate.pad_y??6)); set("accPlateRadius",+(plate.border_radius??10));}
+  accUiSync(); saveLastStyle(); if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
+  setStatus("✦ Акцент узяв вигляд з «"+name+"» (шрифт, кольори, обведення, тінь, плашка). Розмір і позиція титру не змінились.","ok");
+}
+(function wireAccent(){
+  const g=$("grpAccent"); if(!g)return;
+  g.addEventListener("toggle",()=>{if(g.open){fillAccFont();fillAccFrom();accUiSync();}});
+  g.addEventListener("change",()=>{accUiSync(); if(typeof invalidateLayout==="function")invalidateLayout();});
+  if($("accCaseSeg"))$("accCaseSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("accCase").value=b.dataset.v;accUiSync();
+    if(typeof invalidateLayout==="function")invalidateLayout(); saveLastStyle(); scheduleExact();});
+  if($("accFrom"))$("accFrom").onchange=e=>{const n=e.target.value; e.target.value=""; if(n)accentFrom(n);};
+  accUiSync();
+})();
 function punctMode(v){return (v===true||v==="true"||v==="all")?"all":(v==="off"?"off":"qe");}
 function punctToEngine(v){v=punctMode(v);return v==="all"?true:(v==="off"?"off":false);}
 function updatePunctSeg(){const v=punctMode($("punct").value);$("punctSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));}
@@ -3433,23 +3648,28 @@ $("caseSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("textCase").
 // ---------- Words view: click a word = seek, active phrase highlights during playback (editing stays in Text) ----------
 $("txtViewSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>{
   $("txtViewSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));
-  txtView=b.dataset.v;
+  txtView=b.dataset.v; if(typeof renderDatePanel==="function")setTimeout(renderDatePanel,0);
   const ta=$("transcript"), box=$("transcriptWords");
   if($("wordTools"))$("wordTools").style.display=(txtView==="words")?"flex":"none";
   const sb=$("transcriptSents"); if(sb)sb.style.display=(txtView==="sents")?"flex":"none";
+  const cb=$("transcriptCaps"); if(cb)cb.style.display=(txtView==="caps")?"flex":"none";
+  if(txtView==="caps"){ if(ta)ta.style.display="none"; if(box)box.style.display="none"; renderCapsView(true); }
+  capsHelp();
   if($("sentBar"))$("sentBar").style.display="none";
   if(txtView==="sents"){ if(ta)ta.style.display="none"; if(box)box.style.display="none"; _sentPick=null; renderSentsView(true); }
   else if(txtView==="words"){ if(ta)ta.style.display="none"; if(box){box.style.display="block";renderWordsView();} }
-  else { if(ta){ if(realWords&&realWords.length)ta.value=wordsToText(realWords); ta.style.display=""; if(typeof autoGrow==="function")autoGrow(); } if(box)box.style.display="none"; }   // switching to Text → show the latest words (incl. Words-tab edits)
+  else if(txtView!=="caps"){ if(ta){ if(realWords&&realWords.length)ta.value=wordsToText(realWords); ta.style.display=""; if(typeof autoGrow==="function")autoGrow(); } if(box)box.style.display="none"; }   // switching to Text → show the latest words (incl. Words-tab edits)
 });
 function renderWordsView(){
   const box=$("transcriptWords"); if(!box)return; box.innerHTML="";
   (realWords||[]).forEach((w,i)=>{
     const _tr=(variants[activeVar]||{}).trim, _out=!!(_tr&&(+w.end<=_tr[0]||+w.start>=_tr[1]));   // outside the trim = not in the creative
-    const sp=document.createElement("span");sp.className="w"+(i===_wSel?" sel":"")+(w.manual?" man":"")+(_wRng&&i>=_wRng[0]&&i<_wRng[1]?" rng":"")+(_out?" otrim":"");sp.dataset.start=w.start;sp.dataset.i=i;
+    const sp=document.createElement("span");sp.className="w"+(i===_wSel?" sel":"")+(w.manual?" man":"")+(_wRng&&i>=_wRng[0]&&i<_wRng[1]?" rng":"")+(_out?" otrim":"")+(w.accent?" wacc":"")+((typeof dateAt==="function"&&dateAt(i))?" wdate":"");sp.dataset.start=w.start;sp.dataset.i=i;
+    {const _d=(typeof dateAt==="function")?dateAt(i):null; if(_d||w.accent)sp.title=(w.accent?"✦ accent":"")+(_d?(w.accent?" · ":"")+"📅 дата: "+_d.text:"");}
     sp.textContent=(w.word||w.text||""); sp.title=_fmtCut(+w.start);
     box.appendChild(sp); box.appendChild(document.createTextNode(" "));
     if(w.brk==="soft") box.appendChild(document.createElement("br"));
+    else if(w.brk==="nl"){const m=document.createElement("b");m.className="wnl";m.textContent="↵";m.title="Новий рядок у титрі";m.style.cssText="color:#60a5fa;margin:0 3px";box.appendChild(m);}
   });
 }
 // click a word = seek (works while it's also editable); typing edits like the Text field
@@ -3463,7 +3683,7 @@ function renderWordsView(){
     const st=+sp.dataset.start; if(video&&videoLoaded){ try{video.currentTime=st;}catch(_){} if(video.paused){try{render(st,video.duration||0);}catch(_){}} if(typeof scheduleExact==="function")scheduleExact(); } });
   box.addEventListener("input",()=>{ // edit in-place → re-map onto word timings (same as the Text field)
     _wRng=null;   // indices shift while typing — select the phrase again after editing
-    if(realWords&&realWords.length){ realWords=parseBreaksToWords(box.innerText, realWords); if(variants[activeVar])variants[activeVar].words=realWords;
+    if(realWords&&realWords.length){ realWords=parseBreaksToWords(box.innerText.replace(/↵/g," "), realWords); if(variants[activeVar])variants[activeVar].words=realWords;
       const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords); }   // mirror edits into the Text field so BOTH tabs + export/layout use the same words
     if(typeof scheduleExact==="function")scheduleExact();
     if(typeof scheduleRevoiceBox==="function")scheduleRevoiceBox(); });
@@ -3485,6 +3705,7 @@ function commitWords(ws){
   if(variants[activeVar])variants[activeVar].words=ws;
   const h=(typeof openHookRef==="function")?openHookRef():null; if(h)h.words=ws;
   if(txtView==="words")renderWordsView();
+  else if(txtView==="caps"){const ta=$("transcript"); if(ta)ta.value=wordsToText(ws);}
   else{const ta=$("transcript"); if(ta){ta.value=wordsToText(ws); if(typeof autoGrow==="function")autoGrow();}}
   if(txtView==="sents"&&typeof renderSentsView==="function")renderSentsView();
   if(typeof invalidateLayout==="function")invalidateLayout();
@@ -3558,7 +3779,7 @@ if(typeof video!=="undefined"&&video){["timeupdate","seeked","loadedmetadata"].f
 // "Changed" means: different from what was actually SAID — the recogniser's original words
 // (origWords), not the previous edit. Case and punctuation don't count (they don't change the
 // sound). A deletion leaves the audio alone; an insertion or replacement can be re-voiced.
-let _rvSay={}, _rvTimer=null, _rvBusy=false, _rvSkip=new Set();
+let _rvSay={}, _rvTimer=null, _rvBusy=false, _rvSkip=new Set(), _lastRv=null;
 function rvHilite(r){const box=$("transcriptWords");if(!box)return;box.querySelectorAll(".w").forEach(sp=>{const i=+sp.dataset.i;sp.classList.toggle("rvhl",!!(r&&i>=r[0]&&i<r[1]));});}
 const rvNorm=s=>String(s||"").toLowerCase().replace(/[\u2019\u2018\u02BC`\u00B4]/g,"'").replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"");
 // LCS of the current words against what the audio actually says → matched [cur i, orig j] pairs
@@ -3718,6 +3939,7 @@ async function doRevoice(list){
       if(o!==v&&o!==_vh&&("words" in o))o.words=cur.map(w=>({...w}));});   // board / LOC copies: the new words too, or they caption the new audio with the old text
     if(typeof exportedNames!=="undefined")exportedNames.add(d.clip);   // ours — don't let the board re-add it as a new hook
     _rvSay={};_wRng=null;
+    _lastRv={clip:d.clip,list:(d.spans||[]).map(x=>{const w=(x&&x.words)||[];return w.length?{a:+w[0].start,b:+w[w.length-1].end}:null;}).filter(Boolean)};   // 👄 lips can follow
     rvLoadVideo(API+d.url);
     commitWords(cur);
     if(typeof renderHookStrip==="function")renderHookStrip();
@@ -3940,7 +4162,7 @@ const rgCost=(d,res)=>+(2*Math.max(4,Math.min(30,d||0))*(RG_RATES[res]||0.22)).t
 let _rgJobs=[], _rgTimer=null, _rgBal=null, _rgLast=null;   // _rgLast: the panel keeps your prompt + references between opens
 function rgOpen(){if(!videoLoaded){setStatus("Спершу відкрий кліп.","err");return;}
   const prev=(_rgLast||{});
-  laneSelect({kind:"regen",text:prev.text||"",res:prev.res||"720p",keep:prev.keep!==false,refs:prev.refs||[]});
+  laneSelect({kind:"regen",text:prev.text||"",res:prev.res||"720p",keep:prev.keep===true,refs:prev.refs||[]});   // default OFF: Seedance changes the sound AND the picture
   fetch(API+"/api/wavespeed/status").then(r=>r.json()).then(d=>{_rgBal=d;if(_laneSel&&_laneSel.kind==="regen"){const b=$("rgBal");if(b)b.textContent=d.ok?("баланс $"+(+d.balance).toFixed(2)):("⚠ "+(d.error==="not set"?"немає ключа WaveSpeed (⚙ Settings)":d.error));}}).catch(()=>{});}
 function rgRender(ed,s){
   _rgLast=s;
@@ -3956,7 +4178,7 @@ function rgRender(ed,s){
       +"<label class='tmini' style='cursor:pointer;border-radius:6px'>＋ Reference image<input type='file' id='rgRefIn' accept='image/*' multiple hidden></label>"
       +"<span class='lhint' style='flex-basis:auto'>Наприклад: «Replace the woman with the person in @Image 1, keep pose and motion».</span></div>"
     +"<select id='rgRes' title='Роздільність генерації (результат все одно підганяється під розмір кліпу)'>"+["480p","720p","1080p"].map(r=>"<option"+(r===s.res?" selected":"")+">"+r+"</option>").join("")+"</select>"
-    +"<label title='ON — звук кліпу лишається рівно як був (голос, тайминги, титри валідні). OFF — Seedance пише свій звук'><input type='checkbox' id='rgKeep'"+(s.keep?" checked":"")+">Keep original audio</label>"
+    +"<label title='OFF (за замовчуванням) — Seedance міняє і звук, і картинку (нові слова скаже сам). ON — звук кліпу лишається як був, міняється тільки картинка'><input type='checkbox' id='rgKeep'"+(s.keep?" checked":"")+">Keep original audio</label>"
     +"<span>≈ <b>$"+cost.toFixed(2)+"</b> · <span id='rgBal'>"+(_rgBal?(_rgBal.ok?"баланс $"+(+_rgBal.balance).toFixed(2):"⚠ "+_rgBal.error):"")+"</span></span>"
     +"<button type='button' class='primary' id='rgGo' style='font-size:11px;padding:5px 12px'"+(long?" disabled":"")+">✨ Regenerate</button><button type='button' class='ghost' id='rgX' style='font-size:11px'>✕</button>"
     +"<span class='lhint'>Що змінити і що лишити: «Change only the sunglasses to eyeglasses, keep everything else exactly the same». Шматок часу — «From 2–4s, …». Займає ~5–7 хв, можна працювати далі; результат замінить цей кліп, ↩ — у History. Ціна: (вхід + вихід) × "+(RG_RATES[s.res]||0.22)+" $/с, мінімум 4 с.</span>";
@@ -4030,7 +4252,7 @@ async function dictSend(id,blob){
     const el=$(id); if(!el){setStatus("🎙 «"+d.text+"» — поле вже закрите, скопіюй звідси.","ok");return;}
     el.value=((el.value||"").trim()?(el.value.trim()+" "):"")+d.text;
     el.dispatchEvent(new Event("input",{bubbles:true})); try{el.focus();}catch(_){}
-    setStatus("🎙 "+(d.language&&d.language!=="en"?("("+d.language.toUpperCase()+" → EN) "):"")+"«"+d.text+"»","ok");
+    setStatus("🎙 "+(d.language&&d.language!=="en"?("("+d.language.toUpperCase()+" → EN"+(d.via==="whisper"?", офлайн Whisper":"")+") "):"")+"«"+d.text+"»"+(d.original&&d.original!==d.text?" · було: «"+d.original+"»":""),"ok");
   }catch(e){setStatus("🎙 "+e.message,"err");}
 }
 // 🔊 Auto SFX for a piece: HunyuanVideo-Foley (WaveSpeed) watches that part and writes the sounds
@@ -4077,9 +4299,9 @@ function rgPoll(){clearInterval(_rgTimer); if(!_rgJobs.length){rgLabel();return;
       try{const r=await fetch(API+"/api/regen/"+j.job);const d=await r.json();
         if(!r.ok)throw new Error(d.detail||"job lost");
         j.state=d.state; j.elapsed=d.elapsed;
-        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="foley")fyApply(j,d); else rgApply(j,d);}
-        else if(d.state==="error"){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus((j.kind==="foley"?"🔊 Auto SFX: ":"✨ Seedance: ")+d.error,"err");}
-      }catch(e){_rgJobs.splice(_rgJobs.indexOf(j),1); setStatus("✨ Seedance: "+e.message,"err");}
+        if(d.state==="done"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="foley")fyApply(j,d); else if(j.kind==="piece"){j.grp.done.push({piece:d.piece,a:d.a,b:d.b,audio:d.audio||null});datesMaybeSplice(j.grp);} else rgApply(j,d);}
+        else if(d.state==="error"){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="piece"){j.grp.failed++;datesMaybeSplice(j.grp);} setStatus((j.kind==="foley"?"🔊 Auto SFX: ":"✨ Seedance: ")+d.error,"err");}
+      }catch(e){_rgJobs.splice(_rgJobs.indexOf(j),1); if(j.kind==="piece"){j.grp.failed++;datesMaybeSplice(j.grp);} setStatus("✨ Seedance: "+e.message,"err");}
     }
     rgLabel(); if(!_rgJobs.length)clearInterval(_rgTimer);
   },5000); rgLabel();}
@@ -4204,7 +4426,7 @@ if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{if
 // optional "як звучатиме" for pronunciation only). A sentence — not a caption — is the unit,
 // because caption chunks move with the style (size, lines) and can cut a sentence in half;
 // a sentence keeps the intonation whole and gives the new line all the room its old words had.
-let _sentPick=null, _sentMore=new Set(), _sentStopAt=null, _sentRanges=[];
+let _sentPick=null, _sentMore=new Set(), _sentStopAt=null, _sentRanges=[], _sentSnap=null;
 const sentEnd=w=>/[.!?…]["»”')\]]?$/.test(w.word||w.text||"")||w.brk==="hard";
 function splitSentences(ws){
   const out=[]; if(!ws||!ws.length)return out;
@@ -4246,13 +4468,14 @@ function renderSentsView(force){
         const t=row.querySelector(".stime");if(t)t.firstChild.textContent=_fmtT(sentInfo(k).start)+" ";});}
     renderSentBar(canVoice);return;
   }
-  _sentRanges=ranges;
+  _sentRanges=ranges; _sentSnap={words:(realWords||[]).map(w=>({...w})),ranges:ranges.map(r=>[r[0],r[1]])};   // what the rows on screen were built from
   if(!ranges.length){box.innerHTML="<div style='color:var(--muted);font-size:12px;padding:8px'>Спершу ① Transcribe — тут з'являться речення.</div>";renderSentBar(false);return;}
   box.innerHTML=ranges.map((r,k)=>{const inf=sentInfo(k), meta=sentMetaHTML(k,esc), sig="sent:"+r[0]+":"+r[1], more=_sentMore.has(k);
     const pick=_sentPick&&k>=_sentPick[0]&&k<_sentPick[1];
     const _tr=(variants[activeVar]||{}).trim, _out=!!(_tr&&(inf.end<=_tr[0]||inf.start>=_tr[1]));
     const _V=(typeof voicesOf==="function")?voicesOf():null, _vid=_V&&_V.list&&_V.list.length?voiceForRange(_V,inf.start,inf.end):null, _vo=_vid&&_V.list.find(x=>x.id===_vid);
-    return "<div class='srow"+(pick?" pick":"")+(_out?" otrim":"")+"' data-k='"+k+"' "+(_out?"title='Поза трімом — у креатив не потрапить'":"")+(_vo?" style='border-left:3px solid "+_vo.color+"'":"")+">"
+    const _own=curPhraseStyles().some(m=>Math.abs(m.start-inf.start)<0.06||(inf.start>=m.start&&inf.start<m.end));
+    return "<div class='srow"+(pick?" pick":"")+(_out?" otrim":"")+(_sentEdit&&_sentEdit.k===k?" sedit":"")+(_own?" sown":"")+"' data-k='"+k+"' "+(_out?"title='Поза трімом — у креатив не потрапить'":"")+(_vo?" style='border-left:3px solid "+_vo.color+"'":"")+">"
       +"<div class='scol'><button type='button' class='stime' data-sk='"+k+"' title='Клік — програти речення · Shift+клік — виділити кілька речень, щоб озвучити однією фразою'>"+_fmtT(inf.start)+" <span>▶</span></button>"
       +(_vo?"<button type='button' class='svoicech' data-svch='"+k+"' style='color:"+_vo.color+";border-color:"+_vo.color+"66;background:"+_vo.color+"1f' title='Хто говорить — клік, щоб змінити"+(_vo.style?" · стиль: "+esc(_vo.style):"")+"'>"+esc(_vo.name)+"</button>":"")+"</div>"
       +"<div class='stext' contenteditable='true' spellcheck='false' data-k='"+k+"'>"+sentWordsHTML(r,esc)+"</div>"
@@ -4262,28 +4485,264 @@ function renderSentsView(force){
       +(more?"<div class='smore'>як звучатиме:<input data-ssay='"+k+"' placeholder='"+esc(inf.text)+"' value='"+esc(_rvSay[sig]||"")+"' title='Лише вимова для ElevenLabs. У титрах лишиться текст рядка. Напр. «Tie Chee» для «Tai Chi».'>"
         +"<button type='button' class='tmini' data-scut='"+k+"' title='Вирізати це речення з відео і звуку; стики — у паузах'>✂ Cut sentence</button></div>":"")
       +"</div>";}).join("");
-  renderSentBar(canVoice);
+  renderSentBar(canVoice); renderDatePanel();
   box.querySelectorAll("[data-svch]").forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();cycleSentVoice(+b.dataset.svch);});
   if(typeof renderVoices==="function")renderVoices();
+}
+// ---------- 📅 Dates: find every date the speaker says, replace them all at once ----------
+// @@findDates:start
+// Plain rules, no AI (instant, free): Month + day ("November 16th", "Nov. sixteenth"), day + month
+// ("the 16th of November"), an optional weekday before and a year after, and 11/16 · 16.11.
+// "May" / "March" count only next to a day. Same date → one group ("November 16 ×4").
+const DT_MONTHS={january:1,jan:1,february:2,feb:2,march:3,mar:3,april:4,apr:4,may:5,june:6,jun:6,july:7,jul:7,
+  august:8,aug:8,september:9,sep:9,sept:9,october:10,oct:10,november:11,nov:11,december:12,dec:12};
+const DT_WEEK=new Set(["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]);
+const DT_UNITS={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,
+  fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,
+  ninth:9,tenth:10,eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,fifteenth:15,sixteenth:16,seventeenth:17,eighteenth:18,nineteenth:19,
+  twenty:20,twentieth:20,thirty:30,thirtieth:30};
+const DT_SMALL={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9};
+function _dtNorm(w){return String(w&&(w.word||w.text)||"").toLowerCase().replace(/[’']s$/,"").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g,"");}
+// a day at token i → {day, n tokens} ("16", "16th", "sixteenth", "twenty-first", "twenty first")
+function _dtDay(T,i){
+  const t=T[i]; if(t==null)return null;
+  let m=t.match(/^(\d{1,2})(st|nd|rd|th)?$/); if(m){const d=+m[1];return d>=1&&d<=31?{day:d,n:1}:null;}
+  m=t.match(/^(twenty|thirty)-?(\w+)$/); if(m&&DT_SMALL[m[2]]!=null){const d=DT_UNITS[m[1]]+DT_SMALL[m[2]];return d<=31?{day:d,n:1}:null;}
+  if((t==="twenty"||t==="thirty")&&DT_SMALL[T[i+1]]!=null){const d=DT_UNITS[t]+DT_SMALL[T[i+1]];return d<=31?{day:d,n:2}:null;}
+  if(DT_UNITS[t]!=null&&t!=="second"){const d=DT_UNITS[t];return d<=31?{day:d,n:1}:null;}   // "second" is too often a time word
+  return null;
+}
+function findDates(ws){
+  const T=(ws||[]).map(_dtNorm), out=[]; let i=0;
+  const isYear=t=>/^(19|20)\d\d$/.test(t||"");
+  while(i<T.length){
+    let s=i, mo=null, dd=null, e=-1;
+    if(DT_WEEK.has(T[i])&&(DT_MONTHS[T[i+1]]||(T[i+1]==="the"&&_dtDay(T,i+2))||_dtDay(T,i+1)))s=i, i++;   // "Sunday, November 16"
+    if(DT_MONTHS[T[i]]!=null){const d=_dtDay(T,i+1)||(T[i+1]==="the"?(x=>x&&{day:x.day,n:x.n+1})(_dtDay(T,i+2)):null);
+      if(d){mo=DT_MONTHS[T[i]];dd=d.day;e=i+d.n;}}
+    if(e<0){let j=i; if(T[j]==="the")j++; const d=_dtDay(T,j);
+      if(d){let k=j+d.n; if(T[k]==="of")k++; if(DT_MONTHS[T[k]]!=null){mo=DT_MONTHS[T[k]];dd=d.day;e=k;}}}
+    if(e<0){const m=(T[i]||"").match(/^(\d{1,2})[\/.](\d{1,2})(?:[\/.](\d{2,4}))?$/);
+      if(m&&+m[1]<=31&&+m[2]<=31&&(+m[1]<=12||+m[2]<=12)){mo=+m[1]<=12?+m[1]:+m[2];dd=+m[1]<=12?+m[2]:+m[1];e=i;}}
+    if(e<0){i=s+1;continue;}
+    if(isYear(T[e+1]))e++;
+    const text=(ws||[]).slice(s,e+1).map(w=>w.word||w.text||"").join(" ").replace(/[,.;:!?]+$/,"");
+    out.push({i0:s,i1:e,text,key:mo+"-"+dd,start:+ws[s].start,end:+ws[e].end});
+    i=e+1;
+  }
+  return out;
+}
+// @@findDates:end
+let _dateIdxK="", _dateIdx=new Map(), _datePanelOn=false, _dateNew={}, _dateOff=new Set();
+function dateAt(i){const ws=realWords||[], k=ws.length+"|"+ws.map(w=>w.word||w.text).join(" ").length;
+  if(k!==_dateIdxK){_dateIdxK=k;_dateIdx=new Map();findDates(ws).forEach(d=>{for(let j=d.i0;j<=d.i1;j++)_dateIdx.set(j,d);});
+    if(typeof drawDateMarks==="function")setTimeout(drawDateMarks,0);}
+  return _dateIdx.get(i)||null;}
+function drawDateMarks(){
+  const bar=$("trimBar"), dur=video.duration||0; if(!bar)return;
+  let box=$("trimDates"); if(!box){box=document.createElement("div");box.id="trimDates";bar.appendChild(box);}
+  const D=dur?findDates(realWords||[]):[];
+  box.innerHTML=D.map((d,k)=>"<i data-dk='"+k+"' style='left:"+(d.start/dur*100)+"%' title='📅 "+String(d.text).replace(/'/g,"&#39;")+" · "+tc(d.start)+"'></i>").join("");
+  box.querySelectorAll("[data-dk]").forEach(el=>{el.onclick=e=>{e.stopPropagation();const d=D[+el.dataset.dk];if(d&&videoLoaded){video.currentTime=Math.max(0,d.start-0.05);}};
+    el.onpointerdown=e=>e.stopPropagation();});
+}
+function dateGroups(){const g=new Map(); findDates(realWords||[]).forEach(d=>{if(!g.has(d.key))g.set(d.key,{key:d.key,label:d.text,list:[]});g.get(d.key).list.push(d);}); return [...g.values()];}
+function renderDatePanel(){
+  const P=$("datePanel"); if(!P)return;
+  const G=(txtView==="sents"&&_datePanelOn)?dateGroups():[];
+  if(!G.length){P.style.display="none";P.innerHTML="";if(_datePanelOn&&txtView==="sents"&&!findDates(realWords||[]).length)_datePanelOn=false;return;}
+  if(P.contains(document.activeElement)&&document.activeElement.tagName==="INPUT")return;   // never re-render under the caret
+  const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  const mode=_dateNew._mode||"lips", lips=mode!=="voice", model=_dateNew._model||"turbo25";
+  P.innerHTML="<div class='drow'><b>📅 Дати в кліпі</b><span style='color:var(--muted);flex:1'>Познач, які міняти, впиши нову дату.</span>"
+      +"<button type='button' class='ghost' id='dpX' style='font-size:11px;padding:3px 7px'>✕</button></div>"
+    +G.map((g,gi)=>"<div class='dgroup'><div class='drow'><b>«"+esc(g.label)+"»</b> ×"+g.list.length+"</div>"
+      +"<div class='docc'>"+g.list.map(d=>"<label title='Клік по часу — подивитись'><input type='checkbox' data-doff='"+d.i0+"'"+(_dateOff.has(d.start.toFixed(2))?"":" checked")+"><span data-dgo='"+d.start+"'>"+tc(d.start)+"</span></label>").join("")+"</div>"
+      +"<div class='drow'><span>→</span><input type='text' data-dnew='"+gi+"' placeholder='напр. November 23rd' value='"+esc(_dateNew[g.key]||"")+"'>"
+      +"<button type='button' class='primary' data-dgo2='"+gi+"' style='font-size:11px;padding:5px 10px'>"+(mode==="lips"?"🎙 + 👄 Замінити":mode==="seedance"?"✨ Замінити":"🎙 Замінити")+"</button></div></div>").join("")
+    +"<div class='drow' style='color:var(--muted)'><select id='dpMode' title='Як міняти'>"
+      +[["lips","🎙 ElevenLabs + 👄 губи (рекомендую)"],["voice","🎙 тільки голос (ElevenLabs)"],["seedance","✨ Seedance: звук і картинка"]].map(([v,l])=>"<option value='"+v+"'"+(mode===v?" selected":"")+">"+l+"</option>").join("")+"</select>"
+      +(mode!=="seedance"?"":"<select id='dpModel' title='2.5 Turbo — найновіша, якість 2.5, швидше й дешевше за повну 2.5'>"
+        +[["turbo25","Seedance 2.5 Turbo (рекомендую)"],["flash25","2.5 Flash Turbo — дешевше, 480p→1080p"],["2.5","Seedance 2.5 (повна)"],["turbo","2.0 Fast Turbo — найдешевша"]].map(([v,l])=>"<option value='"+v+"'"+(model===v?" selected":"")+">"+l+"</option>").join("")+"</select>"
+      +"<label title='Широкий план, дві людини в кадрі — вклейку видно. Seedance перекадрує шматок на середній / середньо-крупний план того, хто говорить, як окремий кадр монтажу'><input type='checkbox' id='dpReframe'"+(_dateNew._reframe?" checked":"")+"> 📐 середній план мовця</label>")
+      +"<span style='flex:1'>"+(mode==="lips"?"Голос — ElevenLabs тим самим голосом, губи — Sync Lipsync-2-Pro (≈ $0.08 / с), картинка не перемальовується.":mode==="seedance"?"Seedance сам каже нову дату і перемальовує ~4 с навколо.":"Тільки звук, картинка без змін.")+"</span></div>";
+  P.style.display="flex";
+  $("dpX").onclick=()=>{_datePanelOn=false;renderDatePanel();renderSentBar(!!origWordsNow());};
+  $("dpMode").onchange=e=>{_dateNew._mode=e.target.value;renderDatePanel();};
+  if($("dpModel"))$("dpModel").onchange=e=>{_dateNew._model=e.target.value;};
+  if($("dpReframe"))$("dpReframe").onchange=e=>{_dateNew._reframe=e.target.checked;};
+  P.querySelectorAll("[data-dnew]").forEach(inp=>{inp.oninput=e=>{_dateNew[G[+inp.dataset.dnew].key]=e.target.value;};
+    inp.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();replaceDates(G[+inp.dataset.dnew]);}};});
+  P.querySelectorAll("[data-doff]").forEach(cb=>cb.onchange=()=>{const d=findDates(realWords||[]).find(x=>x.i0===+cb.dataset.doff); if(!d)return;
+    const k=d.start.toFixed(2); cb.checked?_dateOff.delete(k):_dateOff.add(k);});
+  P.querySelectorAll("[data-dgo]").forEach(el=>el.onclick=e=>{e.preventDefault();if(videoLoaded){video.currentTime=Math.max(0,+el.dataset.dgo-0.05);}});
+  P.querySelectorAll("[data-dgo2]").forEach(b=>b.onclick=()=>replaceDates(G[+b.dataset.dgo2]));
+}
+// 🎙 every picked occurrence: new words in the captions → one re-voice pass (same voice) → optional
+// ✨ Seedance on a ~4 s piece around each (lips), spliced back in ONE step when all are back.
+async function replaceDates(g){
+  const nt=String(_dateNew[g.key]||"").trim(); if(!nt){setStatus("📅 Впиши нову дату.","err");return;}
+  const v=variants[activeVar]; if(!v||!v.clip||!fileId||!origWordsNow()){setStatus("📅 Спершу ① Transcribe цей кліп.","err");return;}
+  const occ=g.list.filter(d=>!_dateOff.has(d.start.toFixed(2))).sort((a,b)=>b.i0-a.i0);   // from the end: earlier indices stay valid
+  if(!occ.length){setStatus("📅 Не вибрано жодного входження.","err");return;}
+  const mode=_dateNew._mode||"lips", lips=mode!=="voice", model=_dateNew._model||"turbo25";
+  const toks=nt.split(/\s+/).filter(Boolean);
+  const ws0=(realWords||[]).map(w=>({...w}));
+  let ws=(realWords||[]).map(w=>({...w})); const ranges=[];
+  occ.forEach(d=>{const a=+ws[d.i0].start, b=+ws[d.i1].end, lastBrk=ws[d.i1].brk||null, tail=(String(ws[d.i1].word||ws[d.i1].text||"").match(/[,.;:!?]+$/)||[""])[0];
+    const step=(b-a)/toks.length;
+    const fresh=toks.map((t,j)=>({word:t+(j===toks.length-1?tail:""),start:+(a+j*step).toFixed(3),end:+(a+(j+1)*step).toFixed(3),brk:j===toks.length-1?lastBrk:null}));
+    ws.splice(d.i0,d.i1-d.i0+1,...fresh);
+    ranges.forEach(r=>{r[0]+=fresh.length-(d.i1-d.i0+1);r[1]+=fresh.length-(d.i1-d.i0+1);});
+    ranges.push([d.i0,d.i0+fresh.length]);});
+  commitWords(ws);
+  if(mode==="seedance"){   // ✨ Seedance says the new date itself: no ElevenLabs, sound + picture from Seedance
+    const W2=realWords||[];
+    datesLips(ranges.sort((x,y)=>x[0]-y[0]).map(([x,y])=>({a:+W2[x].start,b:+W2[y-1].end,ns:x,ne:y})),nt,model,{keepAudio:false});
+    return;}
+  const spans=ranges.sort((x,y)=>x[0]-y[0]).map(([a,b])=>rangeSpan(a,b)).filter(Boolean);
+  spans.forEach(sp=>{_rvSay[sp.sig]=sp.text;});
+  const clip0=v.clip;
+  await doRevoice(spans);
+  if(variants[activeVar].clip===clip0){   // the voice didn't change → don't leave captions saying a date the audio doesn't
+    const msg=($("status")&&$("status").innerText)||""; commitWords(ws0);
+    setStatus("📅 Переозвучка не вдалась, текст повернуто. "+msg.replace(/^Переозвучка:\s*/,""),"err");return;}
+  if(!lips){setStatus("📅 «"+g.label+"» → «"+nt+"»: "+spans.length+"× переозвучено. ↩ Undo re-voice — повернути.","ok");return;}
+  for(let k=0;k<50&&!(video.duration>0&&video.readyState>=1);k++)await new Promise(r=>setTimeout(r,100));   // the re-voiced clip is loading
+  const W2=realWords||[];   // the NEW words of each date (re-voice re-timed them)
+  datesLips(ranges.map(([x,y])=>({a:+W2[x].start,b:+W2[y-1].end,ns:x,ne:y})).filter(p=>p.b>p.a),nt,"lipsync");
+}
+function datesLips(list,nt,model,opt){
+  opt=opt||{}; const LIP=model==="lipsync", keepAudio=opt.keepAudio!==false;
+  const W=realWords||[], dur=(video.duration>0?video.duration:0)||(W.length?+W[W.length-1].end+0.5:0), o=mixHolder();
+  if(!o||!dur||!list.length){setStatus("📅 Не вийшло запустити губи — відкрий панель 📅 і спробуй ще раз.","err");return;}
+  // 👄 lip-sync: just the words ± 0.5 s · ✨ Seedance: ~4 s around (it bills ≥ 4 s anyway); overlaps merge
+  let P=LIP?list.map(x=>{let a=Math.max(0,x.a-0.5), b=Math.min(dur,x.b+0.5); if(b-a<1.5){const m=(a+b)/2;a=Math.max(0,m-0.75);b=Math.min(dur,m+0.75);} return {a,b,ns:x.ns,ne:x.ne};}).sort((x,y)=>x.a-y.a)
+   :list.map(x=>{const mid=(x.a+x.b)/2, half=Math.max(2.0,(x.b-x.a)/2+0.6);
+    let a=Math.max(0,mid-half), b=Math.min(dur,mid+half); if(b-a<4&&dur>=4){if(a===0)b=Math.min(dur,4);else a=Math.max(0,b-4);}
+    return {a,b,ns:x.ns,ne:x.ne};}).sort((x,y)=>x.a-y.a);
+  const M=[]; P.forEach(p=>{const l=M[M.length-1]; if(l&&p.a<l.b&&p.b-l.a<=15){l.b=Math.max(l.b,p.b);l.ne=p.ne;}else M.push({...p});});
+  const sentOf=(ns,ne)=>{let a=ns,b=ne; while(a>0&&!/[.!?]$/.test(W[a-1].word||""))a--; while(b<W.length&&!/[.!?]$/.test(W[b-1].word||""))b++; return W.slice(a,Math.min(b,W.length)).map(w=>w.word).join(" ");};
+  const RATE={turbo25:0.234,flash25:0.171}, MN={lipsync:"👄 Sync Lipsync-2-Pro (тільки губи)",turbo25:"Seedance 2.5 Turbo · 1080p",flash25:"Seedance 2.5 Flash Turbo · 1080p",turbo:"Seedance 2.0 Fast Turbo · 1080p","2.5":"Seedance 2.5 · 720p"};
+  const est=M.reduce((s,p)=>{const d=p.b-p.a;return s+(LIP?Math.max(1,Math.ceil(d))*0.084:model==="turbo"?(Math.max(2,d)*0.0675+Math.max(4,d)*0.0855):model==="2.5"?2*Math.max(4,d)*0.22:Math.max(4,Math.ceil(d))*RATE[model]);},0);
+  const reframe=!LIP&&!!_dateNew._reframe;
+  if(!confirm((LIP?"👄 Губи під нову озвучку: ":keepAudio?"✨ Губи під нову дату: ":"✨ Seedance міняє звук і картинку: ")+M.length+" шматк. · "+MN[model]+(reframe?" · 📐 середній план":"")+" · ≈ $"+est.toFixed(2)+" з балансу WaveSpeed.\n\nЗапустити?"))
+    {setStatus("📅 Голос замінено. Губи не чіпали — можна запустити пізніше з панелі 📅.","ok");return;}
+  const src=(o.mix&&o.mix.base)||o.clip, grp={id:Date.now().toString(36),n:M.length,done:[],failed:0,o,src,nt,model};
+  M.forEach(async p=>{
+    const line=sentOf(p.ns,p.ne);
+    const prompt=LIP?"lipsync":!keepAudio
+      ?(reframe?"Reframe this shot as a medium close-up (chest up) of the person who is speaking, as the next camera angle in the edit: same person, outfit, room and lighting. ":"")+"The person on camera now says exactly: \""+line+"\" — in her own voice, same tone and pace, her lips matching the words. Keep her identity, expression, gestures, the background and the camera"+(reframe?"":" exactly the same")+". Do not add music, text or subtitles."
+      :reframe
+      ?"Reframe this shot as a medium close-up (chest up) of the person who is speaking, as if it were the next camera angle in the edit: same person, same outfit, same room, same lighting, natural handheld feel. She says: \""+line+"\" — her lips, mouth and jaw match these words exactly, especially \""+nt+"\", in sync with the existing audio. Keep her identity, expression and gestures. Do not add text or subtitles."
+      :"The person on camera says: \""+line+"\". Re-animate ONLY the lips, mouth and jaw so they match these words, especially \""+nt+"\", in sync with the existing audio. Keep the face, identity, expression, head and body motion, lighting, background, camera and every other detail exactly the same. Do not add text or subtitles.";
+    try{const r=await fetch(API+"/api/regen/piece/start",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:src,a:+p.a.toFixed(3),b:+p.b.toFixed(3),prompt,model,resolution:model==="2.5"?"720p":"1080p",keep_audio:keepAudio})});
+      const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"seedance failed"));
+      _rgJobs.push({job:d.job,kind:"piece",grp,o,prompt:"📅 "+nt}); rgPoll();
+    }catch(e){grp.failed++; setStatus("✨ Seedance: "+e.message,"err"); datesMaybeSplice(grp);}
+  });
+  setStatus((LIP?"👄 Губи: ":"✨ Seedance: ")+M.length+" шматк. під «"+nt+"» запущено. Займе кілька хвилин — працюй далі, вони самі вклеяться разом.","ok");
+}
+async function datesMaybeSplice(grp){
+  if(grp.done.length+grp.failed<grp.n)return;
+  if(!grp.done.length){setStatus("✨ Жоден шматок не вдався — голос уже замінено, губи лишились старі.","err");return;}
+  const o=grp.o, cur=(o.mix&&o.mix.base)||o.clip;
+  if(cur!==grp.src){setStatus("✨ Шматки готові, але кліп змінився, поки вони генерувались — не вклеюю, щоб не зсунути. Запусти 📅 ще раз.","err");return;}
+  // ✨ generated pieces are a LAYER over the clip (like AE): base + pieces, each can be switched off
+  const g=genOf(o), base=g?g.base:cur, baseUrl=g?g.baseUrl:(mixHolder()===o?(o.mix?mixBaseUrl(o.mix):o.videoUrl):o.videoUrl);
+  const fresh=grp.done.map(p=>({...p,on:true,label:grp.nt,model:grp.model||""}));
+  const all=(g?g.pieces.filter(x=>!fresh.some(f=>f.a<x.b&&x.a<f.b)):[]).concat(fresh).sort((x,y)=>x.a-y.a);
+  try{const r=await fetch(API+"/api/regen/splice",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({file_id:fileId,clip:base,pieces:all.filter(x=>x.on)})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"splice failed"));
+    rgApply({o,prompt:"📅 губи «"+grp.nt+"» ×"+grp.done.length},{clip:d.clip,url:d.url,seconds:0});
+    hmTargets(o).forEach(x=>{x.gen={base,baseUrl,pieces:all,out:d.clip};});
+    drawGenLane();
+    if(grp.failed)setStatus("✨ Вклеєно "+grp.done.length+" з "+grp.n+" шматків; "+grp.failed+" не вдались — там губи старі.","err");
+  }catch(e){setStatus("✨ Вклейка: "+e.message,"err");}
+}
+// ---------- ✨ Generated layer: Seedance pieces over the clip, switchable, purple on the timeline ----------
+function genOf(o){o=o||mixHolder(); const g=o&&o.gen; if(!g)return null;
+  const cur=(o.mix&&o.mix.base)||o.clip; return (cur===g.out||cur===g.base)?g:null;}   // any other edit since → the layer is baked in
+async function genSwitch(o,fn){
+  const g=genOf(o); if(!g)return; fn(g);
+  const on=g.pieces.filter(x=>x.on);
+  try{let clip=g.base,url=g.baseUrl;
+    if(on.length){const r=await fetch(API+"/api/regen/splice",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({file_id:fileId,clip:g.base,pieces:on})});
+      const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"splice failed")); clip=d.clip; url=API+d.url;}
+    const mm=mixUnwrap(o);
+    hmTargets(o).forEach(x=>{x.clip=clip;x.videoUrl=url;if(x.gen)x.gen.out=clip;});
+    if(mm)mixRebase(o); else if(o===mixHolder())rvLoadVideo(url);
+    if(typeof exportedNames!=="undefined")exportedNames.add(clip);
+    drawGenLane();
+    setStatus("✨ Згенеровані шматки: увімкнено "+on.length+" з "+g.pieces.length+(on.length<g.pieces.length?" (вимкнені — оригінальна картинка)":"")+".","ok");
+  }catch(e){setStatus("✨ "+e.message,"err");}
+}
+function drawGenLane(){
+  const pic=document.querySelector("#lanes .lane.lvid"); if(!pic)return;
+  let L=$("laneGen");
+  if(!L){L=document.createElement("div");L.className="lane";L.id="laneGen";
+    L.innerHTML="<div class='lhead'><button type='button' class='lmute' id='genAll' title='Порівняти: усі згенеровані шматки вимкнути / увімкнути'>👁</button><span class='lname' style='color:#c4b5fd'>✨ Generated</span></div><div class='lbody' id='laneGenBody'></div>";
+    pic.insertAdjacentElement("afterend",L);
+    $("genAll").onclick=e=>{e.stopPropagation();const g=genOf(); if(!g)return; const anyOn=g.pieces.some(x=>x.on); genSwitch(mixHolder(),G=>G.pieces.forEach(x=>x.on=!anyOn));};}
+  const g=genOf(), dur=video.duration||0, bar=$("trimBar");
+  let mk=$("trimGen"); if(!mk&&bar){mk=document.createElement("div");mk.id="trimGen";bar.appendChild(mk);}
+  if(!g||!dur){L.style.display="none"; if(mk)mk.innerHTML=""; return;}
+  L.style.display="";
+  const pct=t=>Math.max(0,Math.min(100,t/dur*100));
+  const esc=x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/'/g,"&#39;").replace(/</g,"&lt;");
+  $("laneGenBody").innerHTML=g.pieces.map((p,i)=>"<div class='lblk gen"+(p.on?"":" off")+"' data-gi='"+i+"' style='left:"+pct(p.a)+"%;width:"+Math.max(0.6,pct(p.b)-pct(p.a))+"%' title='✨ "+esc(p.label)+" · "+tc(p.a)+"–"+tc(p.b)+" · клік — "+(p.on?"вимкнути (оригінал)":"увімкнути")+" · правий клік — ще'>"+(p.on?"✨":"○")+"</div>").join("");
+  if(mk)mk.innerHTML=g.pieces.filter(p=>p.on).map(p=>"<i style='left:"+pct(p.a)+"%;width:"+Math.max(0.4,pct(p.b)-pct(p.a))+"%'></i>").join("");
+  $("genAll").textContent=g.pieces.some(p=>p.on)?"👁":"◌";
+  $("laneGenBody").querySelectorAll("[data-gi]").forEach(el=>{const i=+el.dataset.gi;
+    el.onpointerdown=e=>e.stopPropagation();
+    el.onclick=e=>{e.stopPropagation(); genSwitch(mixHolder(),G=>{G.pieces[i].on=!G.pieces[i].on;});};
+    el.oncontextmenu=e=>{const p=g.pieces[i]; ctxMenu(e,[{head:"✨ "+p.label+" · "+tc(p.a)},
+      {label:"▶ Подивитись шматок",on:()=>{video.currentTime=Math.max(0,p.a-0.3);_sentStopAt=p.b+0.2;video.play();}},
+      {label:p.on?"Вимкнути (оригінальна картинка)":"Увімкнути",on:()=>genSwitch(mixHolder(),G=>{G.pieces[i].on=!G.pieces[i].on;})},
+      {label:"Вимкнути всі / увімкнути всі",on:()=>$("genAll").click()}]);};});
+}
+// ↵ Enter in a sentence: the caption breaks to a new LINE after the word before the caret (press
+// again on the same spot to remove it). Same caption — not a new one (that's Enter in Words).
+function sentLineBreak(row){
+  const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return;
+  if(row.innerText.replace(/[\s↵]+/g," ").trim()!==inf.text.replace(/\s+/g," ").trim()){renderSentsView(true);setStatus("↵ Правку збережено — постав курсор і натисни Enter ще раз.","");return;}
+  const sel=window.getSelection(); if(!sel.rangeCount)return;
+  const n=sel.anchorNode, off=sel.anchorOffset, el=n&&(n.nodeType===1?n:n.parentElement);
+  let span=el&&el.closest&&el.closest("[data-wi]"), i;
+  if(span){i=+span.dataset.wi; if(n.nodeType===3&&off===0)i--;}                 // caret at the very start of a word → break before it
+  else{let p=(n.nodeType===3?n:n.childNodes[off-1]||n.childNodes[off]); while(p&&!(p.nodeType===1&&p.dataset&&p.dataset.wi!=null))p=p.previousSibling; i=p?+p.dataset.wi:-1;}
+  const r=_sentRanges[k]; if(!r||i<r[0]||i>=r[1]-1){setStatus("↵ Постав курсор між словами, де має бути новий рядок.","");return;}
+  const ws=(realWords||[]).map(w=>({...w})); const on=ws[i].brk!=="nl";
+  if(ws[i].brk==="soft"&&on){setStatus("↵ Тут уже новий титр.","");return;}
+  ws[i].brk=on?"nl":null; commitWords(ws); renderSentsView(true);
+  setStatus(on?"↵ Новий рядок після «"+(ws[i].word||"")+"» (той самий титр). Enter там само ще раз — прибрати.":"↵ Розрив рядка прибрано.","ok");
 }
 // ✦ accent words / 🎨 phrase styles, shown right in the sentence (the row text stays plain words)
 function sentWordsHTML(r,esc){
   const ws=realWords||[], ps=curPhraseStyles(), W=w=>w.word||w.text||"";
   const out=[]; for(let i=r[0];i<r[1];i++){const w=ws[i]; if(!w)continue;
     const ph=ps.find(p=>+w.start>=+p.start&&+w.start<+p.end);
-    const cls=(w.accent?" wacc":"")+(ph?" wphr":""), tt=(w.accent?"✦ accent":"")+(ph?(w.accent?" · ":"")+"🎨 "+(ph.name||"style"):"");
-    out.push("<span data-wi='"+i+"'"+(cls?" class='"+cls.trim()+"'":"")+(tt?" title='"+esc(tt)+"'":"")+">"+esc(W(w))+"</span>");}
+    const dt=dateAt(i);
+    const cls=(w.accent?" wacc":"")+(ph?" wphr":"")+(dt?" wdate":""), tt=(w.accent?"✦ accent":"")+(ph?(w.accent?" · ":"")+"🎨 "+(ph.name||"style"):"")+(dt?((w.accent||ph)?" · ":"")+"📅 дата: "+dt.text:"");
+    out.push("<span data-wi='"+i+"'"+(cls?" class='"+cls.trim()+"'":"")+(tt?" title='"+esc(tt)+"'":"")+">"+esc(W(w))+"</span>"+(w.brk==="nl"&&i<r[1]-1?"<b class='wnl' contenteditable='false' title='Новий рядок у титрі (Enter тут — прибрати)'>↵</b>":""));}
   return out.join(" ");
 }
 // select words in a sentence → a small bar: ✦ Accent (own colour inside the caption) · 🎨 Style (its own caption + preset)
 function sentSelWords(){
   const sel=window.getSelection&&window.getSelection(); if(!sel||sel.isCollapsed||!sel.rangeCount)return null;
-  const box=$("transcriptSents"); if(!box)return null;
   const el=n=>n&&(n.nodeType===1?n:n.parentElement);
+  const cap=el(sel.anchorNode)&&el(sel.anchorNode).closest(".ctext");
+  if(cap){if(!(el(sel.focusNode)&&el(sel.focusNode).closest(".ctext")===cap))return null;
+    const idx=[...cap.querySelectorAll("[data-wi]")].filter(s=>sel.containsNode(s,true)).map(s=>+s.dataset.wi); if(!idx.length)return null;
+    return {k:+cap.dataset.c,cap:true,i0:Math.min(...idx),i1:Math.max(...idx),rect:sel.getRangeAt(0).getBoundingClientRect()};}
+  const box=$("transcriptSents"); if(!box)return null;
   const row=el(sel.anchorNode)&&el(sel.anchorNode).closest(".stext"); if(!row||!box.contains(row))return null;
   if(!(el(sel.focusNode)&&el(sel.focusNode).closest(".stext")===row))return null;
   const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return null;
-  if(row.innerText.replace(/\s+/g," ").trim()!==inf.text.replace(/\s+/g," ").trim())return {k,edited:true};   // finish the edit first (Enter)
+  if(row.innerText.replace(/↵/g," ").replace(/\s+/g," ").trim()!==inf.text.replace(/\s+/g," ").trim())return {k,edited:true};   // finish the edit first (Enter)
   const idx=[...row.querySelectorAll("[data-wi]")].filter(s=>sel.containsNode(s,true)).map(s=>+s.dataset.wi);
   if(!idx.length)return null;
   return {k,i0:Math.min(...idx),i1:Math.max(...idx),rect:sel.getRangeAt(0).getBoundingClientRect()};
@@ -4297,8 +4756,8 @@ function sentToolShow(){
   if(S.edited){t.innerHTML="<span class='stnote'>Enter — зберегти правку, потім виділи слова</span>";}
   else{const ws=realWords||[], txt=ws.slice(S.i0,S.i1+1).map(w=>w.word||w.text||"").join(" ");
     const allAcc=ws.slice(S.i0,S.i1+1).every(w=>w.accent), ph=curPhraseStyles().some(p=>p.end>+ws[S.i0].start&&p.start<=+ws[S.i1].start);
-    t.innerHTML="<button type='button' id='stAcc' title='Ці слова — іншим кольором усередині титру (колір: Style → Karaoke → ✦ Accent words)'>"+(allAcc?"✦ Прибрати акцент":"✦ Accent")+"</button>"
-      +"<button type='button' id='stSty' title='Ця фраза — окремим титром у своєму пресеті'>🎨 Style ▾</button>"
+    t.innerHTML="<button type='button' id='stAcc' title='Ці слова — своїм виглядом усередині того самого титру. Як саме виглядають: Style → ✦ Accent'>"+(allAcc?"✦ Прибрати виділення":"✦ Виділити слова")+"</button>"
+      +"<button type='button' id='stSty' title='Ця фраза — ОКРЕМИМ титром у вибраному пресеті (свій розмір, регістр, позиція)'>🎨 Окремий титр ▾</button>"
       +(ph?"<button type='button' id='stStyX' title='Прибрати окремий стиль фрази'>✕ стиль</button>":"")
       +"<span class='stnote'>«"+String(txt).replace(/</g,"&lt;").slice(0,40)+"»</span>";
     t.querySelector("#stAcc").onclick=()=>{sentAccent(S.i0,S.i1,!allAcc);};
@@ -4315,24 +4774,298 @@ function sentAccent(i0,i1,on){
   for(let i=i0;i<=i1&&i<ws.length;i++){if(on)ws[i].accent=true;else delete ws[i].accent;}
   sentToolHide(); window.getSelection().removeAllRanges();
   commitWords(ws); if(txtView==="sents")renderSentsView(true);
-  setStatus(on?"✦ Акцент: слова будуть кольором ✦ Accent words (Style → Karaoke).":"✦ Акцент прибрано.","ok");
+  setStatus(on?"✦ Акцент. Як він виглядає — Style → ✦ Accent (колір, шрифт, italic, розмір, обведення, тінь, плашка).":"✦ Акцент прибрано.","ok");
 }
+// ---------- ✎ Sentence style: one caption, edited with ALL the Style controls ----------
+// A sentence keeps only what you CHANGED (diff) on top of the caption style (and, optionally, a
+// preset's look) — change the base later and the sentence follows, except for its own changes.
+var _sentEdit=null;   // {rec, base, k} while the Style tab edits one sentence
+const SE_SKIP=new Set(["holdLast","scrimFade"]);            // clip-wide settings: not per sentence
+const SE_POS=["marginBottom","boxOffsetY"];                 // position: from the caption style unless asked
+function presetLook(name,withPos){const c=presetToCtrl(name),o={...c}; if(!withPos)SE_POS.forEach(k=>delete o[k]); SE_SKIP.forEach(k=>delete o[k]); return o;}
+function phraseStart(m,base){base=base||readControls(); return m.name?{...base,...presetLook(m.name,m.presetPos)}:{...base};}
+function phraseCtrl(m){
+  if(_sentEdit&&_sentEdit.rec===m)return {...readPanel(),...Object.fromEntries([...SE_SKIP].map(k=>[k,_sentEdit.base[k]]))};   // live while editing
+  if(m.diff||m.name)return {...phraseStart(m),...(m.diff||{})};
+  return m.ctrl||readControls();   // an old project: a full snapshot
+}
+function ctrlDiff(a,b){const d={}; Object.keys(a).forEach(k=>{if(!SE_SKIP.has(k)&&JSON.stringify(a[k])!==JSON.stringify(b[k]))d[k]=a[k];}); return d;}
+function sentRec(k,create){
+  const r=_sentRanges[k], ws=realWords||[]; if(!r||!ws[r[0]])return null;
+  const a=+ws[r[0]].start, b=ws[r[1]]?Math.max(+ws[r[1]-1].start+0.001,+ws[r[1]].start-0.0005):+ws[r[1]-1].end+0.05;
+  const arr=curPhraseStyles();
+  let m=arr.find(x=>Math.abs(x.start-a)<0.02&&Math.abs(x.end-b)<0.05);
+  if(!m&&create){for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);
+    m={start:fl3(a),end:fl3(b-0.0005),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
+  return m;
+}
+const fl3=x=>Math.floor((+x+1e-9)*1000)/1000;   // region edges just BELOW a word start (3.1799… must not land in the region that ends at 3.18)
+function recFor(a,b,create){
+  const arr=curPhraseStyles();
+  let m=arr.find(x=>Math.abs(x.start-a)<0.02&&Math.abs(x.end-b)<0.05);
+  if(!m&&create){for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);
+    m={start:fl3(a),end:fl3(b-0.0005),diff:{}}; arr.push(m); arr.sort((x,y)=>x.start-y.start);}
+  return m;
+}
+function sentEditStart(k,presetName,capRange){
+  if(_sentEdit)sentEditDone();
+  const m=capRange?recFor(capRange[0],capRange[1],true):sentRec(k,true); if(!m)return;
+  if(m.ctrl&&!m.diff){m.diff=ctrlDiff(m.ctrl,readPanel());delete m.ctrl;}   // old snapshot → a diff against today's base
+  if(presetName!==undefined){m.name=presetName||null;m.diff={};}
+  const base=readPanel();
+  _sentEdit={rec:m,base,k,cap:!!capRange};
+  writeControls({...phraseStart(m,base),...(m.diff||{})});
+  if(typeof insTab==="function")insTab("style");
+  sentEditBanner(); if(capRange)renderCapsView(true); else renderSentsView(true);
+  if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
+  const t0=capRange?capRange[0]:(sentInfo(k)||{}).start; if(t0!=null&&videoLoaded){try{video.currentTime=t0+0.05;}catch(_){}}
+  setStatus("✎ Редагуєш стиль "+(capRange?"титру ":"речення ")+(k+1)+" — усі налаштування Style діють тільки на нього. ✓ Готово — назад до всіх.","ok");
+}
+function sentEditDone(reset){
+  const E=_sentEdit; if(!E)return;
+  const m=E.rec, start=phraseStart(m,E.base);
+  m.diff=ctrlDiff(readPanel(),start);
+  _sentEdit=null;
+  const arr=curPhraseStyles();
+  if(reset||(!m.name&&!Object.keys(m.diff).length)){const i=arr.indexOf(m); if(i>=0)arr.splice(i,1);}
+  writeControls(E.base); _effCache={k:"",t:0,v:null};
+  sentEditBanner(); if(txtView==="caps")renderCapsView(true); else renderSentsView(true);
+  if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
+  if(typeof saveProjectSoon==="function")saveProjectSoon();
+  setStatus(reset?"↺ Речення знову в стилі титрів.":("✓ Стиль речення збережено ("+(Object.keys(m.diff).length||"без")+" змін"+(m.name?", з пресету «"+m.name+"»":"")+")."),"ok");
+}
+function sentEditBanner(){
+  const pane=document.querySelector("#quickPanel .ipane[data-ip='style']")||$("panelContent"); if(!pane)return;
+  let b=$("sentEditBar");
+  if(!_sentEdit){if(b)b.remove(); document.body.classList.remove("sentedit"); return;}
+  if(!b){b=document.createElement("div");b.id="sentEditBar";pane.insertBefore(b,pane.firstChild);}
+  const inf=_sentEdit.cap?{text:capText(_sentEdit.k)}:(sentInfo(_sentEdit.k)||{text:""});
+  b.innerHTML="<div><b>✎ Редагуєш "+(_sentEdit.cap?"титр ":"речення ")+(_sentEdit.k+1)+"</b>"+(_sentEdit.rec.name?" · з пресету «"+String(_sentEdit.rec.name).replace(/</g,"&lt;")+"»":"")+"<br><span>«"+String(inf.text).replace(/</g,"&lt;").slice(0,60)+"»</span></div>"
+    +"<button type='button' id='seDone' class='primary'>✓ Готово</button><button type='button' id='seReset' class='ghost' title='Прибрати свій стиль речення'>↺ Як у всіх</button>";
+  document.body.classList.add("sentedit");
+  $("seDone").onclick=()=>sentEditDone(false); $("seReset").onclick=()=>sentEditDone(true);
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&_sentEdit&&!(e.target&&e.target.closest&&e.target.closest("input,textarea,[contenteditable='true']")))sentEditDone(false);});
+// while editing, every panel change re-lays the caption (the server layout uses the regions too)
+["input","change"].forEach(ev=>document.addEventListener(ev,e=>{if(!(e.target&&e.target.closest&&e.target.closest("#panelContent,#quickPanel")))return;
+  if(_sentEdit){if(typeof scheduleLayout==="function")scheduleLayout();}
+  clearTimeout(window._pdT); window._pdT=setTimeout(()=>{if(typeof presetDirtyCheck==="function")presetDirtyCheck();},150);},true));
+// right-click a sentence (or the words you selected) → everything you can do with it
+function sentContext(e){
+  const row=e.target.closest&&e.target.closest(".srow"); if(!row)return;
+  e.preventDefault();
+  const k=+row.dataset.k, inf=sentInfo(k); if(!inf)return;
+  const S=sentSelWords(), sel=S&&!S.edited&&S.k===k?S:null;
+  const ws=realWords||[], r=_sentRanges[k];
+  const i0=sel?sel.i0:r[0], i1=sel?sel.i1:r[1]-1;
+  const allAcc=ws.slice(i0,i1+1).every(w=>w.accent);
+  const wEl=e.target.closest("[data-wi]"), wi=wEl?+wEl.dataset.wi:-1;
+  const m=sentRec(k,false);
+  const what=sel?"«"+ws.slice(i0,i1+1).map(w=>w.word).join(" ").slice(0,30)+"»":"речення "+(k+1);
+  ctxMenu(e,[{head:what+" · голос"},
+    {label:"▶ Програти",on:()=>{if(videoLoaded){video.currentTime=Math.max(0,inf.start-0.05);_sentStopAt=inf.end+0.12;video.play();}}},
+    {label:"🎙 Переозвучити речення",on:()=>voiceSentences(k,k+1)},
+    {label:"✂ Вирізати речення",on:()=>cutSentences(k,k+1)},
+    "-",{label:"Розриви, виділення, стиль титру → вкладка Captions",on:()=>document.querySelector("#txtViewSeg button[data-v=caps]").click()}]);
+}
+// ======================= Captions tab: the captions exactly as on screen =======================
+// One card = one caption from the SAME layout the render uses (server /api/layout). The text is
+// not typed here (Text / Sentences are for that) — here you shape what's on screen: ↵ line breaks,
+// new captions, merging, highlighted words, a caption's own style, word timing [ / ].
+var _caps=[], _capsSig="", _capsCaret=null, _capSel=-1;
+function capsList(){
+  const L=serverLayout, ws=realWords||[]; if(!L||!ws.length)return [];
+  const idx=new Map(); ws.forEach((w,i)=>{const k=(+w.start).toFixed(2); if(!idx.has(k))idx.set(k,i);});
+  const caps=[]; let last=null;
+  for(const e of L){const fw=[].concat(...(e.lines||[])); if(!fw.length)continue; const key=(+fw[0].start).toFixed(3);
+    if(!last||last.key!==key){last={key,a:+fw[0].start,b:+e.end,lines:e.lines.map(l=>l.map(w=>({text:w.text,start:+w.start,accent:!!w.accent,i:idx.has((+w.start).toFixed(2))?idx.get((+w.start).toFixed(2)):-1})))};caps.push(last);}
+    else last.b=Math.max(last.b,+e.end);}
+  caps.forEach((c,k)=>{c.next=caps[k+1]?caps[k+1].a:c.b+0.05; c.words=[].concat(...c.lines).filter(w=>w.i>=0);});
+  return caps;
+}
+function capText(k){const c=_caps[k]; return c?c.lines.map(l=>l.map(w=>w.text).join(" ")).join(" / "):"";}
+function capRec(k){const c=_caps[k]; return c?recFor(c.a,c.next,false):null;}
+function renderCapsView(force){
+  const box=$("transcriptCaps"); if(!box||txtView!=="caps")return;
+  if(!realWords||!realWords.length){box.innerHTML="<div class='chint'>Спершу ① Transcribe — тут з'являться титри рівно як на екрані.</div>";capsHelp();return;}
+  if(!serverLayout||_layoutKey!==layoutKey()){box.innerHTML="<div class='chint'>Будую титри…</div>"; if(typeof fetchLayout==="function")fetchLayout(); return;}
+  const caps=capsList(), sig=JSON.stringify(caps.map(c=>[c.a,c.lines.map(l=>l.map(w=>w.text+(w.accent?"*":"")))]))+"|"+JSON.stringify(curPhraseStyles().map(m=>[m.start,m.name||"",m.diff||0]))+(_sentEdit?_sentEdit.k:"");
+  const focused=box.contains(document.activeElement);
+  if(!force&&sig===_capsSig)return;
+  _caps=caps; _capsSig=sig;
+  const esc=t=>String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  const st=box.scrollTop;
+  box.innerHTML="<div class='chelp'>"+CAPS_HELP_SHORT+"</div>"+caps.map((c,k)=>{const m=recFor(c.a,c.next,false), ed=_sentEdit&&_sentEdit.cap&&_sentEdit.rec===m&&m;
+    return "<div class='ccard"+(m?" cown":"")+(ed?" sedit":"")+(k===_capSel?" csel":"")+"' data-c='"+k+"' data-a='"+c.a+"' data-b='"+c.b+"'>"
+      +"<div class='chead'><button type='button' class='ctime' data-cgo='"+k+"' title='Програти цей титр'>"+_fmtT(c.a)+" ▶</button><span class='cdur'>"+(c.b-c.a).toFixed(1)+" с</span>"
+      +(m?"<span class='cstyle' title='У титру свій стиль'>🎨 "+esc(m.name||"свій")+"</span>":"")+"<span style='flex:1'></span>"
+      +(k<caps.length-1?"<button type='button' class='cbtn cmerge' data-cmerge='"+k+"' title='Злити цей титр з наступним в один'>⊕ злити ↓</button>":"")
+      +"<button type='button' class='cbtn' data-cmenu='"+k+"' title='Дії з титром'>⋯</button></div>"
+      +"<div class='ctext' contenteditable='true' spellcheck='false' data-c='"+k+"'>"
+      +c.lines.map(l=>"<div class='cline'>"+l.map(w=>{const dt=w.i>=0&&typeof dateAt==="function"&&dateAt(w.i);
+          return "<span data-wi='"+w.i+"' class='w"+(w.accent?" wacc":"")+(dt?" wdate":"")+(w.i===_wSel?" wsel":"")+"'>"+esc(w.text)+"</span>";}).join(" ")+"</div>").join("")
+      +"</div></div>";}).join("")||"<div class='chint'>Титрів поки нема.</div>";
+  box.scrollTop=st;
+  if(_capsCaret!=null){const sp=box.querySelector("[data-wi='"+_capsCaret+"']"); _capsCaret=null;
+    if(sp){const card=sp.closest(".ctext"); card.focus(); const r=document.createRange(); r.setStart(sp.firstChild||sp,0); r.collapse(true); const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);}}
+  else if(focused){/* the caret was lost by the rebuild — leave focus on the box */}
+  capsHelp();
+}
+// the word BEFORE the caret (a break goes after it) — inside one caption card
+function capCaretWord(card){
+  const sel=window.getSelection(); if(!sel.rangeCount)return -1;
+  const n=sel.anchorNode, off=sel.anchorOffset, el=n&&(n.nodeType===1?n:n.parentElement);
+  if(!card.contains(el))return -1;
+  const spans=[...card.querySelectorAll("[data-wi]")];
+  const sp=el.closest&&el.closest("[data-wi]");
+  if(sp){const j=spans.indexOf(sp); return (n.nodeType===3&&off===0)?j-1:j;}
+  // caret between spans / at a line start: the last span that comes before the caret
+  const r=sel.getRangeAt(0); let j=-1;
+  spans.forEach((x,q)=>{const rr=document.createRange(); rr.selectNode(x); if(rr.compareBoundaryPoints(Range.END_TO_START,r)<=0)j=q;});
+  return j;
+}
+function capBreak(card,kind){
+  const k=+card.dataset.c, c=_caps[k]; if(!c)return;
+  const spans=[...card.querySelectorAll("[data-wi]")], j=capCaretWord(card);
+  if(j<0||j>=spans.length-1){setStatus(kind==="nl"?"↵ Постав курсор між словами — там почнеться новий рядок.":"✂ Постав курсор між словами — там почнеться новий титр.","");return;}
+  const i=+spans[j].dataset.wi; if(i<0)return;
+  const ws=(realWords||[]).map(w=>({...w})), on=ws[i].brk!==kind;
+  ws[i].brk=on?kind:null; _capsCaret=+spans[j+1].dataset.wi;
+  if(kind==="soft"&&on&&ws[i+1])unmergeAt(+ws[i+1].start);
+  commitWords(ws);
+  setStatus(kind==="nl"?(on?"↵ Новий рядок після «"+ws[i].word+"». Enter там само ще раз — прибрати.":"↵ Розрив рядка прибрано."):(on?"✂ Новий титр з «"+(ws[i+1]||{}).word+"». Shift+Enter там само — злити назад.":"Титри злито."),"ok");
+}
+function capMerge(k){
+  const c=_caps[k], n=_caps[k+1]; if(!c||!n)return;
+  const lw=c.words[c.words.length-1]; if(!lw)return;
+  const ws=(realWords||[]).map(w=>({...w})), w=ws[lw.i], nx=ws[lw.i+1];
+  if(w&&w.brk==="soft"){w.brk=null; commitWords(ws); setStatus("⊕ Злито з наступним титром.","ok"); return;}
+  const lines=c.lines.length+n.lines.length;
+  if(lines>4){setStatus("⊕ Разом вийшло б "+lines+" рядків — забагато для одного титру.","");return;}
+  const end=/[.!?…]["»”']?$/.test(w&&w.word||""), pause=nx?(+nx.start-(+w.end)):0;
+  if(end||pause>0.5){   // split by a sentence end / a pause → the designer says «together anyway»
+    w.brk="join";
+    const mine=capRec(k), theirs=capRec(k+1);
+    const maxL=+((mine&&mine.diff&&mine.diff.maxLines)||readControls().maxLines||2);
+    if(lines>maxL||mine||theirs){   // own styles / more lines → one region over both, or the region edge would split them again
+      const diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
+      const arr=curPhraseStyles(); [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
+      mergeRec(c,n,mine,theirs,diff,name,Math.max(lines,maxL)); _effCache={k:"",t:0,v:null};}
+    commitWords(ws);
+    setStatus("⊕ Злито"+(end?" через кінець речення":" через паузу "+pause.toFixed(1)+" с")+". Розділити знову — Shift+Enter між ними.","ok");
+    return;}
+  // the next caption only exists because this one hit the style's line limit → give THESE two
+  // captions room for all their lines (their own style: more lines), so they become one
+  const mine=capRec(k), theirs=capRec(k+1), diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
+  const arr=curPhraseStyles();
+  [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
+  const m=mergeRec(c,n,mine,theirs,diff,name,lines);
+  _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
+  if(typeof saveProjectSoon==="function")saveProjectSoon();
+  setStatus("⊕ Злито: один титр на "+lines+" рядки. Повернути — правий клік → ↺ Стиль як у всіх.","ok");
+}
+// a merged pair keeps what each caption had, so splitting it again gives each its own style back
+// (instead of the first caption's look spreading over the second one — «everything went UPPERCASE»)
+function mergeRec(c,n,mine,theirs,diff,name,lines){
+  const snap=(x,a,b)=>({start:a,end:b,diff:x&&x.diff?{...x.diff}:null,name:x&&x.name||null,parts:x&&x.parts||null});
+  const m=recFor(c.a,n.next,true); m.diff={...diff,maxLines:lines}; if(name)m.name=name;
+  m.parts=[].concat(mine&&mine.parts?mine.parts:[snap(mine,fl3(c.a),fl3(n.a-0.0005))], theirs&&theirs.parts?theirs.parts:[snap(theirs,fl3(n.a),fl3(n.next-0.0005))]);
+  return m;
+}
+// a new caption (Shift+Enter) inside a merged pair → undo the merge there: the parts get their own styles back
+function unmergeAt(t){
+  const arr=curPhraseStyles(), m=arr.find(x=>x.parts&&t>x.start&&t<x.end); if(!m)return false;
+  arr.splice(arr.indexOf(m),1);
+  m.parts.forEach(p=>{if(p.diff&&Object.keys(p.diff).length||p.name||p.parts){const q={start:p.start,end:p.end,diff:p.diff||{}}; if(p.name)q.name=p.name; if(p.parts)q.parts=p.parts; arr.push(q);}});
+  arr.sort((x,y)=>x.start-y.start); _effCache={k:"",t:0,v:null}; return true;
+}
+function capMergeLines(a,lines){
+  const k=_caps.findIndex(c=>Math.abs(c.a-a)<0.01); const c=_caps[k], n=_caps[k+1]; if(!c||!n)return;
+  const mine=capRec(k), theirs=capRec(k+1), diff={...((theirs&&theirs.diff)||{}),...((mine&&mine.diff)||{})}, name=(mine&&mine.name)||null;
+  const arr=curPhraseStyles(); [mine,theirs].forEach(m=>{const i=m?arr.indexOf(m):-1; if(i>=0)arr.splice(i,1);});
+  const m=mergeRec(c,n,mine,theirs,diff,name,lines);
+  _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();
+  setStatus("⊕ Злито: один титр на "+lines+" рядки. Розділити — Shift+Enter між ними або ↺ у правому кліку.","ok");
+}
+function capContext(e,kForce){
+  const card=e.target.closest&&e.target.closest(".ccard"); const k=kForce!=null?kForce:(card?+card.dataset.c:-1), c=_caps[k]; if(!c)return;
+  e.preventDefault();
+  const S=sentSelWords(), sel=S&&S.cap&&S.k===k?S:null, ws=realWords||[];
+  const wEl=e.target.closest&&e.target.closest("[data-wi]"), wi=wEl?+wEl.dataset.wi:-1;
+  const i0=sel?sel.i0:wi, i1=sel?sel.i1:wi;
+  const m=capRec(k), lastI=c.words.length?c.words[c.words.length-1].i:-1;
+  const acc=i0>=0&&ws.slice(i0,i1+1).every(w=>w.accent);
+  ctxMenu(e,[{head:"Титр "+(k+1)+" · «"+capText(k).slice(0,32)+"»"},
+    i0>=0?{label:(acc?"✦ Прибрати виділення":"✦ Виділити")+" «"+ws.slice(i0,i1+1).map(w=>w.word).join(" ").slice(0,24)+"»",on:()=>sentAccent(i0,i1,!acc)}:null,
+    {label:"✎ Стиль цього титру…",title:"Праві вкладки Style редагують тільки цей титр",on:()=>sentEditStart(k,undefined,[c.a,c.next])},
+    {label:"🎨 Стиль з пресету ▸",on:()=>setTimeout(()=>ctxMenu(e,[{head:"Титр "+(k+1)+" у стилі"}].concat(presetNames().map(n=>({label:String(n).replace(/</g,"&lt;"),on:()=>sentEditStart(k,n,[c.a,c.next])})))),0)},
+    m?{label:"↺ Стиль як у всіх",on:()=>{const arr=curPhraseStyles(),i=arr.indexOf(m); if(i>=0)arr.splice(i,1); _effCache={k:"",t:0,v:null}; if(typeof invalidateLayout==="function")invalidateLayout(); scheduleExact();}}:null,
+    "-",
+    (wi>=0&&wi!==lastI)?{label:(ws[wi].brk==="nl"?"↵ Прибрати розрив після «":"↵ Новий рядок після «")+ws[wi].word+"»",on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="nl"?null:"nl";commitWords(W2);}}:null,
+    (wi>=0&&wi!==lastI)?{label:(ws[wi].brk==="soft"?"⊕ Злити тут назад":"✂ Новий титр після «"+ws[wi].word+"»"),on:()=>{const W2=ws.map(w=>({...w}));W2[wi].brk=W2[wi].brk==="soft"?null:"soft"; if(W2[wi].brk==="soft"&&W2[wi+1])unmergeAt(+W2[wi+1].start); commitWords(W2);}}:null,
+    k<_caps.length-1?{label:"⊕ Злити з наступним",on:()=>capMerge(k)}:null,
+    {label:"▶ Програти титр",on:()=>{if(videoLoaded){video.currentTime=Math.max(0,c.a);_sentStopAt=c.b;video.play();}}}]);
+}
+(function wireCaps(){
+  const box=$("transcriptCaps"); if(!box)return;
+  box.addEventListener("contextmenu",e=>{if(e.target.closest(".ccard"))capContext(e);});
+  box.addEventListener("click",e=>{
+    const go=e.target.closest("[data-cgo]"); if(go){const c=_caps[+go.dataset.cgo]; if(c&&videoLoaded){video.currentTime=Math.max(0,c.a);_sentStopAt=c.b;video.play();} return;}
+    const mg=e.target.closest("[data-cmerge]"); if(mg){mg.blur();capMerge(+mg.dataset.cmerge);return;}
+    const mn=e.target.closest("[data-cmenu]"); if(mn){mn.blur();capContext(e,+mn.dataset.cmenu);return;}
+    const card=e.target.closest(".ccard");
+    if(card&&!e.target.closest("[data-wi]")&&window.getSelection().isCollapsed){   // a click on the card's free space = select this caption
+      box.querySelectorAll(".ccard.csel").forEach(x=>x.classList.remove("csel")); card.classList.add("csel"); _capSel=+card.dataset.c;
+      const c=_caps[_capSel]; if(c&&videoLoaded){if(!video.paused)video.pause(); video.currentTime=c.a+0.5/fps(); if(typeof scheduleExact==="function")scheduleExact();}
+      const ct=card.querySelector(".ctext"); if(ct&&!e.target.closest(".ctext"))ct.focus({preventScroll:true});
+      return;}
+    const sp=e.target.closest(".ctext [data-wi]"); if(sp&&window.getSelection().isCollapsed){const i=+sp.dataset.wi; if(i<0)return;
+      _wSel=i; box.querySelectorAll(".wsel").forEach(x=>x.classList.remove("wsel")); sp.classList.add("wsel");
+      const w=(realWords||[])[i]; if(w&&videoLoaded){if(!video.paused)video.pause(); video.currentTime=Math.max(0,+w.start+0.5/fps()); if(typeof scheduleExact==="function")scheduleExact();}
+      if(typeof updateWordTools==="function")updateWordTools();}
+  });
+  box.addEventListener("keydown",e=>{
+    const card=e.target.closest&&e.target.closest(".ctext"); if(!card)return;
+    if(e.key==="Enter"){e.preventDefault(); capBreak(card,e.shiftKey?"soft":"nl"); return;}
+    if(e.key==="["||e.key==="]"){e.preventDefault(); const spans=[...card.querySelectorAll("[data-wi]")], j=capCaretWord(card), i=_wSel>=0?_wSel:(j>=0?+spans[j].dataset.wi:-1);
+      if(i>=0){_wSel=i; setWordEdge(e.key==="["?"start":"end");} return;}
+    if(e.key==="Escape"){card.blur();return;}
+    if(/^(Arrow|Home|End|PageUp|PageDown|Tab|Shift|Alt|Meta|Control)/.test(e.key))return;
+    if((e.metaKey||e.ctrlKey)&&/^[acz]$/i.test(e.key))return;   // copy / select all / undo stay
+    e.preventDefault();
+    if(!window._capsTypeTold){window._capsTypeTold=1;setStatus("Тут титри як на екрані: Enter — новий рядок, Shift+Enter — новий титр, правий клік — ще. Сам текст правиться в Text або Sentences.","");}
+  });
+  ["paste","drop","cut","beforeinput"].forEach(ev=>box.addEventListener(ev,e=>{if(e.target.closest&&e.target.closest(".ctext"))e.preventDefault();}));
+})();
+// the cheat-sheet lives in the empty space right of the picture while Captions is open
+const CAPS_HELP_SHORT="<b>Клік по картці</b> — вибрати титр · <b>Enter</b> — новий рядок · <b>Shift+Enter</b> — новий титр · <b>⊕ злити ↓</b> — з наступним в один · <b>правий клік</b> — ✦ виділити слова, ✎ стиль титру, 🎨 пресет, ↺ · <b>клік по слову</b> — плейхед, <b>[ / ]</b> — початок / кінець слова. Текст — у Text, голос — у Sentences.";
+function capsHelp(){const h=$("capsHelp"); if(h)h.style.display="none";}   // the help now sits at the top of the Captions list (left)
+const CAPS_HELP="<b>Captions — титри як на екрані</b><ul>"
+      +"<li><b>Одна картка = один титр</b>, рівно як у кадрі: його рядки, час і стиль.</li>"
+      +"<li><b>Enter</b> — новий рядок у цьому титрі.</li>"
+      +"<li><b>Shift+Enter</b> — розрізати на два титри в цьому місці.</li>"
+      +"<li><b>⊕</b> — злити з наступним (якщо влазить у ліміт рядків стилю).</li>"
+      +"<li><b>Правий клік</b>: ✦ виділити слова · ✎ стиль цього титру · 🎨 з пресету · ↺ як у всіх.</li>"
+      +"<li><b>Клік по слову</b> — плейхед туди; <b>[ / ]</b> — початок / кінець слова на кадр плейхеда.</li>"
+      +"<li>Сам текст — у <b>Text</b>, голос (🎙 👄 📅) — у <b>Sentences</b>.</li></ul>";
+window.addEventListener("resize",()=>{clearTimeout(window._chT);window._chT=setTimeout(capsHelp,200);});
 function sentPhraseStyle(i0,i1,name){
   const ws=realWords||[]; if(!ws[i0]||!ws[i1])return;
   const a=+ws[i0].start, b=ws[i1+1]?Math.max(+ws[i1].start+0.001,+ws[i1+1].start-0.0005):+ws[i1].end+0.05;
   const arr=curPhraseStyles();
   for(let j=arr.length-1;j>=0;j--)if(arr[j].end>a&&arr[j].start<b)arr.splice(j,1);   // one style per word: the new one replaces what it overlaps
-  if(name)arr.push({start:+a.toFixed(3),end:+b.toFixed(3),name,ctrl:presetToCtrl(name)});
+  if(name)arr.push({start:+a.toFixed(3),end:+b.toFixed(3),name,diff:{}});   // the preset by NAME (edits to it follow), the caption's position
   arr.sort((x,y)=>x.start-y.start);
   sentToolHide(); window.getSelection().removeAllRanges();
   _effCache={k:"",t:0,v:null};
   if(typeof invalidateLayout==="function")invalidateLayout(); if(typeof scheduleExact==="function")scheduleExact();
   if(typeof saveProjectSoon==="function")saveProjectSoon();
   renderSentsView(true);
+  if(txtView==="caps")renderCapsView(true);
   setStatus(name?"🎨 «"+ws.slice(i0,i1+1).map(w=>w.word||w.text).join(" ")+"» — окремий титр у стилі "+name+".":"🎨 Окремий стиль фрази прибрано.","ok");
 }
 window.addEventListener("scroll",e=>{const t=$("sentTool");if(t&&t.style.display!=="none"&&!t.contains(e.target))sentToolHide();},true);
-document.addEventListener("selectionchange",()=>{clearTimeout(window._stT);window._stT=setTimeout(()=>{if(txtView==="sents")sentToolShow();else sentToolHide();},120);});
+document.addEventListener("selectionchange",()=>{clearTimeout(window._stT);window._stT=setTimeout(()=>{if(txtView==="caps")sentToolShow();else sentToolHide();},120);});
 function renderSentBar(canVoice){
   const bar=$("sentBar"); if(!bar)return;
   const _st=rvUndoStack(), undo=!!(_st&&_st.length&&_st[_st.length-1].kind==="revoice"), n=_sentPick?(_sentPick[1]-_sentPick[0]):0;
@@ -4343,6 +5076,9 @@ function renderSentBar(canVoice){
     +"<button type='button' id='sentCutPick' class='ghost' style='font-size:11px;padding:6px 10px' title='Вирізати виділені речення з відео і звуку'>✂ Cut "+n+" sentences</button>"
     +"<button type='button' id='sentPickX' class='ghost' style='font-size:11px;padding:6px 8px' title='Зняти виділення (Esc)'>✕</button>";
   if(undo)h+="<button type='button' id='sentUndo' class='ghost' style='font-size:11px;padding:6px 10px' title='Повернути звук і текст до цієї переозвучки'>↩ Undo re-voice</button>";
+  {const _mo=mixHolder(), cur=_mo&&((_mo.mix&&_mo.mix.base)||_mo.clip);
+   if(undo&&_lastRv&&_lastRv.clip===cur&&_lastRv.list.length)h+="<button type='button' id='sentLips' class='primary' style='font-size:11px;padding:6px 10px' title='Підігнати губи під нову озвучку (Sync Lipsync-2-Pro через WaveSpeed). Картинка не перемальовується, тільки рот'>👄 Губи під озвучку ("+_lastRv.list.length+")</button>";}
+  {const D=findDates(realWords||[]); if(D.length)h+="<button type='button' id='sentDates' class='"+(_datePanelOn?"primary":"ghost")+"' style='font-size:11px;padding:6px 10px' title='Знайдені дати — замінити всі разом (голос + губи)'>📅 Dates · "+D.length+"</button>";}
   h+="<span style='flex:1;min-width:150px'>Правиш текст у рядку — титр міняється одразу; 🎙 — щоб змінився і звук. Довжина кліпу не зміниться.</span>";
   bar.innerHTML=h; bar.style.display=(txtView==="sents")?"flex":"none";
   if($("sentVoicePick"))$("sentVoicePick").onclick=()=>voiceSentences(_sentPick[0],_sentPick[1]);
@@ -4350,6 +5086,8 @@ function renderSentBar(canVoice){
   if($("sentCutPick"))$("sentCutPick").onclick=()=>cutSentences(_sentPick[0],_sentPick[1]);
   if($("sentPickX"))$("sentPickX").onclick=()=>{_sentPick=null;renderSentsView(true);};
   if($("sentUndo"))$("sentUndo").onclick=undoRevoice;
+  if($("sentLips"))$("sentLips").onclick=()=>{const W=realWords||[]; datesLips(_lastRv.list.map(x=>{const ns=W.findIndex(w=>+w.end>x.a); let ne=ns; while(ne<W.length&&+W[ne].start<x.b)ne++; return {...x,ns:Math.max(0,ns),ne:Math.max(ns+1,ne)};}),"переозвучка","lipsync");};
+  if($("sentDates"))$("sentDates").onclick=()=>{_datePanelOn=!_datePanelOn;renderDatePanel();renderSentBar(canVoice);};
 }
 function cutSentences(k0,k1){
   const a=_sentRanges[k0], b=_sentRanges[k1-1], ws=realWords||[]; if(!a||!b||!ws[a[0]]||!ws[b[1]-1])return;
@@ -4376,6 +5114,7 @@ function voiceSentences(k0,k1){
 }
 (function wireSents(){
   const box=$("transcriptSents"); if(!box)return;
+  box.addEventListener("contextmenu",sentContext);
   box.addEventListener("click",e=>{
     const t=e.target.closest&&e.target.closest("[data-sk]");
     if(t){const k=+t.dataset.sk;
@@ -4384,6 +5123,8 @@ function voiceSentences(k0,k1){
       const inf=sentInfo(k); if(inf&&video&&videoLoaded){try{video.currentTime=Math.max(0,inf.start-0.05);_sentStopAt=inf.end+0.12;video.play();}catch(_){}}
       return;}
     const vb=e.target.closest&&e.target.closest("[data-svoice]"); if(vb){const k=+vb.dataset.svoice;voiceSentences(k,k+1);return;}
+    const wi=e.target.closest&&e.target.closest(".stext [data-wi]");   // click a word → the playhead jumps there (like Words)
+    if(wi&&videoLoaded&&video.paused&&window.getSelection().isCollapsed){const w=(realWords||[])[+wi.dataset.wi]; if(w){video.currentTime=Math.max(0,+w.start+0.5/fps());if(typeof scheduleExact==="function")scheduleExact();}}
     const rv=e.target.closest&&e.target.closest("[data-srevert]");
     if(rv){const inf=sentInfo(+rv.dataset.srevert); if(inf)inf.changes.slice().sort((x,y)=>y.ns-x.ns).forEach(revertSpan); renderSentsView(true); return;}
     const cb=e.target.closest&&e.target.closest("[data-scut]"); if(cb){const k=+cb.dataset.scut;cutSentences(k,k+1);return;}
@@ -4391,11 +5132,14 @@ function voiceSentences(k0,k1){
   });
   box.addEventListener("input",e=>{
     const s=e.target.closest&&e.target.closest(".stext");
-    if(s){const k=+s.dataset.k, rs=_sentRanges; if(!realWords||!rs[k])return;
-      // rebuild the full text with this row replaced; other rows keep their own words (and breaks)
-      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/\s+/g," ").trim():wordsToText(realWords.slice(r[0],r[1])));
-      const full=parts.map((p,i)=>p+((i<rs.length-1&&realWords[rs[i][1]-1]&&realWords[rs[i][1]-1].brk==="soft"&&i!==k)?"\n":"")).join(" ");
-      realWords=parseBreaksToWords(full,realWords); if(variants[activeVar])variants[activeVar].words=realWords;
+    if(s){const k=+s.dataset.k, S0=_sentSnap, rs=S0&&S0.ranges; if(!realWords||!rs||!rs[k])return;
+      // rebuild the full text from the SNAPSHOT the rows were drawn from: this row's new text +
+      // every other row's own words. (Using the live words with row ranges from before a new full
+      // stop split a sentence duplicated words — "challenge. challenge. challenge.")
+      const B=S0.words;
+      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/↵/g," | ").replace(/\s+/g," ").trim():wordsToText(B.slice(r[0],r[1])));
+      const full=parts.map((p,i)=>p+((i<rs.length-1&&B[rs[i][1]-1]&&B[rs[i][1]-1].brk==="soft"&&i!==k)?"\n":"")).join(" ");
+      realWords=parseBreaksToWords(full,B); if(variants[activeVar])variants[activeVar].words=realWords;
       const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords);
       if(typeof invalidateLayout==="function")invalidateLayout();
       if(typeof scheduleExact==="function")scheduleExact();
@@ -4406,7 +5150,9 @@ function voiceSentences(k0,k1){
   });
   box.addEventListener("keydown",e=>{
     if(e.key==="Escape"&&_sentPick){e.preventDefault();_sentPick=null;renderSentsView(true);return;}
-    if(e.key==="Enter"&&e.target.classList&&e.target.classList.contains("stext")){e.preventDefault();e.target.blur();}   // Enter = done (line breaks belong to the Text tab)
+    if(e.key==="Enter"&&e.target.classList&&e.target.classList.contains("stext")){e.preventDefault();
+      e.target.blur();
+      if(!window._capsTold){window._capsTold=1;setStatus("Розриви рядків і титрів тепер у вкладці Captions — там видно титри рівно як на екрані.","");}}
   });
   box.addEventListener("focusout",e=>{ if(e.target.classList&&e.target.classList.contains("stext"))setTimeout(()=>{if(!box.contains(document.activeElement)||!document.activeElement.classList.contains("stext"))renderSentsView(true);},0); });
   if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{
@@ -4623,7 +5369,7 @@ if($("tbBody"))$("tbBody").onclick=()=>toolPop($("tbBody"),[
 // State = plain data only. Blob URLs and history (↩ snapshots) are not saved: clips are re-served
 // from the session folder, and History starts fresh after opening a project.
 let _projName="", _projSavedKey="", _projTimer=null, _projBusy=false;
-const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_rdTo","_cutsDone","pick"]);
+const PROJ_SKIP=new Set(["videoUrl","peaks","_rvFrom","_rdTo","_cutsDone","pick"]);   // gen (✨ layer) is saved: base + pieces
 function _projClean(o){return JSON.parse(JSON.stringify(o,(k,v)=>{
   if(PROJ_SKIP.has(k))return undefined;
   if(v instanceof Set||v instanceof Map)return undefined;
@@ -4845,6 +5591,7 @@ function drawLanes(){
   $("laneMusic").style.display=hasMu?"":"none"; $("laneSfx").style.display=hasFx?"":"none";
   if($("addMusicBtn"))$("addMusicBtn").style.display=hasMu?"none":"";
   drawWave(o);
+  if(typeof drawGenLane==="function")drawGenLane();
   renderLaneEdit();
   // the music follows the trim / body: when its zone moves, re-mix (debounced)
   if(m&&m.music&&!m.music.mute){const k=JSON.stringify(musicZone(o));const was=_zoneKey.get(m);_zoneKey.set(m,k);if(was!=null&&was!==k)mixSoon(o,700);}
@@ -5054,6 +5801,7 @@ function pieces(){const dur=video.duration||0, s=splitsOf(); const pts=[0].conca
 function pieceAt(t){return pieces().find(([a,b])=>t>=a&&t<b)||null;}
 function drawSplits(){
   const bar=$("trimBar"),dur=video.duration||0; if(!bar)return;
+  if(typeof drawDateMarks==="function")drawDateMarks();
   let box=$("trimSplits"); if(!box){box=document.createElement("div");box.id="trimSplits";bar.appendChild(box);}
   box.innerHTML=dur?splitsOf().map(t=>"<i data-split='"+t+"' style='left:"+(t/dur*100)+"%' title='Розріз "+tc(t)+" · подвійний клік — прибрати · правий клік — меню'></i>").join(""):"";
   box.querySelectorAll("[data-split]").forEach(el=>{el.ondblclick=e=>{e.preventDefault();e.stopPropagation();removeSplit(+el.dataset.split);};});
@@ -5146,7 +5894,21 @@ function moreMenu(ev){
   ctxMenu(ev,[{head:"More"},
     {label:"⚙ Normalize for the board",title:"Підготувати кліп до збірки без титрів (швидке склеювання на дошці)",disabled:!vis("normalizeBtn"),on:()=>$("normalizeBtn").click()},
     {label:"⬇ SRT",title:"Титри файлом .srt",disabled:!vis("srtBtn"),on:()=>$("srtBtn").click()},
-    {label:"→ LOC",title:"Відправити кліп у локалізації",disabled:!vis("sLocBtn"),on:()=>$("sLocBtn").click()}]);
+    {label:"→ LOC",title:"Відправити кліп у локалізації",disabled:!vis("sLocBtn"),on:()=>$("sLocBtn").click()},
+    "-",{label:"123 Числа цифрами",title:"«twenty-eight day», «four weeks» → «28-day», «4 weeks» у вже готовому транскрипті (новий Transcribe робить це сам)",disabled:!(realWords&&realWords.length),on:digitsNow}]);
+}
+// 123: the same clean-up the server runs after every transcribe, for a transcript made before it
+async function digitsNow(){
+  const v=variants[activeVar]; if(!realWords||!realWords.length)return;
+  try{const r=await fetch(API+"/api/text/clean",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({words:realWords,orig_words:origWordsNow()||[],lang:capLang()})});
+    const d=await r.json(); if(!r.ok)throw new Error(apiErr(r,d,"clean failed"));
+    if(!d.changed){setStatus("123 Усі числа вже цифрами 👌","ok");return;}
+    const h=openHookRef();
+    if(d.orig_words&&d.orig_words.length){if(v)v.origWords=d.orig_words; if(h&&h.origWords)h.origWords=d.orig_words.map(w=>({...w}));}   // the audio SAYS the same — no re-voice prompts
+    commitWords(d.words);
+    setStatus("123 Числа цифрами: "+d.changed+" місць.","ok");
+  }catch(e){setStatus("123: "+e.message,"err");}
 }
 // ---------- Export ▾ ----------
 function exportMenu(ev){
@@ -5266,11 +6028,11 @@ function sentenceVoices(words,V){   // [{start,end,voice}] per sentence
 let _effCache={k:null,t:0,v:null};
 function effOverrides(v,words,holder){
   v=v||variants[activeVar]; words=words||realWords||(v&&v.words)||[]; holder=holder||((typeof cutHolder==="function")?cutHolder():null);
-  const manual=(v&&v.phraseStyles)||[], V=holder&&holder.voices;
+  const manual=((v&&v.phraseStyles)||[]).map(m=>({start:m.start,end:m.end,ctrl:phraseCtrl(m)})), V=holder&&holder.voices;
   const useV=!!(V&&V.on&&V.list&&V.list.some(x=>x.style)), useB=!!(V&&V.body&&V.body.on&&V.body.style&&holder&&holder.body!=null);
   if(!useV&&!useB)return manual;
-  const key=JSON.stringify([V,holder&&holder.body,manual.length,manual.map(m=>[m.start,m.end]),words.length,words.length?[words[0].start,words[words.length-1].end]:0]);
-  const now=performance.now(); if(_effCache.k===key&&now-_effCache.t<400)return _effCache.v;
+  const key=JSON.stringify([V,holder&&holder.body,manual.length,((v&&v.phraseStyles)||[]).map(m=>[m.start,m.end,m.name||"",m.diff||0]),words.length,words.length?[words[0].start,words[words.length-1].end]:0]);
+  const now=performance.now(); if(!_sentEdit&&_effCache.k===key&&now-_effCache.t<400)return _effCache.v;
   const layers=[];
   manual.forEach(m=>layers.push({start:+m.start,end:+m.end,ctrl:m.ctrl,p:3}));
   if(useB)layers.push({start:+holder.body,end:1e6,ctrl:presetToCtrl(V.body.style),p:2});
@@ -5352,6 +6114,7 @@ function cycleSentVoice(k){const V=voicesOf(); if(!V||!V.list.length)return; con
   setStatus("🗣 Речення «"+inf.text.slice(0,40)+"» → "+V.list.find(x=>x.id===nx).name+".","ok");}
 // ======================= /step 3 =======================
 function updateWordHighlight(){
+  if(txtView==="caps"){const t=video&&video.currentTime||0; document.querySelectorAll("#transcriptCaps .ccard").forEach(c=>c.classList.toggle("cur",t>=+c.dataset.a&&t<+c.dataset.b)); return;}
   if(txtView!=="words")return;
   const box=$("transcriptWords"); if(!box||box.style.display==="none")return;
   const focused=(document.activeElement===box);
@@ -6752,7 +7515,7 @@ function buildInspector(){
 }
 function insFold(c){const q=$("quickPanel"); if(!q)return; q.classList.toggle("col",c); document.body.classList.toggle("ircol",c);
   try{localStorage.setItem("cs_irCol",c?"1":"0");}catch(_){}
-  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();},320);}
+  setTimeout(()=>{if(typeof fitVideo==="function")fitVideo();if(typeof drawLanes==="function")drawLanes();if(typeof capsHelp==="function")capsHelp();},320);}
 function insTab(k){
   const q=$("quickPanel"); if(q&&q.classList.contains("col"))insFold(false);   // asking for a tab opens the panel
   document.querySelectorAll("#insTabs [data-it]").forEach(b=>b.classList.toggle("on",b.dataset.it===k));

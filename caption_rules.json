@@ -176,11 +176,11 @@
     ]
   },
   "min_last_line_words": 2,
-  "_text_rules_comment": "Clean-up applied right after transcription (both Whisper and Scribe), so the transcript box shows exactly what gets burned in. numbers: spelled-out numbers become digits. min_number: keep tiny numbers as words (2 = convert multi-word numbers or values >= 10). replace: literal word swaps (case-insensitive); %/$/€ glue onto a preceding number.",
+  "_text_rules_comment": "Clean-up applied right after transcription (both Whisper and Scribe), so the transcript box shows exactly what gets burned in. numbers: spelled-out numbers become digits. min_number: 1 = every number as digits (one / zero only before a unit like week, day, lbs); 2 = keep tiny numbers as words. replace: literal word swaps (case-insensitive); %/$/€ glue onto a preceding number.",
   "text_rules": {
     "en": {
       "numbers": true,
-      "min_number": 2,
+      "min_number": 1,
       "replace": {
         "percent": "%",
         "per cent": "%",

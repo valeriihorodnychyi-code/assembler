@@ -47,6 +47,43 @@ def test_accent_word_colour():
     assert (0, 255, 0) in cols and (255, 255, 255) in cols
 
 
+def test_accent_look_font_size_plate_italic_and_karaoke_leaves_it():
+    """✦ accent = its own look inside the caption: plate under the word, own colour, bigger,
+    italic; karaoke does NOT repaint it when it is the active word (designer's choice «a»)."""
+    from PIL import Image
+    base = {"karaoke": {"enabled": True, "active_color": [255, 0, 0, 255]}, "stroke": {"width": 0}}
+    acc = {"color": [0, 0, 255, 255], "scale": 1.3, "italic": True,
+           "plate": {"enabled": True, "color": [0, 255, 0, 255], "pad_x": 10, "pad_y": 6, "border_radius": 0}}
+    ws = _ws()
+    plain = st.normalize(base)
+    looks = st.normalize(dict(base, accent=acc))
+    def render(style, active_word):
+        tagged = compose.build_timeline(ws, [{"start": 0, "end": None, "style": style}])
+        ev = next(e for e, _ in tagged if [w["text"] for l in e["lines"] for w in l][e["active_word_index"]] == active_word)
+        p = tempfile.mktemp(suffix=".png")
+        S.render_subtitle_png(ev, p, 1080, 1920, st.resolve_font(style.get("font_name")), style, 1.0)
+        im = Image.open(p).convert("RGBA")
+        return im, {px[:3] for px in im.getdata() if px[3] == 255}
+    im, cols = render(looks, "MILITARY")
+    assert (0, 255, 0) in cols, "accent word plate missing"
+    assert (0, 0, 255) in cols, "accent colour missing"
+    assert (255, 0, 0) not in cols, "karaoke repainted the accent word"
+    w_acc = im.getbbox()[2] - im.getbbox()[0]
+    im2, _ = render(plain, "MILITARY")
+    assert w_acc > (im2.getbbox()[2] - im2.getbbox()[0]), "130 % accent must widen the line"
+
+
+def test_a_caption_with_its_own_style_holds_until_the_next_one():
+    """A region's last caption used to end as if the clip ended — it vanished before the next caption."""
+    ws = [{"word": w, "start": t, "end": t + 0.3} for w, t in (("This", 0.3), ("Monday", 0.66), ("we", 1.02), ("start", 2.3), ("now", 2.66))]
+    b, big = st.normalize({}), st.normalize({"font_size": 120})
+    one = compose.build_timeline(ws, [{"start": 0, "end": None, "style": b}])
+    two = compose.build_timeline(ws, [{"start": 0, "end": 2.0, "style": big}, {"start": 2.0, "end": None, "style": b}])
+    end_we = lambda t: next(e["end"] for e, _ in t if [w["text"] for l in e["lines"] for w in l][e["active_word_index"]] == "WE")
+    assert abs(end_we(one) - 2.3) < 1e-6 and abs(end_we(two) - 2.3) < 1e-6
+    assert not any("_nat_end" in e for e, _ in two)
+
+
 if __name__ == "__main__":
     for n, f in list(globals().items()):
         if n.startswith("test_"):

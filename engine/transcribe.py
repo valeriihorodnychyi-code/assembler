@@ -95,6 +95,32 @@ def dictate_english(audio_path: str, model_size: str = None, device: str = "cpu"
     return {"text": text, "language": getattr(info, "language", "") or ""}
 
 
+def scribe_text(audio_path: str, api_key: str = None) -> dict:
+    """A short voice note → {"text", "language"} with ElevenLabs Scribe (far better than local
+    Whisper for Ukrainian). No timestamps / diarization — this is for prompt fields."""
+    import requests  # lazy
+    api_key = api_key or os.environ.get("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise RuntimeError("ElevenLabs API key missing.")
+    with open(audio_path, "rb") as f:
+        resp = requests.post("https://api.elevenlabs.io/v1/speech-to-text", headers={"xi-api-key": api_key},
+                             files={"file": ("note.wav", f, "audio/wav")},
+                             data={"model_id": "scribe_v1", "tag_audio_events": "false"}, timeout=120)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Scribe failed ({resp.status_code}): {resp.text[:300]}")
+    p = resp.json()
+    return {"text": (p.get("text") or "").strip(), "language": lang2(p.get("language_code")) or ""}
+
+
+DICTATE_SYSTEM = (
+    "You turn a designer's spoken note into an English instruction for an AI video / sound generator "
+    "(Seedance, ElevenLabs SFX). Translate faithfully into natural, concise English; fix speech "
+    "disfluencies (repeats, 'um', false starts). Keep references like @Image 1 / @Image 2, names, "
+    "numbers, dates and quoted lines exactly; translate quoted spoken lines only if they are not in "
+    "English already. Do not add details that were not said. Output ONLY the English text, no quotes, "
+    "no comments.")
+
+
 def transcribe_scribe(video_path: str, api_key: str = None, language: str = None) -> dict:
     """ElevenLabs Scribe speech-to-text with word timestamps."""
     import requests  # lazy

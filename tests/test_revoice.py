@@ -259,6 +259,38 @@ def test_clone_is_made_from_the_speaker_who_says_the_span():
         assert b > 20 * a, f"another character's voice leaked into the clone sample at {t}s (300 Hz {a:.0f} vs 500 Hz {b:.0f})"
 
 
+def test_frankenstein_one_label_two_people_gets_a_local_clone_each():
+    """A long creative stitched from several source videos: the diarizer calls two different women
+    'speaker_0'. A date at 5 s and at 75 s must each be re-voiced from the voice NEAR it (300 Hz in
+    the first source video, 500 Hz in the second), not one blended clone."""
+    clip, out = os.path.join(TMP, "clip_fr.mp4"), os.path.join(TMP, "out_fr.mp4")
+    expr = "if(lt(t,40),0.5*sin(2*PI*300*t),0.5*sin(2*PI*500*t))"
+    sh("ffmpeg", "-y", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=25:duration=80", "-f", "lavfi",
+       "-i", f"aevalsrc='{expr}':s=44100:d=80", "-shortest", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "44100", "-ac", "2", clip)
+    words = [{"text": "w", "type": "word", "start": round(t * 0.4, 2), "end": round(t * 0.4 + 0.35, 2), "speaker_id": "speaker_0"}
+             for t in range(200)]
+
+    class F(Fake11):
+        samples = []
+
+        def post(self, url, headers=None, data=None, files=None, params=None, timeout=None):
+            if url.endswith("/v1/speech-to-text"):
+                return _R(200, {"words": words})
+            if url.endswith("/v1/voices/add"):
+                p = os.path.join(TMP, f"fr_sample_{len(F.samples)}.mp3")
+                open(p, "wb").write(files[0][1][1].read())
+                F.samples.append(p)
+            return Fake11.post(self, url, headers=headers, data=data, files=files, params=params, timeout=timeout)
+
+    spans = [dict(SPAN, a=5.0, b=5.6, lo=4.95, hi=5.8), dict(SPAN, a=75.0, b=75.6, lo=74.95, hi=75.8)]
+    res = RV.revoice(clip, spans, out, requests=F())
+    assert len(F.samples) == 2, f"one clone per far-apart line, got {len(F.samples)}"
+    first, second = F.samples
+    assert tone_power(first, 300, 1.0) > 20 * tone_power(first, 500, 1.0), "line 1 cloned from the wrong video"
+    assert tone_power(second, 500, 1.0) > 20 * tone_power(second, 300, 1.0), "line 2 cloned from the wrong video"
+    assert "клонів: 2" in res["note"]
+
+
 def test_restricted_key_says_which_permission_is_missing():
     """1.9.65 in production: a key that transcribes fine got a bare '401' on clone."""
     class F(Fake11):

@@ -1204,6 +1204,202 @@ def _regen_run(job, sdir, src, req):
         J.update(state="error", error=str(e))
 
 
+# ---------- ✨ Seedance on a PIECE of a long clip (dates, a word on the lips) ----------
+# The piece [a, b] goes up alone (Turbo: 2–15 s), comes back conformed to the clip's size / fps
+# and exact length, and waits; /api/regen/splice then puts every finished piece back into the
+# clip in ONE pass (one new file, one ↩ step). The clip's own audio stays — re-voice it first.
+class RegenPieceReq(BaseModel):
+    file_id: str
+    clip: str
+    a: float
+    b: float
+    prompt: str
+    model: str = "turbo25"          # turbo25 (Seedance 2.5 Turbo) · flash25 (2.5 Flash Turbo) · 2.5 · turbo (2.0 Fast Turbo)
+    resolution: str = "1080p"
+    refs: List[str] = []
+    keep_audio: bool = True         # Seedance: True = the clip's audio stays (lips only) · False = Seedance writes the sound too
+
+
+def _snap(t, fps):
+    return round(float(t) * fps) / fps
+
+
+def _regen_piece_run(job, sdir, src, req):
+    import requests as _rq, time as _t
+    from engine import wavespeed as ws
+    J = _REGEN[job]
+    p = compose._stream_params(src) or (None,) * 8
+    w, h, fps = int(p[0] or 1080), int(p[1] or 1920), float(p[2] or 30.0)
+    a, b = J["a"], J["b"]
+    seg = os.path.join(sdir, f"_piece_{job}.mp4")
+    try:
+        J["state"] = "uploading"
+        ffmpeg_utils.run(["ffmpeg", "-y", "-ss", f"{a:.4f}", "-i", src, "-t", f"{b - a:.4f}",
+                          "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p",
+                          "-c:a", "aac", "-b:a", "192k", seg])
+        url = ws.upload(seg, _rq)
+        if req.model == "lipsync":     # 👄 the piece + its (re-voiced) audio → lips only
+            wav = os.path.join(sdir, f"_piece_{job}.wav")
+            ffmpeg_utils.run(["ffmpeg", "-y", "-i", seg, "-vn", "-ac", "1", "-ar", "44100", wav])
+            aurl = ws.upload(wav, _rq)
+            J["state"] = "queued"
+            pid = ws.submit_lipsync(url, aurl, _rq)
+        else:
+            refs = [ws.upload(os.path.join(sdir, os.path.basename(r_)), _rq) for r_ in (req.refs or [])[:9]
+                    if os.path.exists(os.path.join(sdir, os.path.basename(r_)))]
+            J["state"] = "queued"
+            model = ws.MODELS.get(req.model, ws.MODELS["turbo25"])
+            pid = ws.submit_edit(url, req.prompt, _rq, resolution=req.resolution, keep_audio=req.keep_audio, refs=refs, model=model)
+        J["prediction"] = pid
+        t0 = _t.time()
+        while True:
+            _t.sleep(4)
+            r = ws.result(pid, _rq)
+            J["state"] = r["status"] or "processing"
+            if r["status"] == "completed":
+                if not r["outputs"]:
+                    raise ws.WaveSpeedError("Seedance завершив, але без відео.")
+                break
+            if r["status"] in ("failed", "cancelled", "timeout", "deleted"):
+                raise ws.WaveSpeedError("Seedance: " + (r["error"] or r["status"]))
+            if _t.time() - t0 > 30 * 60:
+                raise ws.WaveSpeedError("Seedance не встиг за 30 хв (id " + pid + ").")
+        J["state"] = "downloading"
+        out0 = r["outputs"][0]
+        g = _rq.get(out0 if isinstance(out0, str) else out0.get("url", ""), timeout=600)
+        if g.status_code != 200 or len(g.content) < 1000:
+            raise ws.WaveSpeedError(f"Не вдалося скачати результат (HTTP {g.status_code}).")
+        raw = os.path.join(sdir, f"_piece_{job}_raw.mp4")
+        with open(raw, "wb") as f:
+            f.write(g.content)
+        J["state"] = "conforming"
+        name = f"_piece_{job}_ok.mp4"   # picture only, exactly b - a long, the clip's size and fps
+        vf = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},fps={fps:g},setsar=1"
+        ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-an", "-vf", vf, "-frames:v", str(max(1, round((b - a) * fps))),
+                          "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p",
+                          os.path.join(sdir, name)])
+        if not req.keep_audio and req.model != "lipsync":   # Seedance wrote the SOUND too → keep it with the piece
+            aname = f"_piece_{job}_ok.wav"
+            ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-vn", "-ac", "2", "-ar", "44100", "-t", f"{b - a:.4f}",
+                              "-af", f"apad=whole_dur={b - a:.4f}", os.path.join(sdir, aname)])
+            J["audio"] = aname
+        J.update(state="done", piece=name, piece_url=f"/clip/{req.file_id}/{name}",
+                 seconds=round(_t.time() - J["started"]))
+        _log_timing("seedance-piece", _t.time() - J["started"], req.model + " " + req.resolution)
+    except Exception as e:  # noqa: BLE001
+        J.update(state="error", error=str(e))
+
+
+@app.post("/api/regen/piece/start")
+def regen_piece_start(req: RegenPieceReq):
+    import threading, time as _t, uuid
+    from engine import wavespeed as ws
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    if not os.environ.get("WAVESPEED_API_KEY"):
+        raise HTTPException(400, "Немає ключа WaveSpeed — додай його в ⚙ Settings.")
+    if not (req.prompt or "").strip() and req.model != "lipsync":
+        raise HTTPException(400, "Опиши, що змінити в кадрі.")
+    fps = float((compose._stream_params(src) or (None, None, 30.0))[2] or 30.0)
+    dur = revoice.duration(src)
+    a, b = _snap(max(0.0, req.a), fps), _snap(min(dur, req.b), fps)
+    if req.model not in ws.MODELS and req.model != "lipsync":
+        req.model = "turbo25"
+    if req.model == "lipsync":
+        req.keep_audio = True
+    lim = ws.PIECE_MAX.get(req.model, 30.0)
+    if b - a < (0.5 if req.model == "lipsync" else 1.0) or b - a > lim + 0.01:
+        raise HTTPException(400, f"Шматок має бути 1–{lim:.0f} с (зараз {b - a:.1f} с).")
+    if req.model == "2.5":
+        res = req.resolution if req.resolution in ws.RATES else "720p"
+    else:
+        res = req.resolution if req.resolution in ("720p", "1080p") else "1080p"
+    cost, billed = ws.estimate_piece(req.model, b - a, res)
+    req.resolution = res
+    job = uuid.uuid4().hex[:12]
+    _REGEN[job] = {"state": "starting", "started": _t.time(), "cost": cost, "billed": billed, "clip": None,
+                   "error": "", "a": a, "b": b, "kind": "piece"}
+    threading.Thread(target=_regen_piece_run, args=(job, sdir, src, req), daemon=True).start()
+    return {"job": job, "cost": cost, "a": a, "b": b}
+
+
+class SpliceReq(BaseModel):
+    file_id: str
+    clip: str
+    pieces: List[dict]              # [{piece, a, b}] — finished /api/regen/piece results
+
+
+@app.post("/api/regen/splice")
+def regen_splice(req: SpliceReq):
+    """Every finished piece back into the clip in one pass: picture swapped frame-exact, the clip's
+    audio untouched. → a new clip "<stem>_sdN" (↩ in History goes back to the one before)."""
+    import re as _re
+    sdir = _session_dir(req.file_id)
+    src = os.path.join(sdir, os.path.basename(req.clip))
+    if not os.path.exists(src):
+        raise HTTPException(404, "Clip not found in the session")
+    p = compose._stream_params(src) or (None,) * 8
+    fps = float(p[2] or 30.0)
+    dur = ffmpeg_utils.video_stream_duration(src) or revoice.duration(src)
+    ps, aud = [], {}
+    for x in sorted(req.pieces or [], key=lambda x: float(x.get("a", 0))):
+        f = os.path.join(sdir, os.path.basename(str(x.get("piece", ""))))
+        a, b = _snap(x.get("a", 0), fps), _snap(x.get("b", 0), fps)
+        if os.path.exists(f) and b > a and (not ps or a >= ps[-1][2] - 1e-6):
+            ps.append((f, a, b))
+            af = os.path.join(sdir, os.path.basename(str(x.get("audio") or "")))
+            if x.get("audio") and os.path.exists(af):
+                aud[len(ps) - 1] = af      # ✨ Seedance wrote this piece's SOUND too
+    if not ps:
+        raise HTTPException(400, "Немає готових шматків для вклейки.")
+    inputs = ["-i", src]
+    parts, chain, t = [], "", 0.0
+    for k, (f, a, b) in enumerate(ps, start=1):
+        inputs += ["-i", f]
+        if a - t > 0.5 / fps:
+            chain += f"[0:v]trim=start={t:.6f}:end={a:.6f},setpts=PTS-STARTPTS[o{k}];"
+            parts.append(f"[o{k}]")
+        chain += f"[{k}:v]setpts=PTS-STARTPTS,fps={fps:g}[p{k}];"
+        parts.append(f"[p{k}]")
+        t = b
+    if dur - t > 0.5 / fps:
+        chain += f"[0:v]trim=start={t:.6f},setpts=PTS-STARTPTS[otail];"
+        parts.append("[otail]")
+    chain += "".join(parts) + f"concat=n={len(parts)}:v=1:a=0[v]"
+    amap = ["-map", "0:a:0?"]
+    acodec = ["-c:a", "copy"]
+    if aud:                                  # the clip's audio, with the Seedance pieces' own sound in their slots
+        ain = len(ps) + 1
+        aparts, t = [], 0.0
+        for k, (f, a, b) in enumerate(ps):
+            if k in aud:
+                inputs += ["-i", aud[k]]
+                if a - t > 0.001:
+                    chain += f";[0:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=start={t:.6f}:end={a:.6f},asetpts=PTS-STARTPTS[ao{k}]"
+                    aparts.append(f"[ao{k}]")
+                chain += f";[{ain}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:{b - a:.6f},asetpts=PTS-STARTPTS[ap{k}]"
+                aparts.append(f"[ap{k}]")
+                ain += 1
+                t = b
+        chain += f";[0:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=start={t:.6f},asetpts=PTS-STARTPTS[aot]"
+        aparts.append("[aot]")
+        chain += ";" + "".join(aparts) + f"concat=n={len(aparts)}:v=0:a=1[a]"
+        amap, acodec = ["-map", "[a]"], ["-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
+    stem, ext = os.path.splitext(os.path.basename(src))
+    stem = _re.sub(r"(_mix_[0-9a-f]{10}|_sd\d+)+$", "", stem)
+    k = 1
+    while os.path.exists(os.path.join(sdir, f"{stem}_sd{k}{ext}")):
+        k += 1
+    out = f"{stem}_sd{k}{ext}"
+    cmd = ["ffmpeg", "-y"] + inputs + ["-filter_complex", chain, "-map", "[v]"] + amap + [
+           "-frames:v", str(max(1, round(dur * fps)))]
+    cmd += ffmpeg_utils.encoder_quality_args("12M") + acodec + [os.path.join(sdir, out)]
+    ffmpeg_utils.run(cmd)
+    return {"clip": out, "url": f"/clip/{req.file_id}/{out}", "pieces": len(ps)}
+
+
 @app.post("/api/regen/start")
 def regen_start(req: RegenReq):
     import threading, time as _t, uuid
@@ -1903,6 +2099,34 @@ def _clean_transcript(words, lang=None):
     except Exception as e:
         print(f"[textrules] skipped ({type(e).__name__}: {e})", flush=True)
         return words
+
+
+class MrtechReq(BaseModel):
+    style: dict
+    name: str = ""
+    clean: bool = False             # True = ONLY their 13 keys (works in their renderer as is)
+
+
+@app.post("/api/styles/mrtech")
+def api_style_mrtech(req: MrtechReq):
+    """A caption preset in MRTech's flat caption JSON (+ the extras their format doesn't have yet)."""
+    from engine import mrtech
+    return mrtech.to_mrtech(req.style, req.name, clean=req.clean)
+
+
+class TextCleanReq(BaseModel):
+    words: List[dict] = []
+    orig_words: List[dict] = []
+    lang: str = "en"
+
+
+@app.post("/api/text/clean")
+def api_text_clean(req: TextCleanReq):
+    """The after-transcribe clean-up (numbers → digits, unit swaps) for a transcript made before it."""
+    w2 = _clean_transcript(req.words, req.lang)
+    o2 = _clean_transcript(req.orig_words, req.lang) if req.orig_words else []
+    changed = sum(1 for a in w2 if a not in req.words)
+    return {"words": w2, "orig_words": o2, "changed": changed}
 
 
 class TranscribeClipReq(BaseModel):
@@ -2605,6 +2829,34 @@ def library_file(name: str):
 # ----- Assemble (hook render + library body) -----
 
 
+def _dictate(wav):
+    """Best available path: Scribe hears it (good Ukrainian) → WaveSpeed LLM writes clean English.
+    Falls back step by step to local Whisper translate (offline, weaker)."""
+    import requests as _rq
+    from engine import wavespeed
+    src = None
+    if os.environ.get("ELEVENLABS_API_KEY"):
+        try:
+            src = transcribe.scribe_text(wav)
+        except Exception as e:  # noqa: BLE001
+            print(f"[dictate] Scribe failed, falling back to Whisper: {e}", flush=True)
+    if src and src["text"]:
+        if src["language"] == "en" and len(src["text"]) < 400:
+            return {"text": src["text"], "language": "en", "original": src["text"], "via": "scribe"}
+        if os.environ.get("WAVESPEED_API_KEY"):
+            try:
+                en = wavespeed.llm(src["text"], _rq, system=transcribe.DICTATE_SYSTEM)
+                if en:
+                    return {"text": en, "language": src["language"], "original": src["text"], "via": "scribe+llm"}
+            except Exception as e:  # noqa: BLE001
+                print(f"[dictate] LLM failed, falling back to Whisper translate: {e}", flush=True)
+    r = transcribe.dictate_english(wav)
+    r["via"] = "whisper"
+    if src and src["text"]:
+        r["original"] = src["text"]
+    return r
+
+
 @app.post("/api/dictate")
 async def dictate(file: UploadFile = File(...)):
     """🎙 A recorded voice note (any language) → English prompt text, locally with Whisper."""
@@ -2617,8 +2869,8 @@ async def dictate(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, out)
         ffmpeg_utils.run(["ffmpeg", "-y", "-i", raw, "-vn", "-ac", "1", "-ar", "16000", wav])
         t0 = _t.time()
-        r = transcribe.dictate_english(wav)
-        _log_timing("dictate", _t.time() - t0, r.get("language", ""))
+        r = _dictate(wav)
+        _log_timing("dictate", _t.time() - t0, r.get("language", "") + " " + r.get("via", ""))
         if not r["text"]:
             raise HTTPException(400, "Не почув слів — спробуй ще раз, ближче до мікрофона.")
         return r

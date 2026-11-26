@@ -41,6 +41,60 @@ def balance(requests, api_key=None):
 # shorter is padded to 4 s, longer cut at 30 s). Priced on input + output seconds.
 MODEL = os.environ.get("CS_SEEDANCE_MODEL", "bytedance/seedance-2.5/video-edit")
 RATES = {"480p": 0.11, "720p": 0.22, "1080p": 0.55}
+# Seedance 2.0 Fast · Video-Edit Turbo: the cheap, fast tier — for SMALL fixes in a piece (a date,
+# a word on the lips). 2.5 stays for whole-scene changes and as the fallback when Turbo can't.
+# Input 2–15 s, output ≥ 4 s; 720p / 1080p only. Per second of input + output (1080p output costs more).
+TURBO_MODEL = os.environ.get("CS_SEEDANCE_TURBO", "bytedance/seedance-2.0-fast/video-edit-turbo")
+TURBO_RATES = {"720p": (0.0675, 0.0675), "1080p": (0.0675, 0.0855)}   # (input, output) $/s
+MODELS = {"2.5": MODEL, "turbo": TURBO_MODEL,
+          "turbo25": os.environ.get("CS_SEEDANCE_TURBO25", "bytedance/seedance-2.5/video-edit-turbo"),
+          "flash25": os.environ.get("CS_SEEDANCE_FLASH25", "bytedance/seedance-2.5-flash/video-edit-turbo")}
+# 2.5 Turbo: full 2.5 quality, faster / cheaper than 2.5 · 2.5 Flash Turbo: made at 480p and upscaled
+# (cheapest 2.5). Both: billed per input second (rounded up, 4–30 s), $/s by resolution.
+PIECE_RATES = {"turbo25": {"720p": 0.216, "1080p": 0.234}, "flash25": {"720p": 0.153, "1080p": 0.171}}
+PIECE_MAX = {"turbo": 15.0, "turbo25": 30.0, "flash25": 30.0, "2.5": 30.0, "lipsync": 60.0}
+
+
+# 👄 lip-sync only (after an ElevenLabs re-voice): the mouth is re-animated to the new audio,
+# every other pixel stays — no Seedance re-paint. Sync Lipsync-2-Pro, $0.084 / s (rounded up).
+LIPSYNC_MODEL = os.environ.get("CS_LIPSYNC_MODEL", "sync/lipsync-2-pro")
+LIPSYNC_RATE = 0.084
+
+
+def submit_lipsync(video_url, audio_url, requests, api_key=None, model=None):
+    """→ prediction id. The piece's video + the NEW audio → the same piece with matching lips."""
+    r = requests.post(f"{API}/{model or LIPSYNC_MODEL}", headers={"Authorization": f"Bearer {_key(api_key)}",
+                                                                 "Content-Type": "application/json"},
+                      json={"video": video_url, "audio": audio_url, "sync_mode": "cut_off"}, timeout=60)
+    if r.status_code != 200:
+        raise WaveSpeedError(_err(r, "lipsync"))
+    pid = _j(r).get("id")
+    if not pid:
+        raise WaveSpeedError("WaveSpeed не повернув id задачі.")
+    return pid
+
+
+def estimate_piece(model, duration_s, resolution="1080p"):
+    """→ (usd, billed_seconds) for one Seedance run on a piece, any of MODELS."""
+    import math
+    if model == "lipsync":
+        sec = max(1, math.ceil(float(duration_s or 0) - 1e-6))
+        return round(sec * LIPSYNC_RATE, 2), float(sec)
+    if model == "turbo":
+        return estimate_turbo(duration_s, resolution)
+    if model == "2.5":
+        return estimate(duration_s, resolution)
+    r = PIECE_RATES.get(model, PIECE_RATES["turbo25"])
+    sec = max(4, min(30, math.ceil(float(duration_s or 0) - 1e-6)))
+    return round(sec * r.get(resolution, r["1080p"]), 2), float(sec)
+
+
+def estimate_turbo(duration_s, resolution="720p"):
+    """→ (usd, billed_seconds) for one Turbo run on a piece of `duration_s`."""
+    d_in = max(2.0, min(15.0, float(duration_s or 0)))
+    d_out = max(4.0, min(15.0, float(duration_s or 0)))
+    ri, ro = TURBO_RATES.get(resolution, TURBO_RATES["720p"])
+    return round(d_in * ri + d_out * ro, 2), round(d_in + d_out, 1)
 
 
 def estimate(duration_s, resolution="720p"):
@@ -121,7 +175,42 @@ def result(pid, requests, api_key=None):
     if r.status_code != 200:
         raise WaveSpeedError(_err(r, "result"))
     d = _j(r)
-    return {"status": d.get("status") or "", "outputs": d.get("outputs") or [], "error": d.get("error") or ""}
+    return {"status": d.get("status") or "", "outputs": d.get("outputs") or [], "error": d.get("error") or "",
+            "id": d.get("id") or pid}
+
+
+# ---------------------------------------------------------------- text LLM (translate / polish)
+# WaveSpeed "Any LLM": one endpoint, many models, $0.01 a request, the SAME key as Seedance —
+# so the dictation can translate properly without a separate Gemini / OpenAI key.
+LLM_ENDPOINT = "wavespeed-ai/any-llm"
+LLM_MODEL = os.environ.get("CS_LLM_MODEL", "google/gemini-2.5-flash")
+
+
+def llm(prompt, requests, system=None, model=None, temperature=0.2, max_tokens=800, api_key=None,
+        timeout=45, sleep=None):
+    """→ the model's text. Submits and polls (the endpoint is async, usually ~1–3 s)."""
+    import time as _t
+    sleep = sleep or _t.sleep
+    body = {"prompt": prompt, "temperature": temperature, "max_tokens": max_tokens, "model": model or LLM_MODEL}
+    if system:
+        body["system_prompt"] = system
+    hdr = {"Authorization": f"Bearer {_key(api_key)}", "Content-Type": "application/json"}
+    r = requests.post(f"{API}/{LLM_ENDPOINT}", headers=hdr, json=body, timeout=30)
+    if r.status_code != 200:
+        raise WaveSpeedError(_err(r, "llm"))
+    d = _j(r)
+    t_end = _t.time() + timeout
+    while (d.get("status") or "") not in ("completed", "failed", "cancelled", "timeout"):
+        if _t.time() > t_end:
+            raise WaveSpeedError("WaveSpeed LLM: занадто довго — спробуй ще раз.")
+        sleep(0.7)
+        d = result(d.get("id"), requests, api_key=api_key)
+    if d.get("status") != "completed":
+        raise WaveSpeedError("WaveSpeed LLM: " + (d.get("error") or d.get("status") or "failed"))
+    out = (d.get("outputs") or [""])[0]
+    if isinstance(out, dict):
+        out = out.get("text") or out.get("content") or out.get("output") or ""
+    return str(out or "").strip()
 
 
 # ---------------------------------------------------------------- video → foley (auto SFX)

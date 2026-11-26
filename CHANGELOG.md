@@ -5,6 +5,22 @@ release up to 1.9.88 are kept below, unchanged.
 
 ## Releases
 
+- **2026-11-26** — Assembler 2.0.1: v2 merged into main (Captions tab, sentence / caption styles, accents, dates, lips, Seedance 2.5 Turbo, numbers as digits, dictation, MRTech export…). Rollback: tag v2.0.0
+- **2026-11-26** — Fix: merge + split no longer spreads one caption's style over the others (2.0.1-b15)
+- **2026-11-26** — Captions: merge across pauses / sentence ends, «⊕ злити ↓» label, click a card to select it (2.0.1-b14)
+- **2026-11-26** — Fix: styled caption vanished early; ⊕ merge across the line limit; subtle 'on screen' mark; help on the left (2.0.1-b13)
+- **2026-11-26** — Captions tab (cards = on-screen captions: breaks, merge, highlight, per-caption style, [ / ]); Sentences = voice only; «|» line break in Text (2.0.1-b12)
+- **2026-11-26** — Fix: Sentences duplicated words after a new full stop + Enter (2.0.1-b11)
+- **2026-11-26** — Sentences right-click menu; ✎ per-sentence style via the Style tab (diff-based, follows the base); 💾 save changes into the preset (2.0.1-b10)
+- **2026-11-25** — MRTech export: clean 13-key file or + x_assembler block (2.0.1-b9)
+- **2026-11-24** — ⬇ MRTech JSON export for caption presets (2.0.1-b8)
+- **2026-11-19** — 👄 Lip-sync after ElevenLabs (Sync Lipsync-2-Pro); Seedance changes sound + picture by default (Keep original audio OFF); 📅 Dates: 3 modes (2.0.1-b7)
+- **2026-11-19** — Sentences: Enter = new line in the caption, click a word = seek; timeline click leaves the text so Space plays (2.0.1-b6)
+- **2026-11-19** — ✨ Generated lane: switch Seedance pieces on / off, compare; Seedance 2.5 Turbo / 2.5 Flash Turbo for dates; 📐 reframe to a medium shot of the speaker (2.0.1-b5)
+- **2026-11-19** — Words view: dates and accents highlighted (2.0.1-b4)
+- **2026-11-19** — ✦ Accent style group: font, italic, size, case, colour / gradient, stroke, shadow, word plate, borrow a preset's look; karaoke leaves accents alone (2.0.1-b3)
+- **2026-11-19** — Re-voice clones each line from the voice near it (Frankenstein creatives); numbers as digits after transcribe (Scribe hyphens, 4 weeks, ages), ⋯ → 123 for old transcripts (2.0.1-b2)
+- **2026-11-19** — 📅 Dates: find, highlight, replace all (re-voice + Seedance Fast Turbo lips per piece, one splice); 🎙 dictation = Scribe + Gemini via WaveSpeed (2.0.1-b1)
 - **2026-11-19** — Assembler 2.0.0: v2 merged into main (fast editor layout, Premiere-like timeline, audio lanes, voices / accents / phrase styles, Punctuation ?! only). Rollback: tag v1-final
 - **2026-11-12** — Sentences: ✦ accent words + 🎨 own style for a phrase; Punctuation Off / ?! only / All (? ! stay by default); exact shows voice / phrase styles (2.0.0-b21)
 - **2026-11-12** — ↪ Redo (Cmd+Shift+Z); 🔍 timeline zoom (Alt+wheel, = / −) + ⤢ big timeline; 🔊 Cmd-drag audio scrub (2.0.0-b20)
