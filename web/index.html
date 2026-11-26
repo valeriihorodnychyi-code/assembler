@@ -4392,7 +4392,7 @@ if(typeof video!=="undefined"&&video)video.addEventListener("timeupdate",()=>{if
 // optional "як звучатиме" for pronunciation only). A sentence — not a caption — is the unit,
 // because caption chunks move with the style (size, lines) and can cut a sentence in half;
 // a sentence keeps the intonation whole and gives the new line all the room its old words had.
-let _sentPick=null, _sentMore=new Set(), _sentStopAt=null, _sentRanges=[];
+let _sentPick=null, _sentMore=new Set(), _sentStopAt=null, _sentRanges=[], _sentSnap=null;
 const sentEnd=w=>/[.!?…]["»”')\]]?$/.test(w.word||w.text||"")||w.brk==="hard";
 function splitSentences(ws){
   const out=[]; if(!ws||!ws.length)return out;
@@ -4434,7 +4434,7 @@ function renderSentsView(force){
         const t=row.querySelector(".stime");if(t)t.firstChild.textContent=_fmtT(sentInfo(k).start)+" ";});}
     renderSentBar(canVoice);return;
   }
-  _sentRanges=ranges;
+  _sentRanges=ranges; _sentSnap={words:(realWords||[]).map(w=>({...w})),ranges:ranges.map(r=>[r[0],r[1]])};   // what the rows on screen were built from
   if(!ranges.length){box.innerHTML="<div style='color:var(--muted);font-size:12px;padding:8px'>Спершу ① Transcribe — тут з'являться речення.</div>";renderSentBar(false);return;}
   box.innerHTML=ranges.map((r,k)=>{const inf=sentInfo(k), meta=sentMetaHTML(k,esc), sig="sent:"+r[0]+":"+r[1], more=_sentMore.has(k);
     const pick=_sentPick&&k>=_sentPick[0]&&k<_sentPick[1];
@@ -4909,11 +4909,14 @@ function voiceSentences(k0,k1){
   });
   box.addEventListener("input",e=>{
     const s=e.target.closest&&e.target.closest(".stext");
-    if(s){const k=+s.dataset.k, rs=_sentRanges; if(!realWords||!rs[k])return;
-      // rebuild the full text with this row replaced; other rows keep their own words (and breaks)
-      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/↵/g," ").replace(/\s+/g," ").trim():wordsToText(realWords.slice(r[0],r[1])));
-      const full=parts.map((p,i)=>p+((i<rs.length-1&&realWords[rs[i][1]-1]&&realWords[rs[i][1]-1].brk==="soft"&&i!==k)?"\n":"")).join(" ");
-      realWords=parseBreaksToWords(full,realWords); if(variants[activeVar])variants[activeVar].words=realWords;
+    if(s){const k=+s.dataset.k, S0=_sentSnap, rs=S0&&S0.ranges; if(!realWords||!rs||!rs[k])return;
+      // rebuild the full text from the SNAPSHOT the rows were drawn from: this row's new text +
+      // every other row's own words. (Using the live words with row ranges from before a new full
+      // stop split a sentence duplicated words — "challenge. challenge. challenge.")
+      const B=S0.words;
+      const parts=rs.map((r,i)=>i===k?s.innerText.replace(/↵/g," ").replace(/\s+/g," ").trim():wordsToText(B.slice(r[0],r[1])));
+      const full=parts.map((p,i)=>p+((i<rs.length-1&&B[rs[i][1]-1]&&B[rs[i][1]-1].brk==="soft"&&i!==k)?"\n":"")).join(" ");
+      realWords=parseBreaksToWords(full,B); if(variants[activeVar])variants[activeVar].words=realWords;
       const ta=$("transcript"); if(ta)ta.value=wordsToText(realWords);
       if(typeof invalidateLayout==="function")invalidateLayout();
       if(typeof scheduleExact==="function")scheduleExact();
